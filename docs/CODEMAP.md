@@ -102,6 +102,11 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - File chinh: `docs/superpowers/specs/*`, `docs/superpowers/specs/2026-05-25-noi-quy-onboarding-flow-design.md`
 - Dung khi: can xem lai quyet dinh da chot voi user truoc khi viet plan hoac sua UI/service
 
+### Plan trien khai chi tiet
+- Mo ta: implementation plan chia task nho de code theo tung cum, bao gom file map, verify va commit checkpoint.
+- File chinh: `docs/superpowers/plans/*`, `docs/superpowers/plans/2026-05-25-noi-quy-onboarding-flow-plan.md`
+- Dung khi: da duyet spec va can bat dau code theo tung task co thu tu ro rang
+
 ## Script tien ich cuc bo
 ### Mo nhanh va restart dev server
 - Mo ta: script Windows giup mo nhanh hoac restart rieng app HRM local.
