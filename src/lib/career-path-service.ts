@@ -12,7 +12,7 @@ import type {
   SettingsChangeLog, CareerPathTemplate, CareerPathSettings,
   LeaderboardEntry, CareerAnalytics, EmployeeCareerProgress,
   CareerPathReport, CareerWarning, SmartSuggestion, Achievement,
-  PromotionConditionProgress,
+  PromotionConditionProgress, OnboardingOpsSettings, OnboardingOpsStoreOverride,
 } from './career-path-types';
 
 import {
@@ -58,6 +58,32 @@ const KEYS = {
 
 // ─── localStorage helpers ────────────────────────────────────
 
+const defaultOnboardingOperationsSettings: OnboardingOpsSettings = {
+  enabled: true,
+  lookahead_days: 7,
+  rules: [
+    { key: 'first_shift', label: 'Ca dau va gio co mat', severity: 'attention', store_override_allowed: true },
+    { key: 'buddy', label: 'Nguoi kem / nguoi huong dan', severity: 'block', store_override_allowed: true },
+    { key: 'uniform_attendance_policy', label: 'Dong phuc, cham cong, noi quy tai quan', severity: 'attention', store_override_allowed: true },
+    { key: 'tools_and_group', label: 'Tai khoan, nhom chat, cong cu', severity: 'attention', store_override_allowed: true },
+    { key: 'first_shift_result', label: 'Xac nhan xong ca dau on', severity: 'attention', store_override_allowed: false },
+  ],
+  store_overrides: [],
+};
+
+function normalizeSettings(saved: CareerPathSettings): CareerPathSettings {
+  return {
+    ...defaultSettings,
+    ...saved,
+    onboarding_operations: {
+      ...defaultOnboardingOperationsSettings,
+      ...saved.onboarding_operations,
+      rules: saved.onboarding_operations?.rules ?? defaultOnboardingOperationsSettings.rules,
+      store_overrides: saved.onboarding_operations?.store_overrides ?? defaultOnboardingOperationsSettings.store_overrides,
+    },
+  };
+}
+
 function load<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
   try {
@@ -90,7 +116,7 @@ let _conditions: PromotionCondition[] = [];
 let _buddyRewards: BuddyRewardConfig[] = [];
 let _trialChecklist: TrialChecklistItem[] = [];
 let _onboardingSteps: OnboardingStep[] = [];
-let _settings: CareerPathSettings = { ...defaultSettings };
+let _settings: CareerPathSettings = normalizeSettings(defaultSettings);
 let _promoRequests: PromotionRequest[] = [];
 let _typeChangeRequests: TypeChangeRequest[] = [];
 let _buddyAssignments: BuddyAssignment[] = [];
@@ -119,7 +145,7 @@ export function initCareerPathStores(): void {
   _buddyRewards = load(KEYS.buddyRewards, defaultBuddyRewards);
   _trialChecklist = load(KEYS.trialChecklist, defaultTrialChecklist);
   _onboardingSteps = load(KEYS.onboardingSteps, defaultOnboardingSteps);
-  _settings = load(KEYS.settings, defaultSettings);
+  _settings = normalizeSettings(load(KEYS.settings, defaultSettings));
   _promoRequests = load(KEYS.promotionRequests, samplePromotionRequests);
   _typeChangeRequests = load(KEYS.typeChangeRequests, sampleTypeChangeRequests);
   _buddyAssignments = load(KEYS.buddyAssignments, sampleBuddyAssignments);
@@ -722,7 +748,7 @@ export function getLeaderboard(category: string, period: string): LeaderboardEnt
 export function getSettings(): CareerPathSettings { return _settings; }
 export function updateSettings(data: Partial<CareerPathSettings>): CareerPathSettings {
   const before = JSON.stringify(_settings);
-  _settings = { ..._settings, ...data };
+  _settings = normalizeSettings({ ..._settings, ...data });
   save(KEYS.settings, _settings);
   logChange('settings', 'global', 'update', before, JSON.stringify(_settings), 'Cập nhật cài đặt');
   return _settings;
@@ -731,6 +757,21 @@ export function updateSettings(data: Partial<CareerPathSettings>): CareerPathSet
 // ═══════════════════════════════════════════════════════════════
 // CHANGE LOGS
 // ═══════════════════════════════════════════════════════════════
+
+export function upsertOnboardingOperationsStoreOverride(input: OnboardingOpsStoreOverride): void {
+  const settings = getSettings();
+  const currentOverrides = settings.onboarding_operations?.store_overrides ?? [];
+  const nextOverrides = currentOverrides.some((item) => item.store_id === input.store_id)
+    ? currentOverrides.map((item) => (item.store_id === input.store_id ? input : item))
+    : [...currentOverrides, input];
+
+  updateSettings({
+    onboarding_operations: {
+      ...settings.onboarding_operations,
+      store_overrides: nextOverrides,
+    },
+  });
+}
 
 export function getChangeLogs(): SettingsChangeLog[] { return _changeLogs.sort((a, b) => b.changed_at.localeCompare(a.changed_at)); }
 

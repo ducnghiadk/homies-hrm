@@ -391,6 +391,36 @@ export interface CareerPathTemplate {
 
 // ─── 20. Settings ────────────────────────────────────────────
 
+export type OnboardingOpsChecklistKey =
+  | 'first_shift'
+  | 'buddy'
+  | 'uniform_attendance_policy'
+  | 'tools_and_group'
+  | 'first_shift_result';
+
+export type OnboardingOpsSeverity = 'block' | 'attention';
+
+export interface OnboardingOpsRuleItem {
+  key: OnboardingOpsChecklistKey;
+  label: string;
+  severity: OnboardingOpsSeverity;
+  store_override_allowed: boolean;
+}
+
+export interface OnboardingOpsStoreOverride {
+  store_id: string;
+  block_keys: OnboardingOpsChecklistKey[];
+  reminder_days_before_start: number;
+  alert_roles: Array<'hr_admin' | 'store_manager'>;
+}
+
+export interface OnboardingOpsSettings {
+  enabled: boolean;
+  lookahead_days: number;
+  rules: OnboardingOpsRuleItem[];
+  store_overrides: OnboardingOpsStoreOverride[];
+}
+
 export interface CareerPathSettings {
   buddy_system_enabled: boolean;
   leaderboard_enabled: boolean;
@@ -398,6 +428,15 @@ export interface CareerPathSettings {
   endorsements_enabled: boolean;
   notifications_enabled: boolean;
   onboarding_enabled: boolean;
+  onboarding_policy_enabled: boolean;
+  onboarding_policy_summary_trigger: 'approval_confirm' | 'contract_send';
+  onboarding_policy_full_trigger: 'contract_countersign' | 'days_before_start';
+  onboarding_policy_full_days_before_start: number;
+  onboarding_policy_require_ack: boolean;
+  onboarding_policy_max_reminders: number;
+  onboarding_policy_template_id: 'default-policy-v1';
+  onboarding_policy_alert_scope: 'hr_only' | 'hr_and_store_manager';
+  onboarding_operations?: OnboardingOpsSettings;
   skill_refresh_enabled: boolean;
   cross_training_enabled: boolean;
   trial_duration_days: number;
