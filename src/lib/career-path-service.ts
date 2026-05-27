@@ -760,14 +760,15 @@ export function updateSettings(data: Partial<CareerPathSettings>): CareerPathSet
 
 export function upsertOnboardingOperationsStoreOverride(input: OnboardingOpsStoreOverride): void {
   const settings = getSettings();
-  const currentOverrides = settings.onboarding_operations?.store_overrides ?? [];
+  const currentOnboardingOperations = settings.onboarding_operations ?? defaultOnboardingOperationsSettings;
+  const currentOverrides = currentOnboardingOperations.store_overrides;
   const nextOverrides = currentOverrides.some((item) => item.store_id === input.store_id)
     ? currentOverrides.map((item) => (item.store_id === input.store_id ? input : item))
     : [...currentOverrides, input];
 
   updateSettings({
     onboarding_operations: {
-      ...settings.onboarding_operations,
+      ...currentOnboardingOperations,
       store_overrides: nextOverrides,
     },
   });

@@ -1,21 +1,24 @@
 'use client'
 
-import { useState } from 'react'
-import { OperationsChecklistDetail } from '@/components/onboarding-operations/OperationsChecklistDetail'
+import React, { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { UpcomingOnboardingList } from '@/components/onboarding-operations/UpcomingOnboardingList'
-import { OnboardingOperationsService } from '@/lib/services/onboarding-operations-service'
+import { OperationsChecklistDetail } from '@/components/onboarding-operations/OperationsChecklistDetail'
+import { initCareerPathStores } from '@/lib/career-path-service'
+import {
+  OnboardingOperationsService,
+  type OnboardingOpsFirstShiftResult,
+} from '@/lib/services/onboarding-operations-service'
 import { useAuthStore } from '@/store/auth-store'
 
-type QuickCompletePayload = {
-  employeeId: string
-  key: string
-  value?: string
-}
+initCareerPathStores()
 
-export default function CareerPathOnboardingPage() {
+export default function OnboardingPage() {
   const user = useAuthStore((state) => state.user)
+  const hasHydrated = useAuthStore((state) => state.hasHydrated)
+  const [, setRevision] = useState(0)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null)
-  const [, setRefreshKey] = useState(0)
+  const [, startTransition] = useTransition()
 
   const rows = user ? OnboardingOperationsService.getUpcomingRows(user) : []
   const activeEmployeeId = rows.some((row) => row.employeeId === selectedEmployeeId)
@@ -25,76 +28,112 @@ export default function CareerPathOnboardingPage() {
     ? OnboardingOperationsService.getEmployeeDetail(activeEmployeeId, user)
     : null
 
-  const handleQuickComplete = ({ employeeId, key, value }: QuickCompletePayload) => {
-    if (key === 'first_shift') {
-      const firstShiftLabel = value?.trim() || window.prompt('Nhập ca đầu và giờ có mặt')
-      if (!firstShiftLabel) return
-      OnboardingOperationsService.updateChecklist(employeeId, {
-        key: 'first_shift',
-        firstShiftLabel,
-      })
-    } else if (key === 'buddy') {
-      const assignedBuddyName = value?.trim() || window.prompt('Nhập tên người kèm')
-      if (!assignedBuddyName) return
-      OnboardingOperationsService.updateChecklist(employeeId, {
-        key: 'buddy',
-        assignedBuddyName,
-      })
-    } else if (key === 'uniform_attendance_policy') {
-      OnboardingOperationsService.updateChecklist(employeeId, {
-        key: 'uniform_attendance_policy',
-        storePolicyConfirmed: true,
-      })
-    } else if (key === 'tools_and_group') {
-      OnboardingOperationsService.updateChecklist(employeeId, {
-        key: 'tools_and_group',
-        hasChatAccess: true,
-      })
-    } else if (
-      key === 'first_shift_result'
-      && (value === 'pass' || value === 'follow_up' || value === 'issue')
-    ) {
-      OnboardingOperationsService.updateChecklist(employeeId, {
-        key: 'first_shift_result',
-        firstShiftResult: value,
-      })
-    }
+  const refresh = () => {
+    startTransition(() => {
+      setRevision((current) => current + 1)
+    })
+  }
 
-    setRefreshKey((current) => current + 1)
+  const handleMarkFirstShift = (employeeId: string) => {
+    const value = window.prompt('Nhập ca đầu và giờ có mặt. Ví dụ: Ca sáng 07:30 • Có mặt 07:15')
+    if (!value?.trim()) return
+
+    OnboardingOperationsService.updateChecklist(employeeId, {
+      key: 'first_shift',
+      firstShiftLabel: value.trim(),
+    })
+    refresh()
+  }
+
+  const handleAssignBuddy = (employeeId: string) => {
+    const value = window.prompt('Nhập tên người kèm')
+    if (!value?.trim()) return
+
+    OnboardingOperationsService.updateChecklist(employeeId, {
+      key: 'buddy',
+      assignedBuddyName: value.trim(),
+    })
+    refresh()
+  }
+
+  const handleConfirmStorePolicy = (employeeId: string) => {
+    OnboardingOperationsService.updateChecklist(employeeId, {
+      key: 'uniform_attendance_policy',
+      storePolicyConfirmed: true,
+    })
+    refresh()
+  }
+
+  const handleConfirmTools = (employeeId: string) => {
+    OnboardingOperationsService.updateChecklist(employeeId, {
+      key: 'tools_and_group',
+      hasChatAccess: true,
+    })
+    refresh()
+  }
+
+  const handleSetFirstShiftResult = (employeeId: string, result: OnboardingOpsFirstShiftResult) => {
+    OnboardingOperationsService.updateChecklist(employeeId, {
+      key: 'first_shift_result',
+      firstShiftResult: result,
+    })
+    refresh()
+  }
+
+  if (!hasHydrated) {
+    return (
+      <div style={{ padding: '24px 16px 80px', maxWidth: 720, margin: '0 auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#001D3D' }}>Đang tải dữ liệu onboarding...</div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div style={{ padding: '24px 16px 80px', maxWidth: 720, margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <Link href="/career-path" style={{ fontSize: 20, textDecoration: 'none' }}>←</Link>
+          <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Onboard vận hành</h1>
+        </div>
+        <div style={{ fontSize: 14, color: '#5F6B7A' }}>Cần đăng nhập để xem danh sách onboard vận hành.</div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#fff7ef_0%,#fffdf9_100%)] px-4 py-4 md:px-6 md:py-5">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <div className="rounded-[28px] bg-white/80 px-4 py-4 shadow-sm ring-1 ring-black/5 backdrop-blur md:px-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary-600">
-            Onboarding Operations
-          </p>
-          <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold text-[var(--text-primary)]">
-                Danh sách vào ca mới
-              </h1>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                Quản lý xem nhanh ai sắp vào ca đầu và còn thiếu mục nào trước khi nhận việc.
-              </p>
+    <div style={{ minHeight: '100vh', background: '#FFF8E8', padding: '20px 16px 80px' }}>
+      <div style={{ maxWidth: 1220, margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <Link href="/career-path" style={{ fontSize: 20, textDecoration: 'none' }}>←</Link>
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7A6B53' }}>
+              Homies onboarding
             </div>
-            <div className="inline-flex w-fit items-center gap-2 rounded-full bg-[#fff4e8] px-3 py-1.5 text-xs font-medium text-[#9a5b22]">
-              <span className="h-2 w-2 rounded-full bg-[#f1a561]" />
-              {rows.length} người trong danh sách gần nhất
-            </div>
+            <h1 style={{ fontSize: 24, fontWeight: 800, margin: '4px 0 0', color: '#001D3D' }}>Onboard vận hành</h1>
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <div
+          style={{
+            display: 'grid',
+            gap: 16,
+            gridTemplateColumns: 'minmax(320px, 380px) minmax(0, 1fr)',
+            alignItems: 'start',
+          }}
+        >
           <UpcomingOnboardingList
             rows={rows}
             selectedEmployeeId={activeEmployeeId}
             onSelect={setSelectedEmployeeId}
           />
+
           <OperationsChecklistDetail
             detail={detail}
-            onQuickComplete={handleQuickComplete}
+            onMarkFirstShift={handleMarkFirstShift}
+            onAssignBuddy={handleAssignBuddy}
+            onConfirmStorePolicy={handleConfirmStorePolicy}
+            onConfirmTools={handleConfirmTools}
+            onSetFirstShiftResult={handleSetFirstShiftResult}
           />
         </div>
       </div>

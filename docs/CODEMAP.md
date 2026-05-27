@@ -36,9 +36,9 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - Dung khi: sua flow moi nhan su, trang thai invitation, checklist duyet
 
 ### Hop dong nhan su va ky tren app
-- Mo ta: thu vien template hop dong, tao contract tu ho so nhan su, preview noi dung, gui nhan su ky tren app, HR countersign va luu audit/version.
-- File chinh: `src/app/employees/contracts/page.tsx`, `src/app/employees/contracts/[id]/page.tsx`, `src/app/employees/contracts/_components.tsx`, `src/lib/services/contract-service.ts`, `src/lib/services/contract-service-data.ts`, `src/lib/navigation/sidebar-config.ts`, `src/app/more/page.tsx`
-- Dung khi: sua template hop dong, flow ky hop dong, trang thai contract, audit log, placeholder tu dong
+- Mo ta: thu vien template hop dong, tao contract tu ho so nhan su, quet placeholder `{{group.field}}`, preview web co highlight field, checklist chan gui ky, gui nhan su ky tren app, HR countersign va luu audit/version.
+- File chinh: `src/app/employees/contracts/page.tsx`, `src/app/employees/contracts/[id]/page.tsx`, `src/app/employees/contracts/_components.tsx`, `src/lib/services/contract-service.ts`, `src/lib/services/contract-service-data.ts`, `src/lib/services/contract-template-placeholder.ts`, `src/lib/navigation/sidebar-config.ts`, `src/app/more/page.tsx`
+- Dung khi: sua template hop dong, flow ky hop dong, trang thai contract, audit log, placeholder tu dong, panel field va checklist preview
 
 ## Scheduling
 ### Lich ca nhan
@@ -97,10 +97,20 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - File chinh: `docs/HRM_HIRING_TO_EMPLOYEE_FLOW.md`, `docs/assets/hrm-hiring-flow/*`
 - Dung khi: can huong dan nguoi van hanh bam tung man hinh theo dung flow
 
+### Noi quy nhan viec va onboarding
+- Mo ta: flow gui noi quy 2 nhip, setting toi thieu, xac nhan cua nhan vien, nhac day-1, va workspace onboard van hanh do quan ly cua hang cam chinh.
+- File chinh: `src/lib/services/onboarding-policy-service.ts`, `src/lib/services/onboarding-operations-service.ts`, `src/app/career-path/settings/page.tsx`, `src/app/career-path/onboarding/page.tsx`, `src/components/onboarding-operations/*`, `src/app/employees/contracts/[id]/page.tsx`, `src/app/employees/[id]/page.tsx`, `src/app/onboarding/page.tsx`
+- Dung khi: sua moc gui noi quy, nhac lai, xac nhan nhan vien, checklist onboarding ngay dau, rule block/can hoan tat som, danh sach nguoi sap vao lam, va checklist chi tiet theo tung nguoi
+
 ### Spec flow va quyet dinh moi
 - Mo ta: cac spec nho de chot flow nghiep vu truoc khi code, nhu flow noi quy nhan viec, setting toi thieu, va cac quyet dinh scope tuong tu.
-- File chinh: `docs/superpowers/specs/*`, `docs/superpowers/specs/2026-05-25-noi-quy-onboarding-flow-design.md`
+- File chinh: `docs/superpowers/specs/*`, `docs/superpowers/specs/2026-05-25-noi-quy-onboarding-flow-design.md`, `docs/superpowers/specs/2026-05-27-setting-shortcut-full-web-backlog.md`
 - Dung khi: can xem lai quyet dinh da chot voi user truoc khi viet plan hoac sua UI/service
+
+### Backlog map icon rang cua toan web
+- Mo ta: map man hinh nao nen co icon rang cua, dat o dau, va nhay toi route setting nao de rollout theo tung pass.
+- File chinh: `docs/superpowers/specs/2026-05-27-setting-shortcut-full-web-backlog.md`
+- Dung khi: can mo lai backlog shortcut setting, uu tien rollout, hoac doi chieu route setting truoc khi code UI
 
 ### Plan trien khai chi tiet
 - Mo ta: implementation plan chia task nho de code theo tung cum, bao gom file map, verify va commit checkpoint.

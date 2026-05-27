@@ -1,77 +1,116 @@
-import type { OnboardingOpsListRow, OnboardingOpsStatusTone } from '@/lib/services/onboarding-operations-service'
+import type { OnboardingOpsListRow } from '@/lib/services/onboarding-operations-service'
 
-const toneClassMap: Record<OnboardingOpsStatusTone, string> = {
-  block: 'bg-[color:color-mix(in_srgb,var(--error)_12%,white)] text-[var(--error)]',
-  attention: 'bg-[color:color-mix(in_srgb,var(--warning)_18%,white)] text-[var(--warning-strong)]',
-  ready: 'bg-[var(--success-soft)] text-[var(--success)]',
+const toneStyles: Record<OnboardingOpsListRow['tone'], { background: string; color: string }> = {
+  block: {
+    background: 'rgba(217, 56, 30, 0.12)',
+    color: '#D9381E',
+  },
+  attention: {
+    background: 'rgba(246, 200, 95, 0.22)',
+    color: '#8A5A00',
+  },
+  ready: {
+    background: 'rgba(30, 158, 87, 0.14)',
+    color: '#1E9E57',
+  },
 }
 
-export function UpcomingOnboardingList(props: {
+export function UpcomingOnboardingList({
+  rows,
+  selectedEmployeeId,
+  onSelect,
+}: {
   rows: OnboardingOpsListRow[]
   selectedEmployeeId: string | null
   onSelect: (employeeId: string) => void
 }) {
-  return (
-    <section className="rounded-[28px] bg-white p-4 shadow-sm ring-1 ring-black/5 md:p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">Sắp vào ca đầu</h2>
-          <p className="mt-1 text-xs text-[var(--text-secondary)]">
-            Chọn 1 người để xem checklist chi tiết.
-          </p>
-        </div>
-        <div className="rounded-full bg-[#fff7ef] px-2.5 py-1 text-[11px] font-medium text-[#9a5b22]">
-          {props.rows.length} người
+  if (rows.length === 0) {
+    return (
+      <div
+        style={{
+          background: '#FFFFFF',
+          border: '1px solid rgba(0, 29, 61, 0.08)',
+          borderRadius: 24,
+          boxShadow: '0 10px 30px rgba(0, 29, 61, 0.06)',
+          padding: 20,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#001D3D' }}>Chưa có người sắp vào làm</div>
+        <div style={{ fontSize: 12, color: '#5F6B7A', marginTop: 6 }}>
+          Không có nhân sự mới nào nằm trong khoảng nhìn hiện tại.
         </div>
       </div>
+    )
+  }
 
-      {props.rows.length === 0 ? (
-        <div className="mt-4 rounded-3xl bg-[#fffaf5] px-4 py-8 text-center text-sm text-[var(--text-secondary)] ring-1 ring-black/5">
-          Chưa có nhân viên nào trong cửa sổ theo dõi onboarding.
+  return (
+    <div
+      style={{
+        background: '#FFFDF9',
+        border: '1px solid rgba(0, 29, 61, 0.08)',
+        borderRadius: 28,
+        padding: 16,
+      }}
+    >
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7A6B53' }}>
+          Onboard vận hành
         </div>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {props.rows.map((row) => {
-            const isSelected = row.employeeId === props.selectedEmployeeId
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#001D3D', marginTop: 4 }}>Người sắp vào làm</div>
+      </div>
 
-            return (
-              <button
-                key={row.employeeId}
-                type="button"
-                onClick={() => props.onSelect(row.employeeId)}
-                className={`w-full rounded-3xl border px-4 py-3 text-left transition ${
-                  isSelected
-                    ? 'border-primary-200 bg-[#fff9f3] shadow-sm'
-                    : 'border-black/5 bg-white hover:bg-[#fffdfa]'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-[var(--text-muted)]">{row.hireDate}</p>
-                    <h3 className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">
-                      {row.employeeName}
-                    </h3>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                      {row.roleLabel} • {row.storeLabel}
-                    </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {rows.map((row) => {
+          const isSelected = row.employeeId === selectedEmployeeId
+          const tone = toneStyles[row.tone]
+
+          return (
+            <button
+              key={row.employeeId}
+              type="button"
+              onClick={() => onSelect(row.employeeId)}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                borderRadius: 22,
+                border: isSelected ? '1.5px solid #2F6FA8' : '1px solid rgba(0, 29, 61, 0.08)',
+                background: '#FFFFFF',
+                boxShadow: isSelected ? '0 12px 28px rgba(47, 111, 168, 0.14)' : '0 8px 24px rgba(0, 29, 61, 0.06)',
+                padding: 14,
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: 11, color: '#7A8796' }}>Vào làm {row.hireDate}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#001D3D', marginTop: 4 }}>{row.employeeName}</div>
+                  <div style={{ fontSize: 12, color: '#4A5A6A', marginTop: 4 }}>
+                    {row.roleLabel} • {row.storeLabel}
                   </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${toneClassMap[row.tone]}`}
-                  >
-                    {row.toneLabel}
-                  </span>
                 </div>
+                <span
+                  style={{
+                    borderRadius: 999,
+                    padding: '6px 10px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: tone.background,
+                    color: tone.color,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {row.toneLabel}
+                </span>
+              </div>
 
-                <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">
-                  {row.missingLabels.length > 0
-                    ? `${row.missingLabels.join(', ')}${row.hiddenMissingCount > 0 ? ` +${row.hiddenMissingCount} mục` : ''}`
-                    : 'Đã đủ mục chính trước ngày đầu.'}
-                </p>
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </section>
+              <div style={{ fontSize: 12, color: '#5F6B7A', marginTop: 10, lineHeight: 1.5 }}>
+                {row.missingLabels.length > 0 ? row.missingLabels.join(', ') : 'Đủ các bước trước ngày đầu'}
+                {row.hiddenMissingCount > 0 ? ` +${row.hiddenMissingCount} mục` : ''}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }

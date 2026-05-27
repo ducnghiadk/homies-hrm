@@ -1,207 +1,261 @@
 import type {
   OnboardingOpsChecklistItem,
   OnboardingOpsEmployeeDetail,
-  OnboardingOpsStatusTone,
+  OnboardingOpsFirstShiftResult,
 } from '@/lib/services/onboarding-operations-service'
 
-const toneClassMap: Record<OnboardingOpsStatusTone, string> = {
-  block: 'bg-[color:color-mix(in_srgb,var(--error)_12%,white)] text-[var(--error)]',
-  attention: 'bg-[color:color-mix(in_srgb,var(--warning)_18%,white)] text-[var(--warning-strong)]',
-  ready: 'bg-[var(--success-soft)] text-[var(--success)]',
+const toneStyles: Record<OnboardingOpsEmployeeDetail['tone'], { background: string; color: string }> = {
+  block: {
+    background: 'rgba(217, 56, 30, 0.12)',
+    color: '#D9381E',
+  },
+  attention: {
+    background: 'rgba(246, 200, 95, 0.22)',
+    color: '#8A5A00',
+  },
+  ready: {
+    background: 'rgba(30, 158, 87, 0.14)',
+    color: '#1E9E57',
+  },
 }
 
-const phaseMeta = {
-  before_first_shift: {
-    title: 'Trước ca đầu',
-    description: '5 mục quản lý cần chốt trước khi nhân viên vào nhận việc.',
-  },
-  after_first_shift: {
-    title: 'Sau ca đầu',
-    description: 'Chốt kết quả sau ca đầu để biết người mới đang ổn tới đâu.',
-  },
-} as const
-
-function ActionButton(props: {
-  children: string
-  onClick: () => void
-  subtle?: boolean
+export function OperationsChecklistDetail({
+  detail,
+  onMarkFirstShift,
+  onAssignBuddy,
+  onConfirmStorePolicy,
+  onConfirmTools,
+  onSetFirstShiftResult,
+}: {
+  detail: OnboardingOpsEmployeeDetail | null
+  onMarkFirstShift: (employeeId: string) => void
+  onAssignBuddy: (employeeId: string) => void
+  onConfirmStorePolicy: (employeeId: string) => void
+  onConfirmTools: (employeeId: string) => void
+  onSetFirstShiftResult: (employeeId: string, result: OnboardingOpsFirstShiftResult) => void
 }) {
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-        props.subtle
-          ? 'bg-[#fff5ea] text-[#9a5b22] hover:bg-[#ffeedb]'
-          : 'bg-primary-50 text-primary-700 hover:bg-primary-100'
-      }`}
-    >
-      {props.children}
-    </button>
-  )
-}
-
-function ChecklistCard(props: {
-  employeeId: string
-  item: OnboardingOpsChecklistItem
-  onQuickComplete: (payload: { employeeId: string; key: string; value?: string }) => void
-}) {
-  const { employeeId, item, onQuickComplete } = props
-
-  return (
-    <div className="rounded-3xl border border-black/5 bg-[#fffdfa] p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">{item.label}</h3>
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                item.done
-                  ? 'bg-[var(--success-soft)] text-[var(--success)]'
-                  : item.severity === 'block'
-                    ? 'bg-[color:color-mix(in_srgb,var(--error)_12%,white)] text-[var(--error)]'
-                    : 'bg-[color:color-mix(in_srgb,var(--warning)_18%,white)] text-[var(--warning-strong)]'
-              }`}
-            >
-              {item.done ? 'Đã chốt' : item.severity === 'block' ? 'Block' : 'Cần làm'}
-            </span>
-          </div>
-          <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">{item.summary}</p>
+  if (!detail) {
+    return (
+      <div
+        style={{
+          background: '#FFFFFF',
+          border: '1px solid rgba(0, 29, 61, 0.08)',
+          borderRadius: 28,
+          boxShadow: '0 10px 30px rgba(0, 29, 61, 0.06)',
+          padding: 24,
+        }}
+      >
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#001D3D' }}>Chọn 1 người để xem checklist</div>
+        <div style={{ fontSize: 12, color: '#5F6B7A', marginTop: 8 }}>
+          Bấm từ danh sách bên trái để xem tình trạng sẵn sàng và xử lý từng bước.
         </div>
       </div>
+    )
+  }
 
-      {!item.done ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {item.key === 'first_shift' ? (
-            <ActionButton onClick={() => onQuickComplete({ employeeId, key: item.key })}>
-              Nhập ca đầu
-            </ActionButton>
-          ) : null}
-          {item.key === 'buddy' ? (
-            <ActionButton onClick={() => onQuickComplete({ employeeId, key: item.key })}>
-              Gán người kèm
-            </ActionButton>
-          ) : null}
-          {item.key === 'uniform_attendance_policy' ? (
-            <ActionButton onClick={() => onQuickComplete({ employeeId, key: item.key })}>
-              Đã nhắc nội quy
-            </ActionButton>
-          ) : null}
-          {item.key === 'tools_and_group' ? (
-            <ActionButton onClick={() => onQuickComplete({ employeeId, key: item.key })}>
-              Đã vào nhóm
-            </ActionButton>
-          ) : null}
-          {item.key === 'first_shift_result' ? (
-            <>
-              <ActionButton onClick={() => onQuickComplete({ employeeId, key: item.key, value: 'pass' })}>
-                Ổn
-              </ActionButton>
-              <ActionButton
-                subtle
-                onClick={() => onQuickComplete({ employeeId, key: item.key, value: 'follow_up' })}
-              >
-                Theo sát thêm
-              </ActionButton>
-              <ActionButton
-                subtle
-                onClick={() => onQuickComplete({ employeeId, key: item.key, value: 'issue' })}
-              >
-                Có vấn đề
-              </ActionButton>
-            </>
-          ) : null}
+  const beforeShift = detail.checklist.filter((item) => item.phase === 'before_first_shift')
+  const afterShift = detail.checklist.filter((item) => item.phase === 'after_first_shift')
+  const tone = toneStyles[detail.tone]
+
+  return (
+    <div
+      style={{
+        background: '#FFFFFF',
+        border: '1px solid rgba(0, 29, 61, 0.08)',
+        borderRadius: 28,
+        boxShadow: '0 10px 30px rgba(0, 29, 61, 0.06)',
+        padding: 20,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 18 }}>
+        <div>
+          <div style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#7A6B53' }}>
+            Chi tiết checklist
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: '#001D3D', marginTop: 4 }}>{detail.employeeName}</div>
+          <div style={{ fontSize: 13, color: '#4A5A6A', marginTop: 4 }}>
+            {detail.roleLabel} • {detail.storeLabel} • Vào làm {detail.hireDate}
+          </div>
         </div>
-      ) : null}
+        <span
+          style={{
+            borderRadius: 999,
+            padding: '7px 12px',
+            fontSize: 11,
+            fontWeight: 800,
+            background: tone.background,
+            color: tone.color,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {detail.toneLabel}
+        </span>
+      </div>
+
+      <div
+        style={{
+          borderRadius: 22,
+          padding: 14,
+          background: '#FFF8E8',
+          border: '1px solid rgba(246, 200, 95, 0.35)',
+          fontSize: 13,
+          color: '#5A4A2F',
+          marginBottom: 18,
+        }}
+      >
+        {detail.summaryLabel}
+      </div>
+
+      <ChecklistSection
+        title="Trước ngày đầu"
+        items={beforeShift}
+        employeeId={detail.employeeId}
+        onMarkFirstShift={onMarkFirstShift}
+        onAssignBuddy={onAssignBuddy}
+        onConfirmStorePolicy={onConfirmStorePolicy}
+        onConfirmTools={onConfirmTools}
+      />
+
+      <div style={{ height: 14 }} />
+
+      <ChecklistSection
+        title="Sau ca đầu"
+        items={afterShift}
+        employeeId={detail.employeeId}
+        onSetFirstShiftResult={onSetFirstShiftResult}
+      />
     </div>
   )
 }
 
-export function OperationsChecklistDetail(props: {
-  detail: OnboardingOpsEmployeeDetail | null
-  onQuickComplete: (payload: { employeeId: string; key: string; value?: string }) => void
+function ChecklistSection({
+  title,
+  items,
+  employeeId,
+  onMarkFirstShift,
+  onAssignBuddy,
+  onConfirmStorePolicy,
+  onConfirmTools,
+  onSetFirstShiftResult,
+}: {
+  title: string
+  items: OnboardingOpsChecklistItem[]
+  employeeId: string
+  onMarkFirstShift?: (employeeId: string) => void
+  onAssignBuddy?: (employeeId: string) => void
+  onConfirmStorePolicy?: (employeeId: string) => void
+  onConfirmTools?: (employeeId: string) => void
+  onSetFirstShiftResult?: (employeeId: string, result: OnboardingOpsFirstShiftResult) => void
 }) {
-  if (!props.detail) {
-    return (
-      <section className="rounded-[28px] bg-white p-6 shadow-sm ring-1 ring-black/5">
-        <h2 className="text-base font-semibold text-[var(--text-primary)]">Checklist onboarding</h2>
-        <p className="mt-2 text-sm text-[var(--text-secondary)]">
-          Chọn 1 người ở cột trái để xem các mục cần chốt.
-        </p>
-      </section>
-    )
-  }
-
-  const beforeShiftItems = props.detail.checklist.filter((item) => item.phase === 'before_first_shift')
-  const afterShiftItems = props.detail.checklist.filter((item) => item.phase === 'after_first_shift')
-
   return (
-    <section className="rounded-[28px] bg-white p-4 shadow-sm ring-1 ring-black/5 md:p-5">
-      <div className="flex flex-col gap-3 border-b border-black/5 pb-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-[11px] font-medium text-[var(--text-muted)]">{props.detail.hireDate}</p>
-            <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
-              {props.detail.employeeName}
-            </h2>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              {props.detail.roleLabel} • {props.detail.storeLabel}
-            </p>
-          </div>
-          <span
-            className={`w-fit rounded-full px-2.5 py-1 text-[10px] font-semibold ${toneClassMap[props.detail.tone]}`}
-          >
-            {props.detail.toneLabel}
-          </span>
-        </div>
-        <div className="rounded-3xl bg-[#fff8f2] px-4 py-3 text-sm text-[var(--text-secondary)]">
-          {props.detail.summaryLabel}
-        </div>
-      </div>
+    <div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: '#001D3D', marginBottom: 10 }}>{title}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {items.map((item) => {
+          const severityColor = item.severity === 'block' ? '#D9381E' : '#B7791F'
 
-      <div className="mt-4 space-y-4">
-        <div>
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-              {phaseMeta.before_first_shift.title}
-            </h3>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              {phaseMeta.before_first_shift.description}
-            </p>
-          </div>
-          <div className="space-y-3">
-            {beforeShiftItems.map((item) => (
-              <ChecklistCard
-                key={item.key}
-                employeeId={props.detail.employeeId}
-                item={item}
-                onQuickComplete={props.onQuickComplete}
-              />
-            ))}
-          </div>
-        </div>
+          return (
+            <div
+              key={item.key}
+              style={{
+                border: '1px solid rgba(0, 29, 61, 0.08)',
+                borderRadius: 20,
+                padding: 14,
+                background: '#FFFFFF',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#001D3D' }}>{item.label}</div>
+                  <div style={{ fontSize: 12, color: '#5F6B7A', marginTop: 6, lineHeight: 1.45 }}>{item.summary}</div>
+                </div>
+                <span
+                  style={{
+                    borderRadius: 999,
+                    padding: '5px 9px',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    background: item.done ? 'rgba(30, 158, 87, 0.12)' : 'rgba(246, 200, 95, 0.16)',
+                    color: item.done ? '#1E9E57' : severityColor,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {item.done ? 'Đã xong' : item.severity === 'block' ? 'Block' : 'Cần làm'}
+                </span>
+              </div>
 
-        <div>
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-              {phaseMeta.after_first_shift.title}
-            </h3>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              {phaseMeta.after_first_shift.description}
-            </p>
-          </div>
-          <div className="space-y-3">
-            {afterShiftItems.map((item) => (
-              <ChecklistCard
-                key={item.key}
-                employeeId={props.detail.employeeId}
-                item={item}
-                onQuickComplete={props.onQuickComplete}
-              />
-            ))}
-          </div>
-        </div>
+              {!item.done && item.phase === 'before_first_shift' ? (
+                <div style={{ marginTop: 10 }}>
+                  {item.key === 'first_shift' ? (
+                    <button type="button" onClick={() => onMarkFirstShift?.(employeeId)} style={actionButtonStyle}>
+                      Chốt ca đầu
+                    </button>
+                  ) : item.key === 'buddy' ? (
+                    <button type="button" onClick={() => onAssignBuddy?.(employeeId)} style={actionButtonStyle}>
+                      Gán người kèm
+                    </button>
+                  ) : item.key === 'uniform_attendance_policy' ? (
+                    <button type="button" onClick={() => onConfirmStorePolicy?.(employeeId)} style={actionButtonStyle}>
+                      Xác nhận tại quán
+                    </button>
+                  ) : item.key === 'tools_and_group' ? (
+                    <button type="button" onClick={() => onConfirmTools?.(employeeId)} style={actionButtonStyle}>
+                      Đánh dấu đủ công cụ
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {!item.done && item.key === 'first_shift_result' ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                  <button type="button" onClick={() => onSetFirstShiftResult?.(employeeId, 'pass')} style={actionButtonStyle}>
+                    Ổn
+                  </button>
+                  <button type="button" onClick={() => onSetFirstShiftResult?.(employeeId, 'follow_up')} style={secondaryActionButtonStyle}>
+                    Theo sát thêm
+                  </button>
+                  <button type="button" onClick={() => onSetFirstShiftResult?.(employeeId, 'issue')} style={warningActionButtonStyle}>
+                    Có vấn đề
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
       </div>
-    </section>
+    </div>
   )
+}
+
+const actionButtonStyle: React.CSSProperties = {
+  border: 'none',
+  borderRadius: 999,
+  background: '#2F6FA8',
+  color: '#FFFFFF',
+  padding: '8px 14px',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+}
+
+const secondaryActionButtonStyle: React.CSSProperties = {
+  border: '1px solid rgba(47, 111, 168, 0.22)',
+  borderRadius: 999,
+  background: '#FFFFFF',
+  color: '#2F6FA8',
+  padding: '8px 14px',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+}
+
+const warningActionButtonStyle: React.CSSProperties = {
+  border: '1px solid rgba(217, 56, 30, 0.2)',
+  borderRadius: 999,
+  background: 'rgba(217, 56, 30, 0.08)',
+  color: '#D9381E',
+  padding: '8px 14px',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
 }
