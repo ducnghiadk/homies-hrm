@@ -4,22 +4,36 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   initCareerPathStores,
-  getLevels, createLevel, updateLevel, toggleLevel, reorderLevels,
-  getSkills, createSkill, updateSkill, deleteSkill,
-  getPromotionConditions, getEmployeeTypes,
+  getLevels, createLevel, toggleLevel,
+  getSkills, createSkill, deleteSkill,
+  getPromotionConditions,
   getBuddyRewards, toggleBuddyReward,
   getTrialChecklist, getOnboardingSteps,
-  getSettings, updateSettings, getChangeLogs,
+  getSettings, updateSettings, getChangeLogs, upsertOnboardingOperationsStoreOverride,
   exportSettings, importSettings,
 } from '@/lib/career-path-service';
 import type {
-  CareerLevel, Skill, PromotionCondition, EmployeeTypeConfig,
+  CareerLevel, Skill, PromotionCondition,
   BuddyRewardConfig, TrialChecklistItem, OnboardingStep,
-  CareerPathSettings, SettingsChangeLog,
+  CareerPathSettings, SettingsChangeLog, OnboardingOpsChecklistKey,
+  OnboardingOpsSettings, OnboardingOpsStoreOverride, OnboardingOpsSeverity,
 } from '@/lib/career-path-types';
-import IconPicker from '@/components/career-path/IconPicker';
+import { mockStores } from '@/lib/mock-data';
 
 type TabId = 'levels' | 'skills' | 'conditions' | 'buddy' | 'onboarding' | 'general';
+
+const fallbackOnboardingOperationsSettings: OnboardingOpsSettings = {
+  enabled: true,
+  lookahead_days: 7,
+  rules: [
+    { key: 'first_shift', label: 'Ca dau va gio co mat', severity: 'attention', store_override_allowed: true },
+    { key: 'buddy', label: 'Nguoi kem / nguoi huong dan', severity: 'block', store_override_allowed: true },
+    { key: 'uniform_attendance_policy', label: 'Dong phuc, cham cong, noi quy tai quan', severity: 'attention', store_override_allowed: true },
+    { key: 'tools_and_group', label: 'Tai khoan, nhom chat, cong cu', severity: 'attention', store_override_allowed: true },
+    { key: 'first_shift_result', label: 'Xac nhan xong ca dau on', severity: 'attention', store_override_allowed: false },
+  ],
+  store_overrides: [],
+};
 
 const tabs: { id: TabId; label: string; icon: string }[] = [
   { id: 'levels', label: 'Cấp bậc', icon: '📊' },
@@ -31,25 +45,23 @@ const tabs: { id: TabId; label: string; icon: string }[] = [
 ];
 
 export default function CareerPathSettingsPage() {
+  initCareerPathStores();
   const [activeTab, setActiveTab] = useState<TabId>('levels');
-  const [levels, setLevels] = useState<CareerLevel[]>([]);
-  const [skills, setSkills] = useState<Skill[]>([]);
-  const [conditions, setConditions] = useState<PromotionCondition[]>([]);
-  const [empTypes, setEmpTypes] = useState<EmployeeTypeConfig[]>([]);
-  const [rewards, setRewards] = useState<BuddyRewardConfig[]>([]);
-  const [checklist, setChecklist] = useState<TrialChecklistItem[]>([]);
-  const [onbSteps, setOnbSteps] = useState<OnboardingStep[]>([]);
-  const [settings, setSettingsState] = useState<CareerPathSettings | null>(null);
-  const [logs, setLogs] = useState<SettingsChangeLog[]>([]);
+  const [levels, setLevels] = useState<CareerLevel[]>(() => getLevels());
+  const [skills, setSkills] = useState<Skill[]>(() => getSkills());
+  const [conditions, setConditions] = useState<PromotionCondition[]>(() => getPromotionConditions());
+  const [rewards, setRewards] = useState<BuddyRewardConfig[]>(() => getBuddyRewards());
+  const [checklist, setChecklist] = useState<TrialChecklistItem[]>(() => getTrialChecklist());
+  const [onbSteps, setOnbSteps] = useState<OnboardingStep[]>(() => getOnboardingSteps());
+  const [settings, setSettingsState] = useState<CareerPathSettings | null>(() => getSettings());
+  const [logs, setLogs] = useState<SettingsChangeLog[]>(() => getChangeLogs());
   const [showLogs, setShowLogs] = useState(false);
 
   const reload = () => {
     setLevels(getLevels()); setSkills(getSkills()); setConditions(getPromotionConditions());
-    setEmpTypes(getEmployeeTypes()); setRewards(getBuddyRewards()); setChecklist(getTrialChecklist());
+    setRewards(getBuddyRewards()); setChecklist(getTrialChecklist());
     setOnbSteps(getOnboardingSteps()); setSettingsState(getSettings()); setLogs(getChangeLogs());
   };
-
-  useEffect(() => { initCareerPathStores(); reload(); }, []);
 
   const handleExport = () => {
     const data = exportSettings();
@@ -141,7 +153,6 @@ export default function CareerPathSettingsPage() {
 // ─── Sub-components for each tab ─────────────────────────────
 
 function LevelsTab({ levels, onReload }: { levels: CareerLevel[]; onReload: () => void }) {
-  const [editing, setEditing] = useState<string | null>(null);
   const sorted = [...levels].sort((a, b) => a.order - b.order);
 
   return (
@@ -152,7 +163,7 @@ function LevelsTab({ levels, onReload }: { levels: CareerLevel[]; onReload: () =
           padding: '4px 10px', borderRadius: 6, border: 'none', background: '#667eea', color: '#fff', fontSize: 11, cursor: 'pointer',
         }}>+ Thêm</button>
       </div>
-      {sorted.map((level, i) => (
+      {sorted.map((level) => (
         <div key={level.id} style={{
           padding: 12, borderRadius: 10, marginBottom: 8,
           background: level.is_active ? '#fff' : '#f9f9f9',
@@ -275,7 +286,7 @@ function BuddyTab({ rewards, checklist, onReload }: { rewards: BuddyRewardConfig
   );
 }
 
-function OnboardingTab({ steps, onReload }: { steps: OnboardingStep[]; onReload: () => void }) {
+function OnboardingTab({ steps }: { steps: OnboardingStep[]; onReload: () => void }) {
   const typeIcons: Record<string, string> = { video: '🎬', document: '📄', quiz: '📝', task: '✋', checkin: '📍' };
   return (
     <div>
@@ -303,6 +314,9 @@ function GeneralTab({
   settings: CareerPathSettings; onReload: () => void;
   onExport: () => void; onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
+  const storeOptions = mockStores.filter((store) => store.is_active);
+  const onboardingOps = settings.onboarding_operations ?? fallbackOnboardingOperationsSettings;
+  const [opsDraft, setOpsDraft] = useState<OnboardingOpsSettings>(onboardingOps);
   const toggles: { key: keyof CareerPathSettings; label: string; icon: string }[] = [
     { key: 'buddy_system_enabled', label: 'Buddy System', icon: '🤝' },
     { key: 'leaderboard_enabled', label: 'Leaderboard', icon: '🏆' },
@@ -316,6 +330,71 @@ function GeneralTab({
 
   const handleToggle = (key: keyof CareerPathSettings) => {
     updateSettings({ [key]: !(settings[key] as boolean) });
+    onReload();
+  };
+
+  const patchSettings = (data: Partial<CareerPathSettings>) => {
+    updateSettings(data);
+    onReload();
+  };
+
+  useEffect(() => {
+    setOpsDraft(onboardingOps);
+  }, [onboardingOps]);
+
+  const upsertDraftOverride = (
+    storeId: string,
+    updater: (current: OnboardingOpsStoreOverride) => OnboardingOpsStoreOverride,
+  ) => {
+    setOpsDraft((current) => {
+      const existing = current.store_overrides.find((item) => item.store_id === storeId);
+      const nextOverride = updater(existing ?? {
+        store_id: storeId,
+        block_keys: [],
+        reminder_days_before_start: 1,
+        alert_roles: ['store_manager'],
+      });
+      const nextOverrides = existing
+        ? current.store_overrides.map((item) => (item.store_id === storeId ? nextOverride : item))
+        : [...current.store_overrides, nextOverride];
+
+      return {
+        ...current,
+        store_overrides: nextOverrides,
+      };
+    });
+  };
+
+  const handleRuleSeverityChange = (ruleKey: OnboardingOpsChecklistKey, severity: OnboardingOpsSeverity) => {
+    setOpsDraft((current) => ({
+      ...current,
+      rules: current.rules.map((rule) => (rule.key === ruleKey ? { ...rule, severity } : rule)),
+    }));
+  };
+
+  const toggleStoreBlockRule = (storeId: string, ruleKey: OnboardingOpsChecklistKey) => {
+    upsertDraftOverride(storeId, (current) => {
+      const hasRule = current.block_keys.includes(ruleKey);
+      return {
+        ...current,
+        block_keys: hasRule
+          ? current.block_keys.filter((key) => key !== ruleKey)
+          : [...current.block_keys, ruleKey],
+      };
+    });
+  };
+
+  const saveOnboardingOperations = () => {
+    updateSettings({
+      onboarding_operations: {
+        ...onboardingOps,
+        ...opsDraft,
+        store_overrides: opsDraft.store_overrides,
+      },
+    });
+    opsDraft.store_overrides.forEach((override) => {
+      upsertOnboardingOperationsStoreOverride(override);
+    });
     onReload();
   };
 
@@ -338,6 +417,225 @@ function GeneralTab({
         </div>
       ))}
 
+      <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: '#fffaf0', border: '1px solid #f4d7a1' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>📘 Nội quy nhận việc</div>
+
+        <FieldRow
+          label="Bật flow nội quy"
+          control={(
+            <button
+              onClick={() => patchSettings({ onboarding_policy_enabled: !settings.onboarding_policy_enabled })}
+              style={toggleButtonStyle(settings.onboarding_policy_enabled)}
+            >
+              {settings.onboarding_policy_enabled ? 'Bật' : 'Tắt'}
+            </button>
+          )}
+        />
+
+        <FieldRow
+          label="Gửi tóm tắt"
+          control={(
+            <select
+              value={settings.onboarding_policy_summary_trigger}
+              onChange={(event) => patchSettings({ onboarding_policy_summary_trigger: event.target.value as 'approval_confirm' | 'contract_send' })}
+              style={fieldControlStyle}
+            >
+              <option value="approval_confirm">Ngay sau duyet ho so</option>
+              <option value="contract_send">Luc gui hop dong</option>
+            </select>
+          )}
+        />
+
+        <FieldRow
+          label="Gửi đầy đủ"
+          control={(
+            <select
+              value={settings.onboarding_policy_full_trigger}
+              onChange={(event) => patchSettings({ onboarding_policy_full_trigger: event.target.value as 'contract_countersign' | 'days_before_start' })}
+              style={fieldControlStyle}
+            >
+              <option value="contract_countersign">Sau HR countersign</option>
+              <option value="days_before_start">Truoc ngay vao lam</option>
+            </select>
+          )}
+        />
+
+        <FieldRow
+          label="Gửi trước ngày vào làm"
+          control={(
+            <input
+              type="number"
+              min={0}
+              max={7}
+              value={settings.onboarding_policy_full_days_before_start}
+              onChange={(event) => patchSettings({ onboarding_policy_full_days_before_start: Number(event.target.value || 0) })}
+              style={fieldControlStyle}
+            />
+          )}
+        />
+
+        <FieldRow
+          label="Bắt xác nhận"
+          control={(
+            <button
+              onClick={() => patchSettings({ onboarding_policy_require_ack: !settings.onboarding_policy_require_ack })}
+              style={toggleButtonStyle(settings.onboarding_policy_require_ack)}
+            >
+              {settings.onboarding_policy_require_ack ? 'Co' : 'Khong'}
+            </button>
+          )}
+        />
+
+        <FieldRow
+          label="Nhắc tối đa"
+          control={(
+            <input
+              type="number"
+              min={0}
+              max={5}
+              value={settings.onboarding_policy_max_reminders}
+              onChange={(event) => patchSettings({ onboarding_policy_max_reminders: Number(event.target.value || 0) })}
+              style={fieldControlStyle}
+            />
+          )}
+        />
+
+        <FieldRow
+          label="Mẫu nội quy"
+          control={(
+            <select
+              value={settings.onboarding_policy_template_id}
+              onChange={(event) => patchSettings({ onboarding_policy_template_id: event.target.value as 'default-policy-v1' })}
+              style={fieldControlStyle}
+            >
+              <option value="default-policy-v1">Mac dinh v1</option>
+            </select>
+          )}
+        />
+
+        <FieldRow
+          label="Người nhận cảnh báo"
+          control={(
+            <select
+              value={settings.onboarding_policy_alert_scope}
+              onChange={(event) => patchSettings({ onboarding_policy_alert_scope: event.target.value as 'hr_only' | 'hr_and_store_manager' })}
+              style={fieldControlStyle}
+            >
+              <option value="hr_only">Chi HR</option>
+              <option value="hr_and_store_manager">HR va quan ly cua hang</option>
+            </select>
+          )}
+        />
+      </div>
+
+      <div id="onboarding-operations" style={{ marginTop: 14, padding: 12, borderRadius: 10, background: '#f6f8ff', border: '1px solid #dce4ff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Onboarding operations</div>
+            <div style={{ fontSize: 11, color: '#667085', lineHeight: 1.5 }}>
+              Chon muc nao can chan ngay dau toan he thong. Neu cua hang can chan them, bat override o ben duoi.
+            </div>
+          </div>
+          <button
+            onClick={saveOnboardingOperations}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: 'none',
+              background: '#667eea',
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Luu rule
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {opsDraft.rules.map((rule) => (
+            <div
+              key={rule.key}
+              style={{
+                padding: 12,
+                borderRadius: 10,
+                background: '#fff',
+                border: '1px solid #e5e7eb',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#1f2937' }}>{rule.label}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                    {rule.store_override_allowed ? 'Cho phep tung cua hang chan them.' : 'Chi dung rule mac dinh toan he thong.'}
+                  </div>
+                </div>
+                <select
+                  value={rule.severity}
+                  onChange={(event) => handleRuleSeverityChange(rule.key, event.target.value as OnboardingOpsSeverity)}
+                  style={fieldControlStyle}
+                >
+                  <option value="block">Block ngay dau</option>
+                  <option value="attention">Can hoan tat som</option>
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #dce4ff' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#344054', marginBottom: 8 }}>Override theo cua hang</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {storeOptions.map((store) => {
+              const override = opsDraft.store_overrides.find((item) => item.store_id === store.id) ?? {
+                store_id: store.id,
+                block_keys: [],
+                reminder_days_before_start: 1,
+                alert_roles: ['store_manager'],
+              };
+
+              return (
+                <div
+                  key={store.id}
+                  style={{
+                    padding: 12,
+                    borderRadius: 10,
+                    background: '#fff',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#111827', marginBottom: 8 }}>{store.name}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {opsDraft.rules.filter((rule) => rule.store_override_allowed).map((rule) => (
+                      <label
+                        key={`${store.id}-${rule.key}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontSize: 12,
+                          color: '#475467',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={override.block_keys.includes(rule.key)}
+                          onChange={() => toggleStoreBlockRule(store.id, rule.key)}
+                        />
+                        <span>{rule.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: '#f8f9ff', border: '1px solid #e8ecff' }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>📥 Export / Import</div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -357,4 +655,42 @@ function GeneralTab({
       </div>
     </div>
   );
+}
+
+const fieldControlStyle: React.CSSProperties = {
+  minWidth: 160,
+  padding: '6px 10px',
+  borderRadius: 8,
+  border: '1px solid #d6d6d6',
+  background: '#fff',
+  fontSize: 12,
+}
+
+function toggleButtonStyle(enabled: boolean): React.CSSProperties {
+  return {
+    padding: '5px 12px',
+    borderRadius: 999,
+    border: 'none',
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: 'pointer',
+    background: enabled ? '#4caf50' : '#e0e0e0',
+    color: enabled ? '#fff' : '#666',
+  }
+}
+
+function FieldRow({ label, control }: { label: string; control: React.ReactNode }) {
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 12,
+      padding: '10px 0',
+      borderBottom: '1px solid #f2e6c7',
+    }}>
+      <span style={{ fontSize: 12, fontWeight: 500, color: '#6b5d3a' }}>{label}</span>
+      {control}
+    </div>
+  )
 }
