@@ -21,23 +21,13 @@ export function ManagerDashboardPremium({ user }: Props) {
   const morningFull = shifts[0]?.members.length >= shifts[0]?.required;
 
   const quickActions = [
-    { id: 'schedule', icon: '📅', label: 'Xếp ca', href: '/schedule' },
-    { id: 'violations', icon: '📝', label: 'Ghi lỗi', href: '/violations', badge: 2 },
+    { id: 'schedule', icon: '📅', label: 'Quản lý lịch', href: '/schedules' },
+    { id: 'admin-registration', icon: '⏳', label: 'Mở đợt xếp ca', href: '/schedules', color: 'from-primary-50 to-primary-100' },
+    { id: 'admin-review', icon: '⚡', label: 'Phân ca tự động', href: '/schedules', color: 'from-warning-50 to-warning-100' },
     { id: 'leave', icon: '📋', label: 'Duyệt phép', href: '/leave/approvals', badge: 3 },
+    { id: 'violations', icon: '📝', label: 'Ghi lỗi', href: '/violations', badge: 2 },
     { id: 'addEmp', icon: '👤', label: 'Thêm NV', href: '/employees/new' },
-  ];
-
-  const medals = ['🥇', '🥈', '🥉'];
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <GradientHeader
-        user={{ name: user.name, avatar: user.avatar, role: 'store_manager', subtitle: user.storeName }}
-        gradient="from-indigo-600 via-purple-600 to-pink-500"
-        rightContent={
-          <div className="relative">
-            <button className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white">🔔</button>
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">3</span>
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-error-500 text-white text-xs font-bold rounded-full flex items-center justify-center">3</span>
           </div>
         }
       />
@@ -80,15 +70,15 @@ export function ManagerDashboardPremium({ user }: Props) {
                     <p className="text-xs text-gray-500">{p.kpi}% KPI • {p.skills} skills</p>
                   </div>
                   <div className="h-2 w-20 bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full" style={{ width: `${p.kpi}%` }} />
+                    <div className="h-full bg-gradient-to-r from-primary-600 to-primary-500 rounded-full" style={{ width: `${p.kpi}%` }} />
                   </div>
                 </div>
               ))}
             </div>
             {warns.length > 0 && (
-              <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200">
+              <div className="mt-4 p-3 bg-warning-50 rounded-xl border border-warning-200">
                 {warns.map(w => (
-                  <p key={w.id} className="text-sm text-amber-700 flex items-center gap-2">
+                  <p key={w.id} className="text-sm text-warning-700 flex items-center gap-2">
                     <span>⚠️</span><span>Cần chú ý: {w.name} ({w.kpi}% KPI)</span>
                   </p>
                 ))}
