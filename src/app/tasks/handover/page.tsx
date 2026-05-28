@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import { mockHandovers } from '@/lib/mock-data-tasks'
-import { ArrowRight, Check, AlertTriangle, DollarSign, Package, User, CheckCircle2, Clock, FileText } from 'lucide-react'
+import { ArrowRight, AlertTriangle, DollarSign, Package, User, CheckCircle2, Clock, FileText } from 'lucide-react'
 
 export default function TaskHandoverPage() {
   const [selectedId, setSelectedId] = useState(mockHandovers[0]?.id)
@@ -42,8 +42,8 @@ export default function TaskHandoverPage() {
                 </div>
                 <ArrowRight size={24} style={{ color: 'var(--primary)' }} />
                 <div className="text-center">
-                  <div className="w-10 h-10 rounded-full mx-auto mb-1 flex items-center justify-center text-lg" style={{ background: '#f59e0b20' }}>
-                    <User size={20} className="text-amber-500" />
+                  <div className="w-10 h-10 rounded-full mx-auto mb-1 flex items-center justify-center text-lg" style={{ background: '#F6C85F20' }}>
+                    <User size={20} className="text-warning-500" />
                   </div>
                   <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                     {handover.to_employee_name?.split(' ').slice(-2).join(' ') || 'Chưa xác nhận'}
@@ -53,12 +53,12 @@ export default function TaskHandoverPage() {
               </div>
               <div className="mt-3 text-center">
                 {handover.acknowledged ? (
-                  <span className="text-xs px-3 py-1 rounded-full font-medium" style={{ background: '#10b98120', color: '#10b981' }}>
+                  <span className="text-xs px-3 py-1 rounded-full font-medium" style={{ background: '#1E9E5720', color: '#1E9E57' }}>
                     <CheckCircle2 size={12} className="inline text-emerald-500" /> Đã xác nhận lúc {new Date(handover.acknowledged_at!).toLocaleTimeString('vi', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 ) : (
-                  <span className="text-xs px-3 py-1 rounded-full font-medium" style={{ background: '#f59e0b20', color: '#f59e0b' }}>
-                    <Clock size={12} className="inline text-amber-500" /> Chờ xác nhận
+                  <span className="text-xs px-3 py-1 rounded-full font-medium" style={{ background: '#F6C85F20', color: '#F6C85F' }}>
+                    <Clock size={12} className="inline text-warning-500" /> Chờ xác nhận
                   </span>
                 )}
               </div>
@@ -80,7 +80,7 @@ export default function TaskHandoverPage() {
             ))}
 
             {/* Cash */}
-            <div className="card animate-slide-up" style={{ background: '#10b98110', border: '1px solid #10b98130' }}>
+            <div className="card animate-slide-up" style={{ background: '#1E9E5710', border: '1px solid #1E9E5730' }}>
               <div className="flex items-center gap-2">
                 <DollarSign size={18} className="text-emerald-500" />
                 <span className="text-sm font-bold text-emerald-500">Tiền quỹ</span>

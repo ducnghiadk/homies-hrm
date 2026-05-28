@@ -11,7 +11,7 @@ interface Props {
 const sevOrder = ['minor', 'medium', 'major', 'critical'] as const
 const sevLabels: Record<string, { label: string; color: string; bg: string }> = {
   minor:    { label: '🟢 Nhẹ (5 điểm)',           color: '#1d4ed8', bg: '#dbeafe' },
-  medium:   { label: '🟡 Trung bình (10-15 điểm)', color: '#b45309', bg: '#fef3c7' },
+  medium:   { label: '🟡 Trung bình (10-15 điểm)', color: '#b45309', bg: '#FFF8E8' },
   major:    { label: '🟠 Nặng (20 điểm)',          color: '#c2410c', bg: '#fed7aa' },
   critical: { label: '🔴 Nghiêm trọng (30-50 điểm)', color: '#b91c1c', bg: '#fee2e2' },
 }
@@ -44,7 +44,7 @@ export default function ViolationTypeSelector({ onSelect, selected }: Props) {
                   <div className="font-bold truncate" style={{ color: selected === vt.id ? cfg.color : 'var(--text-primary)' }}>
                     {vt.code}: {vt.name}
                   </div>
-                  <div className="text-red-600 font-black mt-0.5">-{vt.penalty_points} điểm</div>
+                  <div className="text-error-600 font-black mt-0.5">-{vt.penalty_points} điểm</div>
                 </button>
               ))}
             </div>

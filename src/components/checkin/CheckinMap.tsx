@@ -7,7 +7,7 @@ import 'leaflet/dist/leaflet.css'
 
 // ─── Custom markers ───
 const storeIcon = new L.DivIcon({
-  html: `<div style="width:32px;height:32px;background:#ef4444;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
+  html: `<div style="width:32px;height:32px;background:#D9381E;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
     </svg>
@@ -18,7 +18,7 @@ const storeIcon = new L.DivIcon({
 })
 
 const userIcon = new L.DivIcon({
-  html: `<div style="width:20px;height:20px;background:#3b82f6;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(59,130,246,0.25),0 2px 8px rgba(0,0,0,0.2)"></div>`,
+  html: `<div style="width:20px;height:20px;background:#2F6FA8;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 6px rgba(59,130,246,0.25),0 2px 8px rgba(0,0,0,0.2)"></div>`,
   className: '',
   iconSize: [20, 20],
   iconAnchor: [10, 10],
@@ -74,8 +74,8 @@ export default function CheckinMap({ storePos, userPos, radius }: Props) {
         center={[storePos.lat, storePos.lng]}
         radius={radius}
         pathOptions={{
-          color: '#3b82f6',
-          fillColor: '#3b82f6',
+          color: '#2F6FA8',
+          fillColor: '#2F6FA8',
           fillOpacity: 0.08,
           weight: 2,
           dashArray: '6 4',

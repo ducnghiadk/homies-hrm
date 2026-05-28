@@ -28,7 +28,7 @@ interface Props {
 const SEVERITY_CONFIG: Record<ViolationSeverity, { label: string; color: string; icon: string }> = {
   minor:    { label: 'Nhẹ',          color: '#eab308', icon: '🟡' },
   medium:   { label: 'Trung bình',   color: '#f97316', icon: '🟠' },
-  major:    { label: 'Nặng',         color: '#ef4444', icon: '🔴' },
+  major:    { label: 'Nặng',         color: '#D9381E', icon: '🔴' },
   critical: { label: 'Nghiêm trọng', color: '#991b1b', icon: '⚫' },
 }
 
@@ -146,7 +146,7 @@ export default function BatchViolationForm({ storeId, loggedBy }: Props) {
                 <span className="flex-1 text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{entry.name}</span>
                 {vioCount > 0 && (
                   <>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: '#fef2f2', color: '#ef4444' }}>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: '#fef2f2', color: '#D9381E' }}>
                       {vioCount} lỗi • -{points}đ
                     </span>
                     {entry.expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -171,7 +171,7 @@ export default function BatchViolationForm({ storeId, loggedBy }: Props) {
                         <span className="flex-1">{vt?.name ?? v.violation_type_id}</span>
                         <span className="font-bold" style={{ color: cfg.color }}>-{vt?.penalty_points ?? 0}đ</span>
                         <button onClick={() => removeViolation(entry.employee_id, i)}>
-                          <X size={12} className="text-gray-400 hover:text-red-500" />
+                          <X size={12} className="text-gray-400 hover:text-error-500" />
                         </button>
                       </div>
                     )
@@ -199,8 +199,8 @@ export default function BatchViolationForm({ storeId, loggedBy }: Props) {
         <div className="text-xs" style={{ color: 'var(--text-primary)' }}>
           • {totalViolations} lỗi cho {affectedCount} nhân viên
         </div>
-        <div className="text-xs" style={{ color: '#ef4444' }}>• Tổng điểm trừ: -{totalPoints} điểm</div>
-        <div className="text-xs" style={{ color: '#10b981' }}>
+        <div className="text-xs" style={{ color: '#D9381E' }}>• Tổng điểm trừ: -{totalPoints} điểm</div>
+        <div className="text-xs" style={{ color: '#1E9E57' }}>
           • {entries.length - affectedCount} nhân viên không có lỗi ✅
         </div>
       </div>

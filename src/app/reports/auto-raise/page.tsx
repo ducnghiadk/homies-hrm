@@ -13,7 +13,7 @@ export default function AutoRaisePage() {
   return (
     <AppShell title="Đề xuất tăng lương">
       <div className="space-y-4">
-        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff' }}>
+        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #F6C85F, #d97706)', color: '#fff' }}>
           <div className="flex items-center gap-2">
             <TrendingUp size={20} />
             <div>
@@ -33,8 +33,8 @@ export default function AutoRaisePage() {
                   <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{c.position} • {c.tenure_months} tháng</div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Star size={12} className="text-amber-500" />
-                  <span className="text-sm font-bold text-amber-500">{c.avg_kpi.toFixed(1)}</span>
+                  <Star size={12} className="text-warning-500" />
+                  <span className="text-sm font-bold text-warning-500">{c.avg_kpi.toFixed(1)}</span>
                 </div>
               </div>
               <div className="flex gap-2 text-xs">
@@ -42,14 +42,14 @@ export default function AutoRaisePage() {
                   <div style={{ color: 'var(--text-muted)' }}>Hiện tại</div>
                   <div className="font-bold" style={{ color: 'var(--text-primary)' }}>{fmt(c.current_salary)}</div>
                 </div>
-                <div className="flex-1 p-2 rounded-lg text-center" style={{ background: c.eligible ? '#10b98110' : '#ef444410' }}>
-                  <div style={{ color: c.eligible ? '#10b981' : '#ef4444' }}>{c.eligible ? 'Đề xuất' : 'Chưa đủ'}</div>
-                  <div className="font-bold" style={{ color: c.eligible ? '#10b981' : '#ef4444' }}>{fmt(c.suggested_salary)}</div>
+                <div className="flex-1 p-2 rounded-lg text-center" style={{ background: c.eligible ? '#1E9E5710' : '#D9381E10' }}>
+                  <div style={{ color: c.eligible ? '#1E9E57' : '#D9381E' }}>{c.eligible ? 'Đề xuất' : 'Chưa đủ'}</div>
+                  <div className="font-bold" style={{ color: c.eligible ? '#1E9E57' : '#D9381E' }}>{fmt(c.suggested_salary)}</div>
                 </div>
                 {c.eligible && (
-                  <div className="flex-1 p-2 rounded-lg text-center" style={{ background: '#f59e0b10' }}>
-                    <div className="text-amber-500">Tăng</div>
-                    <div className="font-bold text-amber-500">{fmt(c.suggested_raise)}</div>
+                  <div className="flex-1 p-2 rounded-lg text-center" style={{ background: '#F6C85F10' }}>
+                    <div className="text-warning-500">Tăng</div>
+                    <div className="font-bold text-warning-500">{fmt(c.suggested_raise)}</div>
                   </div>
                 )}
               </div>

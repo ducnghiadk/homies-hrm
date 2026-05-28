@@ -159,7 +159,7 @@ export default function ManagerReviewPage() {
             refresh()
           }}
             className="w-full py-2 rounded-xl text-xs font-bold text-white"
-            style={{ background: '#10b981' }}>
+            style={{ background: '#1E9E57' }}>
             📢 Công bố hàng loạt ({selected.size})
           </button>
         )}
@@ -174,9 +174,9 @@ export default function ManagerReviewPage() {
             {currentList.map(ev => {
               const STATUS: Record<string, { label: string; color: string }> = {
                 draft: { label: 'Nháp', color: '#6b7280' },
-                self_submitted: { label: 'Chờ review', color: '#f59e0b' },
-                under_review: { label: 'Đang review', color: '#3b82f6' },
-                published: { label: 'Đã công bố', color: '#10b981' },
+                self_submitted: { label: 'Chờ review', color: '#F6C85F' },
+                under_review: { label: 'Đang review', color: '#2F6FA8' },
+                published: { label: 'Đã công bố', color: '#1E9E57' },
                 finalized: { label: 'Hoàn tất', color: '#6b7280' },
               }
               const status = STATUS[ev.status] || { label: ev.status, color: '#6b7280' }

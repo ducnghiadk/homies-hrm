@@ -19,10 +19,10 @@ interface ShiftBarProps {
 }
 
 const STYLE_MAP: Record<ShiftValidationStatus, { bg: string; border: string; ring: string }> = {
-  normal:   { bg: 'bg-blue-500',   border: 'border-blue-600',   ring: 'ring-blue-300' },
+  normal:   { bg: 'bg-primary-500',   border: 'border-primary-600',   ring: 'ring-blue-300' },
   modified: { bg: 'bg-emerald-500', border: 'border-emerald-600', ring: 'ring-emerald-300' },
-  warning:  { bg: 'bg-yellow-500', border: 'border-yellow-600', ring: 'ring-yellow-300' },
-  error:    { bg: 'bg-red-500',    border: 'border-red-600',    ring: 'ring-red-300' },
+  warning:  { bg: 'bg-warning-500', border: 'border-warning-600', ring: 'ring-yellow-300' },
+  error:    { bg: 'bg-error-500',    border: 'border-error-600',    ring: 'ring-red-300' },
 }
 
 export default function ShiftBar({
@@ -181,7 +181,7 @@ export default function ShiftBar({
       {/* Ghost preview while dragging */}
       {(ghostLeft !== null || ghostWidth !== null) && (
         <div
-          className="absolute top-0.5 h-[calc(100%-4px)] border-2 border-dashed border-blue-400 bg-blue-100/30 rounded-lg pointer-events-none z-10"
+          className="absolute top-0.5 h-[calc(100%-4px)] border-2 border-dashed border-primary-400 bg-primary-100/30 rounded-lg pointer-events-none z-10"
           style={{
             left: `${ghostLeft ?? leftPercent}%`,
             width: `${ghostWidth ?? widthPercent}%`,

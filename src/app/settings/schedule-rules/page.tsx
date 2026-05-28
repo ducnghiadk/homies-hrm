@@ -18,15 +18,14 @@ import {
 } from 'lucide-react'
 
 const LEVEL_OPTIONS: { value: WarningLevel; label: string; color: string }[] = [
-  { value: 'info', label: 'Chỉ thông báo', color: 'text-blue-600' },
-  { value: 'warning', label: 'Cần xác nhận', color: 'text-amber-600' },
-  { value: 'block', label: 'Chặn hoàn toàn', color: 'text-red-600' },
+  { value: 'info', label: 'Chỉ thông báo', color: 'text-primary-600' },
+  { value: 'warning', label: 'Cần xác nhận', color: 'text-warning-600' },
+  { value: 'block', label: 'Chặn hoàn toàn', color: 'text-error-600' },
 ]
 
 export default function ScheduleRulesPage() {
   const { user, isAuthenticated } = useAuthStore()
   const router = useRouter()
-  const [isHydrated, setIsHydrated] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'rules' | 'overrides' | 'seasons'>('rules')
@@ -45,13 +44,11 @@ export default function ScheduleRulesPage() {
   const [showNewOverride, setShowNewOverride] = useState(false)
   const [showNewSeason, setShowNewSeason] = useState(false)
 
-  useEffect(() => { setIsHydrated(true) }, [])
-
   useEffect(() => {
-    if (isHydrated && !isAuthenticated) router.push('/login')
-  }, [isHydrated, isAuthenticated, router])
+    if (!isAuthenticated) router.push('/login')
+  }, [isAuthenticated, router])
 
-  if (!isHydrated || !user) return null
+  if (!user) return null
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -137,7 +134,7 @@ export default function ScheduleRulesPage() {
                   <button onClick={() => handleToggle(rule.rule_key, !rule.is_active)}
                     className="ml-3 shrink-0">
                     {rule.is_active
-                      ? <ToggleRight size={28} className="text-green-500" />
+                      ? <ToggleRight size={28} className="text-success-500" />
                       : <ToggleLeft size={28} className="text-gray-300" />
                     }
                   </button>
@@ -152,9 +149,9 @@ export default function ScheduleRulesPage() {
                         {LEVEL_OPTIONS.map(opt => (
                           <button key={opt.value} onClick={() => handleLevelChange(rule.rule_key, opt.value)}
                             className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors ${rule.warning_level === opt.value
-                              ? opt.value === 'block' ? 'bg-red-500 text-white border-red-500'
-                              : opt.value === 'warning' ? 'bg-amber-500 text-white border-amber-500'
-                              : 'bg-blue-500 text-white border-blue-500'
+                              ? opt.value === 'block' ? 'bg-error-500 text-white border-error-500'
+                              : opt.value === 'warning' ? 'bg-warning-500 text-white border-warning-500'
+                              : 'bg-primary-500 text-white border-primary-500'
                               : 'bg-white text-gray-400 border-gray-200'}`}>
                             {opt.label}
                           </button>
@@ -213,8 +210,8 @@ export default function ScheduleRulesPage() {
                     <p className="text-xs text-gray-400">{rule?.label}: {ov.override_warning} → {ov.override_block}</p>
                   </div>
                   <button onClick={() => { removeOverride(ov.id); setRefreshKey(k => k + 1); showToast('🗑️ Đã xóa') }}
-                    className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
-                    <Trash2 size={14} className="text-red-400" />
+                    className="w-8 h-8 rounded-lg bg-error-50 flex items-center justify-center">
+                    <Trash2 size={14} className="text-error-400" />
                   </button>
                 </div>
               )
@@ -278,14 +275,14 @@ export default function ScheduleRulesPage() {
               const isActive = new Date() >= new Date(s.start_date) && new Date() <= new Date(s.end_date)
               return (
                 <div key={s.id} className="bg-white rounded-2xl border border-gray-100 p-3.5 flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-green-100' : 'bg-gray-100'}`}>
-                    <Calendar size={18} className={isActive ? 'text-green-600' : 'text-gray-400'} />
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-success-100' : 'bg-gray-100'}`}>
+                    <Calendar size={18} className={isActive ? 'text-success-600' : 'text-gray-400'} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-bold text-dark-700">{s.name}</p>
                       {isActive && (
-                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-green-50 text-green-600 font-bold flex items-center gap-1">
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-success-50 text-success-600 font-bold flex items-center gap-1">
                           <Zap size={8} /> Active
                         </span>
                       )}
@@ -295,8 +292,8 @@ export default function ScheduleRulesPage() {
                     </p>
                   </div>
                   <button onClick={() => { removeSeason(s.id); setRefreshKey(k => k + 1); showToast('🗑️ Đã xóa') }}
-                    className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
-                    <Trash2 size={14} className="text-red-400" />
+                    className="w-8 h-8 rounded-lg bg-error-50 flex items-center justify-center">
+                    <Trash2 size={14} className="text-error-400" />
                   </button>
                 </div>
               )

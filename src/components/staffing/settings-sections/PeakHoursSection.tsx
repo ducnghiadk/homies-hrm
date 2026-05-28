@@ -11,134 +11,154 @@ interface PeakHour {
 }
 
 const DEFAULT_PEAKS: PeakHour[] = [
-  { label: 'Trưa', startHour: 11, endHour: 14, extraStaff: 1 },
-  { label: 'Tối', startHour: 17, endHour: 21, extraStaff: 2 },
+  { label: 'Trua', startHour: 11, endHour: 14, extraStaff: 1 },
+  { label: 'Toi', startHour: 17, endHour: 21, extraStaff: 2 },
 ]
 
-// ── View Mode ──
 export function PeakHoursSectionView({ onEdit }: { onEdit: () => void }) {
+  const totalExtraStaff = DEFAULT_PEAKS.reduce((sum, peak) => sum + peak.extraStaff, 0)
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-5 hover:border-primary/30 hover:shadow-md transition-all duration-200">
-      <div className="flex items-start justify-between mb-4">
+    <div className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 hover:border-primary/30 hover:shadow-md">
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
-            <Clock size={20} className="text-orange-600" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+            <Clock size={20} />
           </div>
           <div>
-            <h3 className="font-bold text-gray-800 flex items-center gap-1.5">
-              <Clock size={16} className="text-orange-600" />
-              Giờ cao điểm
-            </h3>
-            <p className="text-xs text-gray-500">Điều chỉnh nhân sự theo khung giờ</p>
+            <h3 className="font-bold text-gray-800">Gio cao diem</h3>
+            <p className="text-xs text-gray-500">Khu nay cho biet luc nao can cong them nguoi de tranh vo ca.</p>
           </div>
         </div>
         <button
           onClick={onEdit}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/5"
         >
-          <Pencil size={12} /> Sửa
+          <Pencil size={12} />
+          Sua
         </button>
       </div>
 
-      {/* Mini bar chart */}
-      <div className="flex items-end gap-1 h-12 mb-3">
-        {Array.from({ length: 16 }, (_, i) => {
-          const hour = 7 + i
-          const isPeak = DEFAULT_PEAKS.some(p => hour >= p.startHour && hour < p.endHour)
+      <div className="mb-3 flex items-end gap-1">
+        {Array.from({ length: 16 }, (_, index) => {
+          const hour = 7 + index
+          const peak = DEFAULT_PEAKS.find((item) => hour >= item.startHour && hour < item.endHour)
+
           return (
-            <div
-              key={hour}
-              className={`flex-1 rounded-t transition-all ${isPeak ? 'bg-orange-400' : 'bg-gray-200'}`}
-              style={{ height: isPeak ? '100%' : '30%' }}
-              title={`${hour}h${isPeak ? ' (cao điểm)' : ''}`}
-            />
+            <div key={hour} className="flex-1">
+              <div
+                className={`rounded-t transition-all ${peak ? 'bg-amber-400' : 'bg-gray-200'}`}
+                style={{ height: peak ? `${40 + peak.extraStaff * 24}px` : '24px' }}
+                title={`${hour}h`}
+              />
+            </div>
           )
         })}
       </div>
-      <div className="flex justify-between text-xs text-gray-400 mb-3">
-        <span>7h</span><span>12h</span><span>17h</span><span>22h</span>
+      <div className="mb-4 flex justify-between text-xs text-gray-400">
+        <span>7h</span>
+        <span>12h</span>
+        <span>17h</span>
+        <span>22h</span>
       </div>
 
-      {/* Summary */}
-      <div className="space-y-1.5 text-sm text-gray-600">
-        {DEFAULT_PEAKS.map(p => (
-          <div key={p.label} className="flex justify-between">
-            <span>{p.label} ({p.startHour}h-{p.endHour}h):</span>
-            <span className="font-bold text-orange-600">+{p.extraStaff} người</span>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {DEFAULT_PEAKS.map((peak) => (
+          <div key={peak.label} className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+            <div className="text-sm font-semibold text-gray-800">{peak.label}</div>
+            <p className="mt-1 text-xs text-amber-700">{peak.startHour}h - {peak.endHour}h · +{peak.extraStaff} nguoi</p>
           </div>
         ))}
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+        <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Tac dong nhin nhanh</div>
+        <p className="mt-2 text-sm text-gray-600">
+          Hien tai tong cong them {totalExtraStaff} luot nguoi cho cac khung dong khach.
+          Neu don app tang manh sau 19h, nen uu tien cong vao khung toi truoc khi tang deu ca ngay.
+        </p>
       </div>
     </div>
   )
 }
 
-// ── Edit Mode (inside EditDrawer) ──
-export function PeakHoursSectionEdit({ onSave }: { onSave?: () => void }) {
-  const [peaks, setPeaks] = useState<PeakHour[]>(DEFAULT_PEAKS)
+export function PeakHoursSectionEdit() {
+  const [peakHours, setPeakHours] = useState<PeakHour[]>(DEFAULT_PEAKS)
 
-  const updatePeak = (idx: number, field: keyof PeakHour, value: number) => {
-    setPeaks(prev => prev.map((p, i) =>
-      i === idx ? { ...p, [field]: value } : p
-    ))
+  const updatePeakHour = (index: number, field: keyof PeakHour, value: string | number) => {
+    setPeakHours((prev) => prev.map((item, currentIndex) => (
+      currentIndex === index ? { ...item, [field]: value } : item
+    )))
   }
 
   return (
     <div className="space-y-5">
       <p className="text-sm text-gray-500">
-        Thiết lập khung giờ cao điểm và số nhân viên cần thêm.
+        Dung muc nay de cong them nguoi cho khung dong khach. Nen nhap theo thuc te van hanh:
+        trua dong tai quay, toi dong don app, cuoi tuan dong ca hai.
       </p>
 
-      {peaks.map((peak, idx) => (
-        <div key={idx} className="p-4 rounded-xl border border-gray-200 space-y-3">
-          <div className="font-medium text-gray-700 text-sm">{peak.label}</div>
-          <div className="grid grid-cols-3 gap-3">
+      {peakHours.map((peakHour, index) => (
+        <div key={`${peakHour.label}-${index}`} className="space-y-3 rounded-xl border border-gray-200 p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Bắt đầu</label>
-              <select
-                className="w-full p-2 border border-gray-200 rounded-lg text-sm"
-                value={peak.startHour}
-                onChange={e => updatePeak(idx, 'startHour', Number(e.target.value))}
-              >
-                {Array.from({ length: 16 }, (_, i) => i + 7).map(h => (
-                  <option key={h} value={h}>{h}:00</option>
-                ))}
-              </select>
+              <label className="mb-1 block text-xs text-gray-500">Ten khung gio</label>
+              <input
+                type="text"
+                className="w-full rounded-lg border border-gray-200 p-2 text-sm"
+                value={peakHour.label}
+                onChange={(event) => updatePeakHour(index, 'label', event.target.value)}
+              />
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Kết thúc</label>
-              <select
-                className="w-full p-2 border border-gray-200 rounded-lg text-sm"
-                value={peak.endHour}
-                onChange={e => updatePeak(idx, 'endHour', Number(e.target.value))}
-              >
-                {Array.from({ length: 16 }, (_, i) => i + 7).map(h => (
-                  <option key={h} value={h}>{h}:00</option>
-                ))}
-              </select>
+              <label className="mb-1 block text-xs text-gray-500">Bat dau</label>
+              <input
+                type="number"
+                min={0}
+                max={23}
+                className="w-full rounded-lg border border-gray-200 p-2 text-sm"
+                value={peakHour.startHour}
+                onChange={(event) => updatePeakHour(index, 'startHour', Number(event.target.value))}
+              />
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Thêm</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  max={5}
-                  className="w-16 p-2 border border-gray-200 rounded-lg text-sm text-center"
-                  value={peak.extraStaff}
-                  onChange={e => updatePeak(idx, 'extraStaff', Number(e.target.value))}
-                />
-                <span className="text-xs text-gray-500">người</span>
-              </div>
+              <label className="mb-1 block text-xs text-gray-500">Ket thuc</label>
+              <input
+                type="number"
+                min={0}
+                max={23}
+                className="w-full rounded-lg border border-gray-200 p-2 text-sm"
+                value={peakHour.endHour}
+                onChange={(event) => updatePeakHour(index, 'endHour', Number(event.target.value))}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">Cong them nhan su</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={0}
+                max={5}
+                className="flex-1"
+                value={peakHour.extraStaff}
+                onChange={(event) => updatePeakHour(index, 'extraStaff', Number(event.target.value))}
+              />
+              <span className="min-w-[80px] text-right text-sm font-bold text-amber-600">
+                +{peakHour.extraStaff} nguoi
+              </span>
             </div>
           </div>
         </div>
       ))}
 
       <button
-        onClick={() => setPeaks(prev => [...prev, { label: `Khung ${prev.length + 1}`, startHour: 12, endHour: 14, extraStaff: 1 }])}
-        className="w-full py-2.5 border-2 border-dashed border-gray-200 text-gray-500 text-sm font-medium rounded-xl hover:border-primary/40 hover:text-primary transition-colors"
+        type="button"
+        onClick={() => setPeakHours((prev) => [...prev, { label: '', startHour: 0, endHour: 0, extraStaff: 0 }])}
+        className="w-full rounded-xl border-2 border-dashed border-gray-200 py-2.5 text-sm font-medium text-gray-500 transition-colors hover:border-primary/40 hover:text-primary"
       >
-        + Thêm khung giờ
+        + Them khung gio cao diem
       </button>
     </div>
   )

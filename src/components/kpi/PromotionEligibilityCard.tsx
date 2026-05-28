@@ -38,7 +38,7 @@ export default function PromotionEligibilityCard({
             </div>
           </div>
           <span className="text-xs px-2 py-0.5 rounded-full font-bold text-white"
-            style={{ background: review.eligible ? '#10b981' : '#ef4444' }}>
+            style={{ background: review.eligible ? '#1E9E57' : '#D9381E' }}>
             {review.eligible ? '✅ Đủ ĐK' : '❌ Chưa đủ'}
           </span>
         </div>
@@ -47,11 +47,11 @@ export default function PromotionEligibilityCard({
       {/* Stats */}
       <div className="p-3 grid grid-cols-2 gap-2">
         <div className="text-center p-2 rounded-lg" style={{ background: 'var(--gray-50)' }}>
-          <div className="text-lg font-black" style={{ color: '#3b82f6' }}>{review.average_score}</div>
+          <div className="text-lg font-black" style={{ color: '#2F6FA8' }}>{review.average_score}</div>
           <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>KPI trung bình</div>
         </div>
         <div className="text-center p-2 rounded-lg" style={{ background: 'var(--gray-50)' }}>
-          <div className="text-lg font-black" style={{ color: '#f59e0b' }}>{review.lowest_score}</div>
+          <div className="text-lg font-black" style={{ color: '#F6C85F' }}>{review.lowest_score}</div>
           <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>KPI thấp nhất</div>
         </div>
       </div>
@@ -66,7 +66,7 @@ export default function PromotionEligibilityCard({
         <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--gray-100)' }}>
           <div className="h-full rounded-full transition-all" style={{
             width: `${Math.min((monthsMet / requiredMonths) * 100, 100)}%`,
-            background: '#3b82f6',
+            background: '#2F6FA8',
           }} />
         </div>
       </div>
@@ -84,7 +84,7 @@ export default function PromotionEligibilityCard({
       {/* Violations */}
       {review.violation_count > 0 && (
         <div className="mx-3 mb-3 p-2 rounded-lg text-[10px]" style={{
-          background: review.critical_violations > 0 ? '#fee2e2' : '#fef3c7',
+          background: review.critical_violations > 0 ? '#fee2e2' : '#FFF8E8',
           color: review.critical_violations > 0 ? '#991b1b' : '#92400e',
         }}>
           ⚠️ {review.violation_count} lỗi ({review.critical_violations} nghiêm trọng)
@@ -101,7 +101,7 @@ export default function PromotionEligibilityCard({
           </button>
           <button onClick={onApprove}
             className="flex-1 py-2 rounded-xl text-xs font-bold text-white"
-            style={{ background: '#10b981' }}>
+            style={{ background: '#1E9E57' }}>
             ✅ Phê duyệt
           </button>
         </div>

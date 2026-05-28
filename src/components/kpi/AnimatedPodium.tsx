@@ -14,7 +14,7 @@ export default function AnimatedPodium({ top3 }: AnimatedPodiumProps) {
   const medal = ['🥇', '🥈', '🥉']
   const heights = [100, 76, 60]
   const bgGrad = [
-    'linear-gradient(135deg, #fbbf24, #f59e0b)',
+    'linear-gradient(135deg, #fbbf24, #F6C85F)',
     'linear-gradient(135deg, #9ca3af, #6b7280)',
     'linear-gradient(135deg, #cd7f32, #b8860b)',
   ]
@@ -54,7 +54,7 @@ export default function AnimatedPodium({ top3 }: AnimatedPodiumProps) {
 
             {/* Score */}
             <span className="text-sm font-black mb-1" style={{
-              color: entry.score >= 85 ? '#10b981' : '#3b82f6',
+              color: entry.score >= 85 ? '#1E9E57' : '#2F6FA8',
             }}>{entry.score}</span>
 
             <GradeBadge gradeCode={entry.grade_code} size="sm" showIcon={false} />

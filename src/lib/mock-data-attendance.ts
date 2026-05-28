@@ -223,7 +223,7 @@ export const mockManualEdits: ManualEdit[] = [
 
 // ============ Helpers ============
 export const getAttGridByStore = () => mockAttGrid
-export const getAttByDate = (date: string) => mockAttByDate
+export const getAttByDate = () => mockAttByDate
 export const getPendingAttRequests = () => mockAttRequests.filter(r => r.status === 'pending')
 export const getOTRequestsByStatus = (status: string) => mockOTRequests.filter(r => r.status === status)
 export const getCalendarByEmployee = (empId: string) => mockAttCalendar[empId] || []

@@ -9,7 +9,7 @@ interface TrendIndicatorProps {
 export default function TrendIndicator({ value, showValue = true, size = 'sm' }: TrendIndicatorProps) {
   const isUp = value > 0
   const isDown = value < 0
-  const color = isUp ? '#10b981' : isDown ? '#ef4444' : '#9ca3af'
+  const color = isUp ? '#1E9E57' : isDown ? '#D9381E' : '#9ca3af'
   const fontSize = size === 'sm' ? 10 : 12
   const iconSize = size === 'sm' ? 12 : 16
 

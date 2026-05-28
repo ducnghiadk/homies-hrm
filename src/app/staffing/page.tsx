@@ -3,9 +3,28 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
+import { format, startOfWeek } from 'date-fns'
 import AppShell from '@/components/layout/AppShell'
 import { mockStaffingForecast, mockStaffingAlerts, mockLaborOptimization, formatVND } from '@/lib/mock-data-p5'
+import { mockStores } from '@/lib/mock-data'
 import { AlertTriangle, TrendingDown, TrendingUp, Zap, Check, Lightbulb, CalendarDays, MapPin, DollarSign } from 'lucide-react'
+
+function getWeekStartFromDate(date: string): string {
+  const parsed = new Date(`${date}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  }
+  return format(startOfWeek(parsed, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+}
+
+function resolveStoreId(storeLabel: string, fallbackStoreId: string): string {
+  const normalized = storeLabel.toLowerCase()
+  const store = mockStores.find(candidate =>
+    normalized === candidate.name.toLowerCase() ||
+    normalized.includes(candidate.name.replace('Homies Milk Tea - ', '').toLowerCase())
+  )
+  return store?.id || fallbackStoreId
+}
 
 export default function StaffingPage() {
   const { user, isAuthenticated } = useAuthStore()
@@ -14,6 +33,54 @@ export default function StaffingPage() {
 
   useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
   if (!user) return null
+
+  const currentStoreId = user.store_id || 'store-001'
+
+  const openManageContext = (date: string, storeId = currentStoreId, focusDate?: string) => {
+    const weekStart = getWeekStartFromDate(date)
+    const params = new URLSearchParams({
+      weekStart,
+      storeId,
+    })
+
+    if (focusDate || date) {
+      params.set('focusDate', focusDate || date)
+    }
+
+    router.push(`/schedule/manage?${params.toString()}`)
+  }
+
+  const openWarningsContext = (date: string) => {
+    router.push(`/schedule/warnings?weekStart=${getWeekStartFromDate(date)}`)
+  }
+
+  const openScheduleWizard = () => {
+    router.push('/settings/staffing?tab=schedule')
+  }
+
+  const openOpenShiftContext = (date: string, storeLabel: string) => {
+    const storeId = resolveStoreId(storeLabel, currentStoreId)
+    const params = new URLSearchParams({
+      weekStart: getWeekStartFromDate(date),
+      storeId,
+      focusDate: date,
+    })
+    router.push(`/schedule/manage?${params.toString()}`)
+  }
+
+  const handleOptimizationApply = (action: string) => {
+    if (action.includes('Thuê thêm')) {
+      openScheduleWizard()
+      return
+    }
+
+    if (action.includes('Chuyển') || action.includes('Giảm') || action.includes('Cắt OT')) {
+      openManageContext(new Date().toISOString().split('T')[0], currentStoreId)
+      return
+    }
+
+    openScheduleWizard()
+  }
 
   return (
     <AppShell title="Smart Staffing">
@@ -86,6 +153,22 @@ export default function StaffingPage() {
                     <div key={i} className="flex-1 h-2 rounded-full" style={{ background: i < f.scheduled ? 'var(--success)' : 'var(--error)' }} />
                   ))}
                 </div>
+                {f.gap !== 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => openManageContext(f.date, currentStoreId)}
+                      className="rounded-xl bg-primary px-3 py-2 text-[11px] font-bold text-white transition-colors hover:bg-primary/90"
+                    >
+                      Mở phân ca
+                    </button>
+                    <button
+                      onClick={() => openWarningsContext(f.date)}
+                      className="rounded-xl border border-warning-200 bg-warning-50 px-3 py-2 text-[11px] font-bold text-warning-700 transition-colors hover:bg-warning-100"
+                    >
+                      Xem cảnh báo
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -104,6 +187,40 @@ export default function StaffingPage() {
                   <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                     <MapPin size={10} className="inline" /> {alert.store} · <CalendarDays size={10} className="inline" /> {alert.date}
                   </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {alert.type === 'under' && (
+                      <>
+                        <button
+                          onClick={() => openManageContext(alert.date, resolveStoreId(alert.store, currentStoreId), alert.date)}
+                          className="rounded-xl bg-primary px-3 py-2 text-[11px] font-bold text-white transition-colors hover:bg-primary/90"
+                        >
+                          Xếp ca ngay
+                        </button>
+                        <button
+                          onClick={() => openOpenShiftContext(alert.date, alert.store)}
+                          className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
+                        >
+                          Xử lý thiếu người
+                        </button>
+                      </>
+                    )}
+                    {alert.type === 'over' && (
+                      <button
+                        onClick={() => openManageContext(alert.date, resolveStoreId(alert.store, currentStoreId), alert.date)}
+                        className="rounded-xl border border-warning-200 bg-warning-50 px-3 py-2 text-[11px] font-bold text-warning-700 transition-colors hover:bg-warning-100"
+                      >
+                        Rà soát lịch
+                      </button>
+                    )}
+                    {alert.type === 'event' && (
+                      <button
+                        onClick={openScheduleWizard}
+                        className="rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-[11px] font-bold text-primary-700 transition-colors hover:bg-primary-100"
+                      >
+                        Mở Smart Schedule
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{
                   background: alert.severity === 'high' ? 'var(--error-light)' : alert.severity === 'medium' ? 'var(--warning-light)' : 'var(--gray-100)',
@@ -119,7 +236,7 @@ export default function StaffingPage() {
         {/* OPTIMIZE */}
         {tab === 'optimize' && (
           <div className="space-y-3 animate-slide-up">
-            <div className="card-elevated p-4 text-center" style={{ background: 'linear-gradient(135deg, #22c55e10, #3b82f610)' }}>
+            <div className="card-elevated p-4 text-center" style={{ background: 'linear-gradient(135deg, #48C07910, #2F6FA810)' }}>
               <Zap size={24} className="mx-auto mb-1" style={{ color: 'var(--success)' }} />
               <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Tiết kiệm khả thi</div>
               <div className="text-2xl font-black" style={{ color: 'var(--success)' }}>{formatVND(mockLaborOptimization.savings)}</div>
@@ -128,7 +245,7 @@ export default function StaffingPage() {
               </div>
             </div>
 
-            <h3 className="text-sm font-bold flex items-center gap-1.5"><Lightbulb size={14} className="text-amber-500" /> Đề xuất tối ưu</h3>
+            <h3 className="text-sm font-bold flex items-center gap-1.5"><Lightbulb size={14} className="text-warning-500" /> Đề xuất tối ưu</h3>
             {mockLaborOptimization.suggestions.map((s, i) => (
               <div key={i} className="card p-3 flex items-start gap-3">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{
@@ -146,8 +263,12 @@ export default function StaffingPage() {
                     <span style={{ color: 'var(--text-muted)' }}>Rủi ro: {s.risk}</span>
                   </div>
                 </div>
-                <button className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'var(--primary-light)' }}>
-                  <Check size={14} style={{ color: 'var(--primary)' }} />
+                <button
+                  onClick={() => handleOptimizationApply(s.action)}
+                  className="rounded-full px-3 py-2 text-[11px] font-bold"
+                  style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}
+                >
+                  <Check size={14} className="inline mr-1" /> Mở xử lý
                 </button>
               </div>
             ))}

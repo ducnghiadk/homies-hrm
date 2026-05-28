@@ -40,7 +40,7 @@ export default function ProgressBar({
                   w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold
                   transition-all duration-500
                   ${isCompleted
-                    ? 'bg-green-500 text-white scale-100'
+                    ? 'bg-success-500 text-white scale-100'
                     : isCurrent
                       ? 'bg-primary text-white ring-4 ring-primary/20 animate-pulse'
                       : 'bg-gray-200 text-gray-400'
@@ -52,7 +52,7 @@ export default function ProgressBar({
 
               {/* Label */}
               <span className={`text-xs font-medium text-center leading-tight ${
-                isCompleted ? 'text-green-600'
+                isCompleted ? 'text-success-600'
                 : isCurrent ? 'text-primary font-bold'
                 : 'text-gray-300'
               }`}>
@@ -69,7 +69,7 @@ export default function ProgressBar({
           <div key={i} className="flex-1 h-0.5 mx-4">
             <div
               className={`h-full transition-all duration-500 rounded-full ${
-                currentStep > i + 1 ? 'bg-green-500' : 'bg-gray-200'
+                currentStep > i + 1 ? 'bg-success-500' : 'bg-gray-200'
               }`}
             />
           </div>

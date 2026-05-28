@@ -27,22 +27,22 @@ export default function WarningPanel({ validation, onApplyFix }: WarningPanelPro
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
       <div className="p-3 bg-gray-50 border-b font-bold text-sm text-gray-700 flex items-center gap-2">
-        <AlertTriangle size={16} className="text-amber-600" /> Kiểm tra & Cảnh báo
+        <AlertTriangle size={16} className="text-warning-600" /> Kiểm tra & Cảnh báo
       </div>
 
       <div className="p-3 space-y-3 max-h-[300px] overflow-y-auto">
         {/* Errors */}
         {validation.errors.length > 0 && (
           <div>
-            <div className="text-xs font-bold text-red-600 flex items-center gap-1 mb-2">
+            <div className="text-xs font-bold text-error-600 flex items-center gap-1 mb-2">
               <AlertCircle size={14} /> LỖI ({validation.errors.length})
             </div>
             <div className="space-y-2">
               {validation.errors.map(err => (
-                <div key={err.id} className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <div className="text-xs font-medium text-red-800">• {err.message}</div>
+                <div key={err.id} className="bg-error-50 border border-error-200 rounded-lg p-3">
+                  <div className="text-xs font-medium text-error-800">• {err.message}</div>
                   {err.suggestion && (
-                    <div className="text-xs text-red-600 mt-1 flex items-start gap-1">
+                    <div className="text-xs text-error-600 mt-1 flex items-start gap-1">
                       <Lightbulb size={11} className="inline shrink-0 mt-0.5" /> {err.suggestion}
                     </div>
                   )}
@@ -50,8 +50,8 @@ export default function WarningPanel({ validation, onApplyFix }: WarningPanelPro
                     <button
                       onClick={() => handleShowPreview(err)}
                       className="mt-2 flex items-center gap-1 px-2.5 py-1 text-xs font-bold
-                        bg-white border border-red-300 text-red-700 rounded-md
-                        hover:bg-red-100 transition-colors"
+                        bg-white border border-error-300 text-error-700 rounded-md
+                        hover:bg-error-100 transition-colors"
                     >
                       <Sparkles size={12} /> Áp dụng gợi ý
                     </button>
@@ -65,15 +65,15 @@ export default function WarningPanel({ validation, onApplyFix }: WarningPanelPro
         {/* Warnings */}
         {validation.warnings.length > 0 && (
           <div>
-            <div className="text-xs font-bold text-yellow-600 flex items-center gap-1 mb-2">
+            <div className="text-xs font-bold text-warning-600 flex items-center gap-1 mb-2">
               <AlertTriangle size={14} /> CẢNH BÁO ({validation.warnings.length})
             </div>
             <div className="space-y-2">
               {validation.warnings.map(w => (
-                <div key={w.id} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <div className="text-xs font-medium text-yellow-800">• {w.message}</div>
+                <div key={w.id} className="bg-warning-50 border border-warning-200 rounded-lg p-3">
+                  <div className="text-xs font-medium text-warning-800">• {w.message}</div>
                   {w.suggestion && (
-                    <div className="text-xs text-yellow-600 mt-1 flex items-center gap-1"><Lightbulb size={11} /> {w.suggestion}</div>
+                    <div className="text-xs text-warning-600 mt-1 flex items-center gap-1"><Lightbulb size={11} /> {w.suggestion}</div>
                   )}
                 </div>
               ))}
@@ -84,13 +84,13 @@ export default function WarningPanel({ validation, onApplyFix }: WarningPanelPro
         {/* Passed */}
         {validation.passed.length > 0 && (
           <div>
-            <div className="text-xs font-bold text-green-600 flex items-center gap-1 mb-2">
+            <div className="text-xs font-bold text-success-600 flex items-center gap-1 mb-2">
               <CheckCircle2 size={14} /> ĐÃ ĐẠT ({validation.passed.length})
             </div>
             <div className="space-y-1">
               {validation.passed.map(p => (
-                <div key={p.id} className="text-xs text-green-700 flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className="text-green-500" /> {p.message}
+                <div key={p.id} className="text-xs text-success-700 flex items-center gap-1.5">
+                  <CheckCircle2 size={12} className="text-success-500" /> {p.message}
                 </div>
               ))}
             </div>
@@ -99,8 +99,8 @@ export default function WarningPanel({ validation, onApplyFix }: WarningPanelPro
 
         {/* All clear */}
         {validation.errors.length === 0 && validation.warnings.length === 0 && (
-          <div className="text-center py-4 text-green-600">
-            <CheckCircle2 size={32} className="mx-auto mb-2 text-green-400" />
+          <div className="text-center py-4 text-success-600">
+            <CheckCircle2 size={32} className="mx-auto mb-2 text-success-400" />
             <div className="text-sm font-bold">Không có vấn đề!</div>
           </div>
         )}

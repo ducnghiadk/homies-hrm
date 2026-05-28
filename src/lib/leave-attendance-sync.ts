@@ -38,6 +38,7 @@ export function createLeaveAttendanceRecords(
   isHalfDay: boolean = false,
   _halfDayPeriod?: 'morning' | 'afternoon',
 ): Attendance[] {
+  void _halfDayPeriod
   const employee = getEmployeeById(employeeId)
   const storeId = employee?.store_id || 'store-001'
 
@@ -45,6 +46,8 @@ export function createLeaveAttendanceRecords(
   const created: Attendance[] = []
 
   for (const date of dates) {
+    const isSingleHalfDay = isHalfDay && startDate === endDate
+
     // Check if leave attendance already exists for this date+employee
     const existing = mockAttendances.find(
       a => a.employee_id === employeeId && a.date === date && a.status === 'leave'
@@ -61,7 +64,7 @@ export function createLeaveAttendanceRecords(
       leave_request_id: leaveRequestId,
       leave_type: leaveType,
       late_minutes: 0,
-      total_hours: isHalfDay ? 4 : 8,
+      total_hours: isSingleHalfDay ? 4 : 8,
       overtime_hours: 0,
     }
 

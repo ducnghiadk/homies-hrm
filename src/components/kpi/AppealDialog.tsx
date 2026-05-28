@@ -39,7 +39,7 @@ export default function AppealDialog({ isOpen, onClose, onSubmit, violationName 
           style={{ border: '1px solid var(--gray-200)' }}
         />
         <div className="flex items-center justify-between mt-1 mb-3">
-          <span className="text-[10px]" style={{ color: valid ? '#10b981' : '#ef4444' }}>
+          <span className="text-[10px]" style={{ color: valid ? '#1E9E57' : '#D9381E' }}>
             {reason.length}/20 ký tự tối thiểu
           </span>
           <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>

@@ -205,13 +205,13 @@ export default function LeaveRequestForm({
                     {q.total > 0 && (
                       <span
                         className="text-[9px] font-bold"
-                        style={{ color: q.remaining <= 2 ? '#ef4444' : t.colorHex }}
+                        style={{ color: q.remaining <= 2 ? '#D9381E' : t.colorHex }}
                       >
                         {q.remaining} ngày
                       </span>
                     )}
                     {isExhausted && (
-                      <span className="text-[8px] text-red-400 font-medium">Hết quota</span>
+                      <span className="text-[8px] text-error-400 font-medium">Hết quota</span>
                     )}
                   </button>
                 )
@@ -335,8 +335,8 @@ export default function LeaveRequestForm({
           {hasConflict && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle size={14} className="text-amber-500" />
-                <span className="text-xs font-semibold text-amber-700">
+                <AlertTriangle size={14} className="text-warning-500" />
+                <span className="text-xs font-semibold text-warning-700">
                   Có {affectedShifts.length} ca làm bị ảnh hưởng
                 </span>
               </div>
@@ -351,11 +351,11 @@ export default function LeaveRequestForm({
                   const dayLabel = `${dayNames[d.getDay()]} ${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}`
 
                   return (
-                    <div key={key} className="bg-amber-50/60 border border-amber-100 rounded-xl p-3 space-y-2.5">
+                    <div key={key} className="bg-warning-50/60 border border-warning-100 rounded-xl p-3 space-y-2.5">
                       {/* Shift info */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Clock size={13} className="text-amber-500" />
+                          <Clock size={13} className="text-warning-500" />
                           <span className="text-xs font-bold text-gray-700">
                             {dayLabel} — {shift.shiftName}
                           </span>
@@ -387,7 +387,7 @@ export default function LeaveRequestForm({
                             className={`w-full px-3 py-2 rounded-lg border text-xs appearance-none bg-white pr-8 ${
                               selected
                                 ? 'border-emerald-300 text-gray-700'
-                                : 'border-amber-200 text-gray-400'
+                                : 'border-warning-200 text-gray-400'
                             } focus:ring-2 focus:ring-primary-200 focus:border-primary-400`}
                           >
                             <option value="">— Chọn người thay —</option>
@@ -411,7 +411,7 @@ export default function LeaveRequestForm({
                           onClick={() => setReplacementSelections(prev => ({ ...prev, [key]: candidates[0].id }))}
                           className="flex items-center gap-1.5 text-[10px] text-primary-600 font-medium hover:underline"
                         >
-                          <Star size={10} className="text-amber-400 fill-amber-400" />
+                          <Star size={10} className="text-warning-400 fill-amber-400" />
                           Gợi ý: {candidates[0].name} (đăng ký rảnh)
                         </button>
                       )}
@@ -422,7 +422,7 @@ export default function LeaveRequestForm({
                           <CheckCircle2 size={10} />
                           {selectedCandidate.name} sẽ thay ca này
                           {selectedCandidate.isRegisteredAvailable && (
-                            <span className="text-amber-500 flex items-center gap-0.5">
+                            <span className="text-warning-500 flex items-center gap-0.5">
                               <Star size={8} className="fill-amber-400" /> Rảnh
                             </span>
                           )}
@@ -431,7 +431,7 @@ export default function LeaveRequestForm({
 
                       {/* No candidates */}
                       {candidates.length === 0 && (
-                        <div className="text-[10px] text-red-500 italic">
+                        <div className="text-[10px] text-error-500 italic">
                           Không tìm thấy người thay — quản lý sẽ tự sắp xếp
                         </div>
                       )}
@@ -442,7 +442,7 @@ export default function LeaveRequestForm({
 
               {/* Overall status */}
               {!allReplacementsSelected && (
-                <div className="mt-2 flex items-center gap-1.5 text-[10px] text-amber-600">
+                <div className="mt-2 flex items-center gap-1.5 text-[10px] text-warning-600">
                   <Info size={10} />
                   Vui lòng chọn người thay cho tất cả ca bị ảnh hưởng
                 </div>
@@ -454,18 +454,18 @@ export default function LeaveRequestForm({
           {startDate && (validation.errors.length > 0 || validation.warnings.length > 0) && (
             <div className="space-y-2">
               {validation.errors.map((err, i) => (
-                <div key={`e-${i}`} className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-50 border border-red-100">
-                  <AlertTriangle size={14} className="text-red-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-xs text-red-700">{err.message}</span>
+                <div key={`e-${i}`} className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-error-50 border border-error-100">
+                  <AlertTriangle size={14} className="text-error-500 flex-shrink-0 mt-0.5" />
+                  <span className="text-xs text-error-700">{err.message}</span>
                 </div>
               ))}
               {validation.warnings.map((warn, i) => (
-                <div key={`w-${i}`} className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-100">
-                  <Info size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <div key={`w-${i}`} className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-warning-50 border border-warning-100">
+                  <Info size={14} className="text-warning-500 flex-shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-xs text-amber-700">{warn.message}</span>
+                    <span className="text-xs text-warning-700">{warn.message}</span>
                     {warn.suggestion && (
-                      <div className="text-xs text-amber-500 mt-0.5">{warn.suggestion}</div>
+                      <div className="text-xs text-warning-500 mt-0.5">{warn.suggestion}</div>
                     )}
                   </div>
                 </div>

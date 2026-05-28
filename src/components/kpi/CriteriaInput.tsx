@@ -30,7 +30,7 @@ export default function CriteriaInput({
           <div className="flex items-center gap-1">
             <span className="text-xs font-semibold">{label}</span>
             {criteriaData && (
-              <button type="button" onClick={() => setShowGuide(true)} className="text-gray-400 hover:text-blue-500 transition-colors">
+              <button type="button" onClick={() => setShowGuide(true)} className="text-gray-400 hover:text-primary-500 transition-colors">
                 <Info size={12} />
               </button>
             )}
@@ -45,8 +45,8 @@ export default function CriteriaInput({
                 <button key={i} type="button" disabled={readOnly}
                   className="transition-all"
                   onClick={() => onChange?.(i + 1)}>
-                  <Star size={18} fill={i < value ? '#f59e0b' : 'none'}
-                    color={i < value ? '#f59e0b' : '#d1d5db'}
+                  <Star size={18} fill={i < value ? '#F6C85F' : 'none'}
+                    color={i < value ? '#F6C85F' : '#d1d5db'}
                     className={readOnly ? '' : 'hover:scale-110 cursor-pointer'} />
                 </button>
               ))}
@@ -55,7 +55,7 @@ export default function CriteriaInput({
             <div className="flex items-center gap-1">
               {readOnly ? (
                 <span className="text-sm font-bold" style={{
-                  color: value >= 90 ? '#10b981' : value >= 70 ? '#f59e0b' : '#ef4444',
+                  color: value >= 90 ? '#1E9E57' : value >= 70 ? '#F6C85F' : '#D9381E',
                 }}>{value}%</span>
               ) : (
                 <input type="number" min={0} max={100} value={value}
@@ -87,7 +87,7 @@ export default function CriteriaInput({
         <div className="w-8 h-1.5 rounded-full overflow-hidden flex-shrink-0" style={{ background: 'var(--gray-100)' }}>
           <div className="h-full rounded-full transition-all" style={{
             width: `${Math.min(pct, 100)}%`,
-            background: pct >= 80 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444',
+            background: pct >= 80 ? '#1E9E57' : pct >= 60 ? '#F6C85F' : '#D9381E',
           }} />
         </div>
       </div>

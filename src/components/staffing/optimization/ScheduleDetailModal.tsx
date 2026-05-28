@@ -42,7 +42,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
         <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
           <div>
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <CalendarDays size={18} className="text-blue-600" />
+              <CalendarDays size={18} className="text-primary-600" />
               Lịch làm việc chi tiết - {plan.name}
             </h3>
             <p className="text-xs text-gray-500">Mô phỏng ca làm việc điển hình trong ngày</p>
@@ -61,7 +61,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
             <div className="relative pt-6 pb-2">
               {/* Grid Lines */}
               <div className="absolute inset-0 flex pointer-events-none">
-                {hours.map((h, i) => (
+                {hours.map((h) => (
                     <div key={h} className="flex-1 border-l border-gray-100 first:border-l-0 relative min-h-[200px]">
                         <span className="absolute -top-6 -left-2 text-xs text-gray-400">{h}h</span>
                     </div>
@@ -74,7 +74,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
                     <div key={`ft-${i}`} className="relative h-10 flex items-center group">
                         <div className="w-24 shrink-0 text-xs font-bold text-gray-700">FT {i+1}</div>
                         <div className="flex-1 h-full relative border-t border-gray-50 group-hover:bg-gray-50/50">
-                            {renderTimeline(slot.startTime, slot.endTime, 'bg-blue-500')}
+                            {renderTimeline(slot.startTime, slot.endTime, 'bg-primary-500')}
                             <div className="absolute left-[100px] top-1 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                 {slot.role} ({slot.shiftName})
                             </div>
@@ -85,7 +85,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
                     <div key={`pt-${i}`} className="relative h-10 flex items-center group">
                         <div className="w-24 shrink-0 text-xs font-bold text-gray-500">PT {i+1}</div>
                         <div className="flex-1 h-full relative border-t border-gray-50 group-hover:bg-gray-50/50">
-                             {renderTimeline(slot.startTime, slot.endTime, 'bg-orange-400')}
+                             {renderTimeline(slot.startTime, slot.endTime, 'bg-warning-400')}
                              <div className="absolute left-[100px] top-1 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                 {slot.role} ({slot.shiftName})
                             </div>
@@ -114,7 +114,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
                           {plan.fulltime.map((s, i) => (
                               <tr key={i}>
                                   <td className="p-3 font-medium text-gray-700">FT {i+1} - {s.role}</td>
-                                  <td className="p-3"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold">Full-time</span></td>
+                                  <td className="p-3"><span className="bg-primary-100 text-primary-700 px-2 py-0.5 rounded text-xs font-bold">Full-time</span></td>
                                   <td className="p-3 text-gray-600">{s.shiftName}</td>
                                   <td className="p-3 text-right">{s.hoursPerDay}h</td>
                                   <td className="p-3 text-right font-medium">{s.monthlyCost.toLocaleString('vi-VN')}</td>
@@ -123,7 +123,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
                           {plan.parttime.map((s, i) => (
                               <tr key={i}>
                                   <td className="p-3 font-medium text-gray-700">PT {i+1} - {s.role}</td>
-                                  <td className="p-3"><span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-xs font-bold">Part-time</span></td>
+                                  <td className="p-3"><span className="bg-warning-100 text-warning-700 px-2 py-0.5 rounded text-xs font-bold">Part-time</span></td>
                                   <td className="p-3 text-gray-600">{s.shiftName}</td>
                                   <td className="p-3 text-right">{s.hoursPerDay}h</td>
                                   <td className="p-3 text-right font-medium">{s.monthlyCost.toLocaleString('vi-VN')}</td>

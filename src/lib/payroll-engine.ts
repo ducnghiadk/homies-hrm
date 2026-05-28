@@ -4,13 +4,15 @@
 // =============================================
 
 import {
-  mockAttendances, mockEmployees, mockPositions,
+  mockAttendances, mockEmployees, mockPositions, mockShifts, mockStores,
   type Attendance,
 } from './mock-data'
+import { mockRevenueByMonth, mockRevenueByStore } from './mock-data-p4'
 import {
   mockBonuses, mockDeductions, mockAdvances,
-  mockAllowanceTypes, type SalarySlipData,
+  type SalarySlipData,
 } from './mock-data-payroll'
+import { getActivePayrollPolicy, INSURANCE_MAX_BASE } from './services/payroll-policy-service'
 
 // ══════════════════════════════════════
 // TYPES
@@ -20,6 +22,33 @@ export interface PayrollInput {
   employeeId: string
   periodStart: string   // '2026-02-01'
   periodEnd: string     // '2026-02-28'
+  fnbAllocations?: Record<string, FnbPayrollAllocation>
+}
+
+export interface FnbAllocationBreakdown {
+  store_id: string
+  store_name: string
+  shift_id: string
+  shift_name: string
+  store_revenue: number
+  store_revenue_share: number
+  shift_revenue: number
+  shift_points: number
+  store_points: number
+  service_charge_pool: number
+  tip_pool: number
+  store_reserve: number
+  employee_points: number
+  employee_share: number
+}
+
+export interface FnbPayrollAllocation {
+  serviceChargePool: number
+  tipPool: number
+  storeReserve: number
+  share: number
+  points: number
+  breakdown: FnbAllocationBreakdown[]
 }
 
 export interface PayrollResult {
@@ -46,6 +75,11 @@ export interface PayrollResult {
   total_allowances: number
   bonuses: { name: string; amount: number }[]
   total_bonuses: number
+  fnb_service_charge_pool: number
+  fnb_tip_pool: number
+  fnb_fnb_share: number
+  fnb_allocation_points: number
+  fnb_allocation_breakdown: FnbAllocationBreakdown[]
   total_earnings: number
 
   // Deductions
@@ -84,15 +118,181 @@ const OT_RATES = {
   holiday: 3.0,
 }
 
-const INSURANCE_RATES = {
-  bhxh: 0.08,
-  bhyt: 0.015,
-  bhtn: 0.01,
-}
-const INSURANCE_MAX_BASE = 29800000
-
 // Leave types considered "paid"
 const PAID_LEAVE_TYPES = ['annual', 'sick', 'wedding', 'bereavement', 'maternity']
+
+const FNB_SHIFT_POINTS: Record<string, number> = {
+  'shift-001': 0.96,
+  'shift-002': 1.04,
+  'shift-003': 1.08,
+}
+
+const FNB_POSITION_WEIGHTS: Record<string, number> = {
+  'pos-001': 1.04,
+  'pos-002': 1.02,
+  'pos-003': 1.00,
+  'pos-004': 1.08,
+  'pos-005': 1.18,
+}
+
+function getPayrollMonth(periodStart: string): string {
+  return periodStart.slice(0, 7)
+}
+
+function getStoreRevenueForPeriod(storeId: string, periodStart: string): { name: string; revenue: number } {
+  const base = mockRevenueByStore.find((store) => store.store_id === storeId)
+  const store = mockStores.find((item) => item.id === storeId)
+  const baseRevenue = mockRevenueByStore.reduce((sum, store) => sum + store.revenue, 0)
+  const monthRevenue = mockRevenueByMonth.find((item) => item.month === getPayrollMonth(periodStart))?.revenue
+  const scale = baseRevenue > 0 && monthRevenue ? monthRevenue / baseRevenue : 1
+  return {
+    name: store?.name ?? base?.name ?? storeId,
+    revenue: Math.round((base?.revenue ?? 0) * scale),
+  }
+}
+
+function getShiftName(shiftId: string): string {
+  return mockShifts.find((shift) => shift.id === shiftId)?.name ?? shiftId
+}
+
+function inferShiftId(employee: { position_id: string; role: string }, attendance: Attendance): string {
+  if (attendance.shift_id) return attendance.shift_id
+  if (employee.position_id === 'pos-001') return 'shift-001'
+  if (employee.position_id === 'pos-002') return 'shift-002'
+  if (employee.position_id === 'pos-003') return 'shift-003'
+  if (employee.position_id === 'pos-004') return 'shift-002'
+  if (employee.position_id === 'pos-005') return 'shift-001'
+
+  const daySeed = Number(attendance.date.slice(-2)) || 1
+  return mockShifts[(daySeed - 1) % mockShifts.length]?.id ?? 'shift-001'
+}
+
+function getFnbContributionPoints(employee: { position_id: string; role: string }, attendance: Attendance): number {
+  const hours = attendance.total_hours > 0 ? attendance.total_hours : 8 + (attendance.overtime_hours || 0)
+  const hoursWeight = Math.max(0.65, Math.min((hours || 8) / 8, 1.35))
+  const punctualityWeight = attendance.status === 'late' ? 0.92 : attendance.status === 'early' ? 1.02 : 1
+  const roleWeight = employee.role === 'store_manager'
+    ? 1.25
+    : employee.role === 'shift_leader'
+      ? 1.15
+      : employee.role === 'hr_admin'
+        ? 0.5
+        : 1
+  const positionWeight = FNB_POSITION_WEIGHTS[employee.position_id] ?? 1
+  const shiftWeight = FNB_SHIFT_POINTS[inferShiftId(employee, attendance)] ?? 1
+  return hoursWeight * punctualityWeight * roleWeight * positionWeight * shiftWeight
+}
+
+function buildFnbPayrollAllocations(periodStart: string, periodEnd: string): Record<string, FnbPayrollAllocation> {
+  const policy = getActivePayrollPolicy()
+  if (policy.fnb.serviceChargePoolRate <= 0 || policy.fnb.tipPoolRate <= 0) return {}
+
+  const employees = mockEmployees.filter((e) => e.status !== 'inactive' && e.role !== 'ceo')
+  const employeeMap = new Map(employees.map((employee) => [employee.id, employee]))
+  const storePointTotals = new Map<string, number>()
+  const shiftBuckets = new Map<string, {
+    storeId: string
+    storeName: string
+    shiftId: string
+    shiftName: string
+    storeRevenue: number
+    totalPoints: number
+    employeePoints: Map<string, number>
+  }>()
+
+  for (const attendance of mockAttendances) {
+    if (attendance.date < periodStart || attendance.date > periodEnd) continue
+    if (attendance.status !== 'on_time' && attendance.status !== 'late' && attendance.status !== 'early') continue
+
+    const employee = employeeMap.get(attendance.employee_id)
+    if (!employee) continue
+
+    const storeId = attendance.store_id || employee.store_id
+    const storeRevenueInfo = getStoreRevenueForPeriod(storeId, periodStart)
+    const shiftId = inferShiftId(employee, attendance)
+    const shiftName = getShiftName(shiftId)
+    const points = getFnbContributionPoints(employee, attendance)
+    if (points <= 0) continue
+
+    const bucketKey = `${storeId}:${shiftId}`
+    const bucket = shiftBuckets.get(bucketKey) ?? {
+      storeId,
+      storeName: storeRevenueInfo.name,
+      shiftId,
+      shiftName,
+      storeRevenue: storeRevenueInfo.revenue,
+      totalPoints: 0,
+      employeePoints: new Map<string, number>(),
+    }
+
+    bucket.totalPoints += points
+    bucket.employeePoints.set(employee.id, (bucket.employeePoints.get(employee.id) ?? 0) + points)
+    shiftBuckets.set(bucketKey, bucket)
+    storePointTotals.set(storeId, (storePointTotals.get(storeId) ?? 0) + points)
+  }
+
+  const allocations: Record<string, FnbPayrollAllocation> = {}
+
+  for (const bucket of shiftBuckets.values()) {
+    const storePoints = storePointTotals.get(bucket.storeId) ?? 0
+    const storeRevenueShare = storePoints > 0 ? bucket.totalPoints / storePoints : 0
+    const shiftRevenue = Math.round(bucket.storeRevenue * storeRevenueShare)
+    const serviceChargePool = Math.round(shiftRevenue * policy.fnb.serviceChargePoolRate)
+    const tipPool = Math.round(serviceChargePool * policy.fnb.tipPoolRate)
+    const storeReserve = Math.max(0, serviceChargePool - tipPool)
+    const employeeShares = Array.from(bucket.employeePoints.entries()).map(([employeeId, points]) => ({
+      employeeId,
+      points,
+      share: bucket.totalPoints > 0 ? (tipPool * points) / bucket.totalPoints : 0,
+    }))
+
+    const roundedShares = employeeShares.map((entry) => ({ ...entry, share: Math.round(entry.share) }))
+    const roundedTotal = roundedShares.reduce((sum, entry) => sum + entry.share, 0)
+    const diff = tipPool - roundedTotal
+    if (diff !== 0 && roundedShares.length > 0) {
+      const adjustIndex = roundedShares.reduce((bestIndex, entry, index, list) =>
+        entry.share > list[bestIndex].share ? index : bestIndex, 0)
+      roundedShares[adjustIndex].share += diff
+    }
+
+    for (const entry of roundedShares) {
+      const current = allocations[entry.employeeId] ?? {
+        serviceChargePool: 0,
+        tipPool: 0,
+        storeReserve: 0,
+        share: 0,
+        points: 0,
+        breakdown: [],
+      }
+
+      current.serviceChargePool += serviceChargePool
+      current.tipPool += tipPool
+      current.storeReserve += storeReserve
+      current.share += entry.share
+      current.points += entry.points
+      current.breakdown.push({
+        store_id: bucket.storeId,
+        store_name: bucket.storeName,
+        shift_id: bucket.shiftId,
+        shift_name: bucket.shiftName,
+        store_revenue: bucket.storeRevenue,
+        store_revenue_share: storeRevenueShare,
+        shift_revenue: shiftRevenue,
+        shift_points: bucket.totalPoints,
+        store_points: storePoints,
+        service_charge_pool: serviceChargePool,
+        tip_pool: tipPool,
+        store_reserve: storeReserve,
+        employee_points: entry.points,
+        employee_share: entry.share,
+      })
+
+      allocations[entry.employeeId] = current
+    }
+  }
+
+  return allocations
+}
 
 // ══════════════════════════════════════
 // 1. GET EMPLOYEE BASE SALARY
@@ -102,7 +302,8 @@ export function getEmployeeBaseSalary(employeeId: string): number {
   const emp = mockEmployees.find(e => e.id === employeeId)
   if (!emp) return 0
   const pos = mockPositions.find(p => p.id === emp.position_id)
-  return pos?.base_salary ?? 0
+  const policyGrade = getActivePayrollPolicy().grades.find(grade => grade.id === emp.position_id)
+  return policyGrade?.base_salary ?? pos?.base_salary ?? 0
 }
 
 // ══════════════════════════════════════
@@ -176,8 +377,14 @@ export function calculateOvertimeAmount(
   overtimeHours: number,
   otType: 'weekday' | 'weekend' | 'holiday' = 'weekday',
 ): number {
+  const policy = getActivePayrollPolicy()
   const hourlyRate = baseSalary / STANDARD_WORK_DAYS / 8
-  return Math.round(overtimeHours * hourlyRate * OT_RATES[otType])
+  const rate = otType === 'weekday'
+    ? policy.rates.otWeekday
+    : otType === 'holiday'
+      ? policy.rates.otHoliday
+      : OT_RATES[otType]
+  return Math.round(overtimeHours * hourlyRate * rate)
 }
 
 // ══════════════════════════════════════
@@ -190,10 +397,11 @@ export function calculateInsurance(baseSalary: number): {
   bhtn: number
   total: number
 } {
+  const policy = getActivePayrollPolicy()
   const base = Math.min(baseSalary, INSURANCE_MAX_BASE)
-  const bhxh = Math.round(base * INSURANCE_RATES.bhxh)
-  const bhyt = Math.round(base * INSURANCE_RATES.bhyt)
-  const bhtn = Math.round(base * INSURANCE_RATES.bhtn)
+  const bhxh = Math.round(base * policy.rates.bhxhEmployee)
+  const bhyt = Math.round(base * policy.rates.bhytEmployee)
+  const bhtn = Math.round(base * policy.rates.bhtnEmployee)
   return { bhxh, bhyt, bhtn, total: bhxh + bhyt + bhtn }
 }
 
@@ -222,24 +430,43 @@ export function calculateTax(
 // HELPERS: Allowances, Bonuses, Deductions
 // ══════════════════════════════════════
 
-function getAllowancesForEmployee(employeeId: string, baseSalary: number): { name: string; amount: number }[] {
+function getAllowancesForEmployee(
+  employeeId: string,
+  _baseSalary: number,
+  attendance: AttendanceSummaryForPayroll,
+): { name: string; amount: number }[] {
   const emp = mockEmployees.find(e => e.id === employeeId)
   if (!emp) return []
 
-  // All active fixed allowances apply to all employees
+  const policy = getActivePayrollPolicy()
   const result: { name: string; amount: number }[] = []
-  for (const a of mockAllowanceTypes) {
-    if (!a.is_active) continue
-    if (a.type === 'fixed') {
-      result.push({ name: a.name, amount: a.amount })
-    } else {
-      // percent-based
-      result.push({ name: a.name, amount: Math.round(baseSalary * a.amount / 100) })
-    }
+
+  for (const allowance of policy.allowances) {
+    const appliesToManagers = allowance.appliesTo.toLowerCase().includes('quản lý') || allowance.appliesTo.toLowerCase().includes('trưởng ca')
+    const isManagerLevel = emp.role !== 'employee'
+    if (appliesToManagers && !isManagerLevel) continue
+    result.push({ name: allowance.name, amount: allowance.amount })
+  }
+
+  const mealAllowance = Math.round(attendance.workDays * policy.fnb.mealAllowancePerShift)
+  if (mealAllowance > 0) {
+    result.push({ name: 'F&B: Cơm ca theo ngày công', amount: mealAllowance })
+  }
+
+  if (emp.role !== 'employee' && policy.fnb.closingShiftAllowance > 0) {
+    result.push({ name: 'F&B: Phụ cấp ca đóng cửa', amount: policy.fnb.closingShiftAllowance })
+  }
+
+  if (['shift_leader', 'store_manager', 'area_manager'].includes(emp.role) && policy.fnb.openingShiftAllowance > 0) {
+    result.push({ name: 'F&B: Phụ cấp ca mở cửa', amount: policy.fnb.openingShiftAllowance })
+  }
+
+  if (attendance.overtimeHours > 0 && policy.fnb.nightShiftAllowance > 0) {
+    result.push({ name: 'F&B: Hỗ trợ ca đêm/chốt muộn', amount: policy.fnb.nightShiftAllowance })
   }
 
   // Manager-level get responsibility allowance, others don't
-  if (emp.role === 'employee' || emp.role === 'shift_leader') {
+  if (emp.role === 'employee') {
     return result.filter(r => r.name !== 'Phụ cấp trách nhiệm')
   }
   return result
@@ -292,14 +519,14 @@ function getOtherDeductions(
 
 export function calculatePayroll(input: PayrollInput): PayrollResult {
   const { employeeId, periodStart, periodEnd } = input
+  const policy = getActivePayrollPolicy()
 
   // ── Step 1: Employee info
   const emp = mockEmployees.find(e => e.id === employeeId)
   const pos = mockPositions.find(p => p.id === emp?.position_id)
-  const baseSalary = pos?.base_salary ?? 0
-  const storeName = emp?.store_id === 'store-001' ? 'Boba House Q.1'
-    : emp?.store_id === 'store-002' ? 'Boba House Thủ Đức'
-    : 'Boba House Lê Văn Sỹ'
+  const policyGrade = policy.grades.find(grade => grade.id === pos?.id)
+  const baseSalary = policyGrade?.base_salary ?? pos?.base_salary ?? 0
+  const storeName = emp ? getStoreRevenueForPeriod(emp.store_id, periodStart).name : ''
 
   // ── Step 2: Attendance
   const att = getPayrollAttendanceSummary(employeeId, periodStart, periodEnd)
@@ -312,12 +539,17 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const overtimeAmount = calculateOvertimeAmount(baseSalary, att.overtimeHours)
 
   // ── Step 5: Allowances
-  const allowances = getAllowancesForEmployee(employeeId, baseSalary)
+  const allowances = getAllowancesForEmployee(employeeId, baseSalary, att)
   const totalAllowances = allowances.reduce((sum, a) => sum + a.amount, 0)
 
   // ── Step 6: Bonuses
   const bonuses = getBonusesForPeriod(employeeId, periodStart)
   const totalBonuses = bonuses.reduce((sum, b) => sum + b.amount, 0)
+
+  // ── Step 6b: F&B tip/service charge allocation
+  const fnbAllocations = input.fnbAllocations ?? buildFnbPayrollAllocations(periodStart, periodEnd)
+  const fnbAllocation = fnbAllocations[employeeId]
+  const fnbShare = fnbAllocation?.share ?? 0
 
   // ── Step 7: Deductions
   const lateDeduction = att.lateCount * LATE_PENALTY
@@ -329,7 +561,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const totalDeductions = lateDeduction + absentDeduction + advanceDeduction + totalOtherDeductions
 
   // ── Step 8: Total earnings
-  const totalEarnings = baseEarned + overtimeAmount + totalAllowances + totalBonuses
+  const totalEarnings = baseEarned + overtimeAmount + totalAllowances + totalBonuses + fnbShare
 
   // ── Step 9: Insurance
   const insurance = calculateInsurance(baseSalary)
@@ -364,6 +596,11 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     total_allowances: totalAllowances,
     bonuses,
     total_bonuses: totalBonuses,
+    fnb_service_charge_pool: fnbAllocation?.serviceChargePool ?? 0,
+    fnb_tip_pool: fnbAllocation?.tipPool ?? 0,
+    fnb_fnb_share: fnbShare,
+    fnb_allocation_points: fnbAllocation?.points ?? 0,
+    fnb_allocation_breakdown: fnbAllocation?.breakdown ?? [],
     total_earnings: totalEarnings,
 
     late_deduction: lateDeduction,
@@ -394,12 +631,13 @@ export function calculatePayrollBatch(
   periodStart: string,
   periodEnd: string,
 ): PayrollResult[] {
-  // Only calculate for active employees (not CEO/HR admin)
+  // Only calculate for active employees, except CEO.
   const activeEmployees = mockEmployees.filter(
     e => e.status !== 'inactive' && e.role !== 'ceo',
   )
+  const fnbAllocations = buildFnbPayrollAllocations(periodStart, periodEnd)
   return activeEmployees.map(emp =>
-    calculatePayroll({ employeeId: emp.id, periodStart, periodEnd }),
+    calculatePayroll({ employeeId: emp.id, periodStart, periodEnd, fnbAllocations }),
   )
 }
 
@@ -410,6 +648,10 @@ export function calculatePayrollBatch(
 let slipCounter = 100
 
 export function generateSalarySlip(result: PayrollResult): SalarySlipData {
+  const fnbAllowance = result.fnb_fnb_share > 0
+    ? [{ name: 'F&B: Tip/service charge', amount: result.fnb_fnb_share }]
+    : []
+
   return {
     id: `slip-gen-${slipCounter++}`,
     employee_id: result.employee_id,
@@ -420,7 +662,7 @@ export function generateSalarySlip(result: PayrollResult): SalarySlipData {
     work_days: result.work_days,
     standard_days: result.standard_days,
     base_salary: result.base_earned,
-    allowances: result.allowances,
+    allowances: [...result.allowances, ...fnbAllowance],
     overtime_hours: result.overtime_hours,
     overtime_amount: result.overtime_amount,
     bonus: result.total_bonuses,

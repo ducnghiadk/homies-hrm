@@ -1,0 +1,162 @@
+
+> hrm-tra-sua@1.0.0 build
+> next build
+
+▲ Next.js 16.2.6 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  · optimizePackageImports
+  ✓ scrollRestoration
+  · serverActions
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 20.6s
+  Running TypeScript ...
+  Finished TypeScript in 36.1s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/131) ...
+  Generating static pages using 11 workers (32/131) 
+  Generating static pages using 11 workers (65/131) 
+  Generating static pages using 11 workers (98/131) 
+✓ Generating static pages using 11 workers (131/131) in 2.6s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin
+├ ○ /analytics
+├ ƒ /api/invitations/send
+├ ○ /attendance
+├ ○ /attendance/by-date
+├ ○ /attendance/by-store
+├ ○ /attendance/calendar
+├ ○ /attendance/device-alerts
+├ ○ /attendance/devices
+├ ○ /attendance/late-report
+├ ○ /attendance/manual
+├ ○ /attendance/overtime
+├ ○ /attendance/requests
+├ ○ /attendance/today
+├ ○ /career
+├ ○ /career-path
+├ ○ /career-path/goals
+├ ○ /career-path/leaderboard
+├ ○ /career-path/notifications
+├ ○ /career-path/onboarding
+├ ○ /career-path/promotion
+├ ○ /career-path/reports
+├ ○ /career-path/requests
+├ ○ /career-path/settings
+├ ○ /career-path/skills
+├ ○ /chat
+├ ○ /chat/team
+├ ○ /checkin
+├ ○ /employees
+├ ƒ /employees/[id]
+├ ○ /employees/contracts
+├ ƒ /employees/contracts/[id]
+├ ○ /employees/export
+├ ○ /employees/import
+├ ○ /employees/invitations
+├ ○ /employees/invitations/form
+├ ○ /employees/invitations/new
+├ ○ /employees/new
+├ ○ /employees/offboarding
+├ ○ /evaluation
+├ ○ /gamification
+├ ○ /inventory
+├ ○ /kpi
+├ ○ /kpi/evaluate
+├ ○ /kpi/evaluate/trial
+├ ○ /kpi/leaderboard
+├ ○ /kpi/promotion
+├ ○ /kpi/reports
+├ ○ /kpi/result
+├ ○ /kpi/review
+├ ○ /kpi/settings
+├ ○ /kpi/violations
+├ ○ /kpi/violations/appeals
+├ ○ /kpi/violations/batch
+├ ○ /kpi/violations/log
+├ ○ /kpi/violations/store
+├ ○ /learning
+├ ○ /leave
+├ ○ /leave/approval
+├ ○ /leave/balance
+├ ○ /leave/calendar
+├ ○ /leave/request
+├ ○ /login
+├ ○ /more
+├ ○ /my-schedule
+├ ○ /news
+├ ○ /notifications
+├ ○ /offline-demo
+├ ○ /onboarding
+├ ○ /payroll
+├ ○ /payroll/advance
+├ ○ /payroll/bonus
+├ ○ /payroll/by-store
+├ ○ /payroll/calculate
+├ ○ /payroll/company
+├ ○ /payroll/deductions
+├ ○ /payroll/hold
+├ ○ /payroll/insurance
+├ ○ /payroll/salary-slip
+├ ○ /policies
+├ ○ /profile
+├ ○ /rbac
+├ ○ /recognition
+├ ○ /reports
+├ ○ /reports/attendance-report
+├ ○ /reports/auto-raise
+├ ○ /reports/budget
+├ ○ /reports/hr-overview
+├ ○ /reports/salary-structure
+├ ○ /reports/staff-hours
+├ ○ /reports/tasks
+├ ○ /requests
+├ ○ /rewards
+├ ○ /schedule
+├ ○ /schedule/admin/registration
+├ ○ /schedule/admin/review
+├ ○ /schedule/assign
+├ ○ /schedule/auto
+├ ○ /schedule/by-shift
+├ ○ /schedule/history
+├ ○ /schedule/manage
+├ ○ /schedule/open-shifts
+├ ○ /schedule/open-shifts/claims
+├ ○ /schedule/preferences
+├ ○ /schedule/swap
+├ ○ /schedule/swap/list
+├ ○ /schedule/templates
+├ ○ /schedule/warnings
+├ ○ /schedules
+├ ○ /settings
+├ ○ /settings/labor-cost
+├ ○ /settings/master-data
+├ ○ /settings/payroll
+├ ○ /settings/permissions
+├ ○ /settings/schedule-rules
+├ ○ /settings/schedule-rules/preferences
+├ ○ /settings/schedule-rules/preferences/overview
+├ ○ /settings/schedule-rules/shifts
+├ ○ /settings/staffing
+├ ○ /settings/staffing/calculator
+├ ○ /settings/system
+├ ○ /settings/wifi
+├ ○ /staffing
+├ ○ /tasks/daily
+├ ○ /tasks/handover
+├ ○ /tasks/incidents
+├ ○ /tasks/templates
+├ ○ /verify
+└ ○ /wellness
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

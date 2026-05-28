@@ -16,8 +16,8 @@ export default function HourlyDemandChart({ demand }: HourlyDemandChartProps) {
         <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <defs>
             <linearGradient id="colorStaff" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+              <stop offset="5%" stopColor="#2F6FA8" stopOpacity={0.8}/>
+              <stop offset="95%" stopColor="#2F6FA8" stopOpacity={0}/>
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -40,7 +40,7 @@ export default function HourlyDemandChart({ demand }: HourlyDemandChartProps) {
           <Area 
             type="monotone" 
             dataKey="staff" 
-            stroke="#3b82f6" 
+            stroke="#2F6FA8" 
             fillOpacity={1} 
             fill="url(#colorStaff)" 
           />

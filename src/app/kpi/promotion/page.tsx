@@ -118,7 +118,7 @@ export default function PromotionPage() {
                 }}
                 className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white disabled:opacity-50"
                 style={{
-                  background: confirmAction.action === 'approve' ? '#10b981' : '#ef4444',
+                  background: confirmAction.action === 'approve' ? '#1E9E57' : '#D9381E',
                 }}>
                 {confirmAction.action === 'approve' ? 'Phê duyệt' : 'Từ chối'}
               </button>

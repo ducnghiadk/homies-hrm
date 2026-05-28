@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import type { EmployeeKPITrend, StoreKPISummary } from '@/lib/kpi-report-service'
-import GradeBadge from '@/components/kpi/GradeBadge'
 
 // === TREND LINE CHART ===
 interface TrendChartProps {
@@ -10,7 +9,7 @@ interface TrendChartProps {
   storeAvg?: { period: string; avg: number }[]
 }
 
-export function TrendChart({ trend, storeAvg }: TrendChartProps) {
+export function TrendChart({ trend }: TrendChartProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   if (!trend || !trend.months.length) return <div className="text-xs text-center py-8" style={{ color: 'var(--text-muted)' }}>Chưa có dữ liệu</div>
 
@@ -54,7 +53,7 @@ export function TrendChart({ trend, storeAvg }: TrendChartProps) {
             onMouseLeave={() => setHoveredIdx(null)}
             style={{ cursor: 'pointer' }}>
             <circle cx={p.x} cy={p.y} r={hoveredIdx === i ? 5 : 3.5}
-              fill={p.score >= 85 ? '#10b981' : p.score >= 70 ? '#3b82f6' : '#ef4444'}
+              fill={p.score >= 85 ? '#1E9E57' : p.score >= 70 ? '#2F6FA8' : '#D9381E'}
               stroke="white" strokeWidth={1.5} />
             {/* Month label */}
             <text x={p.x} y={h - 4} textAnchor="middle" fontSize={7} fill="var(--text-muted)">
@@ -95,7 +94,7 @@ export function CategoryBarChart({ categories }: CategoryBarChartProps) {
                 {cat.weakest_area && <span className="px-1 py-0.5 rounded text-[8px] font-black" style={{ background: '#fef2f2', color: '#dc2626' }}>Yếu nhất</span>}
               </span>
               <span className="font-bold" style={{
-                color: cat.average >= 80 ? '#10b981' : cat.average >= 65 ? '#f59e0b' : '#ef4444',
+                color: cat.average >= 80 ? '#1E9E57' : cat.average >= 65 ? '#F6C85F' : '#D9381E',
               }}>{cat.average}
                 <span className="ml-1 text-[8px]">
                   {cat.trend === 'up' ? '↑' : cat.trend === 'down' ? '↓' : '→'}
@@ -105,7 +104,7 @@ export function CategoryBarChart({ categories }: CategoryBarChartProps) {
             <div className="h-2 rounded-full" style={{ background: 'var(--gray-100)' }}>
               <div className="h-full rounded-full transition-all" style={{
                 width: `${cat.average}%`,
-                background: cat.average >= 80 ? '#10b981' : cat.average >= 65 ? '#f59e0b' : '#ef4444',
+                background: cat.average >= 80 ? '#1E9E57' : cat.average >= 65 ? '#F6C85F' : '#D9381E',
               }} />
             </div>
           </div>
@@ -122,11 +121,11 @@ interface GradeDistributionProps {
 
 export function GradeDistribution({ distribution }: GradeDistributionProps) {
   const grades = [
-    { code: 'excellent' as const, label: 'Xuất sắc', color: '#10b981' },
-    { code: 'good' as const, label: 'Tốt', color: '#3b82f6' },
-    { code: 'fair' as const, label: 'Khá', color: '#8b5cf6' },
-    { code: 'average' as const, label: 'TB', color: '#f59e0b' },
-    { code: 'poor' as const, label: 'Yếu', color: '#ef4444' },
+    { code: 'excellent' as const, label: 'Xuất sắc', color: '#1E9E57' },
+    { code: 'good' as const, label: 'Tốt', color: '#2F6FA8' },
+    { code: 'fair' as const, label: 'Khá', color: '#001D3D' },
+    { code: 'average' as const, label: 'TB', color: '#F6C85F' },
+    { code: 'poor' as const, label: 'Yếu', color: '#D9381E' },
   ]
   const total = Object.values(distribution).reduce((a, b) => a + b, 0) || 1
 

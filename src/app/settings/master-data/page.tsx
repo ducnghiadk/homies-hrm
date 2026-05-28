@@ -49,7 +49,7 @@ export default function SettingsMasterDataPage() {
                 </div>
                 <div className="flex gap-1">
                   <button className="p-1.5 rounded-lg" style={{ background: 'var(--gray-100)' }}><Edit2 size={12} style={{ color: 'var(--text-muted)' }} /></button>
-                  <button className="p-1.5 rounded-lg" style={{ background: '#ef444420' }}><Trash2 size={12} className="text-red-500" /></button>
+                  <button className="p-1.5 rounded-lg" style={{ background: '#D9381E20' }}><Trash2 size={12} className="text-error-500" /></button>
                 </div>
               </div>
             ))}

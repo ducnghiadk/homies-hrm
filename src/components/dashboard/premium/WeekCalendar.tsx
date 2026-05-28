@@ -10,7 +10,7 @@ export function WeekCalendar({ days, totalHours }: Props) {
     <div className="bg-white rounded-2xl p-4 border border-gray-100">
       <div className="flex justify-between gap-1">
         {days.map((day, i) => (
-          <div key={i} className={`flex-1 text-center py-3 px-1 rounded-xl transition-all ${day.isToday ? 'bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/30' : day.shift ? 'bg-gray-50 hover:bg-gray-100' : 'bg-gray-50/50'}`}>
+          <div key={i} className={`flex-1 text-center py-3 px-1 rounded-xl transition-all ${day.isToday ? 'bg-gradient-to-br from-primary-700 to-primary-500 text-white shadow-lg shadow-primary-600/30' : day.shift ? 'bg-gray-50 hover:bg-gray-100' : 'bg-gray-50/50'}`}>
             <p className={`text-xs font-medium ${day.isToday ? 'text-white/80' : 'text-gray-500'}`}>{dayNames[i]}</p>
             <div className="my-2">
               {day.shift ? (

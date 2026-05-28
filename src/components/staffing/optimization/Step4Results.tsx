@@ -28,7 +28,7 @@ export default function Step4Results({ state, plans, onSelectPlan, onBack }: Ste
     <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500 pb-10">
       <div className="text-center">
         <h2 className="text-xl font-bold text-gray-900 flex items-center justify-center gap-2">
-          <ClipboardList size={20} className="text-blue-600" />
+          <ClipboardList size={20} className="text-primary-600" />
           Bước 4/4: Kết quả phân tích
         </h2>
         <p className="text-gray-500 text-sm">Chúng tôi đề xuất phương án tối ưu dựa trên traffic của bạn</p>
@@ -38,12 +38,12 @@ export default function Step4Results({ state, plans, onSelectPlan, onBack }: Ste
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
          <div className="flex justify-between items-center mb-4">
              <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                <BarChart3 size={14} className="text-blue-600" />
+                <BarChart3 size={14} className="text-primary-600" />
                 Nhu cầu nhân sự theo giờ
                 <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Dự báo</span>
              </h3>
              <div className="flex gap-4 text-xs text-gray-500">
-                 <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded-sm" /> Cần thiết</div>
+                 <div className="flex items-center gap-1"><div className="w-3 h-3 bg-primary-500 rounded-sm" /> Cần thiết</div>
              </div>
          </div>
          <HourlyDemandChart demand={hourlyDemand} />

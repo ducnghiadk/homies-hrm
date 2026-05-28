@@ -5,13 +5,13 @@
 
 -- Organization
 INSERT INTO organizations (id, name, subscription_plan) VALUES
-('a0000000-0000-0000-0000-000000000001', 'Boba House Vietnam', 'premium');
+('a0000000-0000-0000-0000-000000000001', 'Homies Milk Tea Vietnam', 'premium');
 
 -- Stores
 INSERT INTO stores (id, org_id, name, address, latitude, longitude, checkin_radius_meters) VALUES
-('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Boba House - Quận 1', '123 Nguyễn Huệ, Quận 1, TP.HCM', 10.77359, 106.70302, 100),
-('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'Boba House - Quận 7', '456 Nguyễn Thị Thập, Quận 7, TP.HCM', 10.73587, 106.72157, 100),
-('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'Boba House - Thủ Đức', '789 Võ Văn Ngân, TP. Thủ Đức', 10.85095, 106.77191, 150);
+('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Homies Milk Tea - Quận 1', '123 Nguyễn Huệ, Quận 1, TP.HCM', 10.77359, 106.70302, 100),
+('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'Homies Milk Tea - Quận 7', '456 Nguyễn Thị Thập, Quận 7, TP.HCM', 10.73587, 106.72157, 100),
+('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'Homies Milk Tea - Thủ Đức', '789 Võ Văn Ngân, TP. Thủ Đức', 10.85095, 106.77191, 150);
 
 -- Positions
 INSERT INTO positions (id, org_id, name, level, base_salary) VALUES

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "sonner"
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
@@ -10,13 +11,13 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "HRM Trà Sữa 🧋",
-  description: "Hệ thống quản lý nhân sự chuỗi trà sữa - Chấm công, Xếp lịch, KPI, Gamification",
+  title: "Homies Milk Tea HRM",
+  description: "Hệ thống quản lý nhân sự chuyên nghiệp cho Homies Milk Tea",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "HRM Trà Sữa",
+    title: "Homies HRM",
   },
 }
 
@@ -37,7 +38,9 @@ export default function RootLayout({
   return (
     <html lang="vi" className={inter.variable}>
       <body className={inter.className}>
-        {children}
+        <ErrorBoundary showDetails={process.env.NODE_ENV === 'development'}>
+          {children}
+        </ErrorBoundary>
         <Toaster richColors position="top-right" />
       </body>
     </html>

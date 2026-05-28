@@ -21,7 +21,7 @@ export default function Step1BasicInfo({ state, onUpdate, onNext }: Step1Props) 
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
       <div className="text-center">
         <h2 className="text-xl font-bold text-gray-900 flex items-center justify-center gap-2">
-          <MapPin size={20} className="text-red-500" />
+          <MapPin size={20} className="text-error-500" />
           Bước 1/4: Thông tin quán
         </h2>
         <p className="text-gray-500 text-sm">Cung cấp thông tin cơ bản để tính toán nhu cầu nhân sự</p>

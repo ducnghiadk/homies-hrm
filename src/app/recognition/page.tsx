@@ -7,7 +7,7 @@ import AppShell from '@/components/layout/AppShell'
 import { getEmployeeById, mockEmployees } from '@/lib/mock-data'
 import { mockKudos, mockWallOfFame, KUDOS_TYPES, getKudosForEmployee } from '@/lib/mock-data-p3'
 import { getInitials } from '@/lib/utils'
-import { Heart, Send, Award, Star } from 'lucide-react'
+import { Send } from 'lucide-react'
 
 export default function RecognitionPage() {
   const { user, isAuthenticated } = useAuthStore()
@@ -189,7 +189,7 @@ export default function RecognitionPage() {
                   <div className="text-sm font-bold">{emp?.full_name}</div>
                   <div className="text-xs font-semibold mt-0.5" style={{color:'var(--accent)'}}> {wof.title}</div>
                   <div className="flex items-center justify-center gap-3 mt-2">
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{background:'#FEF3C7',color:'#D97706'}}>{wof.month}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{background:'#FFF8E8',color:'#D97706'}}>{wof.month}</span>
                     <span className="text-xs" style={{color:'var(--text-muted)'}}>💝 {wof.total_kudos} kudos</span>
                   </div>
                 </div>

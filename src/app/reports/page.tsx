@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
@@ -134,9 +135,9 @@ export default function ReportsPage() {
                         <span className="text-xs font-bold">{formatVND(m.total)}</span>
                       </div>
                       <div className="flex h-2.5 rounded-full overflow-hidden">
-                        <div style={{ width: `${(m.salary / maxTotal) * 100}%`, background: '#3b82f6' }} />
-                        <div style={{ width: `${(m.ot / maxTotal) * 100}%`, background: '#f59e0b' }} />
-                        <div style={{ width: `${(m.bonus / maxTotal) * 100}%`, background: '#22c55e' }} />
+                        <div style={{ width: `${(m.salary / maxTotal) * 100}%`, background: '#2F6FA8' }} />
+                        <div style={{ width: `${(m.ot / maxTotal) * 100}%`, background: '#F6C85F' }} />
+                        <div style={{ width: `${(m.bonus / maxTotal) * 100}%`, background: '#48C079' }} />
                       </div>
                       <div className="text-[9px] text-right mt-0.5" style={{ color: 'var(--text-muted)' }}>
                         Tỷ lệ/DT: <b>{m.ratio}%</b>
@@ -146,9 +147,9 @@ export default function ReportsPage() {
                 })}
               </div>
               <div className="flex gap-3 mt-3 justify-center">
-                <span className="flex items-center gap-1 text-xs"><span className="w-2 h-2 rounded-full" style={{ background: '#3b82f6' }} /> Lương</span>
-                <span className="flex items-center gap-1 text-xs"><span className="w-2 h-2 rounded-full" style={{ background: '#f59e0b' }} /> OT</span>
-                <span className="flex items-center gap-1 text-xs"><span className="w-2 h-2 rounded-full" style={{ background: '#22c55e' }} /> Thưởng</span>
+                <span className="flex items-center gap-1 text-xs"><span className="w-2 h-2 rounded-full" style={{ background: '#2F6FA8' }} /> Lương</span>
+                <span className="flex items-center gap-1 text-xs"><span className="w-2 h-2 rounded-full" style={{ background: '#F6C85F' }} /> OT</span>
+                <span className="flex items-center gap-1 text-xs"><span className="w-2 h-2 rounded-full" style={{ background: '#48C079' }} /> Thưởng</span>
               </div>
             </div>
 
@@ -162,6 +163,26 @@ export default function ReportsPage() {
                 <div className="text-lg font-bold">{mockLaborCost[mockLaborCost.length - 1].ratio}%</div>
                 <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Tỷ lệ / DT</div>
               </div>
+            </div>
+
+            {/* Additional Reports */}
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <Link href="/reports/salary-structure" className="card p-4 flex flex-col justify-between hover:border-primary-500 hover:shadow-md transition-all border border-gray-100/80 active:scale-[0.98]">
+                <div>
+                  <div className="text-xl">💰</div>
+                  <div className="text-xs font-black mt-2 text-gray-800 tracking-tight">Cơ cấu Lương</div>
+                  <div className="text-[10px] text-gray-400 mt-1 leading-relaxed">Phân tích chi tiết cấu phần, phụ cấp, OT & BHXH</div>
+                </div>
+                <span className="text-xs text-primary-600 font-bold mt-4 flex items-center gap-0.5">Xem chi tiết →</span>
+              </Link>
+              <Link href="/reports/tasks" className="card p-4 flex flex-col justify-between hover:border-primary-500 hover:shadow-md transition-all border border-gray-100/80 active:scale-[0.98]">
+                <div>
+                  <div className="text-xl">📋</div>
+                  <div className="text-xs font-black mt-2 text-gray-800 tracking-tight">Báo cáo Tác vụ</div>
+                  <div className="text-[10px] text-gray-400 mt-1 leading-relaxed">Checklist hoàn thành, sự cố & hiệu suất vận hành</div>
+                </div>
+                <span className="text-xs text-primary-600 font-bold mt-4 flex items-center gap-0.5">Xem chi tiết →</span>
+              </Link>
             </div>
           </div>
         )}
@@ -195,7 +216,7 @@ export default function ReportsPage() {
               <h3 className="text-sm font-bold mb-3">📊 Tỷ trọng doanh thu</h3>
               {(() => {
                 const totalRev = mockTopProducts.reduce((s, p) => s + p.revenue, 0)
-                const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6']
+                const colors = ['#2F6FA8', '#48C079', '#F6C85F', '#D9381E', '#001D3D']
                 return (
                   <>
                     <div className="flex rounded-full overflow-hidden h-4 mb-3">

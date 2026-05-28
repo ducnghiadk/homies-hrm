@@ -31,7 +31,7 @@ export default function QuickActionsBar({ actions }: QuickActionsBarProps) {
               <span className="text-[10px] font-bold text-center" style={{ color: a.color }}>{a.label}</span>
               {a.badge !== undefined && a.badge > 0 && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[8px] font-black text-white flex items-center justify-center"
-                  style={{ background: '#ef4444' }}>
+                  style={{ background: '#D9381E' }}>
                   {a.badge}
                 </span>
               )}

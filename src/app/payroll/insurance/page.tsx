@@ -2,7 +2,7 @@
 
 import AppShell from '@/components/layout/AppShell'
 import { mockInsurance } from '@/lib/mock-data-payroll'
-import { Shield, Users, Download } from 'lucide-react'
+import { Shield, Download } from 'lucide-react'
 
 const fmt = (n: number) => n.toLocaleString('vi-VN') + '₫'
 
@@ -10,7 +10,7 @@ export default function InsurancePage() {
   return (
     <AppShell title="Bảo hiểm">
       <div className="space-y-4">
-        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff' }}>
+        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #1E9E57, #059669)', color: '#fff' }}>
           <div className="flex items-center gap-2">
             <Shield size={20} />
             <div>
@@ -45,7 +45,7 @@ export default function InsurancePage() {
                   <th className="text-left py-2" style={{ color: 'var(--text-primary)' }}>NV</th>
                   <th className="text-right py-2" style={{ color: 'var(--text-muted)' }}>Lương ĐK</th>
                   <th className="text-right py-2 text-emerald-500">NV đóng</th>
-                  <th className="text-right py-2 text-blue-500">CT đóng</th>
+                  <th className="text-right py-2 text-primary-500">CT đóng</th>
                 </tr>
               </thead>
               <tbody>
@@ -54,7 +54,7 @@ export default function InsurancePage() {
                     <td className="py-2 font-medium" style={{ color: 'var(--text-primary)' }}>{ins.employee_name.split(' ').slice(-2).join(' ')}</td>
                     <td className="text-right py-2" style={{ color: 'var(--text-secondary)' }}>{(ins.salary_base / 1e6).toFixed(1)}tr</td>
                     <td className="text-right py-2 font-medium text-emerald-500">{fmt(ins.bhxh_employee + ins.bhyt_employee + ins.bhtn_employee)}</td>
-                    <td className="text-right py-2 font-medium text-blue-500">{fmt(ins.bhxh_company + ins.bhyt_company + ins.bhtn_company)}</td>
+                    <td className="text-right py-2 font-medium text-primary-500">{fmt(ins.bhxh_company + ins.bhyt_company + ins.bhtn_company)}</td>
                   </tr>
                 ))}
               </tbody>

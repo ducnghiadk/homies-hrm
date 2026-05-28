@@ -2,6 +2,11 @@ export type SettingCategoryId = 'organization' | 'hr' | 'finance' | 'system';
 
 export type SetupStatus = 'not_started' | 'in_progress' | 'completed';
 
+export interface SettingSubItem {
+  title: string;
+  href: string;
+}
+
 export interface SettingItem {
   id: string;
   category: SettingCategoryId;
@@ -18,6 +23,9 @@ export interface SettingItem {
   // Setup wizard
   isRequired: boolean;
   setupOrder: number;
+
+  // Sub-items (optional)
+  subItems?: SettingSubItem[];
 
   // Quick actions (optional)
   quickActions?: {

@@ -3,13 +3,13 @@
 import { useState } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import { getCalendarByEmployee } from '@/lib/mock-data-attendance'
-import type { CalendarDay, AttStatus } from '@/lib/mock-data-attendance'
+import type { CalendarDay } from '@/lib/mock-data-attendance'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 const DAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
 const statusColors: Record<string, string> = {
-  on_time: '#10b981', late: '#f59e0b', early_leave: '#f97316',
-  absent: '#ef4444', day_off: '#9ca3af', leave: '#3b82f6',
+  on_time: '#1E9E57', late: '#F6C85F', early_leave: '#f97316',
+  absent: '#D9381E', day_off: '#9ca3af', leave: '#2F6FA8',
 }
 
 export default function AttendanceCalendarPage() {
@@ -73,8 +73,8 @@ export default function AttendanceCalendarPage() {
         {/* Summary */}
         <div className="grid grid-cols-3 gap-2 animate-slide-up" style={{ animationDelay: '0.1s' }}>
           <div className="card text-center p-3"><div className="text-lg font-bold text-emerald-500">{calendarData.filter(c => c.status === 'on_time').length}</div><div className="text-xs" style={{ color: 'var(--text-muted)' }}>Đúng giờ</div></div>
-          <div className="card text-center p-3"><div className="text-lg font-bold text-blue-500">{calendarData.filter(c => c.status === 'leave').length}</div><div className="text-xs" style={{ color: 'var(--text-muted)' }}>Nghỉ phép</div></div>
-          <div className="card text-center p-3"><div className="text-lg font-bold text-red-500">{calendarData.filter(c => c.status === 'absent').length}</div><div className="text-xs" style={{ color: 'var(--text-muted)' }}>Vắng</div></div>
+          <div className="card text-center p-3"><div className="text-lg font-bold text-primary-500">{calendarData.filter(c => c.status === 'leave').length}</div><div className="text-xs" style={{ color: 'var(--text-muted)' }}>Nghỉ phép</div></div>
+          <div className="card text-center p-3"><div className="text-lg font-bold text-error-500">{calendarData.filter(c => c.status === 'absent').length}</div><div className="text-xs" style={{ color: 'var(--text-muted)' }}>Vắng</div></div>
         </div>
       </div>
     </AppShell>

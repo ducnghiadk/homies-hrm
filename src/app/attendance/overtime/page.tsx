@@ -4,12 +4,12 @@ import { useState } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import { mockOTRequests } from '@/lib/mock-data-attendance'
 import type { OTRequest } from '@/lib/mock-data-attendance'
-import { Clock, CheckCircle, XCircle, AlertCircle, Plus } from 'lucide-react'
+import { Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 
 const statusMap = {
-  pending: { label: 'Chờ duyệt', color: '#f59e0b', icon: AlertCircle },
-  approved: { label: 'Đã duyệt', color: '#10b981', icon: CheckCircle },
-  rejected: { label: 'Từ chối', color: '#ef4444', icon: XCircle },
+  pending: { label: 'Chờ duyệt', color: '#F6C85F', icon: AlertCircle },
+  approved: { label: 'Đã duyệt', color: '#1E9E57', icon: CheckCircle },
+  rejected: { label: 'Từ chối', color: '#D9381E', icon: XCircle },
 }
 
 export default function OvertimeRequestPage() {

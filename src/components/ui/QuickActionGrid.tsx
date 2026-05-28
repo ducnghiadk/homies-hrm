@@ -68,12 +68,12 @@ export function QuickActionGrid({
             className={`
               ${styles.icon} rounded-full
               flex items-center justify-center
-              ${action.bgColor || 'bg-blue-100'}
+              ${action.bgColor || 'bg-primary-100'}
             `}
           >
             <action.icon
               size={styles.iconSize}
-              className={action.iconColor || 'text-blue-600'}
+              className={action.iconColor || 'text-primary-600'}
             />
           </div>
           <span

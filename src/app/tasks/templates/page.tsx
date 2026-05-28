@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import { mockTaskTemplates } from '@/lib/mock-data-tasks'
-import { FileText, Check, Camera, Plus, ChevronDown, ChevronUp, Layers } from 'lucide-react'
+import { Camera, Plus, ChevronDown, ChevronUp, Layers } from 'lucide-react'
 
 export default function TaskTemplatesPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -41,8 +41,8 @@ export default function TaskTemplatesPage() {
                 <div className="flex items-center gap-2">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tpl.is_active ? '' : ''}`}
                     style={{
-                      background: tpl.is_active ? '#10b98120' : '#ef444420',
-                      color: tpl.is_active ? '#10b981' : '#ef4444',
+                      background: tpl.is_active ? '#1E9E5720' : '#D9381E20',
+                      color: tpl.is_active ? '#1E9E57' : '#D9381E',
                     }}>
                     {tpl.is_active ? 'Đang dùng' : 'Tạm ngưng'}
                   </span>
@@ -63,12 +63,12 @@ export default function TaskTemplatesPage() {
                       <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{item.description}</div>
                       <div className="flex gap-2 mt-1">
                         {item.is_required && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: '#ef444420', color: '#ef4444' }}>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: '#D9381E20', color: '#D9381E' }}>
                             Bắt buộc
                           </span>
                         )}
                         {item.requires_photo && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5" style={{ background: '#3b82f620', color: '#3b82f6' }}>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5" style={{ background: '#2F6FA820', color: '#2F6FA8' }}>
                             <Camera size={8} /> Ảnh
                           </span>
                         )}

@@ -177,14 +177,14 @@ export const LEAVE_TYPES: LeaveTypeInfo[] = [
     type: 'annual', name: 'Phép năm', icon: '🏖️',
     isPaid: true, defaultQuota: 12,
     requiresDocument: false, requiresDocumentAfterDays: 0,
-    color: 'blue', colorHex: '#3b82f6',
+    color: 'blue', colorHex: '#2F6FA8',
     description: 'Nghỉ phép có lương theo luật lao động'
   },
   {
     type: 'sick', name: 'Nghỉ ốm', icon: '🏥',
     isPaid: true, defaultQuota: 30,
     requiresDocument: true, requiresDocumentAfterDays: 3,
-    color: 'red', colorHex: '#ef4444',
+    color: 'red', colorHex: '#D9381E',
     description: 'Cần giấy bác sĩ nếu nghỉ trên 3 ngày'
   },
   {
@@ -219,7 +219,7 @@ export const LEAVE_TYPES: LeaveTypeInfo[] = [
     type: 'personal', name: 'Việc riêng', icon: '🏠',
     isPaid: false, defaultQuota: 3,
     requiresDocument: false, requiresDocumentAfterDays: 0,
-    color: 'amber', colorHex: '#f59e0b',
+    color: 'amber', colorHex: '#F6C85F',
     description: 'Việc gia đình đột xuất'
   },
 ]
@@ -231,9 +231,9 @@ export const LEAVE_TYPE_MAP = Object.fromEntries(
 // Status config
 export const STATUS_CONFIG: Record<LeaveStatus, { label: string; color: string; icon: string }> = {
   draft:     { label: 'Nháp',       color: '#9ca3af', icon: '📄' },
-  pending:   { label: 'Chờ duyệt',  color: '#f59e0b', icon: '⏳' },
-  approved:  { label: 'Đã duyệt',   color: '#10b981', icon: '✅' },
-  rejected:  { label: 'Từ chối',    color: '#ef4444', icon: '❌' },
+  pending:   { label: 'Chờ duyệt',  color: '#F6C85F', icon: '⏳' },
+  approved:  { label: 'Đã duyệt',   color: '#1E9E57', icon: '✅' },
+  rejected:  { label: 'Từ chối',    color: '#D9381E', icon: '❌' },
   cancelled: { label: 'Đã hủy',     color: '#9ca3af', icon: '🚫' },
 }
 
@@ -529,7 +529,7 @@ export const mockBlackoutDates: BlackoutDate[] = [
 // ═══════════════════════════════════════════
 
 const leaveTypeColors: Record<LeaveType, string> = {
-  annual: '#3b82f6', sick: '#ef4444', personal: '#f59e0b',
+  annual: '#2F6FA8', sick: '#D9381E', personal: '#F6C85F',
   maternity: '#a855f7', unpaid: '#6b7280',
   wedding: '#ec4899', bereavement: '#475569',
 }

@@ -27,7 +27,7 @@ export function Button({
     secondary: 'bg-accent-400 text-dark-700 shadow-[var(--shadow-accent)] hover:bg-accent-500',
     outline: 'bg-transparent border-2 border-primary-600 text-primary-600 hover:bg-primary-50',
     ghost: 'bg-transparent text-primary-600 hover:bg-primary-50',
-    danger: 'bg-error-light text-error hover:bg-red-100',
+    danger: 'bg-error-light text-error hover:bg-error-100',
   }
 
   const sizes = {

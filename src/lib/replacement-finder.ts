@@ -4,18 +4,14 @@
 // =============================================
 
 import {
-  mockEmployees, mockSchedules, mockShifts, mockPositions,
+  mockEmployees, mockSchedules, mockPositions,
   getShiftById,
-  type Employee, type Schedule, type Shift,
 } from './mock-data'
 import {
   getPreferenceForDate,
-  getAllPreferencesForWeek,
-  type ShiftPreference,
 } from './mock-data-preferences'
 import {
-  mockShiftGrid, getEmployeeSchedule,
-  type ShiftCell, type EmployeeScheduleEntry,
+  getEmployeeSchedule,
 } from './mock-data-scheduling'
 
 // ─── Types ───
@@ -78,9 +74,9 @@ function periodToShiftId(period: ShiftPeriod): string {
 
 function getStoreName(storeId: string): string {
   const storeNames: Record<string, string> = {
-    'store-001': 'Boba House Q.1',
-    'store-002': 'Boba House Thủ Đức',
-    'store-003': 'Boba House Q.3',
+    'store-001': 'Homies Milk Tea Q.1',
+    'store-002': 'Homies Milk Tea Thủ Đức',
+    'store-003': 'Homies Milk Tea Q.3',
   }
   return storeNames[storeId] || storeId
 }
@@ -88,15 +84,6 @@ function getStoreName(storeId: string): string {
 function getPositionName(positionId: string): string {
   const pos = mockPositions.find(p => p.id === positionId)
   return pos?.name || positionId
-}
-
-function getWeekStart(dateStr: string): string {
-  const d = new Date(dateStr)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1) // Monday
-  const monday = new Date(d)
-  monday.setDate(diff)
-  return monday.toISOString().split('T')[0]
 }
 
 // ─── Function 1: isEmployeeAvailableForShift ───

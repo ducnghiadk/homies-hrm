@@ -24,7 +24,7 @@ export function SetupWizardBanner() {
             <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: '#e5e7eb' }}>
               <div
                 className="h-full rounded-full transition-all"
-                style={{ width: `${progress.percentage}%`, background: 'linear-gradient(90deg, #9333ea, #3b82f6)' }}
+                style={{ width: `${progress.percentage}%`, background: 'linear-gradient(90deg, #9333ea, #2F6FA8)' }}
               />
             </div>
             <span className="text-sm font-semibold" style={{ color: '#6b7280' }}>

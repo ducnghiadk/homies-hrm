@@ -173,22 +173,22 @@ export default function AdminDashboard() {
           style={{ background: '#fef2f210', borderColor: '#fca5a540' }}
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-              <AlertTriangle size={20} className="text-red-600" />
+            <div className="w-10 h-10 rounded-xl bg-error-100 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle size={20} className="text-error-600" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-red-800">
+              <p className="text-sm font-bold text-error-800">
                 {staffingStatus.criticalCount} ca thiếu người nghiêm trọng
               </p>
               {staffingStatus.topAlerts[0] && (
-                <p className="text-xs text-red-600 truncate">
+                <p className="text-xs text-error-600 truncate">
                   {staffingStatus.topAlerts[0].message}
                 </p>
               )}
             </div>
             <button
               onClick={() => router.push('/schedule/warnings')}
-              className="shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
+              className="shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg border border-error-300 text-error-700 hover:bg-error-50 transition-colors"
             >
               Xem
             </button>
@@ -202,36 +202,36 @@ export default function AdminDashboard() {
           icon={Users}
           label="Tổng nhân viên"
           value={stats.activeEmployees}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-100"
+          iconColor="text-primary-600"
+          iconBg="bg-primary-100"
           onClick={() => router.push('/employees')}
         />
         <StatCard
           icon={UserCheck}
           label="Đang làm"
           value={stats.currentlyWorking}
-          iconColor="text-green-600"
-          iconBg="bg-green-100"
-          className="bg-green-50 border-green-200"
-          valueClassName="text-green-700"
+          iconColor="text-success-600"
+          iconBg="bg-success-100"
+          className="bg-success-50 border-success-200"
+          valueClassName="text-success-700"
         />
         <StatCard
           icon={CalendarOff}
           label="Nghỉ phép"
           value={stats.pendingLeaves > 0 ? stats.pendingLeaves : 0}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-100"
-          className="bg-blue-50 border-blue-200"
-          valueClassName="text-blue-700"
+          iconColor="text-primary-600"
+          iconBg="bg-primary-100"
+          className="bg-primary-50 border-primary-200"
+          valueClassName="text-primary-700"
         />
         <StatCard
           icon={Clock}
           label="Chờ duyệt"
           value={stats.pendingLeaves}
-          iconColor="text-amber-600"
-          iconBg="bg-amber-100"
-          className="bg-amber-50 border-amber-200"
-          valueClassName="text-amber-700"
+          iconColor="text-warning-600"
+          iconBg="bg-warning-100"
+          className="bg-warning-50 border-warning-200"
+          valueClassName="text-warning-700"
           onClick={() => router.push('/leave/approval')}
         />
       </div>
@@ -242,22 +242,22 @@ export default function AdminDashboard() {
           {
             icon: FileCheck,
             label: 'Duyệt đơn',
-            bgColor: 'bg-blue-100',
-            iconColor: 'text-blue-600',
+            bgColor: 'bg-primary-100',
+            iconColor: 'text-primary-600',
             onClick: () => router.push('/leave/approval'),
           },
           {
             icon: CalendarDays,
             label: 'Xếp lịch',
-            bgColor: 'bg-green-100',
-            iconColor: 'text-green-600',
+            bgColor: 'bg-success-100',
+            iconColor: 'text-success-600',
             onClick: () => router.push('/settings/staffing'),
           },
           {
             icon: BarChart3,
             label: 'Báo cáo',
-            bgColor: 'bg-purple-100',
-            iconColor: 'text-purple-600',
+            bgColor: 'bg-primary-100',
+            iconColor: 'text-primary-600',
             onClick: () => router.push('/reports'),
           },
           {
@@ -275,9 +275,9 @@ export default function AdminDashboard() {
       <SectionGroup title="KPI & Hiệu suất" icon={BarChart3} iconClassName="text-indigo-500">
         <div className="grid grid-cols-2 gap-2 p-3">
           {[
-            { icon: '📊', label: 'Dashboard KPI', href: '/kpi', color: '#3b82f6' },
-            { icon: '📈', label: 'Báo cáo', href: '/kpi/reports', color: '#10b981' },
-            { icon: '✅', label: 'Review KPI', href: '/kpi/review', color: '#8b5cf6' },
+            { icon: '📊', label: 'Dashboard KPI', href: '/kpi', color: '#2F6FA8' },
+            { icon: '📈', label: 'Báo cáo', href: '/kpi/reports', color: '#1E9E57' },
+            { icon: '✅', label: 'Review KPI', href: '/kpi/review', color: '#001D3D' },
             { icon: '🎯', label: 'Thăng tiến', href: '/kpi/promotion', color: '#eab308' },
           ].map(item => (
             <button key={item.href}
@@ -312,8 +312,8 @@ export default function AdminDashboard() {
               <ListItem
                 key={s.store.id}
                 icon={MapPin}
-                iconBgColor={isLow ? 'bg-red-100' : isMedium ? 'bg-amber-100' : 'bg-green-100'}
-                iconColor={isLow ? 'text-red-500' : isMedium ? 'text-amber-500' : 'text-green-500'}
+                iconBgColor={isLow ? 'bg-error-100' : isMedium ? 'bg-warning-100' : 'bg-success-100'}
+                iconColor={isLow ? 'text-error-500' : isMedium ? 'text-warning-500' : 'text-success-500'}
                 title={s.store.name}
                 subtitle={`${s.checkedIn}/${s.total} đã check-in`}
                 rightContent={
@@ -321,13 +321,13 @@ export default function AdminDashboard() {
                     <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all ${
-                          isLow ? 'bg-red-500' : isMedium ? 'bg-amber-500' : 'bg-green-500'
+                          isLow ? 'bg-error-500' : isMedium ? 'bg-warning-500' : 'bg-success-500'
                         }`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
                     <span className={`text-sm font-semibold min-w-[3ch] ${
-                      isLow ? 'text-red-600' : isMedium ? 'text-amber-600' : 'text-green-600'
+                      isLow ? 'text-error-600' : isMedium ? 'text-warning-600' : 'text-success-600'
                     }`}>
                       {pct}%
                     </span>
@@ -348,7 +348,7 @@ export default function AdminDashboard() {
         <SectionGroup
           title={`Đơn chờ duyệt (${pendingLeaves.length})`}
           icon={FileText}
-          iconClassName="text-amber-500"
+          iconClassName="text-warning-500"
           rightAction={
             pendingLeaves.length > 0 ? (
               <button
@@ -422,7 +422,7 @@ export default function AdminDashboard() {
                     }}
                     className="h-9 px-3 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold
                       flex items-center gap-1.5
-                      hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
+                      hover:bg-error-50 hover:text-error-600 active:scale-95 transition-all"
                     aria-label={`Từ chối đơn của ${shortName}`}
                   >
                     <X size={14} />

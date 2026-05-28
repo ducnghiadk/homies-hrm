@@ -70,7 +70,7 @@ export default function StaffingQuickCalc({ onApply, onViewDetail }: Props) {
       {/* Header */}
       <div className="text-center py-2">
         <h2 className="text-lg font-bold flex items-center justify-center gap-2" style={{ color: 'var(--text-primary)' }}>
-          <Zap size={20} className="text-amber-500" />
+          <Zap size={20} className="text-warning-500" />
           Tính nhanh định biên
         </h2>
         <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Chỉ 2 bước, có kết quả ngay</p>
@@ -79,7 +79,7 @@ export default function StaffingQuickCalc({ onApply, onViewDetail }: Props) {
       {/* Q1: Cups per day */}
       <div className="card space-y-2.5">
         <label className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-          <Coffee size={16} className="text-amber-600" />
+          <Coffee size={16} className="text-warning-600" />
           Quán bạn bán khoảng bao nhiêu ly/ngày?
         </label>
         <div className="flex gap-2">
@@ -110,7 +110,7 @@ export default function StaffingQuickCalc({ onApply, onViewDetail }: Props) {
       {/* Q2: Hours per day */}
       <div className="card space-y-2.5">
         <label className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-          <Clock size={16} className="text-blue-600" />
+          <Clock size={16} className="text-primary-600" />
           Quán mở cửa mấy tiếng/ngày?
         </label>
         <div className="flex gap-2">
@@ -145,8 +145,8 @@ export default function StaffingQuickCalc({ onApply, onViewDetail }: Props) {
             {/* Role cards */}
             <div className="grid grid-cols-3 gap-2">
               <div className="text-center p-3 rounded-xl" style={{ background: '#fff', border: '1px solid var(--gray-200)' }}>
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center mb-1">
-                  <Coffee size={20} className="text-amber-600" />
+                <div className="w-10 h-10 rounded-full bg-warning-100 flex items-center justify-center mb-1">
+                  <Coffee size={20} className="text-warning-600" />
                 </div>
                 <div className="text-xl font-black" style={{ color: 'var(--primary)' }}>{result.barista}</div>
                 <div className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Pha chế</div>
@@ -181,7 +181,7 @@ export default function StaffingQuickCalc({ onApply, onViewDetail }: Props) {
             {/* Summary lines */}
             <div className="space-y-1.5 py-2" style={{ borderTop: '1px solid var(--gray-200)' }}>
               <div className="flex items-center gap-2 text-sm">
-                <Users size={16} className="text-blue-500" />
+                <Users size={16} className="text-primary-500" />
                 <span style={{ color: 'var(--text-secondary)' }}>Tổng cần tuyển (để xoay ca):</span>
                 <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{result.totalMin}-{result.totalMax} người</span>
               </div>
@@ -216,7 +216,7 @@ export default function StaffingQuickCalc({ onApply, onViewDetail }: Props) {
         <button onClick={() => setShowTable(!showTable)}
           className="w-full flex items-center justify-between py-1">
           <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
-            <Lightbulb size={14} className="text-amber-500" />
+            <Lightbulb size={14} className="text-warning-500" />
             Bảng tham khảo theo số ly/ngày
           </span>
           {showTable ? <ChevronUp size={16} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />}

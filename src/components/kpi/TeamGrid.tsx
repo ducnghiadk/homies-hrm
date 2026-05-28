@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import EmployeeMiniCard from '@/components/kpi/EmployeeMiniCard'
 import RiskBadge from '@/components/kpi/RiskBadge'
 import type { StoreKPISummary } from '@/lib/kpi-report-service'
 import Link from 'next/link'
@@ -32,7 +31,7 @@ export default function TeamGrid({ summary }: TeamGridProps) {
             style={{ animationDelay: `${i * 50}ms`, minWidth: 70 }}>
             <div className="relative mx-auto w-11 h-11 rounded-full flex items-center justify-center text-xs font-bold text-white mb-1"
               style={{
-                background: i === 0 ? 'linear-gradient(135deg, #eab308, #f59e0b)' :
+                background: i === 0 ? 'linear-gradient(135deg, #eab308, #F6C85F)' :
                   i === 1 ? 'linear-gradient(135deg, #9ca3af, #6b7280)' :
                   i === 2 ? 'linear-gradient(135deg, #cd7f32, #b8860b)' : 'var(--primary)',
               }}>
@@ -47,7 +46,7 @@ export default function TeamGrid({ summary }: TeamGridProps) {
               {t.name.split(' ').slice(-1)[0]}
             </div>
             <div className="text-xs font-black" style={{
-              color: t.score >= 85 ? '#10b981' : t.score >= 70 ? '#f59e0b' : '#ef4444',
+              color: t.score >= 85 ? '#1E9E57' : t.score >= 70 ? '#F6C85F' : '#D9381E',
             }}>{t.score}</div>
             <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
               {t.trend === 'up' ? '↑' : t.trend === 'down' ? '↓' : '→'}
@@ -75,7 +74,7 @@ export default function TeamGrid({ summary }: TeamGridProps) {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold">{emp.name}</span>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-black" style={{ color: '#ef4444' }}>{emp.score}</span>
+                  <span className="text-xs font-black" style={{ color: '#D9381E' }}>{emp.score}</span>
                   <RiskBadge level={emp.risk_level} />
                 </div>
               </div>

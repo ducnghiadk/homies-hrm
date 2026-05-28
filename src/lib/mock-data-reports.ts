@@ -89,9 +89,9 @@ export const mockHROverview: HROverviewData = {
   new_this_month: 1, resigned_this_month: 0, avg_tenure_months: 14,
   gender_ratio: { male: 7, female: 8 },
   by_store: [
-    { store: 'Boba House Q.1', count: 7 },
-    { store: 'Boba House Q.3', count: 5 },
-    { store: 'Boba House Thủ Đức', count: 3 },
+    { store: 'Homies Milk Tea Q.1', count: 7 },
+    { store: 'Homies Milk Tea Q.3', count: 5 },
+    { store: 'Homies Milk Tea Thủ Đức', count: 3 },
   ],
   by_position: [
     { position: 'Pha chế', count: 5 }, { position: 'Thu ngân', count: 3 },

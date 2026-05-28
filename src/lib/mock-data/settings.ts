@@ -10,13 +10,13 @@ export const settingCategories: SettingCategory[] = [
 export const settingItems: SettingItem[] = [
   // === TỔ CHỨC ===
   {
-    id: 'org-info', category: 'organization', icon: '🏪', iconBg: 'bg-blue-100',
+    id: 'org-info', category: 'organization', icon: '🏪', iconBg: 'bg-primary-100',
     title: 'Thông tin doanh nghiệp', description: 'Tên, logo, múi giờ, tiền tệ',
-    href: '/settings/organization', status: 'completed', statusText: 'Boba House',
+    href: '/settings/organization', status: 'completed', statusText: 'Homies Milk Tea',
     isRequired: true, setupOrder: 1,
   },
   {
-    id: 'branches', category: 'organization', icon: '🏬', iconBg: 'bg-blue-100',
+    id: 'branches', category: 'organization', icon: '🏬', iconBg: 'bg-primary-100',
     title: 'Chi nhánh & Cửa hàng', description: 'Quản lý các địa điểm kinh doanh',
     href: '/settings/branches', status: 'completed', statusText: '2 chi nhánh',
     isRequired: true, setupOrder: 2,
@@ -27,15 +27,25 @@ export const settingItems: SettingItem[] = [
     href: '/settings/master-data', status: 'completed', statusText: '5 phòng ban',
     isRequired: true, setupOrder: 3,
   },
-  // === NHÂN SỰ ===
+    // === NHÂN SỰ ===
   {
-    id: 'scheduling', category: 'hr', icon: '📅', iconBg: 'bg-green-100',
+    id: 'scheduling', category: 'hr', icon: '📅', iconBg: 'bg-success-100',
     title: 'Xếp ca & Định biên', description: 'Ca làm việc, quy tắc xếp ca',
-    href: '/settings/schedule-rules', status: 'completed', statusText: '3 ca làm việc',
+    href: '/settings/schedule-rules/shifts', status: 'completed', statusText: '3 ca làm việc',
     isRequired: true, setupOrder: 4,
   },
+    {
+    id: 'preferences', category: 'hr', icon: '❤️', iconBg: 'bg-pink-100',
+    title: 'Đăng ký ca mong muốn', description: 'Cấu hình preference cho nhân viên',
+    href: '/settings/schedule-rules/preferences', status: 'completed', statusText: 'Ưu tiên ca đăng ký',
+    isRequired: false, setupOrder: 4.5,
+    subItems: [
+      { title: 'Cài đặt preference', href: '/settings/schedule-rules/preferences' },
+      { title: 'Tổng quan đăng ký', href: '/settings/schedule-rules/preferences/overview' },
+    ],
+  },
   {
-    id: 'staffing', category: 'hr', icon: '📊', iconBg: 'bg-green-100',
+    id: 'staffing', category: 'hr', icon: '📊', iconBg: 'bg-success-100',
     title: 'Định biên nhân sự', description: 'Tính toán số lượng nhân viên tối ưu',
     href: '/settings/staffing', status: 'completed', statusText: 'Đã cấu hình',
     isRequired: false, setupOrder: 5,
@@ -47,7 +57,7 @@ export const settingItems: SettingItem[] = [
     isRequired: true, setupOrder: 6,
   },
   {
-    id: 'career-path', category: 'hr', icon: '🚀', iconBg: 'bg-purple-100',
+    id: 'career-path', category: 'hr', icon: '🚀', iconBg: 'bg-primary-100',
     title: 'Lộ trình thăng tiến', description: 'Cấp bậc, kỹ năng, điều kiện thăng tiến',
     href: '/career-path/settings', status: 'not_started', statusText: 'Chưa thiết lập',
     isRequired: true, setupOrder: 7,
@@ -60,13 +70,13 @@ export const settingItems: SettingItem[] = [
   },
   // === TÀI CHÍNH ===
   {
-    id: 'payroll', category: 'finance', icon: '💵', iconBg: 'bg-yellow-100',
+    id: 'payroll', category: 'finance', icon: '💵', iconBg: 'bg-warning-100',
     title: 'Bảng lương & Phụ cấp', description: 'Ngày trả lương, năm tài chính',
     href: '/settings/payroll', status: 'completed', statusText: 'Ngày 5 hàng tháng',
     isRequired: true, setupOrder: 9,
   },
   {
-    id: 'labor-cost', category: 'finance', icon: '🧾', iconBg: 'bg-orange-100',
+    id: 'labor-cost', category: 'finance', icon: '🧾', iconBg: 'bg-warning-100',
     title: 'Chi phí lao động', description: 'Cài đặt lương, phụ cấp, OT',
     href: '/settings/labor-cost', status: 'not_started', statusText: 'Chưa thiết lập',
     isRequired: false, setupOrder: 10,
@@ -96,10 +106,22 @@ export const settingItems: SettingItem[] = [
     ],
   },
   {
-    id: 'permissions', category: 'system', icon: '🔐', iconBg: 'bg-red-100',
+    id: 'permissions', category: 'system', icon: '🔐', iconBg: 'bg-error-100',
     title: 'Phân quyền & Bảo mật', description: 'Vai trò, quyền truy cập',
     href: '/settings/permissions', status: 'completed', statusText: '3 vai trò',
     isRequired: false, setupOrder: 14,
+  },
+  {
+    id: 'rbac-demo', category: 'system', icon: '🛡️', iconBg: 'bg-indigo-100',
+    title: 'Demo Phân Quyền (RBAC)', description: 'Giả lập và so sánh quyền các vai trò',
+    href: '/rbac', status: 'completed', statusText: 'Chế độ Demo',
+    isRequired: false, setupOrder: 14.5,
+  },
+  {
+    id: 'offline-demo', category: 'system', icon: '📶', iconBg: 'bg-warning-100',
+    title: 'Demo Chế độ Ngoại tuyến', description: 'Trải nghiệm Offline-first & Sync dữ liệu',
+    href: '/offline-demo', status: 'completed', statusText: 'Chế độ Demo',
+    isRequired: false, setupOrder: 14.7,
   },
   {
     id: 'backup', category: 'system', icon: '📤', iconBg: 'bg-gray-100',

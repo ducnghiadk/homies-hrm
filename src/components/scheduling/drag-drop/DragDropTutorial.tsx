@@ -80,9 +80,9 @@ export default function DragDropTutorial({ onClose, onDismissPermanent }: DragDr
           ))}
 
           {/* Keyboard shortcuts bonus */}
-          <div className="p-3 bg-amber-50 rounded-xl border border-amber-100">
-            <div className="text-xs font-bold text-amber-800 mb-1 flex items-center gap-1"><Keyboard size={12} /> Phím tắt</div>
-            <div className="grid grid-cols-2 gap-1 text-xs text-amber-700">
+          <div className="p-3 bg-warning-50 rounded-xl border border-warning-100">
+            <div className="text-xs font-bold text-warning-800 mb-1 flex items-center gap-1"><Keyboard size={12} /> Phím tắt</div>
+            <div className="grid grid-cols-2 gap-1 text-xs text-warning-700">
               <div><kbd className="px-1 bg-white rounded border text-xs">Ctrl+Z</kbd> Hoàn tác</div>
               <div><kbd className="px-1 bg-white rounded border text-xs">Ctrl+Y</kbd> Làm lại</div>
               <div><kbd className="px-1 bg-white rounded border text-xs">←→</kbd> Dời 1 giờ</div>

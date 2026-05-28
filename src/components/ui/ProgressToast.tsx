@@ -36,14 +36,14 @@ export default function ProgressToast({
 
   const icon = {
     loading: <Loader2 size={16} className="animate-spin text-primary" />,
-    success: <CheckCircle size={16} className="text-green-500" />,
-    error: <AlertCircle size={16} className="text-red-500" />,
+    success: <CheckCircle size={16} className="text-success-500" />,
+    error: <AlertCircle size={16} className="text-error-500" />,
   }[status]
 
   const barColor = {
     loading: 'bg-primary',
-    success: 'bg-green-500',
-    error: 'bg-red-500',
+    success: 'bg-success-500',
+    error: 'bg-error-500',
   }[status]
 
   return (
@@ -84,13 +84,13 @@ export default function ProgressToast({
           {status === 'loading' && onCancel && (
             <button
               onClick={onCancel}
-              className="text-xs text-gray-500 hover:text-red-500 font-medium"
+              className="text-xs text-gray-500 hover:text-error-500 font-medium"
             >
               Hủy
             </button>
           )}
           {status === 'success' && (
-            <span className="text-xs text-green-500 font-medium">✓ Hoàn thành</span>
+            <span className="text-xs text-success-500 font-medium">✓ Hoàn thành</span>
           )}
         </div>
       </div>

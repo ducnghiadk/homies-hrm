@@ -8,7 +8,7 @@ interface Props {
 export function ProgressRing({ value, max = 100, size = 'md', label, sublabel, color = 'purple' }: Props) {
   const pct = Math.min(100, (value / max) * 100);
   const sizes = { sm: { r: 80, s: 6, t: 'text-lg', l: 'text-xs' }, md: { r: 120, s: 8, t: 'text-2xl', l: 'text-sm' }, lg: { r: 160, s: 10, t: 'text-3xl', l: 'text-base' } };
-  const cols: Record<string, string> = { purple: '#8B5CF6', emerald: '#10B981', amber: '#F59E0B', red: '#EF4444' };
+  const cols: Record<string, string> = { purple: '#001D3D', emerald: '#1E9E57', amber: '#F6C85F', red: '#D9381E' };
   const { r, s, t, l } = sizes[size];
   const radius = (r - s) / 2;
   const circ = radius * 2 * Math.PI;

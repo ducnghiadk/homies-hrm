@@ -1,16 +1,18 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
-  initCareerPathStores, getEmployeeGoals, getActiveGoals, createGoal,
-  cancelGoal, getSuggestedGoals, getSkillById, getSettings,
+  initCareerPathStores, getEmployeeGoals, createGoal,
+  cancelGoal, getSuggestedGoals, getSettings,
 } from '@/lib/career-path-service';
 import type { CareerGoal } from '@/lib/career-path-types';
 import ProgressBar from '@/components/career-path/ProgressBar';
 
+initCareerPathStores();
+
 export default function GoalsPage() {
-  const [goals, setGoals] = useState<CareerGoal[]>([]);
+  const [goals, setGoals] = useState<CareerGoal[]>(() => getEmployeeGoals('emp-001'));
   const [showAdd, setShowAdd] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newTarget, setNewTarget] = useState('');
@@ -19,11 +21,6 @@ export default function GoalsPage() {
   const reload = () => {
     setGoals(getEmployeeGoals(empId));
   };
-
-  useEffect(() => {
-    initCareerPathStores();
-    reload();
-  }, []);
 
   const active = goals.filter(g => g.status === 'active');
   const achieved = goals.filter(g => g.status === 'achieved');

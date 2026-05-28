@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import AppShell from '@/components/layout/AppShell'
-import { mockRequests, mockEmployees, getEmployeeById } from '@/lib/mock-data'
+import { mockRequests, getEmployeeById } from '@/lib/mock-data'
 import { getStatusLabel, getStatusColor, formatDate } from '@/lib/utils'
 import { ArrowLeftRight, CalendarOff, Check, X } from 'lucide-react'
 

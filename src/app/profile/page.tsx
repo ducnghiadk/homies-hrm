@@ -11,7 +11,6 @@ import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { StatCard } from '@/components/ui/StatCard'
 
 export default function ProfilePage() {
   const { user, isAuthenticated, logout } = useAuthStore()
@@ -116,7 +115,7 @@ export default function ProfilePage() {
            variant="danger" 
            fullWidth 
            onClick={() => { logout(); router.push('/login') }}
-           className="h-12 bg-red-50 text-error hover:bg-red-100 border border-red-100 rounded-[16px] shadow-sm font-['Poppins']"
+           className="h-12 bg-error-50 text-error hover:bg-error-100 border border-error-100 rounded-[16px] shadow-sm font-['Poppins']"
         >
            <LogOut size={20} className="mr-2" /> Đăng xuất
         </Button>

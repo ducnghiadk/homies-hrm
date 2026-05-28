@@ -43,17 +43,17 @@ export default function KpiDashboardPage() {
   // ── Common Quick Actions ──
   const pendingReviews = mockEvaluations.filter(e => e.period === period && e.status === 'self_submitted').length
   const quickActions = role === 'employee' ? [
-    { icon: '📝', label: 'Tự đánh giá', href: '/kpi/evaluate', color: '#3b82f6' },
-    { icon: '📊', label: 'Kết quả', href: '/kpi/result', color: '#10b981' },
+    { icon: '📝', label: 'Tự đánh giá', href: '/kpi/evaluate', color: '#2F6FA8' },
+    { icon: '📊', label: 'Kết quả', href: '/kpi/result', color: '#1E9E57' },
     { icon: '🏆', label: 'BXH', href: '/kpi/leaderboard', color: '#eab308' },
-    { icon: '📈', label: 'Báo cáo', href: '/kpi/reports', color: '#8b5cf6' },
-    { icon: '❌', label: 'Vi phạm', href: '/kpi/violations', color: '#ef4444' },
+    { icon: '📈', label: 'Báo cáo', href: '/kpi/reports', color: '#001D3D' },
+    { icon: '❌', label: 'Vi phạm', href: '/kpi/violations', color: '#D9381E' },
   ] : [
-    { icon: '✅', label: 'Review', href: '/kpi/review', badge: pendingReviews, color: '#3b82f6' },
-    { icon: '📊', label: 'Báo cáo', href: '/kpi/reports', color: '#10b981' },
+    { icon: '✅', label: 'Review', href: '/kpi/review', badge: pendingReviews, color: '#2F6FA8' },
+    { icon: '📊', label: 'Báo cáo', href: '/kpi/reports', color: '#1E9E57' },
     { icon: '🏆', label: 'BXH', href: '/kpi/leaderboard', color: '#eab308' },
-    { icon: '❌', label: 'Log lỗi', href: '/kpi/violations/log', color: '#ef4444' },
-    { icon: '🎯', label: 'Thăng tiến', href: '/kpi/promotion', color: '#8b5cf6' },
+    { icon: '❌', label: 'Log lỗi', href: '/kpi/violations/log', color: '#D9381E' },
+    { icon: '🎯', label: 'Thăng tiến', href: '/kpi/promotion', color: '#001D3D' },
     { icon: '⚙️', label: 'Cài đặt', href: '/kpi/settings', color: '#6b7280' },
   ]
 
@@ -120,15 +120,15 @@ function CEOView({ period, month, year }: { period: string; month: string; year:
         </h3>
         <div className="grid grid-cols-3 gap-3">
           <div className="text-center">
-            <div className="text-2xl font-black" style={{ color: avgAll >= 80 ? '#10b981' : '#f59e0b' }}>{avgAll}</div>
+            <div className="text-2xl font-black" style={{ color: avgAll >= 80 ? '#1E9E57' : '#F6C85F' }}>{avgAll}</div>
             <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Điểm TB</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-black" style={{ color: '#3b82f6' }}>{evaluatedPct}%</div>
+            <div className="text-2xl font-black" style={{ color: '#2F6FA8' }}>{evaluatedPct}%</div>
             <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Đã đánh giá</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-black" style={{ color: '#8b5cf6' }}>{pendingPromo}</div>
+            <div className="text-2xl font-black" style={{ color: '#001D3D' }}>{pendingPromo}</div>
             <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Chờ thăng tiến</div>
           </div>
         </div>
@@ -169,7 +169,7 @@ function ManagerView({ storeId, period, month, year }: {
             <span className="text-[10px]">⭐ Top: <b>{summary.top_performers[0].name.split(' ').slice(-1)[0]}</b> ({summary.top_performers[0].score})</span>
           )}
           {summary.need_attention[0] && (
-            <span className="text-[10px]" style={{ color: '#ef4444' }}>⚠️ <b>{summary.need_attention[0].name.split(' ').slice(-1)[0]}</b> ({summary.need_attention[0].score})</span>
+            <span className="text-[10px]" style={{ color: '#D9381E' }}>⚠️ <b>{summary.need_attention[0].name.split(' ').slice(-1)[0]}</b> ({summary.need_attention[0].score})</span>
           )}
         </div>
       </div>
@@ -229,7 +229,7 @@ function EmployeeView({ userId, period }: { userId: string; storeId: string; per
 
         {/* Streak */}
         {streak >= 2 && (
-          <div className="text-center mt-3 text-xs font-bold" style={{ color: '#ef4444' }}>
+          <div className="text-center mt-3 text-xs font-bold" style={{ color: '#D9381E' }}>
             🔥 {streak} tháng liên tiếp Top performer!
           </div>
         )}
@@ -243,7 +243,7 @@ function EmployeeView({ userId, period }: { userId: string; storeId: string; per
             <div className="h-2 rounded-full" style={{ background: 'var(--gray-100)' }}>
               <div className="h-full rounded-full" style={{
                 width: `${Math.min((streak / 6) * 100, 100)}%`,
-                background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)',
+                background: 'linear-gradient(90deg, #2F6FA8, #001D3D)',
               }} />
             </div>
           </div>
@@ -253,7 +253,7 @@ function EmployeeView({ userId, period }: { userId: string; storeId: string; per
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-2 animate-slide-up" style={{ animationDelay: '0.1s' }}>
         <div className="card p-2.5 text-center">
-          <div className="text-lg font-black" style={{ color: '#3b82f6' }}>#{peer.rank}</div>
+          <div className="text-lg font-black" style={{ color: '#2F6FA8' }}>#{peer.rank}</div>
           <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>Thứ hạng</div>
         </div>
         <div className="card p-2.5 text-center">
@@ -261,7 +261,7 @@ function EmployeeView({ userId, period }: { userId: string; storeId: string; per
           <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>TB 6 tháng</div>
         </div>
         <div className="card p-2.5 text-center">
-          <div className="text-lg font-black" style={{ color: '#10b981' }}>{prediction.predicted_next_month}</div>
+          <div className="text-lg font-black" style={{ color: '#1E9E57' }}>{prediction.predicted_next_month}</div>
           <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>Dự kiến T+1</div>
         </div>
       </div>

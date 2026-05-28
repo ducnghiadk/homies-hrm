@@ -2,7 +2,7 @@
 
 import AppShell from '@/components/layout/AppShell'
 import { mockLateRecords } from '@/lib/mock-data-attendance'
-import { Clock, AlertTriangle } from 'lucide-react'
+import { Clock } from 'lucide-react'
 
 export default function LateReportPage() {
   const totalCount = mockLateRecords.length
@@ -21,7 +21,7 @@ export default function LateReportPage() {
   return (
     <AppShell title="Báo cáo đi muộn">
       <div className="space-y-4">
-        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316)', color: '#fff' }}>
+        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #F6C85F, #f97316)', color: '#fff' }}>
           <div className="text-xs opacity-80">Tháng 02/2026</div>
           <div className="text-2xl font-bold mt-1">{totalCount} lần muộn</div>
           <div className="text-xs opacity-80 mt-1">{totalMinutes} phút tổng • {ranked.length} NV</div>
@@ -29,7 +29,7 @@ export default function LateReportPage() {
 
         <div className="space-y-2 animate-slide-up">
           {ranked.map(([name, data]) => {
-            const color = data.count >= 5 ? '#ef4444' : data.count >= 3 ? '#f59e0b' : '#10b981'
+            const color = data.count >= 5 ? '#D9381E' : data.count >= 3 ? '#F6C85F' : '#1E9E57'
             const avg = Math.round(data.total_minutes / data.count)
             return (
               <div key={name} className="card flex items-center gap-3">
@@ -55,10 +55,10 @@ export default function LateReportPage() {
           <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>📋 Chi tiết</h3>
           {mockLateRecords.map((r, i) => (
             <div key={i} className="flex items-center gap-2 text-xs p-2 rounded mb-1" style={{ background: 'var(--gray-50)' }}>
-              <Clock size={12} style={{ color: r.type === 'late_in' ? '#f59e0b' : '#8b5cf6' }} />
+              <Clock size={12} style={{ color: r.type === 'late_in' ? '#F6C85F' : '#001D3D' }} />
               <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{r.employee_name}</span>
               <span style={{ color: 'var(--text-muted)' }}>{r.date} • {r.shift_name}</span>
-              <span className="ml-auto font-bold text-red-500">+{r.diff_minutes}p</span>
+              <span className="ml-auto font-bold text-error-500">+{r.diff_minutes}p</span>
             </div>
           ))}
         </div>

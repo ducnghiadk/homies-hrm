@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   initCareerPathStores,
@@ -14,10 +14,11 @@ import ProgressBar from '@/components/career-path/ProgressBar';
 type RequestTab = 'promotions' | 'type_changes';
 
 export default function CareerPathRequestsPage() {
+  initCareerPathStores();
   const [tab, setTab] = useState<RequestTab>('promotions');
-  const [promoRequests, setPromoRequests] = useState<PromotionRequest[]>([]);
-  const [typeRequests, setTypeRequests] = useState<TypeChangeRequest[]>([]);
-  const [levels, setLevels] = useState<CareerLevel[]>([]);
+  const [promoRequests, setPromoRequests] = useState<PromotionRequest[]>(() => getPromotionRequests());
+  const [typeRequests, setTypeRequests] = useState<TypeChangeRequest[]>(() => getTypeChangeRequests());
+  const [levels, setLevels] = useState<CareerLevel[]>(() => getActiveLevels());
 
   // Mock employee names
   const empNames: Record<string, string> = { 'emp-001': 'Minh', 'emp-002': 'Hùng', 'emp-003': 'Lan', 'emp-004': 'Nam', 'emp-005': 'Linh', 'emp-006': 'Tuấn' };
@@ -27,8 +28,6 @@ export default function CareerPathRequestsPage() {
     setTypeRequests(getTypeChangeRequests());
     setLevels(getActiveLevels());
   };
-
-  useEffect(() => { initCareerPathStores(); reload(); }, []);
 
   const handleReviewPromo = (id: string, status: 'approved' | 'rejected') => {
     const note = status === 'rejected' ? window.prompt('Lý do từ chối:') : null;

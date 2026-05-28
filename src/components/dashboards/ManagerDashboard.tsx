@@ -41,7 +41,7 @@ export default function ManagerDashboard() {
       const timer = setTimeout(() => setIsLoading(false), 400)
       return () => clearTimeout(timer)
     }
-  }, [])
+  }, [user])
 
   if (!user) return null
 
@@ -125,19 +125,19 @@ export default function ManagerDashboard() {
         <div
           className={`rounded-2xl p-3.5 border animate-slide-up ${
             staffingStatus.criticalCount > 0
-              ? 'bg-red-50/60 border-red-200'
-              : 'bg-amber-50/60 border-amber-200'
+              ? 'bg-error-50/60 border-error-200'
+              : 'bg-warning-50/60 border-warning-200'
           }`}
         >
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              staffingStatus.criticalCount > 0 ? 'bg-red-100' : 'bg-amber-100'
+              staffingStatus.criticalCount > 0 ? 'bg-error-100' : 'bg-warning-100'
             }`}>
-              <AlertTriangle size={20} className={staffingStatus.criticalCount > 0 ? 'text-red-600' : 'text-amber-600'} />
+              <AlertTriangle size={20} className={staffingStatus.criticalCount > 0 ? 'text-error-600' : 'text-warning-600'} />
             </div>
             <div className="flex-1 min-w-0">
               <p className={`text-sm font-bold ${
-                staffingStatus.criticalCount > 0 ? 'text-red-800' : 'text-amber-800'
+                staffingStatus.criticalCount > 0 ? 'text-error-800' : 'text-warning-800'
               }`}>
                 {staffingStatus.criticalCount > 0
                   ? `${staffingStatus.criticalCount} ca thiếu người nghiêm trọng`
@@ -145,17 +145,17 @@ export default function ManagerDashboard() {
                 }
               </p>
               {staffingStatus.alerts[0] && (
-                <p className={`text-xs truncate ${staffingStatus.criticalCount > 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                <p className={`text-xs truncate ${staffingStatus.criticalCount > 0 ? 'text-error-600' : 'text-warning-600'}`}>
                   {staffingStatus.alerts[0].message}
                 </p>
               )}
             </div>
             <button
-              onClick={() => router.push('/schedule/warnings')}
+              onClick={() => router.push('/schedules')}
               className={`shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${
                 staffingStatus.criticalCount > 0
-                  ? 'border-red-300 text-red-700 hover:bg-red-100'
-                  : 'border-amber-300 text-amber-700 hover:bg-amber-100'
+                  ? 'border-error-300 text-error-700 hover:bg-error-100'
+                  : 'border-warning-300 text-warning-700 hover:bg-warning-100'
               }`}
             >
               Xem
@@ -170,35 +170,35 @@ export default function ManagerDashboard() {
           icon={Users}
           label="NV hôm nay"
           value={summary.total}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-100"
+          iconColor="text-primary-600"
+          iconBg="bg-primary-100"
         />
         <StatCard
           icon={UserCheck}
           label="Đã check-in"
           value={summary.checkedIn}
-          iconColor="text-green-600"
-          iconBg="bg-green-100"
-          className="bg-green-50 border-green-200"
-          valueClassName="text-green-700"
+          iconColor="text-success-600"
+          iconBg="bg-success-100"
+          className="bg-success-50 border-success-200"
+          valueClassName="text-success-700"
         />
         <StatCard
           icon={UserX}
           label="Chưa check-in"
           value={summary.notArrived}
-          iconColor="text-red-600"
-          iconBg="bg-red-100"
-          className="bg-red-50 border-red-200"
-          valueClassName="text-red-700"
+          iconColor="text-error-600"
+          iconBg="bg-error-100"
+          className="bg-error-50 border-error-200"
+          valueClassName="text-error-700"
         />
         <StatCard
           icon={FileText}
           label="Đơn chờ"
           value={pendingLeaves}
-          iconColor="text-amber-600"
-          iconBg="bg-amber-100"
-          className="bg-amber-50 border-amber-200"
-          valueClassName="text-amber-700"
+          iconColor="text-warning-600"
+          iconBg="bg-warning-100"
+          className="bg-warning-50 border-warning-200"
+          valueClassName="text-warning-700"
           onClick={() => router.push('/leave/approval')}
         />
       </div>
@@ -209,29 +209,29 @@ export default function ManagerDashboard() {
           {
             icon: FileCheck,
             label: 'Duyệt nghỉ',
-            bgColor: 'bg-blue-100',
-            iconColor: 'text-blue-600',
+            bgColor: 'bg-primary-100',
+            iconColor: 'text-primary-600',
             onClick: () => router.push('/leave/approval'),
           },
           {
             icon: CalendarDays,
             label: 'Xếp ca',
-            bgColor: 'bg-green-100',
-            iconColor: 'text-green-600',
-            onClick: () => router.push('/schedule'),
+            bgColor: 'bg-success-100',
+            iconColor: 'text-success-600',
+            onClick: () => router.push('/schedules'),
           },
           {
             icon: UserCheck,
             label: 'Chấm công',
-            bgColor: 'bg-amber-100',
-            iconColor: 'text-amber-600',
+            bgColor: 'bg-warning-100',
+            iconColor: 'text-warning-600',
             onClick: () => router.push('/checkin'),
           },
           {
             icon: BarChart3,
             label: 'Báo cáo',
-            bgColor: 'bg-purple-100',
-            iconColor: 'text-purple-600',
+            bgColor: 'bg-primary-100',
+            iconColor: 'text-primary-600',
             onClick: () => router.push('/reports'),
           },
         ]}
@@ -242,10 +242,10 @@ export default function ManagerDashboard() {
       <SectionGroup title="KPI Store" icon={BarChart3} iconClassName="text-indigo-500">
         <div className="grid grid-cols-2 gap-2 p-3">
           {[
-            { icon: '📊', label: 'Dashboard KPI', href: '/kpi', color: '#3b82f6' },
-            { icon: '📈', label: 'Báo cáo', href: '/kpi/reports', color: '#10b981' },
-            { icon: '✅', label: 'Review KPI', href: '/kpi/review', color: '#8b5cf6' },
-            { icon: '❌', label: 'Log lỗi', href: '/kpi/violations/log', color: '#ef4444' },
+            { icon: '📊', label: 'Dashboard KPI', href: '/kpi', color: '#2F6FA8' },
+            { icon: '📈', label: 'Báo cáo', href: '/kpi/reports', color: '#1E9E57' },
+            { icon: '✅', label: 'Review KPI', href: '/kpi/review', color: '#001D3D' },
+            { icon: '❌', label: 'Log lỗi', href: '/kpi/violations/log', color: '#D9381E' },
           ].map(item => (
             <button key={item.href}
               onClick={() => router.push(item.href)}
@@ -290,7 +290,7 @@ export default function ManagerDashboard() {
       <SectionGroup
         title={`Nhân viên hôm nay (${filteredCrew.length})`}
         icon={Users}
-        iconClassName="text-blue-500"
+        iconClassName="text-primary-500"
         rightAction={
           <span className="text-xs text-gray-500">{filteredCrew.length} người</span>
         }

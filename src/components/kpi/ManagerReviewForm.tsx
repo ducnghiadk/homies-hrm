@@ -76,7 +76,7 @@ export default function ManagerReviewForm({
       {/* Comparison header */}
       <div className="card p-3 flex items-center gap-3">
         <div className="text-center flex-1">
-          <div className="text-lg font-black" style={{ color: '#3b82f6' }}>
+          <div className="text-lg font-black" style={{ color: '#2F6FA8' }}>
             {evaluation.total_score}
           </div>
           <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Tự đánh giá</div>
@@ -110,7 +110,7 @@ export default function ManagerReviewForm({
               {catDef?.type === 'deduction' ? (
                 <div className="text-center py-2">
                   <span className="text-xl font-black" style={{
-                    color: evaluation.violation_score >= 80 ? '#10b981' : '#ef4444',
+                    color: evaluation.violation_score >= 80 ? '#1E9E57' : '#D9381E',
                   }}>{evaluation.violation_score}/100</span>
                   <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Tự động</p>
                 </div>
@@ -207,7 +207,7 @@ export default function ManagerReviewForm({
       {onPublish && (
         <button onClick={onPublish}
           className="w-full py-2.5 rounded-xl text-xs font-bold text-white"
-          style={{ background: '#10b981' }}>
+          style={{ background: '#1E9E57' }}>
           📢 Công bố kết quả
         </button>
       )}

@@ -67,6 +67,11 @@ export type Schedule = {
   shift_id: string
   date: string
   notes?: string
+  status?: 'draft' | 'published'
+  modified_after_publish?: boolean
+  change_reason?: string
+  updated_by?: string
+  updated_at?: string
 }
 
 export type Attendance = {
@@ -80,6 +85,8 @@ export type Attendance = {
   check_out_time?: string
   check_in_lat?: number
   check_in_lng?: number
+  check_out_lat?: number
+  check_out_lng?: number
   check_in_photo_url?: string
   check_in_distance_meters?: number
   status: 'on_time' | 'late' | 'early' | 'absent' | 'leave'
@@ -122,8 +129,8 @@ export type Notification = {
 // ============================================
 export const mockOrg: Organization = {
   id: 'org-001',
-  name: 'Trà Sữa Boba House',
-  logo_url: undefined,
+  name: 'Homies Milk Tea',
+  logo_url: '/logo.png',
 }
 
 // ============================================
@@ -133,7 +140,7 @@ export const mockStores: Store[] = [
   {
     id: 'store-001',
     org_id: 'org-001',
-    name: 'Boba House - Nguyễn Huệ',
+    name: 'Homies Milk Tea - Nguyễn Huệ',
     address: '123 Nguyễn Huệ, Q.1, TP.HCM',
     latitude: 10.7736,
     longitude: 106.7024,
@@ -144,7 +151,7 @@ export const mockStores: Store[] = [
   {
     id: 'store-002',
     org_id: 'org-001',
-    name: 'Boba House - Phạm Văn Đồng',
+    name: 'Homies Milk Tea - Phạm Văn Đồng',
     address: '456 Phạm Văn Đồng, Thủ Đức, TP.HCM',
     latitude: 10.8381,
     longitude: 106.6810,
@@ -155,7 +162,7 @@ export const mockStores: Store[] = [
   {
     id: 'store-003',
     org_id: 'org-001',
-    name: 'Boba House - Lê Văn Sỹ',
+    name: 'Homies Milk Tea - Lê Văn Sỹ',
     address: '789 Lê Văn Sỹ, Q.3, TP.HCM',
     latitude: 10.7845,
     longitude: 106.6679,
@@ -318,9 +325,9 @@ export const mockEmployees: Employee[] = [
 // Shifts (3 ca)
 // ============================================
 export const mockShifts: Shift[] = [
-  { id: 'shift-001', org_id: 'org-001', name: 'Ca Sáng', start_time: '08:00', end_time: '14:00', color: '#3B82F6' },
-  { id: 'shift-002', org_id: 'org-001', name: 'Ca Chiều', start_time: '14:00', end_time: '21:00', color: '#F59E0B' },
-  { id: 'shift-003', org_id: 'org-001', name: 'Ca Tối', start_time: '18:00', end_time: '23:00', color: '#8B5CF6' },
+  { id: 'shift-001', org_id: 'org-001', name: 'Ca Sáng', start_time: '08:00', end_time: '14:00', color: '#2F6FA8' },
+  { id: 'shift-002', org_id: 'org-001', name: 'Ca Chiều', start_time: '14:00', end_time: '21:00', color: '#F6C85F' },
+  { id: 'shift-003', org_id: 'org-001', name: 'Ca Tối', start_time: '18:00', end_time: '23:00', color: '#001D3D' },
 ]
 
 // ============================================
@@ -627,6 +634,70 @@ export function getPositionById(id: string) {
   return mockPositions.find(p => p.id === id)
 }
 
+let schedulesInitialized = false
+
+export function initSchedules() {
+  if (schedulesInitialized) return
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('homies_schedules')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) {
+          mockSchedules.splice(0, mockSchedules.length, ...parsed)
+        }
+      } catch (e) {
+        console.error('Failed to parse saved schedules', e)
+      }
+    }
+    schedulesInitialized = true
+  }
+}
+
+export function saveSchedulesToStorage() {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('homies_schedules', JSON.stringify(mockSchedules))
+  }
+}
+
+export function publishSmartSchedule(result: {
+  weekStart: string
+  storeId?: string
+  shifts: { startTime: string; endTime: string; employeeId: string; date: string }[]
+}) {
+  initSchedules()
+  const storeId = result.storeId || 'store-001'
+
+  // Calculate the 7 week dates
+  const weekDates: string[] = []
+  const monday = new Date(result.weekStart)
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    weekDates.push(d.toISOString().split('T')[0])
+  }
+
+  const nextSchedules: Schedule[] = result.shifts.map((sh, idx) => {
+    const hour = parseInt(sh.startTime.split(':')[0]) || 7
+    let shiftId = 'shift-001'
+    if (hour >= 12 && hour < 17) shiftId = 'shift-002'
+    else if (hour >= 17) shiftId = 'shift-003'
+
+    return {
+      id: `sch-smart-${Date.now()}-${idx}`,
+      org_id: 'org-001',
+      store_id: storeId,
+      employee_id: sh.employeeId,
+      shift_id: shiftId,
+      date: sh.date,
+      notes: `Phân ca tự động Smart Scheduler (${sh.startTime}-${sh.endTime})`,
+      status: 'draft',
+    }
+  })
+
+  replaceSchedulesForStoreWeek(storeId, weekDates, nextSchedules)
+}
+
 export function getShiftById(id: string) {
   return mockShifts.find(s => s.id === id)
 }
@@ -636,7 +707,13 @@ export function getEmployeesByStore(storeId: string) {
 }
 
 export function getSchedulesByEmployee(employeeId: string, weekDates: string[]) {
+  initSchedules()
   return mockSchedules.filter(s => s.employee_id === employeeId && weekDates.includes(s.date))
+}
+
+export function getAllSchedulesByEmployee(employeeId: string): Schedule[] {
+  initSchedules()
+  return mockSchedules.filter(schedule => schedule.employee_id === employeeId)
 }
 
 export function getTodayAttendance(employeeId: string) {
@@ -655,10 +732,28 @@ export function getStoreAttendanceToday(storeId: string) {
 let scheduleCounter = 500
 
 export function getSchedulesByStoreWeek(storeId: string, weekDates: string[]): Schedule[] {
+  initSchedules()
   return mockSchedules.filter(s => s.store_id === storeId && weekDates.includes(s.date))
 }
 
-export function addSchedule(storeId: string, employeeId: string, shiftId: string, date: string, notes?: string): Schedule {
+export function getScheduleByEmployeeDate(employeeId: string, date: string, storeId?: string): Schedule | undefined {
+  initSchedules()
+  return mockSchedules.find(schedule =>
+    schedule.employee_id === employeeId &&
+    schedule.date === date &&
+    (!storeId || schedule.store_id === storeId)
+  )
+}
+
+export function addSchedule(
+  storeId: string,
+  employeeId: string,
+  shiftId: string,
+  date: string,
+  notes?: string,
+  status: 'draft' | 'published' = 'published'
+): Schedule {
+  initSchedules()
   // Remove existing schedule for this employee+date if any
   const existingIdx = mockSchedules.findIndex(s => s.employee_id === employeeId && s.date === date)
   if (existingIdx !== -1) mockSchedules.splice(existingIdx, 1)
@@ -671,19 +766,40 @@ export function addSchedule(storeId: string, employeeId: string, shiftId: string
     shift_id: shiftId,
     date,
     notes,
+    status,
   }
   mockSchedules.push(record)
+  saveSchedulesToStorage()
   return record
 }
 
 export function removeSchedule(employeeId: string, date: string): boolean {
+  initSchedules()
   const idx = mockSchedules.findIndex(s => s.employee_id === employeeId && s.date === date)
   if (idx === -1) return false
   mockSchedules.splice(idx, 1)
+  saveSchedulesToStorage()
   return true
 }
 
+export function replaceSchedulesForStoreWeek(storeId: string, weekDates: string[], schedules: Schedule[]): void {
+  initSchedules()
+  for (let i = mockSchedules.length - 1; i >= 0; i--) {
+    const schedule = mockSchedules[i]
+    if (schedule.store_id === storeId && weekDates.includes(schedule.date)) {
+      mockSchedules.splice(i, 1)
+    }
+  }
+
+  schedules.forEach(schedule => {
+    mockSchedules.push(schedule)
+  })
+
+  saveSchedulesToStorage()
+}
+
 export function copyWeekSchedules(storeId: string, fromWeek: string[], toWeek: string[]): number {
+  initSchedules()
   const sourceSchedules = mockSchedules.filter(s => s.store_id === storeId && fromWeek.includes(s.date))
   let count = 0
   sourceSchedules.forEach(s => {
@@ -694,8 +810,10 @@ export function copyWeekSchedules(storeId: string, fromWeek: string[], toWeek: s
     // Don't overwrite existing
     const exists = mockSchedules.find(x => x.employee_id === s.employee_id && x.date === targetDate)
     if (exists) return
-    addSchedule(storeId, s.employee_id, s.shift_id, targetDate, s.notes)
+    addSchedule(storeId, s.employee_id, s.shift_id, targetDate, s.notes, 'draft')
     count++
   })
+  saveSchedulesToStorage()
   return count
 }
+

@@ -4,15 +4,19 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
-import { getShiftById, mockSchedules } from '@/lib/mock-data'
+import { getShiftById } from '@/lib/mock-data'
 import {
-  createSwapRequest, getMyUpcomingSchedules, getCoworkersForSwap,
+  createSwapRequest, getCoworkersForSwap,
+  getSwapRequestsForMe, getPendingSwapRequestsForManager,
+  getSwapRequestStateMeta,
 } from '@/lib/mock-data-swap'
+import { ScheduleService } from '@/lib/services/schedule-service'
+import { notifySwapRequestCreated } from '@/lib/notifications/swap-notifications'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import {
   ChevronLeft, Check, ArrowRightLeft, UserPlus, Send,
-  Sun, Sunset, Moon, ChevronRight,
+  Sun, Sunset, Moon, ChevronRight, Inbox, Shield,
 } from 'lucide-react'
 import type { Schedule, Employee } from '@/lib/mock-data'
 
@@ -36,8 +40,27 @@ export default function ShiftSwapPage() {
 
   useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
 
-  const mySchedules = useMemo(
-    () => user ? getMyUpcomingSchedules(user.id) : [],
+  const mySchedules = useMemo(() => {
+    if (!user) return []
+    const raw = ScheduleService.getSchedulesForUser(user, user.id)
+    const todayStr = new Date().toISOString().split('T')[0]
+    const future = new Date()
+    future.setDate(future.getDate() + 14)
+    const futureStr = future.toISOString().split('T')[0]
+    return raw.filter(s => s.date >= todayStr && s.date <= futureStr)
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [user])
+
+  const incomingRequests = useMemo(
+    () => user ? getSwapRequestsForMe(user.id).filter(request => request.status === 'pending') : [],
+    [user],
+  )
+  const managerPendingRequests = useMemo(
+    () => (
+      user && (user.role === 'store_manager' || user.role === 'hr_admin' || user.role === 'ceo')
+        ? getPendingSwapRequestsForManager(user.store_id)
+        : []
+    ),
     [user],
   )
 
@@ -49,22 +72,40 @@ export default function ShiftSwapPage() {
   }, [selectedSchedule, user])
 
   const targetSchedules = useMemo(() => {
-    if (!targetUser) return []
+    if (!targetUser || !user) return []
     const todayStr = new Date().toISOString().split('T')[0]
-    return mockSchedules.filter(s =>
+    return ScheduleService.getPeerSchedulesForSwap(user, targetUser.id).filter(s =>
       s.employee_id === targetUser.id && s.date >= todayStr
     ).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 14)
-  }, [targetUser])
+  }, [targetUser, user])
 
   if (!user) return null
 
   const handleSubmit = () => {
     if (!selectedSchedule || !targetUser) return
-    createSwapRequest(
-      user.id, selectedSchedule.id, targetUser.id,
-      swapType === 'swap' ? targetSchedule?.id : undefined,
-      swapType, reason,
-    )
+    let created
+    try {
+      created = createSwapRequest(
+        user.id, selectedSchedule.id, targetUser.id,
+        swapType === 'swap' ? targetSchedule?.id : undefined,
+        swapType, reason,
+      )
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'Không thể tạo yêu cầu đổi ca.')
+      return
+    }
+    notifySwapRequestCreated({
+      requestId: created.id,
+      requesterId: user.id,
+      requesterName: user.full_name,
+      targetUserId: targetUser.id,
+      targetName: targetUser.full_name,
+      type: swapType,
+      shiftName: selectedShift?.name || 'Ca làm',
+      date: format(new Date(selectedSchedule.date), 'dd/MM/yyyy'),
+      targetShiftName: targetSchedule ? getShiftById(targetSchedule.shift_id)?.name : undefined,
+      targetDate: targetSchedule ? format(new Date(targetSchedule.date), 'dd/MM/yyyy') : undefined,
+    })
     setToast('Đã gửi yêu cầu thành công!')
     setTimeout(() => router.push('/schedule/swap/list'), 1500)
   }
@@ -83,16 +124,73 @@ export default function ShiftSwapPage() {
     <AppShell showNav>
       <div className="space-y-5 animate-fade-in font-['Inter'] pb-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <button onClick={() => step > 0 ? setStep(s => s - 1) : router.back()}
-            className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
-            <ChevronLeft size={20} className="text-gray-500" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button onClick={() => step > 0 ? setStep(s => s - 1) : router.back()}
+              className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+              <ChevronLeft size={20} className="text-gray-500" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-dark-700">
+                {swapType === 'swap' ? 'Đổi ca' : 'Nhờ thay ca'}
+              </h1>
+              <p className="text-xs text-gray-400 mt-0.5">Bước {step + 1} / {steps.length}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push('/schedule/swap/list')}
+            className="px-3 py-2 rounded-xl bg-gray-100 text-dark-700 text-xs font-bold flex items-center gap-2 hover:bg-gray-200 transition-colors"
+          >
+            <Inbox size={14} />
+            Inbox
+            {incomingRequests.length > 0 && (
+              <span className="min-w-5 h-5 px-1 rounded-full bg-primary-600 text-white text-[10px] flex items-center justify-center">
+                {incomingRequests.length}
+              </span>
+            )}
+            {managerPendingRequests.length > 0 && (
+              <span className="min-w-5 h-5 px-1 rounded-full bg-warning-500 text-white text-[10px] flex items-center justify-center">
+                {managerPendingRequests.length}
+              </span>
+            )}
           </button>
-          <div>
-            <h1 className="text-xl font-bold text-dark-700">
-              {swapType === 'swap' ? 'Đổi ca' : 'Nhờ thay ca'}
-            </h1>
-            <p className="text-xs text-gray-400 mt-0.5">Bước {step + 1} / {steps.length}</p>
+        </div>
+
+        {(incomingRequests.length > 0 || managerPendingRequests.length > 0) && (
+          <div className="bg-primary-50 border border-primary-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-primary-800">Hộp thư đổi ca đang có việc chờ</p>
+              <p className="text-xs text-primary-700">
+                {incomingRequests.length > 0
+                  ? `${incomingRequests.length} yêu cầu đang chờ bạn phản hồi.`
+                  : `${managerPendingRequests.length} yêu cầu đang chờ quản lý duyệt.`}
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/schedule/swap/list')}
+              className="shrink-0 px-3 py-2 rounded-xl bg-white text-primary-800 border border-primary-300 text-xs font-bold hover:bg-primary-100 transition-colors flex items-center gap-1.5"
+            >
+              {managerPendingRequests.length > 0 ? <Shield size={13} /> : <Inbox size={13} />}
+              Mở inbox
+            </button>
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-gray-100 bg-white p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Đến tôi</p>
+            <p className="mt-2 text-2xl font-black text-dark-700">{incomingRequests.length}</p>
+            <p className="mt-1 text-xs text-gray-500">Yêu cầu đang chờ bạn đồng ý hoặc từ chối.</p>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-white p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Chờ quản lý</p>
+            <p className="mt-2 text-2xl font-black text-dark-700">{managerPendingRequests.length}</p>
+            <p className="mt-1 text-xs text-gray-500">Đồng nghiệp đã đồng ý và đang chờ duyệt cuối.</p>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-white p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Flow state</p>
+            <p className="mt-2 text-sm font-bold text-dark-700">Chờ đồng nghiệp / Chờ quản lý / Đã duyệt</p>
+            <p className="mt-1 text-xs text-gray-500">Nếu bị từ chối hoặc hủy thì flow dừng ở bước đó.</p>
           </div>
         </div>
 
@@ -112,6 +210,9 @@ export default function ShiftSwapPage() {
         {step === 0 && (
           <div className="space-y-2">
             <p className="text-sm font-medium text-gray-500">Chọn ca bạn muốn đổi/nhờ thay:</p>
+            <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3 text-xs text-gray-500">
+              Chỉ các ca chính thức trong 14 ngày tới mới nên được dùng để tạo yêu cầu đổi ca hoặc nhờ thay.
+            </div>
             {mySchedules.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">Không có ca nào trong 2 tuần tới</div>
             ) : mySchedules.map(sch => {
@@ -144,8 +245,8 @@ export default function ShiftSwapPage() {
           <div className="space-y-3">
             <p className="text-sm font-medium text-gray-500">Bạn muốn:</p>
             {[
-              { type: 'swap' as const, icon: ArrowRightLeft, title: 'Đổi ca với đồng nghiệp', desc: 'Tôi làm ca của họ, họ làm ca của tôi', color: '#3B82F6' },
-              { type: 'cover' as const, icon: UserPlus, title: 'Nhờ thay ca', desc: 'Chỉ cần người thay, tôi không làm bù', color: '#8B5CF6' },
+              { type: 'swap' as const, icon: ArrowRightLeft, title: 'Đổi ca với đồng nghiệp', desc: 'Tôi làm ca của họ, họ làm ca của tôi', color: '#2F6FA8' },
+              { type: 'cover' as const, icon: UserPlus, title: 'Nhờ thay ca', desc: 'Chỉ cần người thay, tôi không làm bù', color: '#001D3D' },
             ].map(opt => {
               const isSel = swapType === opt.type
               return (
@@ -226,7 +327,7 @@ export default function ShiftSwapPage() {
             <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
               <p className="text-xs text-gray-400 font-medium">Tóm tắt</p>
               <div className="flex items-center gap-2">
-                <span className={`text-xs font-bold px-2 py-1 rounded-lg ${swapType === 'swap' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
+                <span className={`text-xs font-bold px-2 py-1 rounded-lg ${swapType === 'swap' ? 'bg-primary-100 text-primary-600' : 'bg-primary-100 text-primary-600'}`}>
                   {swapType === 'swap' ? 'Đổi ca' : 'Nhờ thay'}
                 </span>
                 <span className="text-xs text-dark-700 font-medium">{selectedShift?.name} — {selectedSchedule && format(new Date(selectedSchedule.date), 'dd/MM')}</span>
@@ -234,10 +335,33 @@ export default function ShiftSwapPage() {
               <p className="text-xs text-gray-500">→ {targetUser?.full_name}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500 mb-2">Lý do <span className="text-red-400">*</span></p>
+              <p className="text-sm font-medium text-gray-500 mb-2">Lý do <span className="text-error-400">*</span></p>
               <textarea value={reason} onChange={e => setReason(e.target.value)}
                 placeholder="Nhập lý do đổi ca / nhờ thay..."
                 rows={4} className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 resize-none" />
+            </div>
+            <div className={`rounded-2xl px-4 py-3 text-xs ${getSwapRequestStateMeta({
+              id: 'preview',
+              requester_id: user.id,
+              requester_schedule_id: selectedSchedule?.id || '',
+              target_user_id: targetUser?.id || '',
+              target_schedule_id: targetSchedule?.id,
+              type: swapType,
+              reason,
+              status: 'pending',
+              created_at: new Date().toISOString(),
+            }).tone}`}>
+              {getSwapRequestStateMeta({
+                id: 'preview',
+                requester_id: user.id,
+                requester_schedule_id: selectedSchedule?.id || '',
+                target_user_id: targetUser?.id || '',
+                target_schedule_id: targetSchedule?.id,
+                type: swapType,
+                reason,
+                status: 'pending',
+                created_at: new Date().toISOString(),
+              }).detail}
             </div>
           </div>
         )}
@@ -255,6 +379,39 @@ export default function ShiftSwapPage() {
               <p><span className="text-gray-400">Ca:</span> <span className="font-medium text-dark-700">{selectedShift?.name} — {selectedSchedule && format(new Date(selectedSchedule.date), 'EEEE dd/MM', { locale: vi })}</span></p>
               <p><span className="text-gray-400">Đồng nghiệp:</span> <span className="font-medium text-dark-700">{targetUser?.full_name}</span></p>
               <p><span className="text-gray-400">Lý do:</span> <span className="font-medium text-dark-700">{reason}</span></p>
+            </div>
+            <div className={`rounded-2xl px-4 py-3 text-xs ${getSwapRequestStateMeta({
+              id: 'preview',
+              requester_id: user.id,
+              requester_schedule_id: selectedSchedule?.id || '',
+              target_user_id: targetUser?.id || '',
+              target_schedule_id: targetSchedule?.id,
+              type: swapType,
+              reason,
+              status: 'pending',
+              created_at: new Date().toISOString(),
+            }).tone}`}>
+              {getSwapRequestStateMeta({
+                id: 'preview',
+                requester_id: user.id,
+                requester_schedule_id: selectedSchedule?.id || '',
+                target_user_id: targetUser?.id || '',
+                target_schedule_id: targetSchedule?.id,
+                type: swapType,
+                reason,
+                status: 'pending',
+                created_at: new Date().toISOString(),
+              }).label}: {getSwapRequestStateMeta({
+                id: 'preview',
+                requester_id: user.id,
+                requester_schedule_id: selectedSchedule?.id || '',
+                target_user_id: targetUser?.id || '',
+                target_schedule_id: targetSchedule?.id,
+                type: swapType,
+                reason,
+                status: 'pending',
+                created_at: new Date().toISOString(),
+              }).detail}
             </div>
           </div>
         )}

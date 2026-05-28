@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   initCareerPathStores, getNotifications, markNotificationRead, markAllNotificationsRead, getUnreadCount,
 } from '@/lib/career-path-service';
 import type { CareerNotification } from '@/lib/career-path-types';
+
+initCareerPathStores();
 
 const typeIcons: Record<string, string> = {
   skill_unlock_available: '⚡', promotion_eligible: '🚀', goal_reminder: '🎯',
@@ -14,16 +16,14 @@ const typeIcons: Record<string, string> = {
 };
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<CareerNotification[]>([]);
-  const [unread, setUnread] = useState(0);
   const empId = 'emp-001';
+  const [notifications, setNotifications] = useState<CareerNotification[]>(() => getNotifications(empId));
+  const [unread, setUnread] = useState(() => getUnreadCount(empId));
 
   const reload = () => {
     setNotifications(getNotifications(empId));
     setUnread(getUnreadCount(empId));
   };
-
-  useEffect(() => { initCareerPathStores(); reload(); }, []);
 
   const handleRead = (id: string) => { markNotificationRead(id); reload(); };
   const handleReadAll = () => { markAllNotificationsRead(empId); reload(); };

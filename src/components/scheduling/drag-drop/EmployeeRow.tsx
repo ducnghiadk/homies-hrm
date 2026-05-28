@@ -39,7 +39,7 @@ export default function EmployeeRow({
     <div
       className={`
         flex border-b border-gray-100 transition-colors
-        ${isDragOver ? 'bg-blue-50/60' : 'hover:bg-gray-50/50'}
+        ${isDragOver ? 'bg-primary-50/60' : 'hover:bg-gray-50/50'}
       `}
       style={{ minHeight: '48px' }}
     >
@@ -52,8 +52,8 @@ export default function EmployeeRow({
           <div className="text-xs font-bold text-gray-900 truncate">{employee.name}</div>
           <div className={`text-xs font-medium px-1 py-0.5 rounded inline-block ${
             employee.type === 'fulltime'
-              ? 'bg-blue-50 text-blue-600'
-              : 'bg-orange-50 text-orange-600'
+              ? 'bg-primary-50 text-primary-600'
+              : 'bg-warning-50 text-warning-600'
           }`}>
             {employee.type === 'fulltime' ? 'FT' : 'PT'}
           </div>

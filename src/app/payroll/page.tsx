@@ -87,10 +87,10 @@ export default function PayrollPage() {
                 const totalAllow = slips.reduce((s, p) => s + p.allowance, 0)
                 const total = totalBase + totalOT + totalBonus + totalAllow
                 const items = [
-                  { label: 'Lương cơ bản', val: totalBase, color: '#3b82f6' },
-                  { label: 'Tăng ca', val: totalOT, color: '#f59e0b' },
-                  { label: 'Thưởng', val: totalBonus, color: '#22c55e' },
-                  { label: 'Phụ cấp', val: totalAllow, color: '#8b5cf6' },
+                  { label: 'Lương cơ bản', val: totalBase, color: '#2F6FA8' },
+                  { label: 'Tăng ca', val: totalOT, color: '#F6C85F' },
+                  { label: 'Thưởng', val: totalBonus, color: '#48C079' },
+                  { label: 'Phụ cấp', val: totalAllow, color: '#001D3D' },
                 ]
                 return (
                   <>
@@ -161,7 +161,7 @@ export default function PayrollPage() {
         {/* MY PAYSLIP */}
         {(tab === 'my' || !isManager) && mySlip && (
           <div className="animate-slide-up">
-            <div className="card-elevated p-5 text-center mb-4" style={{ background: 'linear-gradient(135deg, #22c55e10, #3b82f610)' }}>
+            <div className="card-elevated p-5 text-center mb-4" style={{ background: 'linear-gradient(135deg, #48C07910, #2F6FA810)' }}>
               <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Thực nhận tháng {selectedPeriod.split('-')[1]}</div>
               <div className="text-3xl font-black mt-1" style={{ color: 'var(--success)' }}>{formatVND(mySlip.net)}</div>
             </div>

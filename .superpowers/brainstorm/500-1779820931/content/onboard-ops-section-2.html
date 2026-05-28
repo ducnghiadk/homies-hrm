@@ -1,0 +1,111 @@
+<h2>Onboard vận hành: danh sách + checklist</h2>
+<p class="subtitle">Mục tiêu: quản lý quét nhanh người sắp vào làm, rồi mở từng bạn để xử lý đủ việc trước và trong ngày đầu.</p>
+
+<div class="section">
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Lớp 1: Danh sách người sắp vào làm</div>
+      <div class="mockup-body">
+        <div style="display:grid; gap:12px;">
+          <div style="border:1px solid #f59e0b; border-radius:12px; padding:12px; background:#fffbeb;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+              <div>
+                <div class="label">Ngày vào làm 28/05</div>
+                <h3 style="margin:4px 0 2px;">Nguyễn Trà My • Thu ngân</h3>
+                <p style="margin:0;">Cửa hàng Quận 3 • Còn thiếu: người kèm, nhóm chat</p>
+              </div>
+              <div style="padding:6px 10px; border-radius:999px; background:#f59e0b; color:white; font-size:12px;">Cần hoàn tất sớm</div>
+            </div>
+          </div>
+
+          <div style="border:2px solid #dc2626; border-radius:12px; padding:12px; background:#fef2f2;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+              <div>
+                <div class="label">Ngày vào làm 29/05</div>
+                <h3 style="margin:4px 0 2px;">Lê Gia Huy • Pha chế</h3>
+                <p style="margin:0;">Cửa hàng Bình Thạnh • Thiếu: người kèm</p>
+              </div>
+              <div style="padding:6px 10px; border-radius:999px; background:#dc2626; color:white; font-size:12px;">Block ngày đầu</div>
+            </div>
+          </div>
+
+          <div style="border:1px solid #16a34a; border-radius:12px; padding:12px; background:#f0fdf4;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+              <div>
+                <div class="label">Ngày vào làm 30/05</div>
+                <h3 style="margin:4px 0 2px;">Phạm Khánh Linh • Phục vụ</h3>
+                <p style="margin:0;">Cửa hàng Gò Vấp • Đủ bước trước ngày đầu</p>
+              </div>
+              <div style="padding:6px 10px; border-radius:999px; background:#16a34a; color:white; font-size:12px;">Sẵn sàng</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-header">Lớp 2: Checklist từng người</div>
+      <div class="mockup-body">
+        <div style="display:grid; gap:12px;">
+          <div style="padding:12px; border-radius:12px; background:#f8fafc; border:1px solid #e2e8f0;">
+            <div class="label">Lê Gia Huy • Pha chế • Vào làm 29/05</div>
+            <h3 style="margin:6px 0;">Block ngày đầu vì chưa có người kèm</h3>
+            <p style="margin:0;">Quản lý phải chốt người kèm trước khi xem là sẵn sàng.</p>
+          </div>
+
+          <div style="padding:12px; border-radius:12px; border:1px solid #e2e8f0;">
+            <strong>1. Ca đầu và giờ có mặt</strong>
+            <p style="margin:6px 0 0;">Ca sáng 07:30 • Có mặt 07:15 • Đã chốt</p>
+          </div>
+
+          <div style="padding:12px; border-radius:12px; border:2px solid #dc2626; background:#fef2f2;">
+            <strong>2. Người kèm</strong>
+            <p style="margin:6px 0 0;">Chưa gán người kèm</p>
+          </div>
+
+          <div style="padding:12px; border-radius:12px; border:1px solid #e2e8f0;">
+            <strong>3. Đồng phục, chấm công, nội quy tại quán</strong>
+            <p style="margin:6px 0 0;">Đồng phục: đã chuẩn bị • Chấm công: vào được • Nội quy tại quán: chưa nhắc lại</p>
+          </div>
+
+          <div style="padding:12px; border-radius:12px; border:1px solid #e2e8f0;">
+            <strong>4. Tài khoản, nhóm chat, công cụ</strong>
+            <p style="margin:6px 0 0;">Nhóm chat: đã thêm • Máy POS: chưa cần quyền riêng</p>
+          </div>
+
+          <div style="padding:12px; border-radius:12px; border:1px dashed #94a3b8;">
+            <strong>5. Xác nhận xong ca đầu ổn</strong>
+            <p style="margin:6px 0 0;">Chỉ mở sau khi qua ca đầu.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Ý chính section 2</h3>
+  <div class="options" data-multiselect>
+    <div class="option" data-choice="a" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Dòng danh sách phải hiện ngay mục đang thiếu</h3>
+        <p>Quản lý không cần mở vào mới biết thiếu gì.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="b" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Checklist chia rõ trước ngày đầu và sau ca đầu</h3>
+        <p>Tránh tick sớm những mục chỉ nên xác nhận sau khi làm thật.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="c" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>Màu trạng thái đỏ vàng xanh phải đọc rất nhanh</h3>
+        <p>Đỏ = block, vàng = cần hoàn tất sớm, xanh = sẵn sàng.</p>
+      </div>
+    </div>
+  </div>
+</div>

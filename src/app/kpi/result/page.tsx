@@ -103,7 +103,7 @@ export default function KPIResultPage() {
           <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--gray-100)' }}>
             <div className="h-full rounded-full transition-all" style={{
               width: `${Math.min((monthsMeetingTarget / requiredMonths) * 100, 100)}%`,
-              background: monthsMeetingTarget >= requiredMonths ? '#10b981' : '#3b82f6',
+              background: monthsMeetingTarget >= requiredMonths ? '#1E9E57' : '#2F6FA8',
             }} />
           </div>
           <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -137,7 +137,7 @@ export default function KPIResultPage() {
                     <div className="h-1.5 rounded-full" style={{ background: 'var(--gray-100)' }}>
                       <div className="h-full rounded-full" style={{
                         width: `${ev.total_score}%`,
-                        background: ev.total_score >= 80 ? '#10b981' : ev.total_score >= 60 ? '#f59e0b' : '#ef4444',
+                        background: ev.total_score >= 80 ? '#1E9E57' : ev.total_score >= 60 ? '#F6C85F' : '#D9381E',
                       }} />
                     </div>
                   </div>

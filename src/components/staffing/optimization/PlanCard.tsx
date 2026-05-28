@@ -1,5 +1,5 @@
 import { OptimizationPlan } from '@/lib/staffing/types';
-import { ArrowRight, Check, X, Star } from 'lucide-react';
+import { Check, Star } from 'lucide-react';
 import { cn } from '@/lib/utils'; // Assuming generic utility
 
 interface PlanCardProps {
@@ -23,7 +23,7 @@ export default function PlanCard({ plan, onSelect, onViewDetail }: PlanCardProps
       )}
       
       {plan.badge?.includes('TIẾT KIỆM') && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-success-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
           {plan.badge}
         </div>
       )}
@@ -54,7 +54,7 @@ export default function PlanCard({ plan, onSelect, onViewDetail }: PlanCardProps
         <div className="mt-4 space-y-2">
             {plan.pros.slice(0, 2).map((pro, i) => (
                 <div key={i} className="flex items-start gap-2 text-xs text-gray-600">
-                    <Check size={14} className="text-green-500 mt-0.5 shrink-0" />
+                    <Check size={14} className="text-success-500 mt-0.5 shrink-0" />
                     <span>{pro}</span>
                 </div>
             ))}

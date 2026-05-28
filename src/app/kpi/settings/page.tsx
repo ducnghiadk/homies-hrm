@@ -18,7 +18,7 @@ import {
 } from '@/lib/kpi-settings-service'
 import type {
   KPIOptionType, KPICategory, KPICriteria, ViolationType,
-  KPIGrade, LevelConfig, KPISettings, ViolationSeverity,
+  KPIGrade, LevelConfig, ViolationSeverity,
   CategoryType, CriteriaInputType, EvaluatorRole, EmployeeLevel,
 } from '@/lib/kpi-types'
 import CategoryCard from '@/components/kpi/CategoryCard'
@@ -245,7 +245,7 @@ export default function KPISettingsPage() {
 
             {/* Weight validation */}
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold" style={{
-              background: weightValidation.valid ? '#dcfce7' : '#fef3c7',
+              background: weightValidation.valid ? '#dcfce7' : '#FFF8E8',
               color: weightValidation.valid ? '#166534' : '#92400e',
             }}>
               {weightValidation.valid ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}

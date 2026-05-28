@@ -12,6 +12,8 @@ import {
 
 export type WarningLevel = 'info' | 'warning' | 'block'
 export type RuleKey = 'min_rest_hours' | 'max_weekly_hours_warn' | 'max_weekly_hours_block' | 'max_daily_hours' | 'max_consecutive_days' | 'max_shifts_per_day' | 'clopening' | 'night_shift_restriction'
+export type SyntheticScheduleWarningType = 'employee_inactive' | 'wrong_store_assignment' | 'empty_week' | 'missing_change_reason'
+export type ScheduleWarningType = RuleKey | SyntheticScheduleWarningType
 
 export interface ScheduleRule {
   id: string
@@ -45,14 +47,21 @@ export interface ScheduleWarning {
   id: string
   employee_id: string
   employee_name: string
-  warning_type: RuleKey
+  warning_type: ScheduleWarningType
   warning_level: WarningLevel
   message: string
   date: string
   shift_id?: string
   is_acknowledged: boolean
   acknowledged_by?: string
-  acknowledged_at?: string
+  acknowledged_at?: string; reason?: string
+}
+
+export const syntheticWarningLabels: Record<SyntheticScheduleWarningType, string> = {
+  employee_inactive: 'Nhan su chua active',
+  wrong_store_assignment: 'Sai chi nhanh',
+  empty_week: 'Tuan chua xep ca',
+  missing_change_reason: 'Thieu ly do sua',
 }
 
 // ─── Default Rules ───
@@ -117,6 +126,34 @@ function getRuleLevel(ruleKey: RuleKey): WarningLevel {
   return scheduleRules.find(r => r.rule_key === ruleKey)?.warning_level ?? 'info'
 }
 
+function sumScheduledHours(
+  schedules: Schedule[],
+  employeeId: string,
+  dates: string[],
+  excludeCurrent?: { date: string; shiftId: string }
+): number {
+  let skippedCurrent = false
+
+  return schedules.reduce((total, schedule) => {
+    if (schedule.employee_id !== employeeId || !dates.includes(schedule.date)) {
+      return total
+    }
+
+    if (
+      excludeCurrent &&
+      !skippedCurrent &&
+      schedule.date === excludeCurrent.date &&
+      schedule.shift_id === excludeCurrent.shiftId
+    ) {
+      skippedCurrent = true
+      return total
+    }
+
+    const scheduledShift = getShiftById(schedule.shift_id)
+    return scheduledShift ? total + getShiftHours(scheduledShift) : total
+  }, 0)
+}
+
 // ─── Warning Engine ───
 
 export function checkScheduleWarnings(
@@ -134,6 +171,10 @@ export function checkScheduleWarnings(
 
   const schedules = allSchedules || mockSchedules
   const posId = emp.position_id
+  const existingCurrent = schedules.some(
+    s => s.employee_id === employeeId && s.date === date && s.shift_id === shiftId
+  )
+  const currentScheduleRef = existingCurrent ? { date, shiftId } : undefined
 
   // 1. CLOPENING
   if (isRuleActive('clopening')) {
@@ -176,17 +217,15 @@ export function checkScheduleWarnings(
   // 2. OVERTIME WEEK (warn + block)
   if (isRuleActive('max_weekly_hours_warn') || isRuleActive('max_weekly_hours_block')) {
     const weekDates = getWeekDatesFromDate(date)
-    let totalHours = getShiftHours(shift) // the new shift being added
-    weekDates.forEach(wd => {
-      schedules.filter(s => s.employee_id === employeeId && s.date === wd)
-        .forEach(s => {
-          const sh = getShiftById(s.shift_id)
-          if (sh) totalHours += getShiftHours(sh)
-        })
-    })
+    const totalHours = getShiftHours(shift) + sumScheduledHours(
+      schedules,
+      employeeId,
+      weekDates,
+      currentScheduleRef
+    )
 
     const warnThreshold = getEffectiveValue('max_weekly_hours_warn', posId, 'warning')
-    const blockThreshold = getEffectiveValue('max_weekly_hours_block', posId, 'warning')
+    const blockThreshold = getEffectiveValue('max_weekly_hours_block', posId, 'block')
 
     if (isRuleActive('max_weekly_hours_block') && totalHours > blockThreshold) {
       result.push(createWarningObj(emp, 'max_weekly_hours_block', 'block', date, shiftId,
@@ -199,12 +238,12 @@ export function checkScheduleWarnings(
 
   // 3. OVERTIME DAY
   if (isRuleActive('max_daily_hours')) {
-    const daySchedules = schedules.filter(s => s.employee_id === employeeId && s.date === date)
-    let dayHours = getShiftHours(shift)
-    daySchedules.forEach(s => {
-      const sh = getShiftById(s.shift_id)
-      if (sh) dayHours += getShiftHours(sh)
-    })
+    const dayHours = getShiftHours(shift) + sumScheduledHours(
+      schedules,
+      employeeId,
+      [date],
+      currentScheduleRef
+    )
     const maxDaily = getEffectiveValue('max_daily_hours', posId, 'warning')
     const blockDaily = getEffectiveValue('max_daily_hours', posId, 'block')
     if (dayHours > blockDaily) {
@@ -246,7 +285,10 @@ export function checkScheduleWarnings(
 
   // 5. MAX SHIFTS PER DAY
   if (isRuleActive('max_shifts_per_day')) {
-    const dayCount = schedules.filter(s => s.employee_id === employeeId && s.date === date).length + 1
+    const existingDayCount = schedules.filter(
+      s => s.employee_id === employeeId && s.date === date
+    ).length - (existingCurrent ? 1 : 0)
+    const dayCount = existingDayCount + 1
     const max = getEffectiveValue('max_shifts_per_day', posId, 'warning')
     if (dayCount > max) {
       result.push(createWarningObj(emp, 'max_shifts_per_day', getRuleLevel('max_shifts_per_day'), date, shiftId,
@@ -289,6 +331,38 @@ function createWarningObj(emp: Employee, type: RuleKey, level: WarningLevel, dat
   }
 }
 
+function createSyntheticWarning(input: {
+  employee_id?: string
+  employee_name?: string
+  warning_type: SyntheticScheduleWarningType
+  warning_level: WarningLevel
+  message: string
+  date: string
+  shift_id?: string
+}): ScheduleWarning {
+  return {
+    id: `warn-${warningCounter++}`,
+    employee_id: input.employee_id || 'store-scope',
+    employee_name: input.employee_name || 'Cua hang',
+    warning_type: input.warning_type,
+    warning_level: input.warning_level,
+    message: input.message,
+    date: input.date,
+    shift_id: input.shift_id,
+    is_acknowledged: false,
+  }
+}
+
+export function getScheduleWarningTypeLabel(type: ScheduleWarningType): string {
+  const ruleLabel = scheduleRules.find(rule => rule.rule_key === type)?.label
+  if (ruleLabel) return ruleLabel
+  return syntheticWarningLabels[type as SyntheticScheduleWarningType] || type
+}
+
+export function getScheduleWarningKey(warning: Pick<ScheduleWarning, 'employee_id' | 'date' | 'warning_type' | 'shift_id'>): string {
+  return `${warning.employee_id}-${warning.date}-${warning.warning_type}-${warning.shift_id || 'none'}`
+}
+
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr)
   d.setDate(d.getDate() + days)
@@ -309,10 +383,20 @@ function getWeekDatesFromDate(dateStr: string): string[] {
 
 // ─── Scan all warnings for a store+week ───
 
-export function scanWeekWarnings(storeId: string, weekDates: string[]): ScheduleWarning[] {
+export function scanWeekWarnings(storeId: string, weekDates: string[], allSchedules?: Schedule[]): ScheduleWarning[] {
   const allWarnings: ScheduleWarning[] = []
-  const storeSchedules = mockSchedules.filter(s => s.store_id === storeId)
+  const schedules = allSchedules || mockSchedules
+  const storeSchedules = schedules.filter(s => s.store_id === storeId && weekDates.includes(s.date))
   const empsInStore = mockEmployees.filter(e => e.store_id === storeId)
+
+  if (storeSchedules.length === 0 && weekDates[0]) {
+    allWarnings.push(createSyntheticWarning({
+      warning_type: 'empty_week',
+      warning_level: 'warning',
+      message: 'Tuan nay chua xep ca nao cho chi nhanh nay.',
+      date: weekDates[0],
+    }))
+  }
 
   for (const emp of empsInStore) {
     for (const date of weekDates) {
@@ -329,18 +413,82 @@ export function scanWeekWarnings(storeId: string, weekDates: string[]): Schedule
     }
   }
 
-  return allWarnings.sort((a, b) => {
+  storeSchedules.forEach(schedule => {
+    const employee = mockEmployees.find(item => item.id === schedule.employee_id)
+    if (!employee || employee.status === 'inactive') {
+      allWarnings.push(createSyntheticWarning({
+        employee_id: schedule.employee_id,
+        employee_name: employee?.full_name || 'Nhan su khong ton tai',
+        warning_type: 'employee_inactive',
+        warning_level: 'block',
+        message: `${employee?.full_name || schedule.employee_id} da nghi hoac chua active nhung van dang bi xep ca.`,
+        date: schedule.date,
+        shift_id: schedule.shift_id,
+      }))
+    }
+
+    if (employee && employee.store_id !== storeId) {
+      allWarnings.push(createSyntheticWarning({
+        employee_id: schedule.employee_id,
+        employee_name: employee.full_name,
+        warning_type: 'wrong_store_assignment',
+        warning_level: 'block',
+        message: `${employee.full_name} khong thuoc chi nhanh nay nhung dang bi xep vao lich hien tai.`,
+        date: schedule.date,
+        shift_id: schedule.shift_id,
+      }))
+    }
+
+    if (schedule.modified_after_publish && !schedule.change_reason?.trim()) {
+      allWarnings.push(createSyntheticWarning({
+        employee_id: schedule.employee_id,
+        employee_name: employee?.full_name || schedule.employee_id,
+        warning_type: 'missing_change_reason',
+        warning_level: 'warning',
+        message: `${employee?.full_name || schedule.employee_id} co ca da sua sau publish nhung chua ghi ly do.`,
+        date: schedule.date,
+        shift_id: schedule.shift_id,
+      }))
+    }
+  })
+
+  const dedupedWarnings = Array.from(
+    new Map(allWarnings.map(warning => [getScheduleWarningKey(warning), warning])).values()
+  )
+
+  // Enrich with persisted acknowledgements
+  const acks = getPersistedAcknowledgements()
+  const ackMap = new Map<string, WarningAcknowledgement>()
+  acks.forEach(ack => ackMap.set(ack.warning_key, ack))
+
+  dedupedWarnings.forEach(w => {
+    const key = getScheduleWarningKey(w)
+    const ack = ackMap.get(key)
+    if (ack) {
+      w.is_acknowledged = true
+      w.acknowledged_by = ack.acknowledged_by_name
+      w.acknowledged_at = ack.acknowledged_at
+      w.reason = ack.reason
+    }
+  })
+
+  return dedupedWarnings.sort((a, b) => {
     const levelOrder: Record<WarningLevel, number> = { block: 0, warning: 1, info: 2 }
-    return (levelOrder[a.warning_level] - levelOrder[b.warning_level]) || a.date.localeCompare(b.date)
+    const levelDiff = levelOrder[a.warning_level] - levelOrder[b.warning_level]
+    if (levelDiff !== 0) return levelDiff
+    const dateDiff = a.date.localeCompare(b.date)
+    if (dateDiff !== 0) return dateDiff
+    return getScheduleWarningKey(a).localeCompare(getScheduleWarningKey(b))
   })
 }
 
 // ─── Get employee weekly hours ───
 
-export function getEmployeeWeeklyHours(employeeId: string, weekDates: string[]): number {
+export function getEmployeeWeeklyHours(employeeId: string, weekDates: string[], allSchedules?: Schedule[]): number {
   let total = 0
+  const schedules = allSchedules || mockSchedules
   weekDates.forEach(date => {
-    mockSchedules
+    schedules
       .filter(s => s.employee_id === employeeId && s.date === date)
       .forEach(s => {
         const sh = getShiftById(s.shift_id)
@@ -392,7 +540,49 @@ export function removeSeason(id: string): void {
   if (idx !== -1) scheduleSeasons.splice(idx, 1)
 }
 
-export function acknowledgeWarning(warningId: string, userId: string): void {
+export interface WarningAcknowledgement {
+  warning_key: string
+  acknowledged_by: string
+  acknowledged_by_name: string
+  acknowledged_at: string
+  reason: string
+}
+
+export function getPersistedAcknowledgements(): WarningAcknowledgement[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const data = localStorage.getItem('homies_warning_acknowledgements')
+    return data ? JSON.parse(data) : []
+  } catch {
+    return []
+  }
+}
+
+export function acknowledgeWarning(
+  warningKey: string,
+  userId: string,
+  userName: string,
+  reason: string
+): void {
+  if (typeof window === 'undefined') return
+  try {
+    const acks = getPersistedAcknowledgements()
+    if (!acks.some(a => a.warning_key === warningKey)) {
+      acks.push({
+        warning_key: warningKey,
+        acknowledged_by: userId,
+        acknowledged_by_name: userName,
+        acknowledged_at: new Date().toISOString(),
+        reason
+      })
+      localStorage.setItem('homies_warning_acknowledgements', JSON.stringify(acks))
+    }
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+export function old_acknowledgeWarning(warningId: string, userId: string): void {
   const w = warnings.find(w => w.id === warningId)
   if (w) {
     w.is_acknowledged = true

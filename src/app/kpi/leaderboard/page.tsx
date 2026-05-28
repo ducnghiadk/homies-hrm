@@ -8,10 +8,9 @@ import AnimatedPodium from '@/components/kpi/AnimatedPodium'
 import MyPositionCard from '@/components/kpi/MyPositionCard'
 import MoversCard from '@/components/kpi/MoversCard'
 import StreaksCard from '@/components/kpi/StreaksCard'
-import EmployeeMiniCard from '@/components/kpi/EmployeeMiniCard'
 import GradeBadge from '@/components/kpi/GradeBadge'
 import TrendIndicator from '@/components/kpi/TrendIndicator'
-import { getLeaderboard, compareWithPeers } from '@/lib/kpi-report-service'
+import { getLeaderboard } from '@/lib/kpi-report-service'
 import { getCurrentPeriod, getPreviousPeriodsHelper } from '@/lib/mock-data-kpi'
 
 export default function LeaderboardPage() {
@@ -27,7 +26,6 @@ export default function LeaderboardPage() {
   const storeId = scope === 'store' ? user.store_id : undefined
   const lb = getLeaderboard(storeId, period)
   const prevLb = getLeaderboard(storeId, prevPeriod)
-  const peer = compareWithPeers(user.id, period)
   const myEntry = lb.current.find(e => e.employee_id === user.id)
   const myPrevEntry = prevLb.current.find(e => e.employee_id === user.id)
 
@@ -96,7 +94,7 @@ export default function LeaderboardPage() {
               <div className="flex items-center gap-2 shrink-0">
                 <GradeBadge gradeCode={entry.grade_code} size="sm" showIcon={false} />
                 <div className="text-sm font-black" style={{
-                  color: entry.score >= 85 ? '#10b981' : entry.score >= 70 ? '#f59e0b' : '#ef4444',
+                  color: entry.score >= 85 ? '#1E9E57' : entry.score >= 70 ? '#F6C85F' : '#D9381E',
                 }}>{entry.score}</div>
                 {entry.change !== 0 && <TrendIndicator value={entry.change} size="sm" />}
               </div>

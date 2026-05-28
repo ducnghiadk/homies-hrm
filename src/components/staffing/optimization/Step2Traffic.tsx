@@ -68,7 +68,7 @@ export default function Step2Traffic({ state, onUpdate, onNext, onBack }: Step2P
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
       <div className="text-center">
         <h2 className="text-xl font-bold text-gray-900 flex items-center justify-center gap-2">
-          <BarChart3 size={20} className="text-blue-600" />
+          <BarChart3 size={20} className="text-primary-600" />
           Bước 2/4: Khách đông lúc nào?
         </h2>
         <p className="text-gray-500 text-sm">Ước tính % khách trong mỗi khung giờ (tổng = 100%)</p>
@@ -77,7 +77,7 @@ export default function Step2Traffic({ state, onUpdate, onNext, onBack }: Step2P
       {/* Template Selector Cards */}
       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
         <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5">
-          <Target size={14} className="text-blue-600" />
+          <Target size={14} className="text-primary-600" />
           Chọn mẫu phù hợp với quán:
         </h3>
         <TemplateSelector
@@ -104,14 +104,14 @@ export default function Step2Traffic({ state, onUpdate, onNext, onBack }: Step2P
                         label={slot.label}
                         value={slot.percentage}
                         onChange={(val) => handleTrafficChange(index, val)}
-                        color={slot.percentage > 20 ? 'bg-orange-500' : slot.percentage > 10 ? 'bg-blue-500' : 'bg-gray-300'}
+                        color={slot.percentage > 20 ? 'bg-warning-500' : slot.percentage > 10 ? 'bg-primary-500' : 'bg-gray-300'}
                     />
                 ))}
             </div>
             
             <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
                 <span className="text-sm font-bold text-gray-600">Tổng cộng:</span>
-                <span className={`text-xl font-bold ${isValid ? 'text-green-600' : 'text-red-500'}`}>
+                <span className={`text-xl font-bold ${isValid ? 'text-success-600' : 'text-error-500'}`}>
                     {currentTotal}% {isValid && '✓'}
                 </span>
             </div>

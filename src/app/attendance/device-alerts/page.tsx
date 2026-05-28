@@ -2,12 +2,12 @@
 
 import AppShell from '@/components/layout/AppShell'
 import { mockDeviceAlerts } from '@/lib/mock-data-attendance'
-import { AlertTriangle, Smartphone, CheckCircle, XCircle } from 'lucide-react'
+import { AlertTriangle, Smartphone } from 'lucide-react'
 
 const resolutionMap: Record<string, { l: string; c: string }> = {
-  unresolved: { l: '⚠️ Chưa xử lý', c: '#f59e0b' },
-  valid: { l: '✅ Hợp lệ', c: '#10b981' },
-  fraud: { l: '🔴 Gian lận', c: '#ef4444' },
+  unresolved: { l: '⚠️ Chưa xử lý', c: '#F6C85F' },
+  valid: { l: '✅ Hợp lệ', c: '#1E9E57' },
+  fraud: { l: '🔴 Gian lận', c: '#D9381E' },
 }
 
 export default function DeviceAlertsPage() {
@@ -16,10 +16,10 @@ export default function DeviceAlertsPage() {
   return (
     <AppShell title="Cảnh báo thiết bị">
       <div className="space-y-4">
-        <div className="card animate-fade-in" style={{ background: '#f59e0b10', border: '1px solid #f59e0b30' }}>
+        <div className="card animate-fade-in" style={{ background: '#F6C85F10', border: '1px solid #F6C85F30' }}>
           <div className="flex items-center gap-2">
-            <AlertTriangle size={18} className="text-amber-500" />
-            <span className="text-sm font-bold text-amber-500">
+            <AlertTriangle size={18} className="text-warning-500" />
+            <span className="text-sm font-bold text-warning-500">
               {unresolvedCount} cảnh báo chưa xử lý
             </span>
           </div>

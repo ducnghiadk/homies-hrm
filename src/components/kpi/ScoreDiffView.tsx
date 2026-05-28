@@ -16,10 +16,10 @@ function getScoreForCriteria(scores: EvaluationScore[], criteriaId: string): num
 }
 
 function getDiffColor(diff: number): string {
-  if (diff >= 2) return '#ef4444'
-  if (diff <= -2) return '#ef4444'
-  if (diff > 0) return '#10b981'
-  if (diff < 0) return '#f59e0b'
+  if (diff >= 2) return '#D9381E'
+  if (diff <= -2) return '#D9381E'
+  if (diff > 0) return '#1E9E57'
+  if (diff < 0) return '#F6C85F'
   return '#9ca3af'
 }
 
@@ -141,7 +141,7 @@ export default function ScoreDiffView({
         {deductionPoints > 0 && (
           <div className="flex justify-between text-xs">
             <span>Điểm lỗi:</span>
-            <span className="font-bold" style={{ color: '#ef4444' }}>-{deductionPoints} điểm</span>
+            <span className="font-bold" style={{ color: '#D9381E' }}>-{deductionPoints} điểm</span>
           </div>
         )}
         <div className="border-t pt-1.5 flex justify-between text-xs font-bold" style={{ borderColor: 'var(--gray-200)' }}>

@@ -4,8 +4,7 @@
 
 import {
   mockPositions, mockStores, mockShifts,
-  getShiftById,
-  type Schedule, type Shift,
+  type Schedule,
 } from './mock-data'
 
 // ─── Types ───
@@ -69,14 +68,7 @@ export const staffingSettings: StaffingSettings = {
   shortage_warning_level: 'warning',
   surplus_warning_level: 'info',
   allow_assign_when_short: true,
-}
-
-// ─── Requirements Data ───
-// Store 1 (Q1): Highest volume
-// Store 2 (Thủ Đức): Medium
-// Store 3 (Q3): Smallest
-
-const staffPositions = ['pos-001', 'pos-002'] // Barista, Cashier
+}// Barista, Cashier
 let reqId = 0
 function rid() { return `sr-${String(++reqId).padStart(3, '0')}` }
 

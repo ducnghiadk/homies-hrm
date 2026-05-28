@@ -6,10 +6,10 @@ import { useSwipeActions } from '@/hooks/useSwipeActions'
 import type { ScheduleShift } from '@/lib/mock-data-smart-schedule'
 
 const positionLabels: Record<string, { label: string; Icon: React.ComponentType<{size?: number; className?: string}>; color: string }> = {
-  barista: { label: 'Pha chế', Icon: Shirt, color: 'text-amber-600 bg-amber-50' },
-  cashier: { label: 'Thu ngân', Icon: DollarSign, color: 'text-green-600 bg-green-50' },
-  support: { label: 'Hỗ trợ', Icon: Handshake, color: 'text-blue-600 bg-blue-50' },
-  store_manager: { label: 'Quản lý', Icon: Star, color: 'text-purple-600 bg-purple-50' },
+  barista: { label: 'Pha chế', Icon: Shirt, color: 'text-warning-600 bg-warning-50' },
+  cashier: { label: 'Thu ngân', Icon: DollarSign, color: 'text-success-600 bg-success-50' },
+  support: { label: 'Hỗ trợ', Icon: Handshake, color: 'text-primary-600 bg-primary-50' },
+  store_manager: { label: 'Quản lý', Icon: Star, color: 'text-primary-600 bg-primary-50' },
 }
 
 function calcHours(start: string, end: string): number {
@@ -20,8 +20,8 @@ function calcHours(start: string, end: string): number {
 
 interface MobileShiftCardProps {
   shift: ScheduleShift
-  onEdit: () => void
-  onDelete: () => void
+  onEdit?: () => void
+  onDelete?: () => void
 }
 
 export default function MobileShiftCard({
@@ -32,7 +32,7 @@ export default function MobileShiftCard({
   const [isExpanded, setIsExpanded] = useState(false)
 
   const { state, handlers, reset } = useSwipeActions({
-    onSwipeLeft: onDelete,
+    onSwipeLeft: onDelete || (() => undefined),
     threshold: 80,
     deleteThreshold: 200,
   })
@@ -51,26 +51,32 @@ export default function MobileShiftCard({
   return (
     <div className="relative overflow-hidden rounded-xl">
       {/* Swipe action buttons (behind card) */}
-      <div className="absolute inset-y-0 right-0 flex">
-        <button
-          onClick={(e) => { e.stopPropagation(); reset(); onEdit() }}
-          className="w-16 flex items-center justify-center bg-blue-500 text-white"
-        >
-          <div className="flex flex-col items-center gap-0.5">
-            <Pencil size={16} />
-            <span className="text-xs">Sửa</span>
-          </div>
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); reset(); onDelete() }}
-          className="w-16 flex items-center justify-center bg-red-500 text-white"
-        >
-          <div className="flex flex-col items-center gap-0.5">
-            <Trash2 size={16} />
-            <span className="text-xs">Xóa</span>
-          </div>
-        </button>
-      </div>
+      {(onEdit || onDelete) && (
+        <div className="absolute inset-y-0 right-0 flex">
+          {onEdit && (
+            <button
+              onClick={(e) => { e.stopPropagation(); reset(); onEdit() }}
+              className="w-16 flex items-center justify-center bg-primary-500 text-white"
+            >
+              <div className="flex flex-col items-center gap-0.5">
+                <Pencil size={16} />
+                <span className="text-xs">Sửa</span>
+              </div>
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); reset(); onDelete() }}
+              className="w-16 flex items-center justify-center bg-error-500 text-white"
+            >
+              <div className="flex flex-col items-center gap-0.5">
+                <Trash2 size={16} />
+                <span className="text-xs">Xóa</span>
+              </div>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Card (slides over actions) */}
       <div
@@ -142,18 +148,25 @@ export default function MobileShiftCard({
                 <Clock size={12} className="text-gray-400" />
                 Nghỉ giữa ca: {shift.breakMinutes} phút
               </div>
+              {shift.assignmentReason && (
+                <div className="rounded-xl bg-primary-50 px-2.5 py-2 text-xs text-primary-700">
+                  Lý do xếp ca: {shift.assignmentReason}
+                </div>
+              )}
               {shift.isOvertime && (
-                <div className="flex items-center gap-2 text-orange-600">
+                <div className="flex items-center gap-2 text-warning-600">
                   <AlertTriangle size={12} /> Ca tăng ca
                 </div>
               )}
             </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit() }}
-              className="mt-3 w-full py-2.5 text-xs font-bold text-primary bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Pencil size={12} /> Sửa ca này
-            </button>
+            {onEdit && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onEdit() }}
+                className="mt-3 w-full py-2.5 text-xs font-bold text-primary bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Pencil size={12} /> Sửa ca này
+              </button>
+            )}
           </div>
         )}
       </div>

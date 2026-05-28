@@ -79,7 +79,7 @@ export default function KPIHistoryChart({ evaluations, currentPeriod }: Props) {
           <div className="mt-3 pt-2 border-t text-center" style={{ borderColor: 'var(--gray-100)' }}>
             <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
               Xu hướng: <span className="font-bold" style={{
-                color: diff > 0 ? '#10b981' : diff < 0 ? '#ef4444' : '#6b7280',
+                color: diff > 0 ? '#1E9E57' : diff < 0 ? '#D9381E' : '#6b7280',
               }}>
                 {diff > 0 ? `↑ +${diff}` : diff < 0 ? `↓ ${diff}` : '→ ổn định'}
               </span>

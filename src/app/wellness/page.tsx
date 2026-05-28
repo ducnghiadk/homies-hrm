@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
-import { MOOD_EMOJIS, mockMoodCheckins, mockFeedbackBox, getMoodHistory } from '@/lib/mock-data-p3'
-import { Smile, MessageSquare, Send, TrendingUp, AlertTriangle } from 'lucide-react'
+import { MOOD_EMOJIS, mockFeedbackBox, getMoodHistory } from '@/lib/mock-data-p3'
+import { Send, TrendingUp, AlertTriangle } from 'lucide-react'
 
 export default function WellnessPage() {
   const { user, isAuthenticated } = useAuthStore()

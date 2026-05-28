@@ -4,48 +4,80 @@
   /* Font */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
-  /* So Matcha Palette */
-  --color-primary-900: #1E4A7A;
-  --color-primary-800: #2A5A8F;
-  --color-primary-700: #3268A3;
-  --color-primary-600: #3971B8;
-  --color-primary-500: #4A82C4;
-  --color-primary-400: #6B9AD0;
-  --color-primary-300: #8FB4DC;
-  --color-primary-200: #B8D0EA;
-  --color-primary-100: #E1EBF6;
-  --color-primary-50: #F0F5FB;
+  /* Homies Milk Tea Palette */
+  --color-primary-900: #000814;
+  --color-primary-800: #001D3D;
+  --color-primary-700: #1D3E61;
+  --color-primary-600: #2F6FA8;
+  --color-primary-500: #4F8ABF;
+  --color-primary-400: #71A5D4;
+  --color-primary-300: #9AC1E5;
+  --color-primary-200: #C2DBF2;
+  --color-primary-100: #E6F0FA;
+  --color-primary-50: #F4F8FC;
 
-  --color-accent-600: #9AB86E;
-  --color-accent-500: #B3C98A;
-  --color-accent-400: #C8D69B;
-  --color-accent-300: #D6E2B5;
-  --color-accent-200: #E4EDCF;
-  --color-accent-100: #F1F6E7;
-  --color-accent-50: #F8FAF3;
+  --color-accent-600: #107C41;
+  --color-accent-500: #1E9E57;
+  --color-accent-400: #48C079;
+  --color-accent-300: #8EDEA9;
+  --color-accent-200: #DDF4EC;
+  --color-accent-100: #EFFBFAF;
+  --color-accent-50: #F5FCFA;
 
-  --color-vanilla-500: #E8D78A;
-  --color-vanilla-400: #F0E09A;
-  --color-vanilla-300: #F6E6A5;
-  --color-vanilla-200: #F9EFC0;
-  --color-vanilla-100: #FCF7DB;
-  --color-vanilla-50: #FEFCF0;
+  --color-vanilla-500: #F6C85F;
+  --color-vanilla-400: #F8D584;
+  --color-vanilla-300: #FAE0A5;
+  --color-vanilla-200: #FCECC6;
+  --color-vanilla-100: #FDF5E3;
+  --color-vanilla-50: #FEFCF6;
 
-  --color-dark-900: #1A1D0E;
-  --color-dark-800: #252914;
-  --color-dark-700: #343B1B;
-  --color-dark-600: #454D25;
-  --color-dark-500: #5A6432;
+  --color-dark-900: #000814;
+  --color-dark-800: #00162B;
+  --color-dark-700: #001D3D;
+  --color-dark-600: #1F324D;
+  --color-dark-500: #3B506D;
 
-  --color-ivory: #F0FCEE;
-  --color-bg-page: #F5FDF4;
+  --color-ivory: #FFFDF2;
+  --color-bg-page: #FFF8E8;
   --color-bg-card: #FFFFFF;
-  --color-bg-subtle: #FAFEFA;
+  --color-bg-subtle: #FFFDF9;
 
-  --color-success: #4CAF50;
-  --color-success-light: #E8F5E9;
-  --color-error: #E57373;
-  --color-error-light: #FFEBEE;
+  --color-success: #1E9E57;
+  --color-success-light: #DDF4EC;
+  --color-success-50: var(--color-accent-50);
+  --color-success-100: var(--color-accent-100);
+  --color-success-200: var(--color-accent-200);
+  --color-success-300: var(--color-accent-300);
+  --color-success-400: var(--color-accent-400);
+  --color-success-500: var(--color-accent-500);
+  --color-success-600: var(--color-accent-600);
+  --color-success-700: #0E6B38;
+  --color-success-800: #0C582F;
+  --color-success-900: #0A4A27;
+
+  --color-warning-50: var(--color-vanilla-50);
+  --color-warning-100: var(--color-vanilla-100);
+  --color-warning-200: var(--color-vanilla-200);
+  --color-warning-300: var(--color-vanilla-300);
+  --color-warning-400: var(--color-vanilla-400);
+  --color-warning-500: var(--color-vanilla-500);
+  --color-warning-600: #D97706;
+  --color-warning-700: #B45309;
+  --color-warning-800: #92400E;
+  --color-warning-900: #78350F;
+
+  --color-error: #D9381E;
+  --color-error-light: #FEF2F2;
+  --color-error-50: #FEF2F2;
+  --color-error-100: #FEE2E2;
+  --color-error-200: #FECACA;
+  --color-error-300: #FCA5A5;
+  --color-error-400: #F87171;
+  --color-error-500: #EF4444;
+  --color-error-600: #DC2626;
+  --color-error-700: #B91C1C;
+  --color-error-800: #991B1B;
+  --color-error-900: #7F1D1D;
   
   --color-white: #FFFFFF;
   --color-gray-50: #FAFAFA;
@@ -84,12 +116,12 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(52, 59, 27, 0.08);
-  --shadow-md: 0 4px 12px rgba(52, 59, 27, 0.1);
-  --shadow-lg: 0 8px 24px rgba(52, 59, 27, 0.12);
-  --shadow-xl: 0 16px 32px rgba(52, 59, 27, 0.15);
-  --shadow-primary: 0 4px 14px rgba(57, 113, 184, 0.3);
-  --shadow-accent: 0 4px 14px rgba(200, 214, 155, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 29, 61, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 29, 61, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 29, 61, 0.12);
+  --shadow-xl: 0 16px 32px rgba(0, 29, 61, 0.15);
+  --shadow-primary: 0 4px 14px rgba(47, 111, 168, 0.3);
+  --shadow-accent: 0 4px 14px rgba(221, 244, 236, 0.4);
   --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-hover: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
   --shadow-float: 0 10px 25px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.05);
@@ -237,12 +269,12 @@
 
   /* ----- STATUS COLORS ----- */
   --color-urgent: #ef4444;
-  --color-urgent-bg: #fef2f2;
-  --color-warning: #f59e0b;
-  --color-warning-bg: #fffbeb;
-  --color-success-v2: #22c55e;
-  --color-success-v2-bg: #f0fdf4;
-  --color-info: #3b82f6;
+  /* Compatibility variables */
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-success-v2: var(--success);
+  --color-error: var(--error);
+  --color-info: var(--primary);
   --color-info-bg: #eff6ff;
 
   /* ----- ANIMATION ----- */
@@ -307,6 +339,42 @@
   padding-top: env(safe-area-inset-top, 0);
 }
 
+/* Desktop fallback for employee detail when an old browser shell keeps stale utility CSS */
+@media (min-width: 1024px) {
+  .xl\:grid-cols-\[320px_minmax\(0\,1fr\)\] {
+    grid-template-columns: 320px minmax(0, 1fr);
+  }
+
+  main > div[class*='lg:flex'][class*='lg:items-start'] {
+    display: flex;
+    align-items: flex-start;
+  }
+
+  main > div[class*='lg:flex'][class*='lg:items-start'] > aside[class*='hidden'][class*='lg:block'] {
+    display: block;
+    flex: 0 0 auto;
+  }
+
+  main > div[class*='lg:flex'][class*='lg:items-start'] > div[class*='min-w-0'][class*='lg:flex-1'] {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .app-shell-desktop-frame {
+    display: flex;
+  }
+
+  .app-shell-desktop-sidebar {
+    display: block;
+    flex: 0 0 auto;
+  }
+
+  .app-shell-desktop-content {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}
+
 /* ── Premium Dashboard Animations ── */
 @keyframes premiumSlideUp {
   from { opacity: 0; transform: translateY(20px); }
@@ -360,9 +428,8 @@
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%);
+  background: linear-gradient(135deg, var(--color-primary-800) 0%, var(--color-primary-600) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
-

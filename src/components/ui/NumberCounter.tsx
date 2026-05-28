@@ -105,7 +105,7 @@ export default function NumberCounter({
 
       {showDiff && diff !== null && state.done && (
         <span className={`text-xs font-medium ${
-          diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-gray-400'
+          diff > 0 ? 'text-error-500' : diff < 0 ? 'text-success-500' : 'text-gray-400'
         }`}>
           {diff > 0 ? '↑' : diff < 0 ? '↓' : '→'}
           {format === 'currency'

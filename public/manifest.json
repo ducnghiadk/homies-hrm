@@ -1,7 +1,7 @@
 {
-  "name": "HRM Trà Sữa",
-  "short_name": "HRM",
-  "description": "Hệ thống quản lý nhân sự chuỗi trà sữa",
+  "name": "Homies Milk Tea HRM",
+  "short_name": "Homies HRM",
+  "description": "Hệ thống quản lý nhân sự chuyên nghiệp cho Homies Milk Tea",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F9FAFB",

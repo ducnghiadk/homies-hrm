@@ -122,16 +122,16 @@ export interface AllowanceType {
 
 // ============ Store Summary ============
 export const mockPayrollByStore: PayrollStoreSummary[] = [
-  { store_id: 'store-001', store_name: 'Boba House Q.1', employee_count: 7, total_base: 45500000, total_allowance: 7000000, total_bonus: 1500000, total_deduction: 500000, total_insurance: 5460000, total_tax: 1200000, total_net: 46840000, status: 'approved' },
-  { store_id: 'store-002', store_name: 'Boba House Q.3', employee_count: 5, total_base: 30000000, total_allowance: 5000000, total_bonus: 500000, total_deduction: 200000, total_insurance: 3600000, total_tax: 800000, total_net: 30900000, status: 'reviewing' },
-  { store_id: 'store-003', store_name: 'Boba House Thủ Đức', employee_count: 5, total_base: 32000000, total_allowance: 5000000, total_bonus: 800000, total_deduction: 0, total_insurance: 3840000, total_tax: 900000, total_net: 33060000, status: 'draft' },
+  { store_id: 'store-001', store_name: 'Homies Milk Tea Q.1', employee_count: 7, total_base: 45500000, total_allowance: 7000000, total_bonus: 1500000, total_deduction: 500000, total_insurance: 5460000, total_tax: 1200000, total_net: 46840000, status: 'approved' },
+  { store_id: 'store-002', store_name: 'Homies Milk Tea Q.3', employee_count: 5, total_base: 30000000, total_allowance: 5000000, total_bonus: 500000, total_deduction: 200000, total_insurance: 3600000, total_tax: 800000, total_net: 30900000, status: 'reviewing' },
+  { store_id: 'store-003', store_name: 'Homies Milk Tea Thủ Đức', employee_count: 5, total_base: 32000000, total_allowance: 5000000, total_bonus: 800000, total_deduction: 0, total_insurance: 3840000, total_tax: 900000, total_net: 33060000, status: 'draft' },
 ]
 
 // ============ Salary Slips ============
 export const mockSalarySlips: SalarySlipData[] = [
   {
     id: 'slip-001', employee_id: 'emp-005', employee_name: 'Trần Thị Mai',
-    position: 'Pha chế', store: 'Boba House Q.1', period: '01/2026',
+    position: 'Pha chế', store: 'Homies Milk Tea Q.1', period: '01/2026',
     work_days: 26, standard_days: 26,
     base_salary: 5500000,
     allowances: [{ name: 'Ăn trưa', amount: 700000 }, { name: 'Xăng xe', amount: 300000 }],
@@ -143,7 +143,7 @@ export const mockSalarySlips: SalarySlipData[] = [
   },
   {
     id: 'slip-002', employee_id: 'emp-007', employee_name: 'Đặng Minh Khoa',
-    position: 'Phục vụ', store: 'Boba House Q.1', period: '01/2026',
+    position: 'Phục vụ', store: 'Homies Milk Tea Q.1', period: '01/2026',
     work_days: 24, standard_days: 26,
     base_salary: 5076923,
     allowances: [{ name: 'Ăn trưa', amount: 700000 }],

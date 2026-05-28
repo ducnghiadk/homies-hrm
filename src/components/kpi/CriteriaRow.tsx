@@ -23,7 +23,7 @@ export default function CriteriaRow({ criteria, onEdit, onDelete, onToggle }: Pr
             {inputLabel[criteria.input_type] || criteria.input_type}
           </span>
           {criteria.auto_source && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600">
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary-50 text-primary-600">
               Auto
             </span>
           )}
@@ -37,7 +37,7 @@ export default function CriteriaRow({ criteria, onEdit, onDelete, onToggle }: Pr
       <button
         onClick={() => onToggle(criteria.id, !criteria.is_active)}
         className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 relative ${
-          criteria.is_active ? 'bg-green-500' : 'bg-gray-300'
+          criteria.is_active ? 'bg-success-500' : 'bg-gray-300'
         }`}
       >
         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
@@ -46,8 +46,8 @@ export default function CriteriaRow({ criteria, onEdit, onDelete, onToggle }: Pr
       </button>
 
       <div className="flex gap-1 flex-shrink-0">
-        <button onClick={() => onEdit(criteria)} className="text-xs px-2 py-1 rounded-lg text-blue-600 hover:bg-blue-50">Sửa</button>
-        <button onClick={() => onDelete(criteria.id)} className="text-xs px-2 py-1 rounded-lg text-red-500 hover:bg-red-50">Xóa</button>
+        <button onClick={() => onEdit(criteria)} className="text-xs px-2 py-1 rounded-lg text-primary-600 hover:bg-primary-50">Sửa</button>
+        <button onClick={() => onDelete(criteria.id)} className="text-xs px-2 py-1 rounded-lg text-error-500 hover:bg-error-50">Xóa</button>
       </div>
     </div>
   )

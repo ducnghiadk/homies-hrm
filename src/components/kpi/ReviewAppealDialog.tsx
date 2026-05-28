@@ -33,7 +33,7 @@ export default function ReviewAppealDialog({ isOpen, onClose, violation, onDecis
         <div className="space-y-2 mb-3 p-3 rounded-xl" style={{ background: 'var(--gray-50)' }}>
           <div className="flex justify-between items-center">
             <span className="text-xs font-bold">{vType?.code}: {vType?.name}</span>
-            <span className="text-sm font-black text-red-600">-{violation.penalty_points} điểm</span>
+            <span className="text-sm font-black text-error-600">-{violation.penalty_points} điểm</span>
           </div>
           <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             <strong>Mô tả:</strong> {violation.description}
@@ -73,7 +73,7 @@ export default function ReviewAppealDialog({ isOpen, onClose, violation, onDecis
             onClick={() => { if (valid) { onDecision(violation.id, 'approved', note.trim()); setNote('') } }}
             disabled={!valid}
             className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity"
-            style={{ background: '#10b981', opacity: valid ? 1 : 0.5 }}
+            style={{ background: '#1E9E57', opacity: valid ? 1 : 0.5 }}
           >
             ✅ Chấp nhận (hoàn điểm)
           </button>
@@ -81,7 +81,7 @@ export default function ReviewAppealDialog({ isOpen, onClose, violation, onDecis
             onClick={() => { if (valid) { onDecision(violation.id, 'rejected', note.trim()); setNote('') } }}
             disabled={!valid}
             className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity"
-            style={{ background: '#ef4444', opacity: valid ? 1 : 0.5 }}
+            style={{ background: '#D9381E', opacity: valid ? 1 : 0.5 }}
           >
             ❌ Từ chối
           </button>

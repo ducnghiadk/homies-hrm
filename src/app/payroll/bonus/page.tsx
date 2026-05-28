@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import { mockBonuses } from '@/lib/mock-data-payroll'
-import { Gift, CheckCircle, Clock, Plus } from 'lucide-react'
+import { Gift, Plus } from 'lucide-react'
 
 const fmt = (n: number) => n.toLocaleString('vi-VN') + '₫'
-const statusMap = { pending: { l: 'Chờ duyệt', c: '#f59e0b' }, approved: { l: 'Đã duyệt', c: '#10b981' }, rejected: { l: 'Từ chối', c: '#ef4444' } }
+const statusMap = { pending: { l: 'Chờ duyệt', c: '#F6C85F' }, approved: { l: 'Đã duyệt', c: '#1E9E57' }, rejected: { l: 'Từ chối', c: '#D9381E' } }
 
 export default function BonusSlipPage() {
   const [filter, setFilter] = useState('all')
@@ -37,7 +37,7 @@ export default function BonusSlipPage() {
             const s = statusMap[b.status]
             return (
               <div key={b.id} className="card flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#10b98120' }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#1E9E5720' }}>
                   <Gift size={18} className="text-emerald-500" />
                 </div>
                 <div className="flex-1 min-w-0">

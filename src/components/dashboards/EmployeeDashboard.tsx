@@ -187,25 +187,25 @@ export default function EmployeeDashboard() {
             icon={Clock}
             label="Điểm KPI"
             value={`${kpi.score}/100`}
-            iconColor={kpi.grade === 'A' ? 'text-green-600' : kpi.grade === 'B' ? 'text-blue-600' : 'text-amber-600'}
-            iconBg={kpi.grade === 'A' ? 'bg-green-100' : kpi.grade === 'B' ? 'bg-blue-100' : 'bg-amber-100'}
-            className={kpi.grade === 'A' ? 'bg-green-50 border-green-200' : kpi.grade === 'B' ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}
-            valueClassName={kpi.grade === 'A' ? 'text-green-700' : kpi.grade === 'B' ? 'text-blue-700' : 'text-amber-700'}
+            iconColor={kpi.grade === 'A' ? 'text-success-600' : kpi.grade === 'B' ? 'text-primary-600' : 'text-warning-600'}
+            iconBg={kpi.grade === 'A' ? 'bg-success-100' : kpi.grade === 'B' ? 'bg-primary-100' : 'bg-warning-100'}
+            className={kpi.grade === 'A' ? 'bg-success-50 border-success-200' : kpi.grade === 'B' ? 'bg-primary-50 border-primary-200' : 'bg-warning-50 border-warning-200'}
+            valueClassName={kpi.grade === 'A' ? 'text-success-700' : kpi.grade === 'B' ? 'text-primary-700' : 'text-warning-700'}
           />
           <StatCard
             icon={Target}
             label="Hạng tháng này"
             value={`Hạng ${kpi.grade}`}
-            iconColor="text-yellow-600"
-            iconBg="bg-yellow-100"
-            className="bg-yellow-50 border-yellow-200"
-            valueClassName="text-yellow-700"
+            iconColor="text-warning-600"
+            iconBg="bg-warning-100"
+            className="bg-warning-50 border-warning-200"
+            valueClassName="text-warning-700"
           />
         </div>
       )}
 
       {/* ─── C2. KPI Evaluation Widget ─── */}
-      <SectionGroup title="Đánh giá KPI tháng này" icon={Target} iconClassName="text-purple-500">
+      <SectionGroup title="Đánh giá KPI tháng này" icon={Target} iconClassName="text-primary-500">
         <div className="p-4 space-y-3">
           <div className="flex gap-2">
             <Link href="/kpi/evaluate" className="flex-1 no-underline">
@@ -223,7 +223,7 @@ export default function EmployeeDashboard() {
           </div>
           <Link href="/kpi/violations" className="block no-underline">
             <div className="py-2 px-3 rounded-xl text-center text-[11px] font-semibold"
-              style={{ background: '#fef3c7', color: '#92400e' }}>
+              style={{ background: 'var(--color-vanilla-200)', color: 'var(--color-primary-800)' }}>
               ⚠️ Xem lỗi vi phạm
             </div>
           </Link>
@@ -236,23 +236,23 @@ export default function EmployeeDashboard() {
           {
             icon: LogIn,
             label: 'Check-in',
-            bgColor: 'bg-green-100',
-            iconColor: 'text-green-600',
+            bgColor: 'bg-success-100',
+            iconColor: 'text-success-600',
             onClick: () => router.push('/checkin'),
             disabled: checkinStatus === 'checked_out',
           },
           {
             icon: CalendarDays,
             label: 'Xin nghỉ',
-            bgColor: 'bg-blue-100',
-            iconColor: 'text-blue-600',
+            bgColor: 'bg-primary-100',
+            iconColor: 'text-primary-600',
             onClick: () => router.push('/leave/request'),
           },
           {
             icon: DollarSign,
             label: 'Xem lương',
-            bgColor: 'bg-amber-100',
-            iconColor: 'text-amber-600',
+            bgColor: 'bg-warning-100',
+            iconColor: 'text-warning-600',
             onClick: () => router.push('/payroll'),
           },
         ]}
@@ -263,7 +263,7 @@ export default function EmployeeDashboard() {
       <SectionGroup
         title="Tuần này"
         icon={CalendarDays}
-        iconClassName="text-blue-500"
+        iconClassName="text-primary-500"
       >
         <div className="p-4">
           <div className="grid grid-cols-7 gap-1.5">
@@ -277,7 +277,7 @@ export default function EmployeeDashboard() {
                     ${isToday ? 'bg-primary-50 ring-2 ring-primary-500 ring-offset-1' : 'hover:bg-gray-50'}
                     ${shift ? 'hover:bg-primary-50' : ''}
                   `}
-                  onClick={() => shift && router.push(`/schedule?date=${ws.date}`)}
+                  onClick={() => shift && router.push(`/schedules?selectedDate=${ws.date}`)}
                 >
                   <p className={`text-[10px] font-medium uppercase ${isToday ? 'text-primary-600' : 'text-gray-400'}`}>
                     {dayLabels[idx]}
@@ -301,9 +301,9 @@ export default function EmployeeDashboard() {
           {/* Shift legend */}
           <div className="flex gap-4 mt-3 pt-2 border-t border-gray-50">
             {[
-              { name: 'Sáng', color: '#3B82F6' },
-              { name: 'Chiều', color: '#F59E0B' },
-              { name: 'Tối', color: '#8B5CF6' },
+              { name: 'Sáng', color: 'var(--color-vanilla-500)' },
+              { name: 'Chiều', color: 'var(--color-accent-400)' },
+              { name: 'Tối', color: 'var(--color-primary-600)' },
             ].map(s => (
               <div key={s.name} className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
@@ -319,7 +319,7 @@ export default function EmployeeDashboard() {
         <SectionGroup
           title={`Nhân viên ca hôm nay (${crewList.length})`}
           icon={Users}
-          iconClassName="text-blue-500"
+          iconClassName="text-primary-500"
         >
           {crewList.map(c => {
             const shortName = c.employee.full_name.split(' ').slice(-2).join(' ')

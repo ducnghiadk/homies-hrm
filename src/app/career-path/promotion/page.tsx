@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   initCareerPathStores, getActiveLevels, checkPromotionEligibility,
@@ -9,31 +9,24 @@ import {
 import type { CareerLevel, PromotionConditionProgress, PromotionRequest } from '@/lib/career-path-types';
 import ProgressRing from '@/components/career-path/ProgressRing';
 import ProgressBar from '@/components/career-path/ProgressBar';
-import ConditionChip from '@/components/career-path/ConditionChip';
 
 export default function PromotionPage() {
-  const [levels, setLevels] = useState<CareerLevel[]>([]);
-  const [conditions, setConditions] = useState<PromotionConditionProgress[]>([]);
-  const [requests, setRequests] = useState<PromotionRequest[]>([]);
+  const [levels] = useState<CareerLevel[]>(() => {
+    initCareerPathStores();
+    return getActiveLevels();
+  });
+  const [requests, setRequests] = useState<PromotionRequest[]>(() => getPromotionRequests());
   const [submitted, setSubmitted] = useState(false);
 
   const currentLevelId = 'level-staff';
   const empId = 'emp-001';
 
-  useEffect(() => {
-    initCareerPathStores();
-    const lvls = getActiveLevels();
-    setLevels(lvls);
-    const curIdx = lvls.findIndex(l => l.id === currentLevelId);
-    if (curIdx >= 0 && curIdx < lvls.length - 1) {
-      setConditions(checkPromotionEligibility(empId, currentLevelId, lvls[curIdx + 1].id));
-    }
-    setRequests(getPromotionRequests());
-  }, []);
-
   const currentLevel = levels.find(l => l.id === currentLevelId);
   const curIdx = levels.findIndex(l => l.id === currentLevelId);
   const nextLevel = curIdx >= 0 && curIdx < levels.length - 1 ? levels[curIdx + 1] : null;
+  const conditions: PromotionConditionProgress[] = nextLevel
+    ? checkPromotionEligibility(empId, currentLevelId, nextLevel.id)
+    : [];
   const allMet = conditions.length > 0 && conditions.every(c => c.is_met);
   const overallProgress = conditions.length > 0 ? Math.round(conditions.reduce((s, c) => s + c.progress_percent, 0) / conditions.length) : 0;
   const hasPending = requests.some(r => r.employee_id === empId && r.status === 'pending');
@@ -73,7 +66,7 @@ export default function PromotionPage() {
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 10px' }}>📊 Lộ trình cấp bậc</h2>
         <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: 8 }}>
-          {levels.map((level, i) => {
+          {levels.map((level) => {
             const isCurrent = level.id === currentLevelId;
             const isPast = level.order < (currentLevel?.order || 0);
             return (

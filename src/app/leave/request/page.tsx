@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
+import { useAuthStore } from '@/store/auth-store'
 import LeaveQuotaCard from '@/components/leave/LeaveQuotaCard'
 import LeaveRequestList from '@/components/leave/LeaveRequestList'
 import LeaveRequestForm from '@/components/leave/LeaveRequestForm'
@@ -44,9 +45,9 @@ function LeavePageInner() {
   const [formInitialType, setFormInitialType] = useState<LeaveType | undefined>()
   const [requests, setRequests] = useState<LeaveRequest[]>(mockLeaveRequests)
 
-  // Mock logged-in user
-  const currentEmployeeId = 'emp-005'
-  const currentQuota = mockLeaveQuotas.find(q => q.employee_id === currentEmployeeId)!
+  const { user } = useAuthStore()
+  const currentEmployeeId = user?.id || 'emp-005'
+  const currentQuota = mockLeaveQuotas.find(q => q.employee_id === currentEmployeeId) || mockLeaveQuotas[0]
 
   const stats = useMemo(() => getLeaveStats(requests), [requests])
 
@@ -89,9 +90,9 @@ function LeavePageInner() {
     const newRequest: LeaveRequest = {
       id: `LR-${String(requests.length + 1).padStart(3, '0')}`,
       employee_id: currentEmployeeId,
-      employee_name: 'Nguyễn Văn An',
-      employee_position: 'Barista',
-      store_id: 'store-001',
+      employee_name: user?.full_name || 'Người dùng ẩn danh',
+      employee_position: user?.role === 'store_manager' ? 'Quản lý cửa hàng' : 'Nhân viên',
+      store_id: user?.store_id || 'store-001',
       leave_type: draft.leave_type || 'annual',
       leave_type_label: LEAVE_TYPE_MAP[draft.leave_type || 'annual'].name,
       status: 'pending',
@@ -108,7 +109,7 @@ function LeavePageInner() {
     }
     setPendingSubmit(newRequest)
     setSubmitDialog(true)
-  }, [requests.length, currentEmployeeId])
+  }, [requests.length, currentEmployeeId, user])
 
   const confirmSubmit = useCallback(() => {
     if (!pendingSubmit) return
@@ -306,28 +307,28 @@ function LeavePageInner() {
                 icon={Clock}
                 label="Chờ duyệt"
                 value={stats.pending}
-                iconColor="text-amber-600"
-                iconBg="bg-amber-100"
-                className="bg-amber-50 border-amber-200"
-                valueClassName="text-amber-700"
+                iconColor="text-warning-600"
+                iconBg="bg-warning-100"
+                className="bg-warning-50 border-warning-200"
+                valueClassName="text-warning-700"
               />
               <StatCard
                 icon={CheckCircle2}
                 label="Đã duyệt"
                 value={stats.approved}
-                iconColor="text-green-600"
-                iconBg="bg-green-100"
-                className="bg-green-50 border-green-200"
-                valueClassName="text-green-700"
+                iconColor="text-success-600"
+                iconBg="bg-success-100"
+                className="bg-success-50 border-success-200"
+                valueClassName="text-success-700"
               />
               <StatCard
                 icon={XCircle}
                 label="Từ chối"
                 value={stats.rejected}
-                iconColor="text-red-600"
-                iconBg="bg-red-100"
-                className="bg-red-50 border-red-200"
-                valueClassName="text-red-700"
+                iconColor="text-error-600"
+                iconBg="bg-error-100"
+                className="bg-error-50 border-error-200"
+                valueClassName="text-error-700"
               />
             </div>
 

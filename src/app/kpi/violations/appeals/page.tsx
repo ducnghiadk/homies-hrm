@@ -44,8 +44,8 @@ export default function AppealsPage() {
 
   const TABS: { key: TabKey; label: string; count: number; color: string }[] = [
     { key: 'pending', label: 'Chờ xét', count: pending.length, color: '#7c3aed' },
-    { key: 'approved', label: 'Đã duyệt', count: approved.length, color: '#10b981' },
-    { key: 'rejected', label: 'Đã từ chối', count: rejected.length, color: '#ef4444' },
+    { key: 'approved', label: 'Đã duyệt', count: approved.length, color: '#1E9E57' },
+    { key: 'rejected', label: 'Đã từ chối', count: rejected.length, color: '#D9381E' },
   ]
 
   return (
@@ -90,12 +90,12 @@ export default function AppealsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-bold">{getEmpName(v.employee_id)}</div>
                       <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {vTypeName} · <span className="font-bold text-red-600">-{v.penalty_points} điểm</span>
+                        {vTypeName} · <span className="font-bold text-error-600">-{v.penalty_points} điểm</span>
                       </div>
                     </div>
                     {tab === 'pending' && (
                       <div className="text-right flex-shrink-0">
-                        <div className="text-[10px] font-bold" style={{ color: appealAge > 24 ? '#ef4444' : '#f59e0b' }}>
+                        <div className="text-[10px] font-bold" style={{ color: appealAge > 24 ? '#D9381E' : '#F6C85F' }}>
                           {appealAge}h trước
                         </div>
                       </div>

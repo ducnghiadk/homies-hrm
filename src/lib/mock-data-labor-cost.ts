@@ -3,7 +3,7 @@
 // ============================================
 
 import {
-  mockPositions, mockEmployees, mockShifts, mockStores,
+  mockPositions, mockEmployees,
   getShiftById,
   type Schedule,
 } from './mock-data'
@@ -112,7 +112,7 @@ function parseTime(t: string): number {
 }
 
 function getShiftHours(shift: { start_time: string; end_time: string }): number {
-  let start = parseTime(shift.start_time)
+  const start = parseTime(shift.start_time)
   let end = parseTime(shift.end_time)
   if (end <= start) end += 24 // overnight
   return end - start
@@ -130,7 +130,7 @@ function isHoliday(dateStr: string): boolean {
 
 /** Calculate night hours within a shift (22:00-06:00) */
 function getNightHours(shift: { start_time: string; end_time: string }): number {
-  let start = parseTime(shift.start_time)
+  const start = parseTime(shift.start_time)
   let end = parseTime(shift.end_time)
   if (end <= start) end += 24
 

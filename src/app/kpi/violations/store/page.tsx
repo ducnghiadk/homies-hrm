@@ -74,10 +74,10 @@ export default function StoreViolationsPage() {
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-2">
           {[
-            { label: 'Tổng lỗi', value: totalViolations, icon: '⚠️', color: '#ef4444' },
-            { label: 'Điểm trừ TB', value: avgPenalty, icon: '📉', color: '#f59e0b' },
+            { label: 'Tổng lỗi', value: totalViolations, icon: '⚠️', color: '#D9381E' },
+            { label: 'Điểm trừ TB', value: avgPenalty, icon: '📉', color: '#F6C85F' },
             { label: 'NV nhiều lỗi', value: worstEmployee?.emp?.full_name?.split(' ').pop() || '—', icon: '👤', color: '#7c3aed' },
-            { label: 'Lỗi phổ biến', value: mostCommon?.code || '—', icon: '🔄', color: '#3b82f6' },
+            { label: 'Lỗi phổ biến', value: mostCommon?.code || '—', icon: '🔄', color: '#2F6FA8' },
           ].map((card, i) => (
             <div key={i} className="card p-3 text-center">
               <div className="text-xl mb-1">{card.icon}</div>
@@ -94,10 +94,10 @@ export default function StoreViolationsPage() {
           <h4 className="text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>📊 Phân bổ theo mức độ</h4>
           <div className="space-y-2">
             {[
-              { key: 'minor', label: 'Nhẹ', color: '#3b82f6' },
-              { key: 'medium', label: 'Trung bình', color: '#f59e0b' },
+              { key: 'minor', label: 'Nhẹ', color: '#2F6FA8' },
+              { key: 'medium', label: 'Trung bình', color: '#F6C85F' },
               { key: 'major', label: 'Nặng', color: '#f97316' },
-              { key: 'critical', label: 'Nghiêm trọng', color: '#ef4444' },
+              { key: 'critical', label: 'Nghiêm trọng', color: '#D9381E' },
             ].map(s => {
               const count = sevCounts[s.key as keyof typeof sevCounts]
               const pct = totalViolations ? (count / totalViolations) * 100 : 0
@@ -143,13 +143,13 @@ export default function StoreViolationsPage() {
                   </div>
                   <div className="text-right flex-shrink-0">
                     <div className="text-sm font-black" style={{
-                      color: summary.violation_score >= 80 ? '#10b981' : summary.violation_score >= 60 ? '#f59e0b' : '#ef4444',
+                      color: summary.violation_score >= 80 ? '#1E9E57' : summary.violation_score >= 60 ? '#F6C85F' : '#D9381E',
                     }}>
                       {summary.violation_score}
                     </div>
                     <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>điểm</div>
                   </div>
-                  <div className="text-xs font-bold text-red-600 flex-shrink-0">-{summary.total_penalty_points}</div>
+                  <div className="text-xs font-bold text-error-600 flex-shrink-0">-{summary.total_penalty_points}</div>
                 </div>
               ))}
             </div>

@@ -12,7 +12,7 @@ const sizes = { sm: 24, md: 40, lg: 64 }
 
 export default function SuccessCheckmark({
   size = 'md',
-  color = '#22c55e',
+  color = '#48C079',
   onComplete,
 }: SuccessCheckmarkProps) {
   const [animate, setAnimate] = useState(false)

@@ -38,8 +38,12 @@ export default function DragDropScheduleEditor({
 
   // --- State ---
   const historyRef = useRef(new ScheduleHistory(schedule.shifts))
-  const [shifts, setShifts] = useState<ScheduleShift[]>(schedule.shifts)
-  const [originalShifts] = useState<ScheduleShift[]>(() => JSON.parse(JSON.stringify(schedule.shifts)))
+  const recoveryKeyRef = useRef<string | null>(null)
+  const originalShifts = useMemo(
+    () => JSON.parse(JSON.stringify(schedule.shifts)) as ScheduleShift[],
+    [schedule.shifts],
+  )
+  const [shifts, setShifts] = useState<ScheduleShift[]>(() => JSON.parse(JSON.stringify(schedule.shifts)))
   const [selectedDate, setSelectedDate] = useState<Date>(parseISO(schedule.weekStart))
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null)
   const [editingShift, setEditingShift] = useState<ScheduleShift | null>(null)
@@ -47,12 +51,18 @@ export default function DragDropScheduleEditor({
   const [canRedo, setCanRedo] = useState(false)
   const [changeCount, setChangeCount] = useState(0)
   const [dragOverEmpId, setDragOverEmpId] = useState<string | null>(null)
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<string | null>(null)
+  const [restoredDraftAt, setRestoredDraftAt] = useState<string | null>(null)
   const onboarding = useOnboarding()
   const [showTutorial, setShowTutorial] = useState(() => onboarding.shouldShowTooltip('dragDropIntro'))
 
   const weekStart = parseISO(schedule.weekStart)
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd')
   const dayOfWeek = selectedDate.getDay()
+  const draftStorageKey = useMemo(
+    () => `homies_schedule_editor_draft:${schedule.weekStart}:${schedule.id}`,
+    [schedule.id, schedule.weekStart]
+  )
 
   // --- Derived (memoized) ---
   const dayShifts = useMemo(
@@ -95,6 +105,11 @@ export default function DragDropScheduleEditor({
     validation.errors.forEach(e => e.affectedShiftIds.forEach(id => set.add(id)))
     return set
   }, [validation])
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (shifts.length !== originalShifts.length) return true
+    return modifiedShiftIds.size > 0
+  }, [modifiedShiftIds.size, originalShifts.length, shifts.length])
 
   // --- Sync history state ---
   const syncHistoryFlags = useCallback(() => {
@@ -213,6 +228,11 @@ export default function DragDropScheduleEditor({
 
   // --- Confirm ---
   const handleConfirm = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(draftStorageKey)
+    }
+    setRestoredDraftAt(null)
+    setLastAutoSavedAt(null)
     const newCost = recalculateCost(shifts, staffList)
     const updatedResult: ScheduleResult = {
       ...schedule,
@@ -239,7 +259,65 @@ export default function DragDropScheduleEditor({
       costBreakdown: newCost,
     }
     onConfirm(updatedResult)
-  }, [shifts, staffList, schedule, validation, onConfirm])
+  }, [draftStorageKey, shifts, staffList, schedule, validation, onConfirm])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (recoveryKeyRef.current === draftStorageKey) return
+    recoveryKeyRef.current = draftStorageKey
+
+    try {
+      const rawDraft = localStorage.getItem(draftStorageKey)
+      if (!rawDraft) return
+
+      const parsed = JSON.parse(rawDraft) as {
+        shifts?: ScheduleShift[]
+        savedAt?: string
+      }
+
+      if (!Array.isArray(parsed.shifts) || parsed.shifts.length === 0) {
+        localStorage.removeItem(draftStorageKey)
+        return
+      }
+
+      if (JSON.stringify(parsed.shifts) === JSON.stringify(originalShifts)) {
+        localStorage.removeItem(draftStorageKey)
+        return
+      }
+
+      const restore = confirm('Có bản nháp chưa xác nhận cho lịch này. Bạn muốn khôi phục để làm tiếp không?')
+      if (!restore) return
+
+      historyRef.current = new ScheduleHistory(originalShifts)
+      const restored = historyRef.current.push(parsed.shifts)
+      setShifts(restored)
+      setLastAutoSavedAt(parsed.savedAt || null)
+      setRestoredDraftAt(parsed.savedAt || new Date().toISOString())
+      syncHistoryFlags()
+    } catch {
+      localStorage.removeItem(draftStorageKey)
+    }
+  }, [draftStorageKey, originalShifts, syncHistoryFlags])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    if (!hasUnsavedChanges) {
+      localStorage.removeItem(draftStorageKey)
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      const savedAt = new Date().toISOString()
+      localStorage.setItem(draftStorageKey, JSON.stringify({
+        shifts,
+        savedAt,
+      }))
+      setLastAutoSavedAt(savedAt)
+    }, 1500)
+
+    return () => window.clearTimeout(timer)
+  }, [draftStorageKey, hasUnsavedChanges, shifts])
 
   // --- Keyboard shortcuts ---
   useEffect(() => {
@@ -327,6 +405,28 @@ export default function DragDropScheduleEditor({
             <Check size={16} /> Xác nhận thay đổi
           </button>
         </div>
+      </div>
+
+      <div className={`rounded-xl border px-4 py-3 text-xs ${
+        hasUnsavedChanges
+          ? 'border-warning-200 bg-warning-50 text-warning-800'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      }`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="font-semibold">
+            {hasUnsavedChanges ? 'Bản nháp đang được tự lưu sau 1.5 giây.' : 'Không có thay đổi chưa xác nhận.'}
+          </span>
+          <span>
+            {lastAutoSavedAt
+              ? `Đã tự lưu lúc ${format(parseISO(lastAutoSavedAt), 'HH:mm:ss dd/MM')}`
+              : 'Chưa có bản nháp tạm thời'}
+          </span>
+        </div>
+        {restoredDraftAt && hasUnsavedChanges && (
+          <div className="mt-1 text-[11px] font-medium">
+            Đã khôi phục bản nháp lưu lúc {format(parseISO(restoredDraftAt), 'HH:mm:ss dd/MM')}.
+          </div>
+        )}
       </div>
 
       {/* Toolbar */}

@@ -11,7 +11,7 @@ const optionLabel: Record<KPIOptionType, string> = {
   A: 'Option A', B: 'Option B', C: 'Option C',
 }
 const optionColor: Record<KPIOptionType, string> = {
-  A: '#3b82f6', B: '#8b5cf6', C: '#f59e0b',
+  A: '#2F6FA8', B: '#001D3D', C: '#F6C85F',
 }
 
 export default function LevelRow({ config, onEdit }: Props) {
@@ -42,7 +42,7 @@ export default function LevelRow({ config, onEdit }: Props) {
 
       <button
         onClick={() => onEdit(config)}
-        className="text-xs px-2 py-1 rounded-lg text-blue-600 hover:bg-blue-50 flex-shrink-0"
+        className="text-xs px-2 py-1 rounded-lg text-primary-600 hover:bg-primary-50 flex-shrink-0"
       >
         Sửa
       </button>

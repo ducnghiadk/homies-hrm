@@ -99,7 +99,7 @@ export default function Step3Salary({ state, onUpdate, onNext, onBack }: Step3Pr
          {/* Template Selector Cards */}
          <div>
            <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5">
-             <Building2 size={14} className="text-blue-600" />
+             <Building2 size={14} className="text-primary-600" />
              Chọn khu vực để áp dụng mức lương:
            </h3>
            <TemplateSelector

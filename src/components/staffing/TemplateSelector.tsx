@@ -41,7 +41,7 @@ export default function TemplateSelector<T extends { key: string }>({
               animate-in fade-in slide-in-from-bottom-2
               ${isSelected
                 ? 'border-primary bg-primary/5 ring-2 ring-primary/20 shadow-md'
-                : 'border-gray-100 bg-white hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-sm'
+                : 'border-gray-100 bg-white hover:border-primary-200 hover:bg-primary-50/30 hover:shadow-sm'
               }
             `}
             style={{ animationDelay: `${i * 80}ms`, animationFillMode: 'both' }}
@@ -51,7 +51,7 @@ export default function TemplateSelector<T extends { key: string }>({
           >
             {/* Default badge */}
             {isDefault && !isSelected && (
-              <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-amber-500 text-white text-[9px] font-bold rounded-full shadow-sm">
+              <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-warning-500 text-white text-[9px] font-bold rounded-full shadow-sm">
                 MẶC ĐỊNH
               </div>
             )}
@@ -79,8 +79,8 @@ function MiniSparkline({ pattern }: { pattern: TrafficTimeSlot[] }) {
         <div
           key={i}
           className={`flex-1 rounded-t-sm transition-all ${
-            slot.level === 'high' ? 'bg-orange-400'
-            : slot.level === 'medium' ? 'bg-blue-400'
+            slot.level === 'high' ? 'bg-warning-400'
+            : slot.level === 'medium' ? 'bg-primary-400'
             : 'bg-gray-200'
           }`}
           style={{ height: `${Math.max(15, (slot.percent / max) * 100)}%` }}

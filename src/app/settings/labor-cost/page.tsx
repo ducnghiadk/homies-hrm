@@ -11,29 +11,8 @@ import {
 } from '@/lib/mock-data-labor-cost'
 import { Save, DollarSign, Bell, Eye, Store, CalendarDays } from 'lucide-react'
 
-export default function LaborCostSettingsPage() {
-  const { user, isAuthenticated } = useAuthStore()
-  const router = useRouter()
-  const [isHydrated, setIsHydrated] = useState(false)
-  const [activeTab, setActiveTab] = useState<'rates' | 'warnings' | 'display' | 'budgets' | 'seasons'>('rates')
-  const [toast, setToast] = useState<string | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
-
-  useEffect(() => { setIsHydrated(true) }, [])
-  useEffect(() => { if (isHydrated && !isAuthenticated) router.push('/login') }, [isHydrated, isAuthenticated, router])
-  if (!isHydrated || !user) return null
-
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2000) }
-
-  const tabs = [
-    { key: 'rates' as const, label: 'Công thức', icon: <DollarSign size={14} /> },
-    { key: 'warnings' as const, label: 'Cảnh báo', icon: <Bell size={14} /> },
-    { key: 'display' as const, label: 'Hiển thị', icon: <Eye size={14} /> },
-    { key: 'budgets' as const, label: 'Ngân sách', icon: <Store size={14} /> },
-    { key: 'seasons' as const, label: 'Mùa', icon: <CalendarDays size={14} /> },
-  ]
-
-  const RateRow = ({ label, desc, value, onChange }: { label: string; desc: string; value: number; onChange: (v: number) => void }) => (
+function RateRow({ label, desc, value, onChange }: { label: string; desc: string; value: number; onChange: (v: number) => void }) {
+  return (
     <div className="flex justify-between items-center py-2" style={{ borderBottom: '1px solid var(--gray-100)' }}>
       <div>
         <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{label}</div>
@@ -46,8 +25,10 @@ export default function LaborCostSettingsPage() {
         onChange={e => onChange(parseFloat(e.target.value) || 0)} />
     </div>
   )
+}
 
-  const Toggle = ({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) => (
+function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
     <div className="flex justify-between items-center py-2" style={{ borderBottom: '1px solid var(--gray-100)' }}>
       <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
       <div className="w-10 h-5 rounded-full relative cursor-pointer"
@@ -58,6 +39,27 @@ export default function LaborCostSettingsPage() {
       </div>
     </div>
   )
+}
+
+export default function LaborCostSettingsPage() {
+  const { user, isAuthenticated } = useAuthStore()
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<'rates' | 'warnings' | 'display' | 'budgets' | 'seasons'>('rates')
+  const [toast, setToast] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
+  if (!user) return null
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2000) }
+
+  const tabs = [
+    { key: 'rates' as const, label: 'Công thức', icon: <DollarSign size={14} /> },
+    { key: 'warnings' as const, label: 'Cảnh báo', icon: <Bell size={14} /> },
+    { key: 'display' as const, label: 'Hiển thị', icon: <Eye size={14} /> },
+    { key: 'budgets' as const, label: 'Ngân sách', icon: <Store size={14} /> },
+    { key: 'seasons' as const, label: 'Mùa', icon: <CalendarDays size={14} /> },
+  ]
 
   return (
     <AppShell title="Chi phí lương">
@@ -218,7 +220,7 @@ export default function LaborCostSettingsPage() {
         {toast && (
           <div className="fixed bottom-20 left-4 right-4 z-50 animate-slide-up">
             <div className="p-3 rounded-xl text-xs font-medium text-center text-white"
-              style={{ background: '#10b981' }}>
+              style={{ background: '#1E9E57' }}>
               {toast}
             </div>
           </div>

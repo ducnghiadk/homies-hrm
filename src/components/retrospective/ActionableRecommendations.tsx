@@ -47,7 +47,7 @@ export default function ActionableRecommendations({
               <tr key={rec.id} className="hover:bg-gray-50/50">
                 <td className="py-2.5 pr-2 text-gray-400 text-xs">{i + 1}</td>
                 <td className="py-2.5 pr-2 text-gray-700">{rec.description}</td>
-                <td className="py-2.5 pr-2 text-right font-bold text-green-600 whitespace-nowrap">
+                <td className="py-2.5 pr-2 text-right font-bold text-success-600 whitespace-nowrap">
                   {(rec.monthlySaving / 1000).toFixed(0)}k
                 </td>
                 <td className="py-2.5 text-right">
@@ -68,7 +68,7 @@ export default function ActionableRecommendations({
       {/* Total + Apply all */}
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
         <span className="text-xs text-gray-500">
-          Tổng tiết kiệm: <strong className="text-green-600">
+          Tổng tiết kiệm: <strong className="text-success-600">
             {(totalSaving / 1000).toFixed(0)}k/tuần
           </strong>
         </span>

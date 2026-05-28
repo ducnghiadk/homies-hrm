@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils'; // Assuming this exists, otherwise I'll remove it
+// Assuming this exists, otherwise I'll remove it
 
 interface TimeRangeSliderProps {
   value: number; // 0-100
@@ -7,7 +7,7 @@ interface TimeRangeSliderProps {
   color?: string; // Class for color bar
 }
 
-export default function TimeRangeSlider({ value, onChange, label, color = 'bg-blue-500' }: TimeRangeSliderProps) {
+export default function TimeRangeSlider({ value, onChange, label, color = 'bg-primary-500' }: TimeRangeSliderProps) {
   return (
     <div className="flex items-center gap-3 py-2">
       <div className="w-20 text-xs font-medium text-gray-600">{label}</div>

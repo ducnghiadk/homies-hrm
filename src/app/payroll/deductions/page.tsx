@@ -5,15 +5,15 @@ import { mockDeductions } from '@/lib/mock-data-payroll'
 import { MinusCircle } from 'lucide-react'
 
 const fmt = (n: number) => n.toLocaleString('vi-VN') + '₫'
-const typeColors = { penalty: '#ef4444', repayment: '#f59e0b', compensation: '#f97316' }
+const typeColors = { penalty: '#D9381E', repayment: '#F6C85F', compensation: '#f97316' }
 
 export default function DeductionSlipPage() {
   return (
     <AppShell title="Phiếu khấu trừ">
       <div className="space-y-4">
-        <div className="card animate-fade-in" style={{ background: '#ef444410', border: '1px solid #ef444430' }}>
-          <div className="text-xs text-red-500">Tổng khấu trừ tháng này</div>
-          <div className="text-2xl font-bold text-red-500">
+        <div className="card animate-fade-in" style={{ background: '#D9381E10', border: '1px solid #D9381E30' }}>
+          <div className="text-xs text-error-500">Tổng khấu trừ tháng này</div>
+          <div className="text-2xl font-bold text-error-500">
             -{fmt(mockDeductions.reduce((s, d) => s + d.amount, 0))}
           </div>
         </div>
@@ -35,7 +35,7 @@ export default function DeductionSlipPage() {
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: color + '20', color }}>{d.type_label}</span>
                     <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>T.{d.month}</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: d.status === 'approved' ? '#10b98120' : '#f59e0b20', color: d.status === 'approved' ? '#10b981' : '#f59e0b' }}>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: d.status === 'approved' ? '#1E9E5720' : '#F6C85F20', color: d.status === 'approved' ? '#1E9E57' : '#F6C85F' }}>
                       {d.status === 'approved' ? 'Đã duyệt' : 'Chờ duyệt'}
                     </span>
                   </div>

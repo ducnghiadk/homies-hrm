@@ -86,7 +86,7 @@ export function TabBar({
             {tab.icon}
             <span>{tab.label}</span>
             {tab.badge !== undefined && tab.badge > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[18px] text-center">
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-error-500 text-white rounded-full min-w-[18px] text-center">
                 {tab.badge > 9 ? '9+' : tab.badge}
               </span>
             )}
@@ -121,7 +121,7 @@ export function TabBar({
               ${tab.disabled ? 'opacity-50 cursor-not-allowed' : ''}
               ${
                 activeTab === tab.key
-                  ? 'text-blue-600'
+                  ? 'text-primary-600'
                   : 'text-gray-500 hover:text-gray-700'
               }
             `}
@@ -129,7 +129,7 @@ export function TabBar({
             {tab.icon}
             <span>{tab.label}</span>
             {tab.badge !== undefined && tab.badge > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[18px] text-center">
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-error-500 text-white rounded-full min-w-[18px] text-center">
                 {tab.badge > 9 ? '9+' : tab.badge}
               </span>
             )}
@@ -140,7 +140,7 @@ export function TabBar({
       {/* Underline indicator */}
       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-200">
         <div
-          className="absolute h-0.5 bg-blue-600 transition-all duration-200 ease-out"
+          className="absolute h-0.5 bg-primary-600 transition-all duration-200 ease-out"
           style={{
             left: indicatorStyle.left,
             width: indicatorStyle.width,

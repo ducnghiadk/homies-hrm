@@ -7,7 +7,9 @@ import { OperationsChecklistDetail } from '@/components/onboarding-operations/Op
 import { initCareerPathStores } from '@/lib/career-path-service'
 import {
   OnboardingOperationsService,
+  type OnboardingOpsFollowUpLevel,
   type OnboardingOpsFirstShiftResult,
+  type OnboardingOpsPriorityFilter,
 } from '@/lib/services/onboarding-operations-service'
 import { useAuthStore } from '@/store/auth-store'
 
@@ -18,9 +20,13 @@ export default function OnboardingPage() {
   const hasHydrated = useAuthStore((state) => state.hasHydrated)
   const [, setRevision] = useState(0)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null)
+  const [activeFilter, setActiveFilter] = useState<OnboardingOpsPriorityFilter>('all')
   const [, startTransition] = useTransition()
 
-  const rows = user ? OnboardingOperationsService.getUpcomingRows(user) : []
+  const overview = user
+    ? OnboardingOperationsService.getWorkspaceOverview(user, activeFilter)
+    : { rows: [], allRows: [], filters: [], stats: [], activeFilter }
+  const rows = overview.rows
   const activeEmployeeId = rows.some((row) => row.employeeId === selectedEmployeeId)
     ? selectedEmployeeId
     : rows[0]?.employeeId ?? null
@@ -34,25 +40,25 @@ export default function OnboardingPage() {
     })
   }
 
-  const handleMarkFirstShift = (employeeId: string) => {
-    const value = window.prompt('Nhập ca đầu và giờ có mặt. Ví dụ: Ca sáng 07:30 • Có mặt 07:15')
-    if (!value?.trim()) return
+  const handleMarkFirstShift = (employeeId: string, shiftId: string) => {
+    if (!user) return
+
+    const employeeDetail = OnboardingOperationsService.getEmployeeDetail(employeeId, user)
+    const shift = employeeDetail?.firstShiftOptions.find((item) => item.id === shiftId)
+    if (!shift) return
 
     OnboardingOperationsService.updateChecklist(employeeId, {
       key: 'first_shift',
-      firstShiftLabel: value.trim(),
+      firstShiftKey: shift.id,
+      firstShiftLabel: shift.label,
     })
     refresh()
   }
 
-  const handleAssignBuddy = (employeeId: string) => {
-    const value = window.prompt('Nhập tên người kèm')
-    if (!value?.trim()) return
+  const handleAssignBuddy = (employeeId: string, buddyId: string) => {
+    if (!user) return
 
-    OnboardingOperationsService.updateChecklist(employeeId, {
-      key: 'buddy',
-      assignedBuddyName: value.trim(),
-    })
+    OnboardingOperationsService.assignBuddy(employeeId, buddyId, user)
     refresh()
   }
 
@@ -64,10 +70,14 @@ export default function OnboardingPage() {
     refresh()
   }
 
-  const handleConfirmTools = (employeeId: string) => {
+  const handleToggleTools = (
+    employeeId: string,
+    field: 'chatGroupJoined' | 'toolAccountReady',
+    value: boolean,
+  ) => {
     OnboardingOperationsService.updateChecklist(employeeId, {
       key: 'tools_and_group',
-      hasChatAccess: true,
+      [field]: value,
     })
     refresh()
   }
@@ -77,6 +87,37 @@ export default function OnboardingPage() {
       key: 'first_shift_result',
       firstShiftResult: result,
     })
+    refresh()
+  }
+
+  const handleSaveFirstShiftNote = (employeeId: string, firstShiftNote: string) => {
+    OnboardingOperationsService.updateChecklist(employeeId, {
+      key: 'first_shift_note',
+      firstShiftNote,
+    })
+    refresh()
+  }
+
+  const handleSetFollowUp = (employeeId: string, followUpLevel: OnboardingOpsFollowUpLevel) => {
+    OnboardingOperationsService.updateChecklist(employeeId, {
+      key: 'follow_up',
+      followUpLevel,
+    })
+    refresh()
+  }
+
+  const handleProposeGate = (employeeId: string, note: string) => {
+    OnboardingOperationsService.proposeStageGate(employeeId, note)
+    refresh()
+  }
+
+  const handleApproveGate = (employeeId: string, managerNote: string) => {
+    OnboardingOperationsService.approveStageGate(employeeId, managerNote)
+    refresh()
+  }
+
+  const handleRejectGate = (employeeId: string, managerNote: string, retryItemIds: string[]) => {
+    OnboardingOperationsService.rejectStageGate(employeeId, managerNote, retryItemIds)
     refresh()
   }
 
@@ -116,24 +157,60 @@ export default function OnboardingPage() {
         <div
           style={{
             display: 'grid',
+            gap: 12,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            marginBottom: 16,
+          }}
+        >
+          {overview.stats.map((stat) => (
+            <div
+              key={stat.key}
+              style={{
+                background: '#FFFFFF',
+                border: '1px solid rgba(0, 29, 61, 0.08)',
+                borderRadius: 22,
+                padding: 14,
+                boxShadow: '0 10px 24px rgba(0, 29, 61, 0.05)',
+              }}
+            >
+              <div style={{ fontSize: 11, color: '#7A6B53', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                {stat.label}
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#001D3D', marginTop: 6 }}>{stat.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
             gap: 16,
-            gridTemplateColumns: 'minmax(320px, 380px) minmax(0, 1fr)',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
             alignItems: 'start',
           }}
         >
           <UpcomingOnboardingList
             rows={rows}
+            filters={overview.filters}
+            activeFilter={overview.activeFilter}
+            onChangeFilter={setActiveFilter}
             selectedEmployeeId={activeEmployeeId}
             onSelect={setSelectedEmployeeId}
           />
 
           <OperationsChecklistDetail
             detail={detail}
+            viewerRole={user.role}
             onMarkFirstShift={handleMarkFirstShift}
             onAssignBuddy={handleAssignBuddy}
             onConfirmStorePolicy={handleConfirmStorePolicy}
-            onConfirmTools={handleConfirmTools}
+            onToggleTools={handleToggleTools}
             onSetFirstShiftResult={handleSetFirstShiftResult}
+            onSaveFirstShiftNote={handleSaveFirstShiftNote}
+            onSetFollowUp={handleSetFollowUp}
+            onProposeGate={handleProposeGate}
+            onApproveGate={handleApproveGate}
+            onRejectGate={handleRejectGate}
           />
         </div>
       </div>

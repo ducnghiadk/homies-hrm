@@ -6,10 +6,13 @@
     "dev": "next dev -p 3333",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "continue:autoaccept": "node scripts/reapply-continue-autoaccept.mjs",
+    "ai:guard": "node scripts/ai-guard.mjs",
+    "ai:context": "node scripts/ai-context.mjs",
+    "ai:ready": "npm run ai:guard && npm run ai:context"
   },
   "dependencies": {
-    "@ducanh2912/next-pwa": "^10.2.9",
     "@supabase/supabase-js": "^2.95.3",
     "@tanstack/react-query": "^5.90.21",
     "@types/leaflet": "^1.9.21",
@@ -19,24 +22,32 @@
     "date-fns": "^4.1.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.564.0",
-    "next": "16.1.6",
+    "next": "16.2.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-leaflet": "^5.0.0",
     "recharts": "^3.7.0",
+    "read-excel-file": "^9.0.10",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
+    "write-excel-file": "^4.0.7",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.2.6",
+    "nodemailer": "^8.0.7",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "8.5.15",
+    "serialize-javascript": "7.0.5"
   }
 }

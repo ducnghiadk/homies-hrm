@@ -53,14 +53,14 @@ export default function EditorToolbar({
             disabled={changeCount === 0}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-all
               disabled:opacity-40 disabled:cursor-not-allowed
-              hover:bg-red-50 active:bg-red-100 border-red-200 text-red-600"
+              hover:bg-error-50 active:bg-error-100 border-error-200 text-error-600"
             title="Reset về lịch gốc"
           >
             <RotateCcw size={16} /> Reset
           </button>
 
           {changeCount > 0 && (
-            <div className="ml-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-semibold flex items-center gap-1.5 border border-blue-100">
+            <div className="ml-2 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-lg text-sm font-semibold flex items-center gap-1.5 border border-primary-100">
               <FileEdit size={14} className="inline mr-1" /> Đã sửa: {changeCount}
             </div>
           )}

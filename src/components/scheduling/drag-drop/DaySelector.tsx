@@ -66,7 +66,7 @@ export default function DaySelector({ weekStart, selectedDate, onSelectDate }: D
                 ${isSelected
                   ? 'bg-primary text-white shadow-md shadow-primary/30 scale-105'
                   : isWeekend
-                    ? 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                    ? 'bg-warning-50 text-warning-700 hover:bg-warning-100'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }
               `}

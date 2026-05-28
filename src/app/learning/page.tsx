@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import { mockCourses, mockMyEnrollments, mockCertificates, mockSkillMatrix, COURSE_CATEGORIES } from '@/lib/mock-data-p5'
-import { BookOpen, Award, Trophy, CheckCircle, Lock, Play, Star } from 'lucide-react'
+import { Award, CheckCircle, Lock, Play } from 'lucide-react'
 
 export default function LearningPage() {
   const { user, isAuthenticated } = useAuthStore()

@@ -25,11 +25,10 @@ function getWeekDates(weekOffset: number): string[] {
 export default function LaborCostReportPage() {
   const { user, isAuthenticated } = useAuthStore()
   const router = useRouter()
-  const [isHydrated, setIsHydrated] = useState(false)
+  const [isHydrated] = useState(() => typeof window !== 'undefined')
   const [selectedStore, setSelectedStore] = useState('store-001')
   const [activeTab, setActiveTab] = useState<'overview' | 'stores' | 'positions' | 'employees'>('overview')
 
-  useEffect(() => { setIsHydrated(true) }, [])
   useEffect(() => { if (isHydrated && !isAuthenticated) router.push('/login') }, [isHydrated, isAuthenticated, router])
 
   // Calculate 4-week data (before early return)
@@ -72,7 +71,7 @@ export default function LaborCostReportPage() {
   const thisWeek = weeksData[3]
   const maxCost = Math.max(...weeksData.map(w => w.cost.totalCost), thisWeek.cost.budget)
 
-  const pctColor = (pct: number) => pct > 100 ? '#ef4444' : pct > 80 ? '#f59e0b' : '#10b981'
+  const pctColor = (pct: number) => pct > 100 ? '#D9381E' : pct > 80 ? '#F6C85F' : '#1E9E57'
 
   const tabs = [
     { key: 'overview' as const, label: 'Tổng quan' },
@@ -178,7 +177,7 @@ export default function LaborCostReportPage() {
                 <div className="flex justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
                   <span>Budget: {fmt(cost.budget)}</span>
                   <span>Thực tế: {fmt(cost.totalCost)}</span>
-                  <span style={{ color: cost.remaining >= 0 ? '#10b981' : '#ef4444' }}>
+                  <span style={{ color: cost.remaining >= 0 ? '#1E9E57' : '#D9381E' }}>
                     {cost.remaining >= 0 ? '-' : '+'}{fmt(Math.abs(cost.remaining))}
                   </span>
                 </div>
@@ -241,7 +240,7 @@ export default function LaborCostReportPage() {
                       <tr key={e.employee_id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
                         <td className="py-2" style={{ color: 'var(--text-primary)' }}>{e.employee_name}</td>
                         <td className="text-right py-2" style={{ color: 'var(--text-muted)' }}>{e.totalHours}h</td>
-                        <td className="text-right py-2" style={{ color: e.overtimeHours > 0 ? '#f59e0b' : 'var(--text-muted)' }}>
+                        <td className="text-right py-2" style={{ color: e.overtimeHours > 0 ? '#F6C85F' : 'var(--text-muted)' }}>
                           {e.overtimeHours > 0 ? `${e.overtimeHours}h` : '-'}
                         </td>
                         <td className="text-right py-2 font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -256,7 +255,7 @@ export default function LaborCostReportPage() {
                       <td className="text-right py-2 font-bold" style={{ color: 'var(--text-primary)' }}>
                         {empBreakdown.reduce((s, e) => s + e.totalHours, 0)}h
                       </td>
-                      <td className="text-right py-2 font-bold text-amber-500">
+                      <td className="text-right py-2 font-bold text-warning-500">
                         {empBreakdown.reduce((s, e) => s + e.overtimeHours, 0)}h
                       </td>
                       <td className="text-right py-2 font-bold" style={{ color: 'var(--primary)' }}>

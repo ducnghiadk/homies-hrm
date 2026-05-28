@@ -61,22 +61,22 @@ const variantDefaults: Record<
     icon: AlertTriangle,
     title: 'Đã xảy ra lỗi',
     description: 'Vui lòng thử lại sau',
-    iconColor: 'text-amber-500',
-    iconBg: 'bg-amber-50',
+    iconColor: 'text-warning-500',
+    iconBg: 'bg-warning-50',
   },
   success: {
     icon: CheckCircle,
     title: 'Hoàn tất!',
     description: 'Mọi thứ đã được xử lý',
-    iconColor: 'text-green-500',
-    iconBg: 'bg-green-50',
+    iconColor: 'text-success-500',
+    iconBg: 'bg-success-50',
   },
   'first-time': {
     icon: Sparkles,
     title: 'Chào mừng!',
     description: 'Hãy bắt đầu hành trình của bạn',
-    iconColor: 'text-blue-500',
-    iconBg: 'bg-blue-50',
+    iconColor: 'text-primary-500',
+    iconBg: 'bg-primary-50',
   },
 }
 
@@ -148,7 +148,7 @@ export function EmptyState({
                 ${
                   action.variant === 'secondary'
                     ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-primary-600 text-white hover:bg-primary-700'
                 }
               `}
             >

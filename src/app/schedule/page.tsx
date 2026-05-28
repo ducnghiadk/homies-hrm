@@ -1,478 +1,562 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { useAuthStore } from '@/store/auth-store'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
+import { useAuthStore } from '@/store/auth-store'
+import { ScheduleService } from '@/lib/services/schedule-service'
+import { getShiftById, getStoreById, mockAttendances, type Attendance, type Schedule } from '@/lib/mock-data'
+import { releasePublishedShift } from '@/lib/mock-data-open-shifts'
+import { notifyOpenShiftCreated } from '@/lib/notifications/open-shift-notifications'
 import {
-  mockSchedules, mockAttendances, mockShifts,
-  getShiftById, getStoreById,
-  type Schedule, type Attendance, type Shift,
-} from '@/lib/mock-data'
-import {
-  format, startOfMonth, endOfMonth, eachDayOfInterval,
-  isSameDay, isToday, addMonths, subMonths,
-  startOfWeek, endOfWeek, isBefore,
-} from 'date-fns'
-import { vi } from 'date-fns/locale'
-import {
-  ChevronLeft, ChevronRight, Clock, MapPin, X,
-  Calendar as CalendarIcon, CheckCircle2, XCircle, Download, ClipboardList, ArrowRightLeft, Briefcase,
   AlertTriangle,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  History,
+  MapPin,
+  Send,
+  Settings2,
+  Shuffle,
 } from 'lucide-react'
-import { formatTime } from '@/lib/utils'
-import { checkDayUnderstaffing } from '@/lib/understaffing-alert'
 
-// ─── Extended schedule generation ───
-// Mock data only has 1-2 weeks. For demo, generate a full-month pattern.
-function getExtendedSchedules(employeeId: string): Schedule[] {
-  // First use real data
-  const real = mockSchedules.filter(s => s.employee_id === employeeId)
-
-  // Derive the employee's typical shift & store from real data
-  const sample = real[0]
-  if (!sample) return real
-
-  // Generate more schedules across the month (Mon–Fri pattern)
-  const now = new Date()
-  const monthStart = startOfMonth(now)
-  const monthEnd = endOfMonth(now)
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
-
-  const extended: Schedule[] = [...real]
-  const existingDates = new Set(real.map(s => s.date))
-
-  // Cycle through shifts for variety
-  const shiftCycle = ['shift-001', 'shift-002', 'shift-001', 'shift-002', 'shift-001']
-
-  days.forEach((day, i) => {
-    const dateStr = format(day, 'yyyy-MM-dd')
-    const dayOfWeek = day.getDay()
-    // Skip weekends and already-existing dates
-    if (dayOfWeek === 0 || dayOfWeek === 6) return
-    if (existingDates.has(dateStr)) return
-
-    extended.push({
-      id: `sch-ext-${dateStr}-${employeeId}`,
-      org_id: 'org-001',
-      store_id: sample.store_id,
-      employee_id: employeeId,
-      shift_id: shiftCycle[dayOfWeek - 1] ?? 'shift-001',
-      date: dateStr,
-    })
-  })
-
-  return extended.sort((a, b) => a.date.localeCompare(b.date))
+function toDateString(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-export default function SchedulePage() {
+function getWeekAnchor(rawWeekStart: string | null): Date {
+  const base = rawWeekStart ? new Date(`${rawWeekStart}T00:00:00`) : new Date()
+  const safeBase = Number.isNaN(base.getTime()) ? new Date() : base
+  const monday = new Date(safeBase)
+  const day = monday.getDay()
+  monday.setDate(monday.getDate() - (day === 0 ? 6 : day - 1))
+  monday.setHours(0, 0, 0, 0)
+  return monday
+}
+
+const weekdayShort = new Intl.DateTimeFormat('vi-VN', { weekday: 'short' })
+const weekdayLong = new Intl.DateTimeFormat('vi-VN', { weekday: 'long' })
+const monthDay = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit' })
+const fullDate = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+function getAttendanceForDay(employeeId: string, date: string): Attendance | undefined {
+  return mockAttendances.find(attendance => attendance.employee_id === employeeId && attendance.date === date)
+}
+
+function SchedulePageContent() {
   const { user, isAuthenticated } = useAuthStore()
   const router = useRouter()
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const searchParams = useSearchParams()
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [selectedDate, setSelectedDate] = useState<string>(toDateString(new Date()))
 
-  useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
+  useEffect(() => {
+    const weekStart = searchParams.get('weekStart')
+    const explicitSelectedDate = searchParams.get('selectedDate')
+    const legacyDate = searchParams.get('date')
+    const month = searchParams.get('month')
+    const storeId = searchParams.get('storeId')
+    const nextParams = new URLSearchParams()
 
-  // All schedules for this user (extended)
-  const allSchedules = useMemo(
-    () => (user ? getExtendedSchedules(user.id) : []),
-    [user],
-  )
+    if (weekStart) nextParams.set('weekStart', weekStart)
+    if (explicitSelectedDate) nextParams.set('selectedDate', explicitSelectedDate)
+    else if (legacyDate) nextParams.set('selectedDate', legacyDate)
+    if (storeId) nextParams.set('storeId', storeId)
 
-  // ─── Understaffing status per day (manager/admin only) ───
-  const isManagerOrAdmin = user?.role === 'hr_admin' || user?.role === 'store_manager'
-  const daysInMonth_forStaffing = useMemo(
-    () => {
-      const ms = startOfMonth(currentDate)
-      const me = endOfMonth(currentDate)
-      return eachDayOfInterval({ start: ms, end: me })
-    },
-    [currentDate],
-  )
-  const dayStaffingMap = useMemo(() => {
-    if (!isManagerOrAdmin || !user) return new Map<string, 'critical' | 'warning' | 'ok'>()
-    const map = new Map<string, 'critical' | 'warning' | 'ok'>()
-    for (const date of daysInMonth_forStaffing) {
-      const dateStr = format(date, 'yyyy-MM-dd')
-      const alerts = checkDayUnderstaffing(user.store_id, dateStr)
-      if (alerts.some(a => a.level === 'critical')) map.set(dateStr, 'critical')
-      else if (alerts.some(a => a.level === 'warning')) map.set(dateStr, 'warning')
-      else map.set(dateStr, 'ok')
-    }
-    return map
-  }, [isManagerOrAdmin, daysInMonth_forStaffing, user])
+    const hasStage2Query = Boolean(weekStart || explicitSelectedDate || legacyDate || month || storeId)
+    if (!hasStage2Query) return
+
+    const nextUrl = nextParams.toString() ? `/schedules?${nextParams.toString()}` : '/schedules'
+    router.replace(nextUrl)
+  }, [router, searchParams])
+
+  useEffect(() => {
+    if (!isAuthenticated) router.push('/login')
+  }, [isAuthenticated, router])
+
+  const weekAnchor = useMemo(() => getWeekAnchor(searchParams.get('weekStart')), [searchParams])
+
+  const weekDates = useMemo(() => {
+    const monday = new Date(weekAnchor)
+    monday.setDate(weekAnchor.getDate() + weekOffset * 7)
+    return Array.from({ length: 7 }, (_, index) => {
+      const current = new Date(monday)
+      current.setDate(monday.getDate() + index)
+      return current
+    })
+  }, [weekAnchor, weekOffset])
+
+  const weekStrs = useMemo(() => weekDates.map(toDateString), [weekDates])
+  const nextWeekStrs = useMemo(() => {
+    const nextMonday = new Date(weekDates[0] || new Date())
+    nextMonday.setDate(nextMonday.getDate() + 7)
+    return Array.from({ length: 7 }, (_, index) => {
+      const current = new Date(nextMonday)
+      current.setDate(nextMonday.getDate() + index)
+      return toDateString(current)
+    })
+  }, [weekDates])
+  const today = toDateString(new Date())
+  const isManagerOrAdmin = ['ceo', 'hr_admin', 'store_manager', 'shift_leader'].includes(user?.role || '')
+
+  const resolvedSelectedDate = weekStrs.includes(selectedDate)
+    ? selectedDate
+    : (weekStrs.includes(today) ? today : weekStrs[0]) || today
+
+  const allSchedules = useMemo(() => {
+    if (!user) return []
+    return ScheduleService.getSchedulesForUser(user, user.id)
+  }, [user])
+
+  const weekSchedules = useMemo(() => {
+    return allSchedules
+      .filter(schedule => weekStrs.includes(schedule.date))
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [allSchedules, weekStrs])
+
+  const scheduleByDate = useMemo(() => {
+    const nextMap = new Map<string, Schedule>()
+    weekSchedules.forEach(schedule => nextMap.set(schedule.date, schedule))
+    return nextMap
+  }, [weekSchedules])
+
+  const weekPublished = useMemo(() => {
+    if (!user || !weekStrs[0]) return false
+    return ScheduleService.isWeekPublished(user.store_id, weekStrs[0])
+  }, [user, weekStrs])
+  const weekStateMeta = useMemo(() => {
+    if (!user || !weekStrs[0]) return null
+    const week = ScheduleService.getScheduleWeek(user.store_id, weekStrs[0])
+    return week ? ScheduleService.getWeekStateMeta(week) : null
+  }, [user, weekStrs])
+  const nextWeekPublished = useMemo(() => {
+    if (!user || !nextWeekStrs[0]) return false
+    return ScheduleService.isWeekPublished(user.store_id, nextWeekStrs[0])
+  }, [nextWeekStrs, user])
+
+  const todaySchedule = scheduleByDate.get(today)
+  const selectedSchedule = scheduleByDate.get(resolvedSelectedDate)
+  const selectedShift = selectedSchedule ? getShiftById(selectedSchedule.shift_id) : null
+  const selectedStore = selectedSchedule ? getStoreById(selectedSchedule.store_id) : null
+  const selectedAttendance = user ? getAttendanceForDay(user.id, resolvedSelectedDate) : undefined
+  const changedCount = weekSchedules.filter(schedule => schedule.modified_after_publish).length
+  const totalHours = weekSchedules.reduce((sum, schedule) => {
+    const shift = getShiftById(schedule.shift_id)
+    if (!shift) return sum
+    const [startHour, startMinute] = shift.start_time.split(':').map(Number)
+    const [endHour, endMinute] = shift.end_time.split(':').map(Number)
+    return sum + (endHour + endMinute / 60) - (startHour + startMinute / 60)
+  }, 0)
+
+  const nextShift = weekSchedules.find(schedule => schedule.date >= today)
+  const weekLabel = `${monthDay.format(weekDates[0])} - ${monthDay.format(weekDates[6])}`
+
+  const releaseSelectedShift = () => {
+    if (!user || !selectedSchedule || !selectedShift || !selectedStore) return
+    const confirmed = window.confirm('Nhả ca này ra danh sách ca trống để đồng nghiệp có thể đăng ký nhận?')
+    if (!confirmed) return
+    const created = releasePublishedShift(selectedSchedule.id, user.id, `Nhân viên ${user.full_name} chủ động nhả ca cần hỗ trợ`)
+    if (!created) return
+    notifyOpenShiftCreated({
+      openShiftId: created.id,
+      storeId: created.store_id,
+      storeName: selectedStore.name,
+      shiftId: created.shift_id,
+      shiftName: selectedShift.name,
+      startTime: selectedShift.start_time,
+      endTime: selectedShift.end_time,
+      date: created.date,
+      positionId: created.position_id,
+      positionName: 'Ca trống cần người phù hợp',
+      createdByName: user.full_name,
+    })
+    router.push(`/schedule/open-shifts?tab=my&openShiftId=${created.id}`)
+  }
 
   if (!user) return null
 
-  // ─── Month calendar data ───
-  const monthStart = startOfMonth(currentDate)
-  const monthEnd = endOfMonth(currentDate)
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd })
-  const monthStr = format(currentDate, 'yyyy-MM')
-
-  const monthSchedules = allSchedules.filter(s => s.date.startsWith(monthStr))
-
-  const getScheduleForDay = (date: Date): Schedule | undefined => {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    return monthSchedules.find(s => s.date === dateStr)
-  }
-
-  const getAttendanceForDay = (date: Date): Attendance | undefined => {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    return mockAttendances.find(a => a.employee_id === user.id && a.date === dateStr)
-  }
-
-  // ─── This week list ───
-  const today = new Date()
-  const weekStart = startOfWeek(today, { weekStartsOn: 1 })
-  const weekEnd = endOfWeek(today, { weekStartsOn: 1 })
-  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
-
-  // ─── Month stats ───
-  const shiftCounts: Record<string, number> = {}
-  let totalHours = 0
-  monthSchedules.forEach(s => {
-    const shift = getShiftById(s.shift_id)
-    if (shift) {
-      shiftCounts[shift.name] = (shiftCounts[shift.name] || 0) + 1
-      // Calculate hours from time strings
-      const [sh, sm] = shift.start_time.split(':').map(Number)
-      const [eh, em] = shift.end_time.split(':').map(Number)
-      totalHours += (eh + em / 60) - (sh + sm / 60)
-    }
-  })
-
-  // ─── Shift color legend ───
-  const shiftLegend: { name: string; color: string }[] = mockShifts.map(s => ({
-    name: s.name, color: s.color,
-  }))
-
-  // ─── Selected day detail ───
-  const selectedSchedule = selectedDate ? getScheduleForDay(selectedDate) : undefined
-  const selectedShift = selectedSchedule ? getShiftById(selectedSchedule.shift_id) : undefined
-  const selectedStore = selectedSchedule ? getStoreById(selectedSchedule.store_id) : undefined
-  const selectedAttendance = selectedDate ? getAttendanceForDay(selectedDate) : undefined
-  const isPast = selectedDate ? isBefore(selectedDate, today) && !isToday(selectedDate) : false
-
-
   return (
     <AppShell showNav>
-      <div className="space-y-5 animate-fade-in pb-20">
-        {/* ─── Header ─── */}
-        <div className="flex justify-between items-center">
+      <div className="animate-fade-in space-y-5 pb-20">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight">Lịch làm việc</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Lịch cá nhân của bạn</p>
+            <h1 className="text-xl font-bold tracking-tight text-gray-800">Lịch của tôi</h1>
+            <p className="mt-0.5 text-xs text-gray-400">
+              Xem lịch tuần chính thức, thay đổi mới và chi tiết từng ca làm.
+            </p>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => router.push('/schedule/open-shifts')}
-              className="h-10 px-3 rounded-xl bg-amber-50 text-amber-700 text-xs font-medium flex items-center gap-1.5 hover:bg-amber-100 transition-colors border border-amber-200"
-            >
-              <Briefcase size={16} /> Ca trống
-            </button>
-            <button
-              onClick={() => router.push('/schedule/swap/list')}
-              className="h-10 px-3 rounded-xl bg-gray-100 text-gray-600 text-xs font-medium flex items-center gap-1.5 hover:bg-gray-200 transition-colors"
-            >
-              <ArrowRightLeft size={16} /> Đổi ca
-            </button>
-            <button
-              onClick={() => router.push('/schedule/preferences')}
-              className="h-10 px-3 rounded-xl bg-primary-600 text-white text-xs font-bold flex items-center gap-1.5 hover:bg-primary-700 transition-colors shadow-sm"
-            >
-              <ClipboardList size={16} /> Đăng ký ca
-            </button>
-            <button
-              onClick={() => alert('Tính năng xuất ICS sẽ sớm ra mắt!')}
-              className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors"
-              title="Xuất lịch"
-            >
-              <Download size={18} />
-            </button>
-          </div>
-        </div>
 
-        {/* ─── Month Navigation ─── */}
-        <div className="flex items-center justify-between bg-white border border-gray-100 rounded-2xl p-2 shadow-[var(--shadow-card)]">
-          <button
-            onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-100 transition-colors"
-          >
-            <ChevronLeft size={20} className="text-gray-500" />
-          </button>
-          <span className="font-bold text-base text-gray-800 capitalize tracking-tight">
-            {format(currentDate, 'MMMM yyyy', { locale: vi })}
-          </span>
-          <button
-            onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-100 transition-colors"
-          >
-            <ChevronRight size={20} className="text-gray-500" />
-          </button>
-        </div>
-
-        {/* ─── Shift Color Legend ─── */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {shiftLegend.map(s => (
-            <div key={s.name} className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />
-              <span className="text-xs text-gray-500">{s.name}</span>
-            </div>
-          ))}
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-            <span className="text-xs text-gray-500">Nghỉ phép</span>
-          </div>
           {isManagerOrAdmin && (
-            <div className="flex items-center gap-1.5">
-              <AlertTriangle size={10} className="text-red-500" />
-              <span className="text-xs text-gray-500">Thiếu người</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => router.push('/schedules')}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <Settings2 size={14} /> Quản lý phân ca
+              </button>
+              <button
+                onClick={() => router.push(`/schedule/history?storeId=${user.store_id}&weekStart=${weekStrs[0]}`)}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                <History size={14} /> Lịch sử thay đổi
+              </button>
             </div>
           )}
         </div>
 
-        {/* ─── Calendar Grid ─── */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-3 shadow-[var(--shadow-card)]">
-          {/* Day headers */}
-          <div className="grid grid-cols-7 gap-1 mb-1">
-            {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(day => (
-              <div key={day} className="text-center text-xs font-bold text-gray-400 py-1.5 uppercase tracking-wider">
-                {day}
-              </div>
-            ))}
-          </div>
+        <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-[var(--shadow-card)]">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setWeekOffset(offset => offset - 1)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-gray-100"
+            >
+              <ChevronLeft size={18} className="text-gray-500" />
+            </button>
 
-          {/* Padding for first week */}
-          <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: (monthStart.getDay() + 6) % 7 }).map((_, i) => (
-              <div key={`pad-${i}`} className="aspect-square" />
-            ))}
-
-            {daysInMonth.map(date => {
-              const schedule = getScheduleForDay(date)
-              const shift = schedule ? getShiftById(schedule.shift_id) : null
-              const isSelected = selectedDate && isSameDay(date, selectedDate)
-              const isTodayDate = isToday(date)
-              const dayOfWeek = date.getDay()
-              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-              const staffStatus = dayStaffingMap.get(format(date, 'yyyy-MM-dd'))
-
-              return (
-                <button
-                  key={date.toISOString()}
-                  onClick={() => setSelectedDate(date)}
-                  className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all relative
-                    ${isSelected ? 'ring-2 ring-primary-600 ring-offset-1 shadow-md scale-105 z-10 bg-primary-50' : ''}
-                    ${isTodayDate && !isSelected ? 'ring-2 ring-primary-500 ring-offset-1' : ''}
-                    ${isWeekend && !schedule ? 'text-gray-300' : ''}
-                    ${staffStatus === 'critical' && !isSelected ? 'bg-red-50' : ''}
-                    ${staffStatus === 'warning' && !isSelected ? 'bg-amber-50' : ''}
-                  `}
-                >
-                  <span className={`text-xs font-bold ${isTodayDate ? 'text-primary-600' : isWeekend ? 'text-gray-400' : 'text-gray-800'}`}>
-                    {format(date, 'd')}
-                  </span>
-                  <div className="flex items-center gap-0.5 mt-0.5">
-                    {shift && (
-                      <div
-                        className="w-[6px] h-[6px] rounded-full"
-                        style={{ backgroundColor: shift.color }}
-                      />
-                    )}
-                    {staffStatus && staffStatus !== 'ok' && (
-                      <AlertTriangle size={8} className={staffStatus === 'critical' ? 'text-red-500' : 'text-amber-500'} />
-                    )}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* ─── This Week List ─── */}
-        <div>
-          <h2 className="text-sm font-bold text-gray-800 tracking-tight mb-3">Tuần này</h2>
-          <div className="space-y-2">
-            {weekDays.map(day => {
-              const schedule = allSchedules.find(s => s.date === format(day, 'yyyy-MM-dd'))
-              const shift = schedule ? getShiftById(schedule.shift_id) : null
-              const attendance = getAttendanceForDay(day)
-              const isTodayDate = isToday(day)
-              const dayOfWeek = day.getDay()
-              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-
-              return (
-                <button
-                  key={day.toISOString()}
-                  onClick={() => setSelectedDate(day)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left ${
-                    isTodayDate ? 'bg-primary-50 border border-primary-200' : 'bg-white border border-gray-100'
-                  } hover:shadow-sm`}
-                >
-                  {/* Day label */}
-                  <div className={`w-11 text-center shrink-0 ${isTodayDate ? 'text-primary-600' : 'text-gray-500'}`}>
-                    <p className="text-xs font-bold uppercase">
-                      {format(day, 'EEE', { locale: vi })}
-                    </p>
-                    <p className="text-lg font-bold leading-tight">{format(day, 'd')}</p>
-                  </div>
-
-                  {/* Shift info */}
-                  <div className="flex-1 min-w-0">
-                    {shift ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-8 rounded-full" style={{ backgroundColor: shift.color }} />
-                        <div>
-                          <p className="text-sm font-bold text-gray-800">{shift.name}</p>
-                          <p className="text-xs text-gray-400 font-numeric">{shift.start_time} – {shift.end_time}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-400 italic">{isWeekend ? 'Cuối tuần' : 'Nghỉ'}</p>
-                    )}
-                  </div>
-
-                  {/* Status */}
-                  <div className="shrink-0">
-                    {shift && attendance?.check_in_time ? (
-                      <CheckCircle2 size={18} className="text-green-500" />
-                    ) : shift && isBefore(day, today) && !isTodayDate ? (
-                      <XCircle size={18} className="text-red-400" />
-                    ) : shift ? (
-                      <div className="w-2 h-2 rounded-full bg-gray-300" />
-                    ) : null}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* ─── Month Statistics ─── */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-[var(--shadow-card)]">
-          <h2 className="text-sm font-bold text-gray-800 tracking-tight mb-3">Thống kê tháng</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-primary-50 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-primary-700 font-numeric">{monthSchedules.length}</p>
-              <p className="text-xs text-gray-500">Tổng số ca</p>
-            </div>
-            <div className="bg-amber-50 rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-amber-700 font-numeric">{Math.round(totalHours)}</p>
-              <p className="text-xs text-gray-500">Giờ dự kiến</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100">
-            {mockShifts.map(s => {
-              const count = shiftCounts[s.name] || 0
-              return (
-                <div key={s.id} className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-                  <span className="text-xs text-gray-500">{s.name}: <b className="text-gray-800 font-numeric">{count}</b></span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Day Detail Bottom Sheet ─── */}
-      {selectedDate && (
-        <>
-          <div className="fixed inset-0 bg-dark-900/40 backdrop-blur-sm z-50 transition-opacity" onClick={() => setSelectedDate(null)} />
-          <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-[32px] p-6 pb-10 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] animate-slide-up max-w-[500px] mx-auto">
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5" />
-
-            {/* Header */}
-            <div className="flex justify-between items-center mb-5">
-              <div>
-                <p className="text-xs text-gray-400 capitalize">{format(selectedDate, 'EEEE', { locale: vi })}</p>
-                <h2 className="text-lg font-bold text-gray-800 tracking-tight">{format(selectedDate, 'd MMMM yyyy', { locale: vi })}</h2>
-              </div>
-              <button onClick={() => setSelectedDate(null)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
-                <X size={16} />
+            <div className="text-center">
+              <div className="text-base font-bold tracking-tight text-gray-800">Tuần {weekLabel}</div>
+              <button
+                onClick={() => setWeekOffset(0)}
+                className="text-[10px] font-bold text-primary-600 transition-colors hover:text-primary-700"
+              >
+                {weekOffset === 0 ? 'Tuần hiện tại' : 'Quay lại tuần hiện tại'}
               </button>
             </div>
 
+            <button
+              onClick={() => setWeekOffset(offset => offset + 1)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-gray-100"
+            >
+              <ChevronRight size={18} className="text-gray-500" />
+            </button>
+          </div>
+
+          <div className="mt-3 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                {weekStateMeta && (
+                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${weekStateMeta.tone}`}>
+                    {weekStateMeta.label}
+                  </span>
+                )}
+                {changedCount > 0 && (
+                  <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-bold text-primary-700">
+                    {changedCount} ca đã đổi sau khi đã chốt
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                {weekStateMeta?.description || (weekPublished
+                  ? 'Đây là lịch tuần chính thức đang áp dụng cho nhân sự.'
+                  : 'Quản lý vẫn đang hoàn thiện lịch tuần. Bản nháp sẽ không hiện cho nhân viên cho tới khi tuần này được chốt.')}
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-xl bg-white px-3 py-3">
+                  <div className="text-[11px] font-medium text-gray-400">Số ca trong tuần</div>
+                  <div className="mt-1 text-lg font-bold text-gray-800">{weekSchedules.length}</div>
+                </div>
+                <div className="rounded-xl bg-white px-3 py-3">
+                  <div className="text-[11px] font-medium text-gray-400">Tổng giờ dự kiến</div>
+                  <div className="mt-1 text-lg font-bold text-gray-800">{Math.round(totalHours * 10) / 10}h</div>
+                </div>
+                <div className="rounded-xl bg-white px-3 py-3">
+                  <div className="text-[11px] font-medium text-gray-400">Ca tiếp theo</div>
+                  <div className="mt-1 text-sm font-bold text-gray-800">
+                    {nextShift ? monthDay.format(new Date(`${nextShift.date}T00:00:00`)) : 'Chưa có'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-white p-4">
+              <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
+                <Clock3 size={16} className="text-primary-600" />
+                Ca hôm nay
+              </div>
+              {todaySchedule ? (
+                <div className="mt-3 rounded-2xl border border-primary-100 bg-primary-50 p-4">
+                  <div className="text-sm font-bold text-gray-800">{getShiftById(todaySchedule.shift_id)?.name || 'Ca làm'}</div>
+                  <div className="mt-1 text-xs text-gray-500">
+                    {getShiftById(todaySchedule.shift_id)?.start_time} - {getShiftById(todaySchedule.shift_id)?.end_time}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+                    {(() => {
+                      const assignmentMeta = ScheduleService.getAssignmentStateMeta(todaySchedule)
+                      return <span className={`inline-flex items-center rounded-full bg-white px-2 py-1 font-bold ${assignmentMeta.tone}`}>{assignmentMeta.label}</span>
+                    })()}
+                    {todaySchedule.change_reason && <span className="text-gray-500">Lý do thay đổi: {todaySchedule.change_reason}</span>}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-500">
+                  {weekPublished ? 'Hôm nay bạn không có ca làm.' : 'Hôm nay chưa có ca chính thức vì tuần này chưa được chốt.'}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {user.role === 'employee' && weekPublished && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              onClick={() => router.push('/schedule/swap')}
+              className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm transition-colors hover:bg-gray-50"
+            >
+              <div>
+                <div className="text-sm font-bold text-gray-800">Đổi ca / nhờ thay ca</div>
+                <div className="mt-1 text-xs text-gray-400">Theo dõi đủ trạng thái: chờ đồng nghiệp, chờ quản lý, đã duyệt hoặc bị từ chối.</div>
+              </div>
+              <Shuffle size={18} className="text-primary-600" />
+            </button>
+            <button
+              onClick={() => router.push('/schedule/open-shifts')}
+              className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm transition-colors hover:bg-gray-50"
+            >
+              <div>
+                <div className="text-sm font-bold text-gray-800">Nhận ca trống</div>
+                <div className="mt-1 text-xs text-gray-400">Xem trạng thái ca trống, gửi yêu cầu nhận và theo dõi chờ duyệt hoặc tự duyệt.</div>
+              </div>
+              <Send size={18} className="text-primary-600" />
+            </button>
+          </div>
+        )}
+
+        {!weekPublished && user.role === 'employee' && (
+          <div className="rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={16} className="mt-0.5 text-warning-600" />
+              <div>
+                <p className="text-sm font-bold text-warning-800">Lịch tuần này chưa được chốt chính thức</p>
+                <p className="mt-1 text-xs leading-relaxed text-warning-700">
+                  Nhân viên chỉ nhìn thấy lịch chính thức sau khi quản lý chốt lịch. Nếu bạn chưa thấy ca, nghĩa là tuần này vẫn đang ở bản nháp và chưa có lịch chính thức để áp dụng.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {user.role === 'employee' && !nextWeekPublished && (
+          <div className="rounded-2xl border border-primary-200 bg-primary-50 px-4 py-3">
+            <div className="flex items-start gap-2">
+              <CalendarDays size={16} className="mt-0.5 text-primary-600" />
+              <div>
+                <p className="text-sm font-bold text-primary-800">Lịch tuần sau chưa được quản lý chốt</p>
+                <p className="mt-1 text-xs leading-relaxed text-primary-700">
+                  Bạn có thể xem lịch tuần này, còn tuần sau sẽ hiện rõ sau khi quản lý chốt bản chính thức.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[var(--shadow-card)]">
+            <div className="mb-3 flex items-center gap-2">
+              <CalendarDays size={16} className="text-primary-600" />
+              <h2 className="text-sm font-bold text-gray-800">Lịch tuần của tôi</h2>
+            </div>
+
+            <div className="space-y-2">
+              {weekDates.map(date => {
+                const dateStr = toDateString(date)
+                const schedule = scheduleByDate.get(dateStr)
+                const shift = schedule ? getShiftById(schedule.shift_id) : null
+                const isTodayDate = dateStr === today
+                const isSelected = resolvedSelectedDate === dateStr
+
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => setSelectedDate(dateStr)}
+                    className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-all ${
+                      isSelected
+                        ? 'border-primary-200 bg-primary-50'
+                        : 'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className={`w-14 shrink-0 text-center ${isTodayDate ? 'text-primary-700' : 'text-gray-500'}`}>
+                      <div className="text-[11px] font-bold uppercase">{weekdayShort.format(date)}</div>
+                      <div className="text-lg font-bold">{date.getDate()}</div>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      {shift ? (
+                        <>
+                          {(() => {
+                            const assignmentMeta = schedule ? ScheduleService.getAssignmentStateMeta(schedule) : null
+                            return (
+                              <>
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-1.5 rounded-full" style={{ backgroundColor: shift.color }} />
+                            <div>
+                              <div className="text-sm font-bold text-gray-800">{shift.name}</div>
+                              <div className="text-xs text-gray-400">{shift.start_time} - {shift.end_time}</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                            {assignmentMeta && <span className={`rounded-full px-2 py-1 font-semibold ${assignmentMeta.tone}`}>{assignmentMeta.label}</span>}
+                            {schedule && schedule.status === 'published' && (
+                              <span className="rounded-full bg-success-50 px-2 py-1 font-semibold text-success-700">
+                                Đã chốt
+                              </span>
+                            )}
+                            {schedule && schedule.modified_after_publish && (
+                              <span className="rounded-full border border-primary-200 bg-primary-50 px-2 py-1 font-semibold text-primary-700">
+                                Mới cập nhật sau khi đã chốt
+                              </span>
+                            )}
+                          </div>
+                              </>
+                            )
+                          })()}
+                        </>
+                      ) : (
+                        <div>
+                          <div className="text-sm font-semibold text-gray-600">
+                            {weekPublished ? 'Không có ca' : 'Chưa có lịch chính thức'}
+                          </div>
+                          <div className="mt-1 text-xs text-gray-400">
+                            {weekPublished ? 'Ngày này hiện không được phân ca.' : 'Quản lý chưa chốt tuần này.'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[var(--shadow-card)]">
+            <h2 className="text-sm font-bold text-gray-800">Chi tiết ngày đã chọn</h2>
+            <p className="mt-1 text-xs text-gray-400">
+              {resolvedSelectedDate ? `${weekdayLong.format(new Date(`${resolvedSelectedDate}T00:00:00`))}, ${fullDate.format(new Date(`${resolvedSelectedDate}T00:00:00`))}` : 'Chọn một ngày để xem chi tiết'}
+            </p>
+
             {selectedSchedule && selectedShift ? (
-              <div className="space-y-3">
-                {/* Shift card */}
-                <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: `${selectedShift.color}15` }}>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${selectedShift.color}25` }}>
-                    <Clock size={20} style={{ color: selectedShift.color }} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-gray-800">{selectedShift.name}</p>
-                    <p className="text-xs text-gray-400 font-numeric">{selectedShift.start_time} – {selectedShift.end_time}</p>
-                  </div>
-                  <div className="px-2 py-1 rounded-lg text-xs font-bold bg-green-100 text-green-700">
-                    Đã xác nhận
+              <div className="mt-4 space-y-3">
+                <div className="rounded-2xl p-4" style={{ background: `${selectedShift.color}12` }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-base font-bold text-gray-800">{selectedShift.name}</div>
+                      <div className="mt-1 text-sm text-gray-500">{selectedShift.start_time} - {selectedShift.end_time}</div>
+                    </div>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-gray-700">
+                      {ScheduleService.getAssignmentStateMeta(selectedSchedule).label}
+                    </span>
                   </div>
                 </div>
 
-                {/* Store info */}
                 {selectedStore && (
-                  <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-                    <MapPin size={16} className="text-gray-400 shrink-0" />
-                    <div>
-                      <p className="text-xs text-gray-400">Cửa hàng</p>
-                      <p className="text-sm font-bold text-gray-800">{selectedStore.name}</p>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
+                    <div className="flex items-start gap-3">
+                      <MapPin size={16} className="mt-0.5 text-gray-400" />
+                      <div>
+                        <div className="text-xs font-medium text-gray-400">Chi nhánh</div>
+                        <div className="text-sm font-bold text-gray-800">{selectedStore.name}</div>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Attendance info (for past days) */}
-                {isPast && selectedAttendance && (
-                  <div className="bg-green-50 rounded-xl p-3 space-y-2">
-                    <p className="text-xs text-green-600 font-bold uppercase tracking-wider">Chấm công</p>
-                    <div className="flex items-center gap-4 text-sm">
-                      <div>
-                        <p className="text-xs text-gray-400">Check-in</p>
-                        <p className="font-bold text-gray-800 font-numeric">
-                          {selectedAttendance.check_in_time ? formatTime(selectedAttendance.check_in_time) : '—'}
-                        </p>
+                {selectedSchedule.modified_after_publish && (
+                  <div className="rounded-2xl border border-primary-300 bg-primary-50 px-4 py-4 shadow-sm shadow-primary-100/60">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-full bg-white p-2 text-primary-700">
+                        <AlertTriangle size={16} />
                       </div>
-                      <div className="text-gray-300">→</div>
-                      <div>
-                        <p className="text-xs text-gray-400">Check-out</p>
-                        <p className="font-bold text-gray-800 font-numeric">
-                          {selectedAttendance.check_out_time ? formatTime(selectedAttendance.check_out_time) : '—'}
-                        </p>
-                      </div>
-                      <div className="ml-auto text-right">
-                        <p className="text-xs text-gray-400">Tổng</p>
-                        <p className="font-bold text-primary-600">{selectedAttendance.total_hours.toFixed(1)}h</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-primary-700">
+                            Lịch chính thức đã đổi
+                          </span>
+                          <span className="text-xs font-semibold text-primary-700">
+                            Đã sửa sau khi chốt
+                          </span>
+                        </div>
+                        <div className="mt-2 text-sm font-bold text-primary-900">
+                          Ca này không còn giống bản bạn đã xem lúc lịch vừa được chốt.
+                        </div>
+                        <div className="mt-3 rounded-2xl border border-primary-200 bg-white/80 px-3 py-3">
+                          <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary-600">
+                            Lý do thay đổi
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-primary-900">
+                            {selectedSchedule.change_reason || 'Chưa có ghi chú lý do thay đổi.'}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    {selectedAttendance.status === 'late' && (
-                      <p className="text-xs text-amber-600">⚠️ Trễ {selectedAttendance.late_minutes} phút</p>
-                    )}
                   </div>
                 )}
 
-                {isPast && !selectedAttendance && (
-                  <div className="bg-red-50 rounded-xl p-3 text-center">
-                    <p className="text-xs text-red-500 font-medium">Không có dữ liệu chấm công</p>
+                {weekPublished && user.role === 'employee' && (
+                  <button
+                    onClick={releaseSelectedShift}
+                    className="w-full rounded-2xl border border-primary-200 bg-white px-4 py-3 text-sm font-bold text-primary-700 transition-colors hover:bg-primary-50"
+                  >
+                    Nhả ca này để đồng nghiệp nhận
+                  </button>
+                )}
+
+                {selectedAttendance && (
+                  <div className="rounded-2xl border border-success-100 bg-success-50 px-4 py-3">
+                    <div className="text-sm font-bold text-success-800">Chấm công</div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                      <div>
+                        <div className="text-[11px] text-success-600">Check-in</div>
+                        <div className="text-sm font-bold text-gray-800">{selectedAttendance.check_in_time || '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] text-success-600">Check-out</div>
+                        <div className="text-sm font-bold text-gray-800">{selectedAttendance.check_out_time || '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] text-success-600">Tổng giờ</div>
+                        <div className="text-sm font-bold text-gray-800">{selectedAttendance.total_hours.toFixed(1)}h</div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3 border-2 border-dashed border-gray-200">
-                  <CalendarIcon size={28} className="text-gray-300" />
+              <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
+                <div className="text-sm font-semibold text-gray-600">
+                  {weekPublished ? 'Ngày này không có ca làm' : 'Ngày này chưa có lịch chính thức'}
                 </div>
-                <p className="text-sm text-gray-500 font-medium">Bạn không có lịch làm ngày này</p>
-                <p className="text-xs text-gray-400 mt-1">{selectedDate.getDay() === 0 || selectedDate.getDay() === 6 ? 'Cuối tuần' : 'Không có ca'}</p>
-                {!isPast && selectedDate.getDay() !== 0 && selectedDate.getDay() !== 6 && (
-                  <button className="mt-4 px-5 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-bold shadow-md active:scale-[0.97] transition-transform">
-                    Đăng ký ca
-                  </button>
-                )}
+                <div className="mt-1 text-xs text-gray-400">
+                  {weekPublished
+                    ? 'Nếu bạn cần đổi ca hoặc xin nghỉ, hãy dùng luồng yêu cầu ở giai đoạn tiếp theo.'
+                    : 'Quản lý vẫn đang hoàn thiện lịch tuần và chưa chốt cho nhân viên.'}
+                </div>
               </div>
             )}
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </AppShell>
   )
 }
+
+export default function SchedulePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+            <p className="text-sm font-medium text-gray-500">Đang tải lịch làm việc...</p>
+          </div>
+        </div>
+      }
+    >
+      <SchedulePageContent />
+    </Suspense>
+  )
+}
+
+

@@ -107,7 +107,7 @@ export default function ViolationLogForm({ employees, storeId, loggedBy, loggedB
           {/* Selected info */}
           <div className="p-2 rounded-xl text-xs" style={{ background: 'var(--gray-50)' }}>
             <strong>{selectedEmp?.name}</strong> · {selectedType.code}: {selectedType.name}
-            <span className="text-red-600 font-bold ml-1">(-{selectedType.penalty_points})</span>
+            <span className="text-error-600 font-bold ml-1">(-{selectedType.penalty_points})</span>
           </div>
 
           {/* Critical warning */}
@@ -172,7 +172,7 @@ export default function ViolationLogForm({ employees, storeId, loggedBy, loggedB
             </div>
             <div className="flex justify-between">
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Điểm trừ</span>
-              <span className="text-xs font-black text-red-600">-{selectedType.penalty_points}</span>
+              <span className="text-xs font-black text-error-600">-{selectedType.penalty_points}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Chế độ</span>
@@ -197,7 +197,7 @@ export default function ViolationLogForm({ employees, storeId, loggedBy, loggedB
             </button>
             <button onClick={handleSubmit}
               className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
-              style={{ background: '#ef4444' }}>
+              style={{ background: '#D9381E' }}>
               ⚠️ Ghi nhận lỗi
             </button>
           </div>

@@ -67,9 +67,9 @@ export interface WorkLocation {
 // ============ Mock Data ============
 
 const shifts = [
-  { id: 'shift-am', name: 'Ca Sáng', color: '#3b82f6', start: '07:00', end: '14:00' },
-  { id: 'shift-pm', name: 'Ca Chiều', color: '#f59e0b', start: '14:00', end: '21:00' },
-  { id: 'shift-ev', name: 'Ca Tối', color: '#8b5cf6', start: '17:00', end: '23:00' },
+  { id: 'shift-am', name: 'Ca Sáng', color: '#2F6FA8', start: '07:00', end: '14:00' },
+  { id: 'shift-pm', name: 'Ca Chiều', color: '#F6C85F', start: '14:00', end: '21:00' },
+  { id: 'shift-ev', name: 'Ca Tối', color: '#001D3D', start: '17:00', end: '23:00' },
 ]
 
 const weekDates = ['2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20','2026-02-21','2026-02-22']
@@ -77,7 +77,7 @@ const weekDates = ['2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-
 export const mockShiftGrid: ShiftCell[] = [
   // Ca Sáng
   ...weekDates.map((d, i) => ({
-    date: d, shift_id: 'shift-am', shift_name: 'Ca Sáng', shift_color: '#3b82f6',
+    date: d, shift_id: 'shift-am', shift_name: 'Ca Sáng', shift_color: '#2F6FA8',
     employees: [
       { id: 'emp-005', name: 'Trần Thị Mai' },
       { id: 'emp-007', name: 'Đặng Minh Khoa' },
@@ -86,7 +86,7 @@ export const mockShiftGrid: ShiftCell[] = [
   })),
   // Ca Chiều
   ...weekDates.map((d, i) => ({
-    date: d, shift_id: 'shift-pm', shift_name: 'Ca Chiều', shift_color: '#f59e0b',
+    date: d, shift_id: 'shift-pm', shift_name: 'Ca Chiều', shift_color: '#F6C85F',
     employees: [
       { id: 'emp-006', name: 'Vũ Hoàng Đức' },
       { id: 'emp-008', name: 'Ngô Thị Hồng' },
@@ -95,7 +95,7 @@ export const mockShiftGrid: ShiftCell[] = [
   })),
   // Ca Tối
   ...weekDates.map((d) => ({
-    date: d, shift_id: 'shift-ev', shift_name: 'Ca Tối', shift_color: '#8b5cf6',
+    date: d, shift_id: 'shift-ev', shift_name: 'Ca Tối', shift_color: '#001D3D',
     employees: [
       { id: 'emp-011', name: 'Hoàng Thị Lan' },
       { id: 'emp-012', name: 'Đinh Văn Phúc' },
@@ -105,15 +105,15 @@ export const mockShiftGrid: ShiftCell[] = [
 
 export const mockEmployeeSchedules: Record<string, EmployeeScheduleEntry[]> = {
   'emp-005': weekDates.map(d => ({
-    date: d, shift_id: 'shift-am', shift_name: 'Ca Sáng', shift_color: '#3b82f6',
+    date: d, shift_id: 'shift-am', shift_name: 'Ca Sáng', shift_color: '#2F6FA8',
     start_time: '07:00', end_time: '14:00', status: 'confirmed' as const,
   })),
   'emp-006': weekDates.map(d => ({
-    date: d, shift_id: 'shift-pm', shift_name: 'Ca Chiều', shift_color: '#f59e0b',
+    date: d, shift_id: 'shift-pm', shift_name: 'Ca Chiều', shift_color: '#F6C85F',
     start_time: '14:00', end_time: '21:00', status: 'confirmed' as const,
   })),
   'emp-011': weekDates.map(d => ({
-    date: d, shift_id: 'shift-ev', shift_name: 'Ca Tối', shift_color: '#8b5cf6',
+    date: d, shift_id: 'shift-ev', shift_name: 'Ca Tối', shift_color: '#001D3D',
     start_time: '17:00', end_time: '23:00', status: 'confirmed' as const,
   })),
 }
@@ -149,14 +149,14 @@ export const mockAutoScheduleOutput: AutoScheduleOutput[] = [
 ]
 
 export const mockWorkLocations: WorkLocation[] = [
-  { id: 'loc-001', store_id: 'store-001', name: 'Boba House Q.1', address: '123 Nguyễn Huệ, Q.1, TP.HCM', gps_lat: 10.7769, gps_lng: 106.7009, radius_meters: 100, is_active: true },
-  { id: 'loc-002', store_id: 'store-002', name: 'Boba House Q.3', address: '456 Võ Văn Tần, Q.3, TP.HCM', gps_lat: 10.7725, gps_lng: 106.6879, radius_meters: 80, is_active: true },
-  { id: 'loc-003', store_id: 'store-003', name: 'Boba House Thủ Đức', address: '789 Phạm Văn Đồng, Thủ Đức', gps_lat: 10.8492, gps_lng: 106.7679, radius_meters: 120, is_active: true },
+  { id: 'loc-001', store_id: 'store-001', name: 'Homies Milk Tea Q.1', address: '123 Nguyễn Huệ, Q.1, TP.HCM', gps_lat: 10.7769, gps_lng: 106.7009, radius_meters: 100, is_active: true },
+  { id: 'loc-002', store_id: 'store-002', name: 'Homies Milk Tea Q.3', address: '456 Võ Văn Tần, Q.3, TP.HCM', gps_lat: 10.7725, gps_lng: 106.6879, radius_meters: 80, is_active: true },
+  { id: 'loc-003', store_id: 'store-003', name: 'Homies Milk Tea Thủ Đức', address: '789 Phạm Văn Đồng, Thủ Đức', gps_lat: 10.8492, gps_lng: 106.7679, radius_meters: 120, is_active: true },
   { id: 'loc-004', store_id: 'store-001', name: 'Kho Q.1 (Backup)', address: '100 Lê Lai, Q.1, TP.HCM', gps_lat: 10.7710, gps_lng: 106.6930, radius_meters: 50, is_active: false },
 ]
 
 // Helpers
-export const getShiftGridByStore = (storeId: string) => mockShiftGrid
+export const getShiftGridByStore = () => mockShiftGrid
 export const getEmployeeSchedule = (empId: string) => mockEmployeeSchedules[empId] || []
 export const getPendingSwapRequests = () => mockShiftSwapRequests.filter(r => r.status === 'pending')
 export const getWorkLocationsByStore = (storeId: string) => mockWorkLocations.filter(l => l.store_id === storeId)

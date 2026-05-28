@@ -85,15 +85,15 @@ export interface DirectMessageThread {
 export const mockNews: NewsArticle[] = [
   {
     id: 'news-001', title: 'Khai trương chi nhánh mới tại Quận 7',
-    excerpt: 'Boba House mở rộng thêm chi nhánh thứ 4 tại khu Phú Mỹ Hưng, Quận 7...',
-    content: 'Chúng tôi vui mừng thông báo Boba House sẽ khai trương chi nhánh mới tại 123 Nguyễn Lương Bằng, Phú Mỹ Hưng, Q.7 vào ngày 01/03/2026.\n\nĐây là chi nhánh thứ 4 của chuỗi và có diện tích lớn nhất với 80 chỗ ngồi.\n\nChúng tôi đang tuyển 8 nhân viên cho chi nhánh mới. Anh chị em có thể giới thiệu bạn bè!',
+    excerpt: 'Homies Milk Tea mở rộng thêm chi nhánh thứ 4 tại khu Phú Mỹ Hưng, Quận 7...',
+    content: 'Chúng tôi vui mừng thông báo Homies Milk Tea sẽ khai trương chi nhánh mới tại 123 Nguyễn Lương Bằng, Phú Mỹ Hưng, Q.7 vào ngày 01/03/2026.\n\nĐây là chi nhánh thứ 4 của chuỗi và có diện tích lớn nhất với 80 chỗ ngồi.\n\nChúng tôi đang tuyển 8 nhân viên cho chi nhánh mới. Anh chị em có thể giới thiệu bạn bè!',
     author_id: 'emp-001', author_name: 'Nguyễn Minh Tuấn', cover_image: '/news/branch-q7.jpg',
     likes: 24, is_liked: false, published_at: '2026-02-14T09:00:00', category: 'Công ty',
   },
   {
     id: 'news-002', title: 'Menu mới tháng 3: Boba Matcha Sakura',
     excerpt: 'Ra mắt dòng sản phẩm mới lấy cảm hứng mùa xuân Nhật Bản...',
-    content: 'Tháng 3 tới, Boba House sẽ ra mắt 3 sản phẩm mới:\n1. Matcha Sakura Latte\n2. Hojicha Boba Frost\n3. Yuzu Genmai Tea\n\nĐào tạo pha chế bắt đầu từ 25/02. Training bắt buộc cho tất cả barista.',
+    content: 'Tháng 3 tới, Homies Milk Tea sẽ ra mắt 3 sản phẩm mới:\n1. Matcha Sakura Latte\n2. Hojicha Boba Frost\n3. Yuzu Genmai Tea\n\nĐào tạo pha chế bắt đầu từ 25/02. Training bắt buộc cho tất cả barista.',
     author_id: 'emp-002', author_name: 'Lê Văn Nam', likes: 18, is_liked: true,
     published_at: '2026-02-12T14:00:00', category: 'Sản phẩm',
   },
@@ -155,9 +155,9 @@ export const mockPolicies: Policy[] = [
 
 // ============ Chat Messages ============
 export const mockChatGroups: ChatGroup[] = [
-  { id: 'grp-001', name: 'Boba House Q.1', store_id: 'store-001', member_count: 7, last_message: 'Mai nhớ kiểm tra hàng nha', last_message_at: '2026-02-15T20:30:00', unread_count: 3 },
-  { id: 'grp-002', name: 'Boba House Q.3', store_id: 'store-002', member_count: 5, last_message: 'OK anh ạ', last_message_at: '2026-02-15T18:00:00', unread_count: 0 },
-  { id: 'grp-003', name: 'Boba House Thủ Đức', store_id: 'store-003', member_count: 5, last_message: 'Máy blender bị hư rồi', last_message_at: '2026-02-15T16:00:00', unread_count: 1 },
+  { id: 'grp-001', name: 'Homies Milk Tea Q.1', store_id: 'store-001', member_count: 7, last_message: 'Mai nhớ kiểm tra hàng nha', last_message_at: '2026-02-15T20:30:00', unread_count: 3 },
+  { id: 'grp-002', name: 'Homies Milk Tea Q.3', store_id: 'store-002', member_count: 5, last_message: 'OK anh ạ', last_message_at: '2026-02-15T18:00:00', unread_count: 0 },
+  { id: 'grp-003', name: 'Homies Milk Tea Thủ Đức', store_id: 'store-003', member_count: 5, last_message: 'Máy blender bị hư rồi', last_message_at: '2026-02-15T16:00:00', unread_count: 1 },
 ]
 
 export const mockChatMessages: ChatMessage[] = [

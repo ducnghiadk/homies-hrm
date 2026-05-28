@@ -1,26 +1,42 @@
 'use client'
 
+import Image from 'next/image'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore, getDashboardPath } from '@/store/auth-store'
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
+import { useAuthStore, DEMO_ACCOUNTS, getDashboardPath } from '@/store/auth-store'
+import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle, Sparkles } from 'lucide-react'
+
+function getSafeRedirectPath(redirect: string | null, fallbackPath: string) {
+  if (!redirect || !redirect.startsWith('/') || redirect.startsWith('//')) {
+    return fallbackPath
+  }
+
+  return redirect
+}
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, isAuthenticated, user, isLoading, rememberMe, setRememberMe } = useAuthStore()
+  const { login, loginAsDemo, isAuthenticated, user, isLoading, hasHydrated, rememberMe, setRememberMe } = useAuthStore()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const redirectParam = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('redirect')
+    : null
+  const redirectPath = getSafeRedirectPath(
+    redirectParam,
+    user ? getDashboardPath(user.role) : '/'
+  )
 
   // Already logged in → redirect to dashboard
   useEffect(() => {
-    if (isAuthenticated && user) {
-      router.replace(getDashboardPath(user.role))
+    if (hasHydrated && isAuthenticated && user) {
+      router.replace(redirectPath)
     }
-  }, [isAuthenticated, user, router])
+  }, [hasHydrated, isAuthenticated, redirectPath, router, user])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,7 +62,7 @@ export default function LoginPage() {
         // Get updated user from store
         const currentUser = useAuthStore.getState().user
         if (currentUser) {
-          router.push(getDashboardPath(currentUser.role))
+          router.push(getSafeRedirectPath(redirectParam, getDashboardPath(currentUser.role)))
         }
       } else {
         setError(result.error || 'Đăng nhập thất bại')
@@ -62,8 +78,39 @@ export default function LoginPage() {
     }
   }
 
+  const handleQuickLogin = (email: string) => {
+    setError('')
+    loginAsDemo(email)
+    const currentUser = useAuthStore.getState().user
+    if (currentUser) {
+      router.push(getSafeRedirectPath(redirectParam, getDashboardPath(currentUser.role)))
+    }
+  }
+
   // Don't render form if already authenticated
-  if (isAuthenticated && user) return null
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6"
+           style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
+        <div className="flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 text-sm font-semibold text-gray-600 shadow-lg border border-gray-100">
+          <Loader2 size={18} className="animate-spin text-primary-500" />
+          Dang tai trang dang nhap...
+        </div>
+      </div>
+    )
+  }
+
+  if (isAuthenticated && user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6"
+           style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
+        <div className="flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 text-sm font-semibold text-gray-600 shadow-lg border border-gray-100">
+          <Loader2 size={18} className="animate-spin text-primary-500" />
+          Dang chuyen den man hinh chinh...
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden"
@@ -78,17 +125,20 @@ export default function LoginPage() {
       <div className="w-full max-w-[400px] z-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
 
         {/* ===== LOGO ===== */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-[22px] mb-5 shadow-lg"
-               style={{ background: 'linear-gradient(135deg, #3971B8, #2A5A8F)' }}>
-            <span className="text-white text-[28px] font-bold tracking-tight"
-                  style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>H</span>
-          </div>
-          <h1 className="text-[28px] font-bold tracking-tight mb-1"
-              style={{ color: '#343B1B', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-            HOMIES
+        <div className="text-center mb-10 flex flex-col items-center">
+          <Image
+            src="/logo.png"
+            alt="Homies Milk Tea Logo"
+            width={160}
+            height={80}
+            className="h-20 w-auto object-contain mb-4"
+            priority
+          />
+          <h1 className="text-[26px] font-black tracking-tight mb-1"
+              style={{ color: '#343B1B', fontFamily: 'Poppins, system-ui, sans-serif' }}>
+            HOMIES MILK TEA
           </h1>
-          <p className="text-[15px] font-medium" style={{ color: '#9E9E9E' }}>
+          <p className="text-xs font-bold uppercase tracking-widest text-primary-700 bg-primary-50 px-3 py-0.5 rounded-full border border-primary-100/30">
             Quản trị nhân sự thông minh
           </p>
         </div>
@@ -259,48 +309,61 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          <div className="mt-6 border-t border-gray-100 pt-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles size={16} style={{ color: '#F6C85F' }} />
+              <h3 className="text-sm font-bold uppercase tracking-wide" style={{ color: '#3971B8' }}>
+                Chọn nhanh tài khoản demo
+              </h3>
+            </div>
+
+            <div className="space-y-2">
+              {DEMO_ACCOUNTS.map((account) => (
+                <button
+                  key={account.email}
+                  type="button"
+                  onClick={() => handleQuickLogin(account.email)}
+                  className="w-full flex items-center justify-between rounded-[16px] border px-4 py-3 text-left transition-all hover:translate-y-[-1px]"
+                  style={{
+                    borderColor: '#E8EEF5',
+                    background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FBFF 100%)',
+                  }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-10 h-10 rounded-[14px] flex items-center justify-center text-lg shrink-0"
+                      style={{ background: '#EEF4FB' }}
+                    >
+                      {account.icon}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold truncate" style={{ color: '#343B1B' }}>
+                        {account.name}
+                      </div>
+                      <div className="text-xs truncate" style={{ color: '#757575' }}>
+                        {account.position} • {account.email}
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className="text-[11px] font-bold px-3 py-1 rounded-full shrink-0"
+                    style={{ background: '#E6F0FA', color: '#3971B8' }}
+                  >
+                    Vào nhanh
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
         <p className="text-center text-sm mt-8 text-gray-400">
-          © 2026 HOMIES. Quản trị nhân sự chuỗi F&B
+          © 2026 Homies Milk Tea. Quản trị nhân sự chuỗi F&B
         </p>
 
-        {/* Quick Login Hint (for demo) */}
-        <div className="mt-6 p-4 rounded-[16px] border border-dashed text-center"
-             style={{ borderColor: '#E4EDCF', backgroundColor: '#F8FAF3' }}>
-          <p className="text-[12px] font-semibold mb-2" style={{ color: '#9AB86E' }}>🧪 Demo — Đăng nhập nhanh</p>
-          <div className="flex flex-wrap gap-2 justify-center">
-            {[
-              { label: 'CEO', email: 'tuan@bobahouse.vn' },
-              { label: 'HR Admin', email: 'yen@bobahouse.vn' },
-              { label: 'Store Mgr', email: 'lan@bobahouse.vn' },
-              { label: 'Shift Lead', email: 'huong@bobahouse.vn' },
-              { label: 'Nhân viên', email: 'binh@bobahouse.vn' },
-            ].map(({ label, email: e }) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => { setEmail(e); setPassword('123456'); setError('') }}
-                className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all border"
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  color: '#3971B8',
-                  borderColor: '#E1EBF6',
-                }}
-                onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLElement).style.backgroundColor = '#E1EBF6'
-                }}
-                onMouseLeave={(e) => {
-                  ;(e.currentTarget as HTMLElement).style.backgroundColor = '#FFFFFF'
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs mt-2 text-gray-400">Mật khẩu: 123456</p>
-        </div>
+
       </div>
     </div>
   )

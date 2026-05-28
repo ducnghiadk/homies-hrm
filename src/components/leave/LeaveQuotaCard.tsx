@@ -78,9 +78,8 @@ export default function LeaveQuotaCard({
   )
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function QuotaItem({
-  type,
+  
   info,
   quota,
   showPending,
@@ -98,7 +97,7 @@ function QuotaItem({
   const isMedium = quota.remaining > 2 && quota.remaining <= 5 && quota.total > 0
   const isUnlimited = quota.total === 0
 
-  const now = Date.now() // eslint-disable-line react-compiler/react-compiler
+  const now = new Date().getTime()
   const isExpiringSoon = quota.expiryDate &&
     new Date(quota.expiryDate).getTime() - now < 30 * 24 * 60 * 60 * 1000
 
@@ -131,7 +130,7 @@ function QuotaItem({
           />
           {quota.pending > 0 && (
             <div
-              className="h-full transition-all duration-700 bg-amber-400"
+              className="h-full transition-all duration-700 bg-warning-400"
               style={{ width: `${pendingPct}%` }}
             />
           )}
@@ -142,10 +141,10 @@ function QuotaItem({
       <div className="text-center mt-1">
         <div className={cn(
           'inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-sm font-bold font-numeric',
-          isLow ? 'bg-red-100 text-red-700'
-          : isMedium ? 'bg-amber-100 text-amber-700'
+          isLow ? 'bg-error-100 text-error-700'
+          : isMedium ? 'bg-warning-100 text-warning-700'
           : isUnlimited ? 'bg-gray-100 text-gray-600'
-          : 'bg-green-100 text-green-700'
+          : 'bg-success-100 text-success-700'
         )}>
           {isUnlimited ? '∞' : `${quota.remaining}/${quota.total}`}
         </div>
@@ -158,11 +157,11 @@ function QuotaItem({
             <div className="text-gray-500">✅ Đã dùng: <span className="font-medium" style={{ color: info.colorHex }}>{quota.used}</span></div>
           )}
           {showPending && quota.pending > 0 && (
-            <div className="text-amber-600 font-medium">⏳ Chờ duyệt: {quota.pending}</div>
+            <div className="text-warning-600 font-medium">⏳ Chờ duyệt: {quota.pending}</div>
           )}
           <div className={cn(
             'font-medium',
-            isLow ? 'text-red-600' : isMedium ? 'text-amber-600' : 'text-gray-500'
+            isLow ? 'text-error-600' : isMedium ? 'text-warning-600' : 'text-gray-500'
           )}>
             📊 Còn lại: {quota.remaining}
           </div>
@@ -171,7 +170,7 @@ function QuotaItem({
 
       {/* Expiry warning */}
       {isExpiringSoon && (
-        <div className="mt-1 flex items-center justify-center gap-1 text-xs text-amber-600">
+        <div className="mt-1 flex items-center justify-center gap-1 text-xs text-warning-600">
           <AlertCircle size={10} />
           HH: {new Date(quota.expiryDate!).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
         </div>

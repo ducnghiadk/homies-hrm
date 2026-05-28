@@ -5,17 +5,21 @@ import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import {
-  mockShifts, mockStores, mockSchedules, mockRequests,
+  mockShifts, mockStores, mockRequests,
   getShiftById, getStoreById, getPositionById,
-  getEmployeesByStore, getSchedulesByStoreWeek,
-  addSchedule, removeSchedule, copyWeekSchedules,
+  getScheduleByEmployeeDate,
   type Schedule,
 } from '@/lib/mock-data'
-import { getAllPreferencesForWeek, type ShiftPreference } from '@/lib/mock-data-preferences'
+import { ScheduleService } from '@/lib/services/schedule-service'
+import { EmployeeService } from '@/lib/services/employee-service'
+import { getAllPreferencesForWeek, getShiftPreferenceAvailability, type ShiftPreference } from '@/lib/mock-data-preferences'
+import { ShiftTemplateService } from '@/lib/services/shift-template-service'
 import { getPendingSwapRequestsForManager } from '@/lib/mock-data-swap'
 import {
   getOpenShiftsByStoreWeek, createOpenShift, getPendingClaimsForStore,
+  cancelOpenShift, getOpenShiftStateMeta,
 } from '@/lib/mock-data-open-shifts'
+import { notifyOpenShiftCreated } from '@/lib/notifications/open-shift-notifications'
 import {
   checkScheduleWarnings, scanWeekWarnings, getEmployeeWeeklyHours,
   type ScheduleWarning,
@@ -103,17 +107,19 @@ export default function ScheduleAssignPage() {
 
   // Employees for selected store (non-manager roles)
   const employees = useMemo(
-    () => selectedStoreId
-      ? getEmployeesByStore(selectedStoreId).filter(e => e.role === 'employee' || e.role === 'shift_leader')
-      : [],
-    [selectedStoreId],
+    () => {
+      if (!selectedStoreId || !user) return []
+      const list = EmployeeService.getEmployees(user)
+      return list.filter(e => e.store_id === selectedStoreId && (e.role === 'employee' || e.role === 'shift_leader'))
+    },
+    [selectedStoreId, user],
   )
 
   // Current week schedules — use refreshKey to force re-read
   const schedules = useMemo(
-    () => selectedStoreId ? getSchedulesByStoreWeek(selectedStoreId, weekDates) : [],
+    () => selectedStoreId && user ? ScheduleService.getStoreSchedules(user, selectedStoreId, weekDates) : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedStoreId, weekDates, refreshKey],
+    [selectedStoreId, weekDates, refreshKey, user],
   )
 
   // Approved leave requests for this week
@@ -135,6 +141,14 @@ export default function ScheduleAssignPage() {
   const getPref = useCallback((empId: string, date: string): ShiftPreference | undefined => {
     return allPrefs.find(p => p.user_id === empId && p.date === date)
   }, [allPrefs])
+
+  const getPrefDots = useCallback((pref: ShiftPreference, storeId: string) => {
+    if (pref.not_available) return []
+    return ShiftTemplateService.getActiveForStore(storeId)
+      .filter(template => getShiftPreferenceAvailability(pref, template.id))
+      .slice(0, 3)
+      .map(template => ({ color: template.color, title: `${template.name} ?` }))
+  }, [])
 
   const getScheduleCell = useCallback((empId: string, date: string): Schedule | undefined => {
     return schedules.find(s => s.employee_id === empId && s.date === date)
@@ -164,6 +178,16 @@ export default function ScheduleAssignPage() {
 
   if (!user) return null
 
+  if (user.role === 'employee') {
+    return (
+      <AppShell title="Phân ca">
+        <div className="py-20 text-center" style={{ color: 'var(--text-muted)' }}>
+          Không có quyền
+        </div>
+      </AppShell>
+    )
+  }
+
   // ─── Validation ───
   const validateAssignment = (empId: string, date: string, shiftId: string): string | null => {
     if (isOnLeave(empId, date)) return 'Ngày này NV đang nghỉ phép'
@@ -171,7 +195,7 @@ export default function ScheduleAssignPage() {
     // Check consecutive night → morning
     if (shiftId === 'shift-001') { // Ca sáng
       const prevDate = format(addDays(new Date(date), -1), 'yyyy-MM-dd')
-      const prevSchedule = mockSchedules.find(s => s.employee_id === empId && s.date === prevDate)
+      const prevSchedule = getScheduleByEmployeeDate(empId, prevDate, selectedStoreId)
       if (prevSchedule?.shift_id === 'shift-003') return 'Chưa đủ 8 tiếng nghỉ (Ca tối → Ca sáng)'
     }
 
@@ -194,7 +218,7 @@ export default function ScheduleAssignPage() {
       if (oldWarning && !confirm(`⚠️ ${oldWarning}\n\nVẫn muốn tiếp tục?`)) return
 
       // Smart warnings check
-      const warns = checkScheduleWarnings(editCell.empId, editShift, editCell.date, selectedStoreId)
+      const warns = checkScheduleWarnings(editCell.empId, editShift, editCell.date, selectedStoreId, schedules)
       const blocked = warns.filter(w => w.warning_level === 'block')
       if (blocked.length > 0) {
         setPendingWarnings(warns)
@@ -207,9 +231,9 @@ export default function ScheduleAssignPage() {
         return // Show popup to confirm
       }
 
-      addSchedule(selectedStoreId, editCell.empId, editShift, editCell.date, editNote || undefined)
+      ScheduleService.assignSchedule(user!, selectedStoreId, editCell.empId, editShift, editCell.date, editNote || undefined)
     } else {
-      removeSchedule(editCell.empId, editCell.date)
+      ScheduleService.deleteSchedule(user!, selectedStoreId, editCell.empId, editCell.date)
     }
     setEditCell(null)
     setRefreshKey(k => k + 1)
@@ -218,7 +242,7 @@ export default function ScheduleAssignPage() {
 
   const handleForceAssign = () => {
     if (!editCell || !selectedStoreId || !editShift) return
-    addSchedule(selectedStoreId, editCell.empId, editShift, editCell.date, editNote || undefined)
+    ScheduleService.assignSchedule(user!, selectedStoreId, editCell.empId, editShift, editCell.date, editNote || undefined)
     setShowWarningPopup(false)
     setPendingWarnings([])
     setEditCell(null)
@@ -228,7 +252,7 @@ export default function ScheduleAssignPage() {
 
   const handleCopyWeek = () => {
     if (!selectedStoreId) return
-    const count = copyWeekSchedules(selectedStoreId, prevWeekDates, weekDates)
+    const count = ScheduleService.copyPreviousWeek(user!, selectedStoreId, prevWeekDates, weekDates)
     setRefreshKey(k => k + 1)
     showToast(`Đã copy ${count} lịch từ tuần trước`)
   }
@@ -248,9 +272,9 @@ export default function ScheduleAssignPage() {
       if (qaPattern === 'tts' && ![2, 4, 6].includes(dayOfWeek)) return
 
       qaEmployees.forEach(empId => {
-        const exists = mockSchedules.find(s => s.employee_id === empId && s.date === date)
+        const exists = getScheduleByEmployeeDate(empId, date, selectedStoreId)
         if (!exists) {
-          addSchedule(selectedStoreId, empId, qaShift, date)
+          ScheduleService.assignSchedule(user!, selectedStoreId, empId, qaShift, date)
           count++
         }
       })
@@ -264,6 +288,17 @@ export default function ScheduleAssignPage() {
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2500)
+  }
+
+  const handleCancelOpenShift = (openShiftId: string) => {
+    if (!window.confirm('Huy ca trong nay?')) return
+    const cancelled = cancelOpenShift(openShiftId)
+    if (!cancelled) {
+      showToast('Khong the huy ca trong')
+      return
+    }
+    setRefreshKey(k => k + 1)
+    showToast('Da huy ca trong tren board')
   }
 
   // ─── Stats ───
@@ -290,13 +325,13 @@ export default function ScheduleAssignPage() {
   })
 
 
-  const costPctColor = (pct: number) => pct > 100 ? '#ef4444' : pct > 80 ? '#f59e0b' : '#10b981'
+  const costPctColor = (pct: number) => pct > 100 ? '#D9381E' : pct > 80 ? '#F6C85F' : '#1E9E57'
   const staffColor = (req: number, asg: number) => {
-    if (req === 0) return '#10b981'
+    if (req === 0) return '#1E9E57'
     const diff = req - asg
-    if (diff <= 0) return '#10b981'
-    if (diff <= 2) return '#f59e0b'
-    return '#ef4444'
+    if (diff <= 0) return '#1E9E57'
+    if (diff <= 2) return '#F6C85F'
+    return '#D9381E'
   }
 
   return (
@@ -312,7 +347,7 @@ export default function ScheduleAssignPage() {
             <button
               onClick={() => setShowPrefs(p => !p)}
               className={`h-9 px-3 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                showPrefs ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                showPrefs ? 'bg-success-100 text-success-700 border border-success-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
               title="Hiện/ẩn đăng ký ca NV"
             >
@@ -350,15 +385,15 @@ export default function ScheduleAssignPage() {
           if (pendingSwaps.length === 0) return null
           return (
             <button onClick={() => router.push('/schedule/swap/list')}
-              className="w-full p-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-3 hover:bg-amber-100 transition-colors">
-              <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center">
-                <ArrowRightLeft size={16} className="text-amber-600" />
+              className="w-full p-3 rounded-2xl bg-warning-50 border border-warning-200 flex items-center gap-3 hover:bg-warning-100 transition-colors">
+              <div className="w-8 h-8 rounded-xl bg-warning-100 flex items-center justify-center">
+                <ArrowRightLeft size={16} className="text-warning-600" />
               </div>
               <div className="flex-1 text-left">
-                <p className="text-xs font-bold text-amber-800">{pendingSwaps.length} yêu cầu đổi ca chờ duyệt</p>
-                <p className="text-xs text-amber-500">Nhấn để xem chi tiết</p>
+                <p className="text-xs font-bold text-warning-800">{pendingSwaps.length} yêu cầu đổi ca chờ duyệt</p>
+                <p className="text-xs text-warning-500">Nhấn để xem chi tiết</p>
               </div>
-              <ChevronRight size={16} className="text-amber-400" />
+              <ChevronRight size={16} className="text-warning-400" />
             </button>
           )
         })()}
@@ -369,40 +404,39 @@ export default function ScheduleAssignPage() {
           if (pendingClaims.length === 0) return null
           return (
             <button onClick={() => router.push('/schedule/open-shifts/claims')}
-              className="w-full p-3 rounded-2xl bg-blue-50 border border-blue-200 flex items-center gap-3 hover:bg-blue-100 transition-colors">
-              <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center">
-                <Users size={16} className="text-blue-600" />
+              className="w-full p-3 rounded-2xl bg-primary-50 border border-primary-200 flex items-center gap-3 hover:bg-primary-100 transition-colors">
+              <div className="w-8 h-8 rounded-xl bg-primary-100 flex items-center justify-center">
+                <Users size={16} className="text-primary-600" />
               </div>
               <div className="flex-1 text-left">
-                <p className="text-xs font-bold text-blue-800">{pendingClaims.length} yêu cầu nhận ca trống chờ duyệt</p>
-                <p className="text-xs text-blue-400">Nhấn để xem chi tiết</p>
+                <p className="text-xs font-bold text-primary-800">{pendingClaims.length} yêu cầu nhận ca trống chờ duyệt</p>
+                <p className="text-xs text-primary-400">Nhấn để xem chi tiết</p>
               </div>
-              <ChevronRight size={16} className="text-blue-400" />
+              <ChevronRight size={16} className="text-primary-400" />
             </button>
           )
         })()}
 
         {/* ─── Schedule Warnings Badge ─── */}
         {(() => {
-          const weekWarns = scanWeekWarnings(selectedStoreId, weekDates)
+          const weekWarns = scanWeekWarnings(selectedStoreId, weekDates, schedules)
           if (weekWarns.length === 0) return null
           const blockCnt = weekWarns.filter(w => w.warning_level === 'block').length
-          const warnCnt = weekWarns.filter(w => w.warning_level === 'warning').length
           return (
-            <button onClick={() => router.push('/schedule/warnings')}
+            <button onClick={() => router.push(`/schedule/warnings?weekStart=${weekDates[0]}`)}
               className={`w-full p-3 rounded-2xl border flex items-center gap-3 hover:opacity-90 transition-colors ${
-                blockCnt > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+                blockCnt > 0 ? 'bg-error-50 border-error-200' : 'bg-warning-50 border-warning-200'
               }`}>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${blockCnt > 0 ? 'bg-red-100' : 'bg-amber-100'}`}>
-                {blockCnt > 0 ? <ShieldAlert size={16} className="text-red-600" /> : <AlertTriangle size={16} className="text-amber-600" />}
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${blockCnt > 0 ? 'bg-error-100' : 'bg-warning-100'}`}>
+                {blockCnt > 0 ? <ShieldAlert size={16} className="text-error-600" /> : <AlertTriangle size={16} className="text-warning-600" />}
               </div>
               <div className="flex-1 text-left">
-                <p className={`text-xs font-bold ${blockCnt > 0 ? 'text-red-800' : 'text-amber-800'}`}>
+                <p className={`text-xs font-bold ${blockCnt > 0 ? 'text-error-800' : 'text-warning-800'}`}>
                   {weekWarns.length} cảnh báo xếp ca {blockCnt > 0 ? `(${blockCnt} chặn)` : ''}
                 </p>
-                <p className={`text-xs ${blockCnt > 0 ? 'text-red-500' : 'text-amber-500'}`}>Nhấn để xem chi tiết</p>
+                <p className={`text-xs ${blockCnt > 0 ? 'text-error-500' : 'text-warning-500'}`}>Nhấn để xem chi tiết</p>
               </div>
-              <ChevronRight size={16} className={blockCnt > 0 ? 'text-red-400' : 'text-amber-400'} />
+              <ChevronRight size={16} className={blockCnt > 0 ? 'text-error-400' : 'text-warning-400'} />
             </button>
           )
         })()}
@@ -410,7 +444,7 @@ export default function ScheduleAssignPage() {
         {/* ─── Staffing + Cost Dashboard ─── */}
         {(viewMode === 'staff' || viewMode === 'both') && staffingSummary && (
           <div className="p-3 rounded-2xl border flex items-center gap-3" style={{
-            background: staffingSummary.shortage > 0 ? '#fef3c7' : '#d1fae5',
+            background: staffingSummary.shortage > 0 ? '#FFF8E8' : '#d1fae5',
             borderColor: staffingSummary.shortage > 0 ? '#fde68a' : '#a7f3d0',
           }}>
             <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm" style={{
@@ -422,7 +456,7 @@ export default function ScheduleAssignPage() {
                   {staffingSummary.totalAssigned}/{staffingSummary.totalRequired} người
                 </span>
                 {staffingSummary.shortage > 0 && (
-                  <span className="text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: '#fef3c7', color: '#92400e' }}>
+                  <span className="text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: '#FFF8E8', color: '#92400e' }}>
                     Thiếu {staffingSummary.shortage}
                   </span>
                 )}
@@ -510,7 +544,7 @@ export default function ScheduleAssignPage() {
               <thead>
                 <tr className="bg-gray-50">
                   <th className="text-left p-2 pl-3 w-[140px] text-gray-500 font-bold sticky left-0 bg-gray-50 z-10">Nhân viên</th>
-                  {weekDates.map((date, i) => {
+                  {weekDates.map((date) => {
                     const d = new Date(date)
                     const isWeekend = d.getDay() === 0 || d.getDay() === 6
                     const isToday = date === format(new Date(), 'yyyy-MM-dd')
@@ -550,8 +584,8 @@ export default function ScheduleAssignPage() {
                           <div className="min-w-0">
                             <p className="font-bold text-dark-700 truncate text-xs">{emp.full_name.split(' ').slice(-2).join(' ')}</p>
                             {(() => {
-                              const hrs = getEmployeeWeeklyHours(emp.id, weekDates)
-                              const hrsColor = hrs > 48 ? 'text-red-500' : hrs > 40 ? 'text-amber-500' : 'text-gray-400'
+                              const hrs = getEmployeeWeeklyHours(emp.id, weekDates, schedules)
+                              const hrsColor = hrs > 48 ? 'text-error-500' : hrs > 40 ? 'text-warning-500' : 'text-gray-400'
                               const rate = laborCostSettings.show_hourly_rate ? getHourlyRate(emp.id) : 0
                               return (
                                 <p className={`text-[9px] ${hrsColor}`}>
@@ -578,7 +612,7 @@ export default function ScheduleAssignPage() {
                               onClick={() => handleCellClick(emp.id, date)}
                               className={`w-full py-2 px-1 rounded-lg text-xs font-bold transition-all ${
                                 leave
-                                  ? 'bg-red-50 text-red-500 border border-red-200'
+                                  ? 'bg-error-50 text-error-500 border border-error-200'
                                   : shift
                                   ? 'border border-transparent hover:shadow-sm'
                                   : 'bg-gray-50 text-gray-300 hover:bg-gray-100 hover:text-gray-400 border border-dashed border-gray-200'
@@ -593,13 +627,10 @@ export default function ScheduleAssignPage() {
                               if (!pref) return null
                               if (pref.not_available) return (
                                 <div className="flex justify-center mt-0.5" title={`Không thể làm${pref.reason ? ': ' + pref.reason : ''}`}>
-                                  <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-error-400" />
                                 </div>
                               )
-                              const dots: { color: string; title: string }[] = []
-                              if (pref.morning_available) dots.push({ color: '#3B82F6', title: 'Sáng ✓' })
-                              if (pref.afternoon_available) dots.push({ color: '#F59E0B', title: 'Chiều ✓' })
-                              if (pref.evening_available) dots.push({ color: '#8B5CF6', title: 'Tối ✓' })
+                              const dots = getPrefDots(pref, selectedStoreId)
                               if (dots.length === 0) return null
                               return (
                                 <div className="flex justify-center gap-0.5 mt-0.5">
@@ -620,10 +651,10 @@ export default function ScheduleAssignPage() {
                   const weekOS = getOpenShiftsByStoreWeek(selectedStoreId, weekDates)
                   if (weekOS.length === 0) return null
                   return (
-                    <tr className="border-t-2 border-amber-200 bg-amber-50/50">
-                      <td className="p-2 pl-3 text-xs font-bold text-amber-700 sticky left-0 bg-amber-50 z-10 whitespace-nowrap">
+                    <tr className="border-t-2 border-warning-200 bg-warning-50/50">
+                      <td className="p-2 pl-3 text-xs font-bold text-warning-700 sticky left-0 bg-warning-50 z-10 whitespace-nowrap">
                         <div className="flex items-center gap-1">
-                          <Briefcase size={12} className="text-amber-500" />
+                          <Briefcase size={12} className="text-warning-500" />
                           Ca trống
                         </div>
                       </td>
@@ -632,7 +663,7 @@ export default function ScheduleAssignPage() {
                         if (dayOS.length === 0) return (
                           <td key={date} className="p-1">
                             <button onClick={() => { setShowCreateOS({ date }); setOsShift('shift-001'); setOsPosition('pos-001'); setOsSlots(1); setOsNote(''); setOsAutoApprove(false) }}
-                              className="w-full py-2 px-1 rounded-lg text-xs text-amber-300 hover:bg-amber-100 hover:text-amber-500 border border-dashed border-amber-200 transition-all">
+                              className="w-full py-2 px-1 rounded-lg text-xs text-warning-300 hover:bg-warning-100 hover:text-warning-500 border border-dashed border-warning-200 transition-all">
                               +
                             </button>
                           </td>
@@ -643,24 +674,59 @@ export default function ScheduleAssignPage() {
                               {dayOS.map(os => {
                                 const shift = getShiftById(os.shift_id)
                                 const remaining = os.slots_needed - os.slots_filled
+                                const stateMeta = getOpenShiftStateMeta(os)
+                                const openShiftTone = os.status === 'filled'
+                                  ? 'bg-success-50 text-success-600 border-success-200'
+                                  : os.status === 'cancelled'
+                                    ? 'bg-slate-100 text-slate-600 border-slate-200'
+                                    : 'bg-warning-100 text-warning-700 border-warning-300 hover:bg-warning-200'
                                 return (
                                   <div key={os.id}
-                                    className={`py-1.5 px-1 rounded-lg text-[9px] font-bold text-center cursor-pointer border transition-all ${
-                                      os.status === 'filled'
-                                        ? 'bg-green-50 text-green-600 border-green-200'
-                                        : 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200'
+                                    className={`py-1.5 px-1 rounded-lg text-[9px] font-bold text-center border transition-all ${openShiftTone} ${
+                                      os.status === 'open' ? 'cursor-pointer' : 'cursor-default'
                                     }`}
                                     onClick={() => {
-                                      if (os.status === 'open') { setShowCreateOS({ date }); setOsShift(os.shift_id); setOsPosition(os.position_id); setOsSlots(os.slots_needed); setOsNote(os.note) }
+                                      if (os.status === 'open') {
+                                        setShowCreateOS({ date })
+                                        setOsShift(os.shift_id)
+                                        setOsPosition(os.position_id)
+                                        setOsSlots(os.slots_needed)
+                                        setOsNote(os.note)
+                                        setOsAutoApprove(os.auto_approve)
+                                      }
                                     }}
-                                    title={os.note || 'Ca trống'}>
-                                    <div style={{ color: shift?.color }}>{shift?.name?.replace('Ca ', '') || '?'}</div>
-                                    <div>{os.status === 'filled' ? '✓ Đủ' : `${remaining}/${os.slots_needed}`}</div>
+                                    title={os.note ? `${os.note} | ${stateMeta.detail}` : stateMeta.detail}>
+                                    <div className="flex items-start justify-between gap-1">
+                                      <div className="min-w-0 text-left">
+                                        <div style={{ color: shift?.color }}>{shift?.name?.replace('Ca ', '') || '?'}</div>
+                                        <div className="text-[8px] font-medium leading-tight">{stateMeta.label}</div>
+                                      </div>
+                                      {os.status === 'open' && (
+                                        <button
+                                          type="button"
+                                          onClick={event => {
+                                            event.stopPropagation()
+                                            handleCancelOpenShift(os.id)
+                                          }}
+                                          className="rounded-md border border-error-200 bg-white/80 px-1.5 py-0.5 text-[8px] font-bold text-error-600 hover:bg-error-50"
+                                          title="Huy ca trong"
+                                        >
+                                          Huy
+                                        </button>
+                                      )}
+                                    </div>
+                                    <div className="mt-1">
+                                      {os.status === 'filled'
+                                        ? 'Du nguoi'
+                                        : os.status === 'cancelled'
+                                          ? 'Da huy'
+                                          : `${remaining}/${os.slots_needed}`}
+                                    </div>
                                   </div>
                                 )
                               })}
                               <button onClick={() => { setShowCreateOS({ date }); setOsShift('shift-001'); setOsPosition('pos-001'); setOsSlots(1); setOsNote(''); setOsAutoApprove(false) }}
-                                className="w-full py-0.5 text-[9px] text-amber-300 hover:text-amber-500 transition-colors">+</button>
+                                className="w-full py-0.5 text-[9px] text-warning-300 hover:text-warning-500 transition-colors">+</button>
                             </div>
                           </td>
                         )
@@ -696,12 +762,12 @@ export default function ScheduleAssignPage() {
             <p className="text-lg font-bold text-primary-700">{totalAssigned}</p>
             <p className="text-xs text-gray-500">Ca đã xếp</p>
           </div>
-          <div className="bg-amber-50 rounded-xl p-3 text-center">
-            <p className="text-lg font-bold text-amber-700">{Math.round(totalHours)}</p>
+          <div className="bg-warning-50 rounded-xl p-3 text-center">
+            <p className="text-lg font-bold text-warning-700">{Math.round(totalHours)}</p>
             <p className="text-xs text-gray-500">Giờ công</p>
           </div>
-          <div className="bg-red-50 rounded-xl p-3 text-center">
-            <p className="text-lg font-bold text-red-500">{unassigned}</p>
+          <div className="bg-error-50 rounded-xl p-3 text-center">
+            <p className="text-lg font-bold text-error-500">{unassigned}</p>
             <p className="text-xs text-gray-500">Chưa có ca</p>
           </div>
         </div>
@@ -732,9 +798,9 @@ export default function ScheduleAssignPage() {
             {editShift && (() => {
               const warning = validateAssignment(editCell.empId, editCell.date, editShift)
               return warning ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-amber-500 shrink-0" />
-                  <p className="text-xs text-amber-700">{warning}</p>
+                <div className="bg-warning-50 border border-warning-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-warning-500 shrink-0" />
+                  <p className="text-xs text-warning-700">{warning}</p>
                 </div>
               ) : null
             })()}
@@ -954,13 +1020,29 @@ export default function ScheduleAssignPage() {
             <button
               onClick={() => {
                 if (!user) return
-                createOpenShift(selectedStoreId, osShift, showCreateOS.date, osPosition, osSlots, osNote, osAutoApprove, user.id)
+                const created = createOpenShift(selectedStoreId, osShift, showCreateOS.date, osPosition, osSlots, osNote, osAutoApprove, user.id)
+                const shift = getShiftById(osShift)
+                const store = getStoreById(selectedStoreId)
+                const position = getPositionById(osPosition)
+                notifyOpenShiftCreated({
+                  openShiftId: created.id,
+                  storeId: selectedStoreId,
+                  storeName: store?.name || '',
+                  shiftId: osShift,
+                  shiftName: shift?.name || 'Ca làm',
+                  startTime: shift?.start_time || '',
+                  endTime: shift?.end_time || '',
+                  date: showCreateOS.date,
+                  positionId: osPosition,
+                  positionName: position?.name || '',
+                  createdByName: user.full_name,
+                })
                 setShowCreateOS(null)
                 setRefreshKey(k => k + 1)
                 setToast('\u2705 \u0110\u00e3 \u0111\u0103ng ca tr\u1ed1ng')
                 setTimeout(() => setToast(null), 2000)
               }}
-              className="w-full py-3 rounded-xl bg-amber-500 text-white text-sm font-bold shadow-md active:scale-[0.97] transition-transform flex items-center justify-center gap-2">
+              className="w-full py-3 rounded-xl bg-warning-500 text-white text-sm font-bold shadow-md active:scale-[0.97] transition-transform flex items-center justify-center gap-2">
               <Briefcase size={16} /> Đăng ca trống
             </button>
           </div>
@@ -973,11 +1055,11 @@ export default function ScheduleAssignPage() {
           <div className="bg-white rounded-t-3xl w-full max-w-lg p-5 space-y-4 animate-slide-up" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                pendingWarnings.some(w => w.warning_level === 'block') ? 'bg-red-100' : 'bg-amber-100'
+                pendingWarnings.some(w => w.warning_level === 'block') ? 'bg-error-100' : 'bg-warning-100'
               }`}>
                 {pendingWarnings.some(w => w.warning_level === 'block')
-                  ? <ShieldAlert size={20} className="text-red-600" />
-                  : <AlertTriangle size={20} className="text-amber-600" />
+                  ? <ShieldAlert size={20} className="text-error-600" />
+                  : <AlertTriangle size={20} className="text-warning-600" />
                 }
               </div>
               <div>
@@ -989,13 +1071,13 @@ export default function ScheduleAssignPage() {
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {pendingWarnings.map((w, i) => (
                 <div key={i} className={`rounded-xl p-3 border ${
-                  w.warning_level === 'block' ? 'bg-red-50 border-red-200' :
-                  w.warning_level === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
+                  w.warning_level === 'block' ? 'bg-error-50 border-error-200' :
+                  w.warning_level === 'warning' ? 'bg-warning-50 border-warning-200' : 'bg-primary-50 border-primary-200'
                 }`}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
-                      w.warning_level === 'block' ? 'bg-red-200 text-red-700' :
-                      w.warning_level === 'warning' ? 'bg-amber-200 text-amber-700' : 'bg-blue-200 text-blue-700'
+                      w.warning_level === 'block' ? 'bg-error-200 text-error-700' :
+                      w.warning_level === 'warning' ? 'bg-warning-200 text-warning-700' : 'bg-primary-200 text-primary-700'
                     }`}>
                       {w.warning_level === 'block' ? 'CHẶN' : w.warning_level === 'warning' ? 'CẢNH BÁO' : 'THÔNG TIN'}
                     </span>
@@ -1012,12 +1094,12 @@ export default function ScheduleAssignPage() {
               </button>
               {!pendingWarnings.some(w => w.warning_level === 'block') && (
                 <button onClick={handleForceAssign}
-                  className="flex-1 py-3 rounded-xl bg-amber-500 text-white text-sm font-bold shadow-sm active:scale-[0.97] transition-transform flex items-center justify-center gap-2">
+                  className="flex-1 py-3 rounded-xl bg-warning-500 text-white text-sm font-bold shadow-sm active:scale-[0.97] transition-transform flex items-center justify-center gap-2">
                   <AlertTriangle size={14} /> Vẫn xếp ca
                 </button>
               )}
               {pendingWarnings.some(w => w.warning_level === 'block') && (
-                <div className="flex-1 py-3 rounded-xl bg-red-100 text-red-500 text-sm font-bold text-center flex items-center justify-center gap-2">
+                <div className="flex-1 py-3 rounded-xl bg-error-100 text-error-500 text-sm font-bold text-center flex items-center justify-center gap-2">
                   <ShieldAlert size={14} /> Không thể xếp
                 </div>
               )}

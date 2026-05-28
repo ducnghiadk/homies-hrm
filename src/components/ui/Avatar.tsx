@@ -19,21 +19,21 @@ const sizeStyles = {
 }
 
 const statusColors = {
-  online: 'bg-green-500',
+  online: 'bg-success-500',
   offline: 'bg-gray-400',
-  busy: 'bg-red-500',
-  away: 'bg-amber-500',
+  busy: 'bg-error-500',
+  away: 'bg-warning-500',
 }
 
 /* ── Avatar color palette — deterministic per name ── */
 const AVATAR_COLORS = [
-  { bg: 'bg-blue-100',    text: 'text-blue-700'    },
+  { bg: 'bg-primary-100',    text: 'text-primary-700'    },
   { bg: 'bg-emerald-100', text: 'text-emerald-700' },
   { bg: 'bg-violet-100',  text: 'text-violet-700'  },
-  { bg: 'bg-amber-100',   text: 'text-amber-700'   },
+  { bg: 'bg-warning-100',   text: 'text-warning-700'   },
   { bg: 'bg-rose-100',    text: 'text-rose-700'    },
   { bg: 'bg-cyan-100',    text: 'text-cyan-700'    },
-  { bg: 'bg-orange-100',  text: 'text-orange-700'  },
+  { bg: 'bg-warning-100',  text: 'text-warning-700'  },
   { bg: 'bg-pink-100',    text: 'text-pink-700'    },
 ] as const
 

@@ -174,10 +174,10 @@ export const mockCareerProgress = [
 
 // BSC categories
 export const bscCategories = [
-  { key: 'financial', label: 'Tài chính', icon: '💰', color: '#3b82f6' },
-  { key: 'customer', label: 'Khách hàng', icon: '👥', color: '#10b981' },
-  { key: 'process', label: 'Quy trình', icon: '⚙️', color: '#f59e0b' },
-  { key: 'learning', label: 'Học hỏi', icon: '📚', color: '#8b5cf6' },
+  { key: 'financial', label: 'Tài chính', icon: '💰', color: '#2F6FA8' },
+  { key: 'customer', label: 'Khách hàng', icon: '👥', color: '#1E9E57' },
+  { key: 'process', label: 'Quy trình', icon: '⚙️', color: '#F6C85F' },
+  { key: 'learning', label: 'Học hỏi', icon: '📚', color: '#001D3D' },
 ]
 
 // Helper

@@ -62,13 +62,6 @@ function calculateHourlyDemand(
     
     // Staff needed
     const staffNeeded = Math.ceil(cupsPerHour / PRODUCTIVITY); // Barista only for now
-    // Always adding 1 cashier/support if load > 25 (1 person can't do all)
-    // Actually simplicity: 1 staff can handle 25 cups.
-    // +1 fixed cashier?
-    // Let's stick to requirement "Barista + 1 Cashier" roughly
-    // We will calculate TOTAL staff needed.
-    // If < 20 cups/hr, 2 staff min (1 make, 1 cashier/serve) usually
-    // Let's use max(2, staffNeeded + 1) for safety, or just staffNeeded if small
     
     const totalNeeded = Math.max(2, staffNeeded + 1); // 1 Service/Cashier + Baristas
 
@@ -83,10 +76,6 @@ function calculateHourlyDemand(
 }
 
 function getSalary(role: 'Barista' | 'Cashier' | 'Helper' | 'Manager', type: 'FT' | 'PT', config: SalaryConfig[]): number {
-  // Map simplified roles to Config IDs
-  // In real app, we would map IDs dynamically. Here we use name matching or type matching
-  // Config usually has: Barista, Cashier, Helper, Manager
-  // Let's try to find by name includes
   const mapName = {
     'Barista': 'Pha chế',
     'Cashier': 'Thu ngân',
@@ -99,17 +88,14 @@ function getSalary(role: 'Barista' | 'Cashier' | 'Helper' | 'Manager', type: 'FT
 }
 
 function createSlot(
-  role: string,
+  role: 'Barista' | 'Cashier' | 'Helper' | 'Manager',
   type: 'FT' | 'PT',
   start: number,
   end: number,
   config: SalaryConfig[]
 ): StaffSlot {
   const hours = end - start;
-  // Calculate cost
-  // PT: hourly * hours * 30 days
-  // FT: monthly
-  const salary = getSalary(role as any, type, config);
+  const salary = getSalary(role, type, config);
   let monthlyCost = 0;
   if (type === 'FT') monthlyCost = salary;
   else monthlyCost = salary * hours * 30; // approx
@@ -126,34 +112,21 @@ function createSlot(
 
 // PLAN A: STABLE (Maximize FT)
 function generatePlanA(demand: number[], config: SalaryConfig[], open: number, close: number): OptimizationPlan {
-  // Strategy: 2 FT shifts covering the whole day.
-  // Shift 1: Open -> Open+8
-  // Shift 2: Close-8 -> Close
-  // Overlap in middle
-  
   const ft: StaffSlot[] = [];
   const pt: StaffSlot[] = [];
 
   // Core Team: 1 Cashier Open-Close (2 FT), 1 Barista Open-Close (2 FT)
-  // Total 4 FT Base
   ft.push(createSlot('Cashier', 'FT', open, open + 8, config));
   ft.push(createSlot('Cashier', 'FT', close - 8, close, config));
   ft.push(createSlot('Barista', 'FT', open, open + 8, config));
   ft.push(createSlot('Barista', 'FT', close - 8, close, config));
 
-  // Check demand coverage
-  // If demand > 2 anywhere, add PT
-  // Simple check for peak
   const maxDemand = Math.max(...demand);
   if (maxDemand > 2) {
-    // Add PT Helper for peak
-    // Find peak hours
-    // Simplified: 11-14, 18-21 usually
-    // Let's add 1 PT for peak
     pt.push(createSlot('Helper', 'PT', 17, 21, config)); // Evening peak
   }
 
-  const totalCost = calculateHourlyCost([...ft, ...pt]); // helper sums monthlyCost
+  const totalCost = calculateHourlyCost([...ft, ...pt]);
 
   return {
     id: 'A',
@@ -170,23 +143,15 @@ function generatePlanA(demand: number[], config: SalaryConfig[], open: number, c
 
 // PLAN B: SAVING (Maximize PT)
 function generatePlanB(demand: number[], config: SalaryConfig[], open: number, close: number): OptimizationPlan {
-  // Strategy: 1 FT Manager/Key holder. Rest PT.
   const ft: StaffSlot[] = [];
   const pt: StaffSlot[] = [];
 
   // 1-2 FT Key
   ft.push(createSlot('Manager', 'FT', open, open + 8, config));
   
-  // Fill rest with PT based on demand
-  // Morning PT: Open -> 12
-  // Noon PT: 11 -> 15
-  // Afternoon PT: 14 -> 18
-  // Evening PT: 17 -> Close
-  pt.push(createSlot('Cashier', 'PT', open, open + 5, config)); // 7-12
+  pt.push(createSlot('Cashier', 'PT', open, open + 5, config));
   pt.push(createSlot('Barista', 'PT', open, open + 5, config));
-  
-  pt.push(createSlot('Helper', 'PT', 11, 15, config)); // Peak
-  
+  pt.push(createSlot('Helper', 'PT', 11, 15, config));
   pt.push(createSlot('Cashier', 'PT', 17, close, config));
   pt.push(createSlot('Barista', 'PT', 17, close, config));
 
@@ -208,19 +173,15 @@ function generatePlanB(demand: number[], config: SalaryConfig[], open: number, c
 
 // PLAN C: BALANCED (Proposed)
 function generatePlanC(demand: number[], config: SalaryConfig[], open: number, close: number): OptimizationPlan {
-  // Strategy: 3 FT (Cover Open/Close/Mid), PT for Peaks
-  // Typical: 1 FT Open, 1 FT Close, 1 FT Mid (Swing)
   const ft: StaffSlot[] = [];
   const pt: StaffSlot[] = [];
 
   ft.push(createSlot('Barista', 'FT', open, open + 8, config));
   ft.push(createSlot('Cashier', 'FT', close - 8, close, config));
-  // Swing shift FT (11-19)
   ft.push(createSlot('Barista', 'FT', 11, 19, config));
 
-  // PT support
-  pt.push(createSlot('Helper', 'PT', 18, 22, config)); // Late peak
-  pt.push(createSlot('Cashier', 'PT', 11, 14, config)); // Noon peak
+  pt.push(createSlot('Helper', 'PT', 18, 22, config));
+  pt.push(createSlot('Cashier', 'PT', 11, 14, config));
 
   const totalCost = calculateHourlyCost([...ft, ...pt]);
 

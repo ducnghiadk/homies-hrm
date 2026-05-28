@@ -1,4 +1,5 @@
 import { Coffee, ShoppingBag, Smartphone } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { BusinessModel } from '@/lib/staffing/types';
 
 interface BusinessModelSelectorProps {
@@ -7,7 +8,7 @@ interface BusinessModelSelectorProps {
 }
 
 export default function BusinessModelSelector({ value, onChange }: BusinessModelSelectorProps) {
-  const options: { id: BusinessModel; label: string; icon: any }[] = [
+  const options: { id: BusinessModel; label: string; icon: LucideIcon }[] = [
     { id: 'dine-in', label: 'Tại quán', icon: Coffee },
     { id: 'takeaway', label: 'Mang đi', icon: ShoppingBag },
     { id: 'app-delivery', label: 'App + Mang đi', icon: Smartphone },

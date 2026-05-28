@@ -82,7 +82,7 @@ export function ListItem({
                 className="
                 w-10 h-10 rounded-full
                 flex items-center justify-center
-                bg-blue-100 text-blue-600
+                bg-primary-100 text-primary-600
                 text-sm font-medium
               "
               >

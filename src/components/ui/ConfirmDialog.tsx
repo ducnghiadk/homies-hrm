@@ -18,32 +18,33 @@ interface ConfirmDialogProps {
   reasonPlaceholder?: string
   reasonRequired?: boolean
   isLoading?: boolean
+  initialReason?: string
 }
 
 const VARIANT_CONFIG = {
   default: {
     icon: Info,
-    iconBg: 'bg-blue-100',
-    iconColor: 'text-blue-600',
+    iconBg: 'bg-primary-100',
+    iconColor: 'text-primary-600',
     confirmBg: 'bg-primary-500 hover:bg-primary-600',
   },
   danger: {
     icon: Trash2,
-    iconBg: 'bg-red-100',
-    iconColor: 'text-red-600',
-    confirmBg: 'bg-red-500 hover:bg-red-600',
+    iconBg: 'bg-error-100',
+    iconColor: 'text-error-600',
+    confirmBg: 'bg-error-500 hover:bg-error-600',
   },
   warning: {
     icon: AlertTriangle,
-    iconBg: 'bg-amber-100',
-    iconColor: 'text-amber-600',
-    confirmBg: 'bg-amber-500 hover:bg-amber-600',
+    iconBg: 'bg-warning-100',
+    iconColor: 'text-warning-600',
+    confirmBg: 'bg-warning-500 hover:bg-warning-600',
   },
   success: {
     icon: CheckCircle,
-    iconBg: 'bg-green-100',
-    iconColor: 'text-green-600',
-    confirmBg: 'bg-green-500 hover:bg-green-600',
+    iconBg: 'bg-success-100',
+    iconColor: 'text-success-600',
+    confirmBg: 'bg-success-500 hover:bg-success-600',
   },
 }
 
@@ -61,8 +62,9 @@ export function ConfirmDialog({
   reasonPlaceholder = 'Nhập lý do...',
   reasonRequired = false,
   isLoading = false,
+  initialReason = '',
 }: ConfirmDialogProps) {
-  const [reason, setReason] = useState('')
+  const [reason, setReason] = useState(initialReason)
   const config = VARIANT_CONFIG[variant]
   const Icon = config.icon
 
@@ -120,7 +122,7 @@ export function ConfirmDialog({
             <div className="px-5 pb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 {reasonLabel}
-                {reasonRequired && <span className="text-red-500 ml-1">*</span>}
+                {reasonRequired && <span className="text-error-500 ml-1">*</span>}
               </label>
               <textarea
                 value={reason}

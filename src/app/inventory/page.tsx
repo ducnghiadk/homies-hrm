@@ -9,7 +9,7 @@ import {
   mockIngredients, mockStockHistory, INGREDIENT_CATEGORIES,
   getLowStockItems, formatVND
 } from '@/lib/mock-data-p4'
-import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search } from 'lucide-react'
+import { AlertTriangle, TrendingDown, TrendingUp, Plus, Search } from 'lucide-react'
 
 export default function InventoryPage() {
   const { user, isAuthenticated } = useAuthStore()

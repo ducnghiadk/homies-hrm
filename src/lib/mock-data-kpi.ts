@@ -16,23 +16,23 @@ import type {
 
 export const mockKPICategories: KPICategory[] = [
   // ── Option A (L0-L1): 4 categories ──
-  { id: 'cat-a1', name: 'Chuyên cần', name_en: 'Attendance', type: 'auto', weight: 25, option_type: 'A', evaluators: ['self', 'manager'], icon: '📅', color: '#3b82f6', sort_order: 1, is_active: true },
-  { id: 'cat-a2', name: 'Thái độ', name_en: 'Attitude', type: 'manual', weight: 25, option_type: 'A', evaluators: ['self', 'mentor', 'manager'], icon: '😊', color: '#10b981', sort_order: 2, is_active: true },
-  { id: 'cat-a3', name: 'Năng lực', name_en: 'Competence', type: 'manual', weight: 25, option_type: 'A', evaluators: ['self', 'mentor', 'manager'], icon: '💪', color: '#f59e0b', sort_order: 3, is_active: true },
-  { id: 'cat-a4', name: 'Lỗi vi phạm', name_en: 'Violations', type: 'deduction', weight: 25, option_type: 'A', evaluators: ['manager'], icon: '⚠️', color: '#ef4444', sort_order: 4, is_active: true },
+  { id: 'cat-a1', name: 'Chuyên cần', name_en: 'Attendance', type: 'auto', weight: 25, option_type: 'A', evaluators: ['self', 'manager'], icon: '📅', color: '#2F6FA8', sort_order: 1, is_active: true },
+  { id: 'cat-a2', name: 'Thái độ', name_en: 'Attitude', type: 'manual', weight: 25, option_type: 'A', evaluators: ['self', 'mentor', 'manager'], icon: '😊', color: '#1E9E57', sort_order: 2, is_active: true },
+  { id: 'cat-a3', name: 'Năng lực', name_en: 'Competence', type: 'manual', weight: 25, option_type: 'A', evaluators: ['self', 'mentor', 'manager'], icon: '💪', color: '#F6C85F', sort_order: 3, is_active: true },
+  { id: 'cat-a4', name: 'Lỗi vi phạm', name_en: 'Violations', type: 'deduction', weight: 25, option_type: 'A', evaluators: ['manager'], icon: '⚠️', color: '#D9381E', sort_order: 4, is_active: true },
 
   // ── Option B (L2-L3): 5 categories ──
-  { id: 'cat-b1', name: 'Chuyên cần', name_en: 'Attendance', type: 'auto', weight: 20, option_type: 'B', evaluators: ['self', 'manager'], icon: '📅', color: '#3b82f6', sort_order: 1, is_active: true },
-  { id: 'cat-b2', name: 'Thái độ', name_en: 'Attitude', type: 'manual', weight: 20, option_type: 'B', evaluators: ['self', 'leader', 'manager'], icon: '😊', color: '#10b981', sort_order: 2, is_active: true },
-  { id: 'cat-b3', name: 'Năng lực', name_en: 'Competence', type: 'manual', weight: 25, option_type: 'B', evaluators: ['self', 'senior', 'manager'], icon: '💪', color: '#f59e0b', sort_order: 3, is_active: true },
-  { id: 'cat-b4', name: 'Hỗ trợ & Đào tạo', name_en: 'Support & Training', type: 'manual', weight: 15, option_type: 'B', evaluators: ['self', 'peer', 'manager'], icon: '🤝', color: '#8b5cf6', sort_order: 4, is_active: true },
-  { id: 'cat-b5', name: 'Lỗi vi phạm', name_en: 'Violations', type: 'deduction', weight: 20, option_type: 'B', evaluators: ['manager'], icon: '⚠️', color: '#ef4444', sort_order: 5, is_active: true },
+  { id: 'cat-b1', name: 'Chuyên cần', name_en: 'Attendance', type: 'auto', weight: 20, option_type: 'B', evaluators: ['self', 'manager'], icon: '📅', color: '#2F6FA8', sort_order: 1, is_active: true },
+  { id: 'cat-b2', name: 'Thái độ', name_en: 'Attitude', type: 'manual', weight: 20, option_type: 'B', evaluators: ['self', 'leader', 'manager'], icon: '😊', color: '#1E9E57', sort_order: 2, is_active: true },
+  { id: 'cat-b3', name: 'Năng lực', name_en: 'Competence', type: 'manual', weight: 25, option_type: 'B', evaluators: ['self', 'senior', 'manager'], icon: '💪', color: '#F6C85F', sort_order: 3, is_active: true },
+  { id: 'cat-b4', name: 'Hỗ trợ & Đào tạo', name_en: 'Support & Training', type: 'manual', weight: 15, option_type: 'B', evaluators: ['self', 'peer', 'manager'], icon: '🤝', color: '#001D3D', sort_order: 4, is_active: true },
+  { id: 'cat-b5', name: 'Lỗi vi phạm', name_en: 'Violations', type: 'deduction', weight: 20, option_type: 'B', evaluators: ['manager'], icon: '⚠️', color: '#D9381E', sort_order: 5, is_active: true },
 
   // ── Option C (L4-L5): 4 categories ──
-  { id: 'cat-c1', name: 'Chuyên cần', name_en: 'Attendance', type: 'auto', weight: 10, option_type: 'C', evaluators: ['self', 'ceo'], icon: '📅', color: '#3b82f6', sort_order: 1, is_active: true },
+  { id: 'cat-c1', name: 'Chuyên cần', name_en: 'Attendance', type: 'auto', weight: 10, option_type: 'C', evaluators: ['self', 'ceo'], icon: '📅', color: '#2F6FA8', sort_order: 1, is_active: true },
   { id: 'cat-c2', name: 'Quản lý', name_en: 'Management', type: 'manual', weight: 35, option_type: 'C', evaluators: ['self', 'ceo', 'peer'], icon: '👔', color: '#0ea5e9', sort_order: 2, is_active: true },
-  { id: 'cat-c3', name: 'Kết quả team', name_en: 'Team Results', type: 'manual', weight: 35, option_type: 'C', evaluators: ['self', 'ceo'], icon: '📊', color: '#10b981', sort_order: 3, is_active: true },
-  { id: 'cat-c4', name: 'Lỗi vi phạm', name_en: 'Violations', type: 'deduction', weight: 20, option_type: 'C', evaluators: ['ceo'], icon: '⚠️', color: '#ef4444', sort_order: 4, is_active: true },
+  { id: 'cat-c3', name: 'Kết quả team', name_en: 'Team Results', type: 'manual', weight: 35, option_type: 'C', evaluators: ['self', 'ceo'], icon: '📊', color: '#1E9E57', sort_order: 3, is_active: true },
+  { id: 'cat-c4', name: 'Lỗi vi phạm', name_en: 'Violations', type: 'deduction', weight: 20, option_type: 'C', evaluators: ['ceo'], icon: '⚠️', color: '#D9381E', sort_order: 4, is_active: true },
 ]
 
 // ══════════════════════════════════════
@@ -127,11 +127,11 @@ export const mockViolationTypes: ViolationType[] = [
 // ══════════════════════════════════════
 
 export const mockKPIGrades: KPIGrade[] = [
-  { id: 'grade-1', code: 'excellent', name: 'Xuất sắc', name_en: 'Excellent', min_score: 95, max_score: 100, color: '#10b981', icon: '🏆', promotion_eligible: true, sort_order: 1 },
-  { id: 'grade-2', code: 'good', name: 'Tốt', name_en: 'Good', min_score: 85, max_score: 94, color: '#3b82f6', icon: '⭐', promotion_eligible: true, sort_order: 2 },
-  { id: 'grade-3', code: 'fair', name: 'Khá', name_en: 'Fair', min_score: 75, max_score: 84, color: '#f59e0b', icon: '👍', promotion_eligible: false, sort_order: 3 },
+  { id: 'grade-1', code: 'excellent', name: 'Xuất sắc', name_en: 'Excellent', min_score: 95, max_score: 100, color: '#1E9E57', icon: '🏆', promotion_eligible: true, sort_order: 1 },
+  { id: 'grade-2', code: 'good', name: 'Tốt', name_en: 'Good', min_score: 85, max_score: 94, color: '#2F6FA8', icon: '⭐', promotion_eligible: true, sort_order: 2 },
+  { id: 'grade-3', code: 'fair', name: 'Khá', name_en: 'Fair', min_score: 75, max_score: 84, color: '#F6C85F', icon: '👍', promotion_eligible: false, sort_order: 3 },
   { id: 'grade-4', code: 'average', name: 'Trung bình', name_en: 'Average', min_score: 60, max_score: 74, color: '#f97316', icon: '📋', promotion_eligible: false, sort_order: 4 },
-  { id: 'grade-5', code: 'poor', name: 'Yếu', name_en: 'Poor', min_score: 0, max_score: 59, color: '#ef4444', icon: '⚡', promotion_eligible: false, sort_order: 5 },
+  { id: 'grade-5', code: 'poor', name: 'Yếu', name_en: 'Poor', min_score: 0, max_score: 59, color: '#D9381E', icon: '⚡', promotion_eligible: false, sort_order: 5 },
 ]
 
 // ══════════════════════════════════════

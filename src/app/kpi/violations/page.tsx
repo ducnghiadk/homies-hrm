@@ -56,7 +56,7 @@ export default function ViolationsPage() {
           <div className="flex gap-2">
             <Link href="/kpi/violations/log"
               className="flex-1 py-2 rounded-xl text-xs font-bold text-white text-center flex items-center justify-center gap-1 no-underline"
-              style={{ background: '#ef4444' }}>
+              style={{ background: '#D9381E' }}>
               <Plus size={14} /> Log lỗi
             </Link>
             <Link href="/kpi/violations/appeals"

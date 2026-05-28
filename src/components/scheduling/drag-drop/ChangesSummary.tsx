@@ -70,11 +70,11 @@ export default function ChangesSummary({ originalShifts, currentShifts }: Change
   if (changes.length === 0) return null
 
   const typeIcon: Record<Change['type'], React.ReactNode> = {
-    moved: <ArrowLeftRight size={12} className="text-blue-500" />,
-    resized: <ArrowUpDown size={12} className="text-purple-500" />,
-    swapped: <RefreshCw size={12} className="text-orange-500" />,
-    deleted: <Trash2 size={12} className="text-red-500" />,
-    added: <Plus size={12} className="text-green-500" />,
+    moved: <ArrowLeftRight size={12} className="text-primary-500" />,
+    resized: <ArrowUpDown size={12} className="text-primary-500" />,
+    swapped: <RefreshCw size={12} className="text-warning-500" />,
+    deleted: <Trash2 size={12} className="text-error-500" />,
+    added: <Plus size={12} className="text-success-500" />,
   }
 
   return (

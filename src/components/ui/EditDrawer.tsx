@@ -37,7 +37,7 @@ export default function EditDrawer({
   preventClose = false,
 }: EditDrawerProps) {
   const [showDirtyWarning, setShowDirtyWarning] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
+  const [isMounted, setIsMounted] = useState(isOpen)
   const drawerRef = useRef<HTMLDivElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const titleId = useId()
@@ -46,7 +46,6 @@ export default function EditDrawer({
   useEffect(() => {
     if (isOpen) {
       previousFocusRef.current = document.activeElement as HTMLElement
-      setIsMounted(true)
       // Focus the drawer after animation
       const timer = setTimeout(() => {
         drawerRef.current?.focus()
@@ -223,7 +222,7 @@ export default function EditDrawer({
                   setShowDirtyWarning(false)
                   onClose()
                 }}
-                className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                className="px-4 py-2 text-sm font-medium text-error-600 hover:bg-error-50 rounded-xl transition-colors"
               >
                 Hủy thay đổi
               </button>

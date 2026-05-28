@@ -5,13 +5,7 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/store/auth-store'
 import AppShell from '@/components/layout/AppShell'
-import { getStoreById, getShiftById } from '@/lib/mock-data'
-import { getTodaySchedule } from '@/lib/mock-data-home'
-import {
-  checkinToday,
-  checkoutToday,
-  getTodayCheckin,
-} from '@/lib/mock-data-checkin'
+import { getStoreById, getShiftById, type Attendance } from '@/lib/mock-data'
 import { saveOfflineCheckin, syncPendingCheckins, getPendingCount } from '@/lib/offline-checkin'
 import { matchStoreWifi } from '@/lib/mock-data-wifi'
 import { isEmployeeOnLeave } from '@/lib/leave-attendance-sync'
@@ -23,6 +17,9 @@ import {
   CheckCircle2, LogIn, LogOut, Loader2, WifiOff, CloudOff, Wifi,
 } from 'lucide-react'
 import WifiSimulator from '@/components/checkin/WifiSimulator'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { ScheduleService } from '@/lib/services/schedule-service'
+import { AttendanceService } from '@/lib/services/attendance-service'
 
 // Dynamically import Leaflet map (no SSR — uses window)
 const CheckinMap = dynamic(() => import('@/components/checkin/CheckinMap'), {
@@ -37,27 +34,59 @@ const CheckinMap = dynamic(() => import('@/components/checkin/CheckinMap'), {
 type PageStatus = 'locating' | 'gps_error' | 'in_range' | 'out_range' | 'checked_in' | 'checked_out'
 
 export default function CheckInPage() {
+  return (
+    <ProtectedRoute>
+      <CheckInPageContent />
+    </ProtectedRoute>
+  )
+}
+
+function CheckInPageContent() {
   const { user } = useAuthStore()
   const router = useRouter()
-
   const isOnline = useNetworkStatus()
 
-  const [status, setStatus] = useState<PageStatus>('locating')
+  const currentUser = user!
+  const store = getStoreById(currentUser.store_id)
+
+  const [checkinRecord, setCheckinRecord] = useState<Attendance | null>(() => {
+    if (typeof window === 'undefined') return null
+    AttendanceService.syncLiveCheckinsToMock()
+    return AttendanceService.getTodayCheckin(currentUser.id) || null
+  })
+
+  const [status, setStatus] = useState<PageStatus>(() => {
+    if (typeof window === 'undefined') return 'locating'
+    AttendanceService.syncLiveCheckinsToMock()
+    const existing = AttendanceService.getTodayCheckin(currentUser.id)
+    if (existing) {
+      return existing.check_out_time ? 'checked_out' : 'checked_in'
+    }
+    return 'locating'
+  })
+
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null)
   const [distance, setDistance] = useState<number | null>(null)
-  const [checkinRecord, setCheckinRecord] = useState(user ? getTodayCheckin(user.id) : undefined)
   const [toast, setToast] = useState<string | null>(null)
-  const [noSchedule, setNoSchedule] = useState(false)
+
+  const [pendingCount, setPendingCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0
+    return getPendingCount(currentUser.id)
+  })
   const [isOfflineCheckin, setIsOfflineCheckin] = useState(false)
-  const [pendingCount, setPendingCount] = useState(0)
+
   const [simulatedWifi, setSimulatedWifi] = useState<{ ssid: string; bssid?: string } | null>(null)
   const [checkinMethod, setCheckinMethod] = useState<'gps' | 'wifi' | null>(null)
   const watchIdRef = useRef<number | null>(null)
   const prevOnlineRef = useRef(true)
 
-  const store = user ? getStoreById(user.store_id) : null
-  const todaySchedule = user ? getTodaySchedule(user.id) : null
+  const todayStr = new Date().toISOString().split('T')[0]
+  const todaySchedule = ScheduleService.getSchedulesForUser(currentUser, currentUser.id)
+    .filter(s => s.status === 'published' && ScheduleService.isWeekPublished(s.store_id, ScheduleService.getWeekStartDate(s.date)))
+    .find(s => s.date === todayStr)
   const shift = todaySchedule ? getShiftById(todaySchedule.shift_id) : null
+
+  const noSchedule = !todaySchedule
 
   // ─── WiFi verification ───
   const wifiMatch = store && simulatedWifi
@@ -66,23 +95,6 @@ export default function CheckInPage() {
   const wifiVerified = !!wifiMatch
   const gpsInRange = distance !== null && store ? distance <= store.checkin_radius_meters : false
   const canCheckin = wifiVerified || gpsInRange
-
-  // Check if already checked in/out from previous session
-  useEffect(() => {
-    if (!user) return
-    const existing = getTodayCheckin(user.id)
-    if (existing) {
-      setCheckinRecord(existing)
-      if (existing.check_out_time) {
-        setStatus('checked_out')
-      } else {
-        setStatus('checked_in')
-      }
-    }
-    if (!todaySchedule) setNoSchedule(true)
-    // Check pending offline checkins
-    setPendingCount(getPendingCount(user.id))
-  }, [user, todaySchedule])
 
   // GPS location tracking
   const startGPS = useCallback(() => {
@@ -103,7 +115,7 @@ export default function CheckInPage() {
         setDistance(distRounded)
 
         // Only update range status if not already checked in/out
-        const existing = user ? getTodayCheckin(user.id) : undefined
+        const existing = AttendanceService.getTodayCheckin(currentUser.id)
         if (!existing) {
           setStatus(distRounded <= store.checkin_radius_meters ? 'in_range' : 'out_range')
         }
@@ -127,20 +139,24 @@ export default function CheckInPage() {
       timeout: 10000,
       maximumAge: 5000,
     })
-  }, [store, user])
+  }, [store, currentUser.id, setStatus, setUserPos, setDistance])
 
   useEffect(() => {
     // Don't start GPS if already checked in/out
-    const existing = user ? getTodayCheckin(user.id) : undefined
+    const existing = AttendanceService.getTodayCheckin(currentUser.id)
+    let active = true
     if (!existing) {
-      startGPS()
+      setTimeout(() => {
+        if (active) startGPS()
+      }, 0)
     }
     return () => {
+      active = false
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current)
       }
     }
-  }, [startGPS, user])
+  }, [startGPS, currentUser.id])
 
   // ─── Auto-sync when back online ───
   useEffect(() => {
@@ -148,8 +164,16 @@ export default function CheckInPage() {
       // Just came back online — sync pending
       const result = syncPendingCheckins()
       if (result.synced > 0) {
-        setToast(`☁️ Đã đồng bộ ${result.synced} chấm công`)
-        setTimeout(() => setToast(null), 3000)
+        setTimeout(() => {
+          setToast(`☁️ Đã đồng bộ ${result.synced} chấm công`)
+          setPendingCount(getPendingCount(currentUser.id))
+          const existing = AttendanceService.getTodayCheckin(currentUser.id)
+          if (existing) {
+            setCheckinRecord(existing)
+            setStatus(existing.check_out_time ? 'checked_out' : 'checked_in')
+          }
+          setTimeout(() => setToast(null), 3000)
+        }, 0)
       }
       if (result.needsReview > 0) {
         setTimeout(() => {
@@ -157,14 +181,13 @@ export default function CheckInPage() {
           setTimeout(() => setToast(null), 4000)
         }, result.synced > 0 ? 3500 : 0)
       }
-      setPendingCount(getPendingCount(user?.id))
     }
     prevOnlineRef.current = isOnline
-  }, [isOnline, user?.id])
+  }, [isOnline, currentUser.id])
 
   // ─── Check-in handler ───
   const handleCheckin = () => {
-    if (!user || !store) return
+    if (!store) return
 
     // Must have WiFi match OR GPS in range
     if (!wifiVerified && !gpsInRange) {
@@ -174,8 +197,7 @@ export default function CheckInPage() {
     }
 
     // ── Validate leave status ──
-    const todayStr = new Date().toISOString().split('T')[0]
-    const leaveStatus = isEmployeeOnLeave(user.id, todayStr)
+    const leaveStatus = isEmployeeOnLeave(currentUser.id, todayStr)
     if (leaveStatus.onLeave) {
       setToast(`Không thể check-in: Bạn đang nghỉ phép (${leaveStatus.leaveType || 'leave'})`)
       setTimeout(() => setToast(null), 4000)
@@ -189,9 +211,9 @@ export default function CheckInPage() {
 
     if (isOnline) {
       // ── Online: write directly ──
-      const record = checkinToday(
-        user.id,
-        user.store_id,
+      const record = AttendanceService.checkinToday(
+        currentUser.id,
+        currentUser.store_id,
         userPos?.lat ?? store.latitude,
         userPos?.lng ?? store.longitude,
         method === 'wifi' ? 0 : (distance ?? 0),
@@ -206,7 +228,7 @@ export default function CheckInPage() {
         particleCount: 120,
         spread: 80,
         origin: { y: 0.6 },
-        colors: ['#3971B8', '#C8D69B', '#F6E6A5', '#10b981'],
+        colors: ['#3971B8', '#C8D69B', '#F6E6A5', '#1E9E57'],
       })
 
       setToast(`✅ Check-in thành công lúc ${timeStr}${method === 'wifi' ? ' (WiFi)' : ''}`)
@@ -217,8 +239,8 @@ export default function CheckInPage() {
     } else {
       // ── Offline: save to localStorage ──
       saveOfflineCheckin(
-        user.id,
-        user.store_id,
+        currentUser.id,
+        currentUser.store_id,
         userPos?.lat ?? store.latitude,
         userPos?.lng ?? store.longitude,
         method === 'wifi' ? 0 : (distance ?? 0),
@@ -227,13 +249,13 @@ export default function CheckInPage() {
       )
       setStatus('checked_in')
       setIsOfflineCheckin(true)
-      setPendingCount(getPendingCount(user.id))
+      setPendingCount(getPendingCount(currentUser.id))
 
       confetti({
         particleCount: 80,
         spread: 60,
         origin: { y: 0.6 },
-        colors: ['#f59e0b', '#d97706', '#fbbf24'],
+        colors: ['#F6C85F', '#d97706', '#fbbf24'],
       })
 
       setToast(`☁️ Check-in thành công lúc ${timeStr} (Chờ đồng bộ)`)
@@ -246,9 +268,9 @@ export default function CheckInPage() {
 
   // ─── Check-out handler ───
   const handleCheckout = () => {
-    if (!user || !userPos) return
+    if (!userPos) return
 
-    const record = checkoutToday(user.id, userPos.lat, userPos.lng)
+    const record = AttendanceService.checkoutToday(currentUser.id, userPos.lat, userPos.lng)
     if (!record) return
 
     setCheckinRecord(record)
@@ -262,8 +284,6 @@ export default function CheckInPage() {
       router.push('/')
     }, 3000)
   }
-
-  if (!user) return null
 
   return (
     <AppShell showNav={false} className="!max-w-none !px-0 !pt-0 h-screen overflow-hidden relative font-['Inter']">
@@ -290,7 +310,7 @@ export default function CheckInPage() {
 
       {/* ─── Offline banner ─── */}
       {!isOnline && (
-        <div className="absolute top-0 left-0 right-0 z-40 bg-amber-500 text-white text-xs font-medium text-center py-2 flex items-center justify-center gap-2 animate-fade-in">
+        <div className="absolute top-0 left-0 right-0 z-40 bg-warning-500 text-white text-xs font-medium text-center py-2 flex items-center justify-center gap-2 animate-fade-in">
           <WifiOff size={14} />
           Không có kết nối mạng — Offline mode
         </div>
@@ -307,9 +327,9 @@ export default function CheckInPage() {
         <h1 className="text-base font-bold text-dark-700 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-sm flex items-center gap-2">
           Chấm công
           {isOnline ? (
-            <Wifi size={14} className="text-green-500" />
+            <Wifi size={14} className="text-success-500" />
           ) : (
-            <CloudOff size={14} className="text-amber-500" />
+            <CloudOff size={14} className="text-warning-500" />
           )}
         </h1>
         <div className="w-10" /> {/* Spacer */}
@@ -334,8 +354,8 @@ export default function CheckInPage() {
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-yellow-50 flex items-center justify-center">
-                <AlertTriangle size={20} className="text-yellow-500" />
+              <div className="w-10 h-10 rounded-xl bg-warning-50 flex items-center justify-center">
+                <AlertTriangle size={20} className="text-warning-500" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-dark-700">Hôm nay bạn không có lịch</p>
@@ -358,8 +378,8 @@ export default function CheckInPage() {
               <div className="flex items-center gap-2">
                 {wifiVerified ? (
                   <>
-                    <Wifi size={14} className="text-green-500" />
-                    <span className="text-xs text-green-700 font-medium">WiFi: {simulatedWifi?.ssid} ✓</span>
+                    <Wifi size={14} className="text-success-500" />
+                    <span className="text-xs text-success-700 font-medium">WiFi: {simulatedWifi?.ssid} ✓</span>
                   </>
                 ) : (
                   <>
@@ -380,13 +400,13 @@ export default function CheckInPage() {
                   </>
                 ) : gpsInRange ? (
                   <>
-                    <Navigation size={14} className="text-green-500" />
-                    <span className="text-xs text-green-700 font-medium">GPS: Trong phạm vi ({distance}m) ✓</span>
+                    <Navigation size={14} className="text-success-500" />
+                    <span className="text-xs text-success-700 font-medium">GPS: Trong phạm vi ({distance}m) ✓</span>
                   </>
                 ) : distance !== null ? (
                   <>
-                    <Navigation size={14} className="text-red-400" />
-                    <span className="text-xs text-red-500">GPS: Ngoài phạm vi ({distance}m)</span>
+                    <Navigation size={14} className="text-error-400" />
+                    <span className="text-xs text-error-500">GPS: Ngoài phạm vi ({distance}m)</span>
                   </>
                 ) : (
                   <>
@@ -410,7 +430,7 @@ export default function CheckInPage() {
 
           {status === 'gps_error' && (
             <div className="space-y-2">
-              <div className="flex items-center justify-center gap-2 text-red-500 font-medium">
+              <div className="flex items-center justify-center gap-2 text-error-500 font-medium">
                 <WifiOff size={18} />
                 <span className="text-sm">Không lấy được vị trí</span>
               </div>
@@ -419,7 +439,7 @@ export default function CheckInPage() {
           )}
 
           {status === 'in_range' && (
-            <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm font-semibold">
+            <div className="inline-flex items-center gap-2 bg-success-50 text-success-700 px-4 py-2 rounded-full text-sm font-semibold">
               <CheckCircle2 size={16} />
               {wifiVerified ? 'Xác nhận qua WiFi cửa hàng' : `Bạn đang trong cửa hàng (${distance}m)`}
             </div>
@@ -427,7 +447,7 @@ export default function CheckInPage() {
 
           {status === 'out_range' && (
             <div className="space-y-1">
-              <div className="inline-flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-full text-sm font-semibold">
+              <div className="inline-flex items-center gap-2 bg-error-50 text-error-600 px-4 py-2 rounded-full text-sm font-semibold">
                 <AlertTriangle size={16} />
                 Bạn cách cửa hàng {distance}m
               </div>
@@ -441,7 +461,7 @@ export default function CheckInPage() {
             <div className="space-y-1">
               {isOfflineCheckin ? (
                 <>
-                  <div className="inline-flex items-center gap-2 text-amber-600 font-semibold text-sm">
+                  <div className="inline-flex items-center gap-2 text-warning-600 font-semibold text-sm">
                     <CloudOff size={16} />
                     Check-in thành công (Chờ đồng bộ)
                   </div>
@@ -454,7 +474,7 @@ export default function CheckInPage() {
                     Đã check-in lúc {checkinRecord && formatTime(checkinRecord.check_in_time!)}{checkinMethod === 'wifi' && ' (WiFi)'}
                   </div>
                   {checkinRecord?.status === 'late' && (
-                    <p className="text-xs text-yellow-600">⚠️ Trễ {checkinRecord.late_minutes} phút</p>
+                    <p className="text-xs text-warning-600">⚠️ Trễ {checkinRecord.late_minutes} phút</p>
                   )}
                 </>
               )}
@@ -478,9 +498,9 @@ export default function CheckInPage() {
 
         {/* ─── No schedule warning ─── */}
         {noSchedule && status !== 'checked_in' && status !== 'checked_out' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4 flex items-center gap-2">
-            <AlertTriangle size={16} className="text-yellow-500 shrink-0" />
-            <p className="text-xs text-yellow-700">Bạn không có lịch hôm nay. Attendance sẽ được ghi với schedule_id = null.</p>
+          <div className="bg-warning-50 border border-warning-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+            <AlertTriangle size={16} className="text-warning-500 shrink-0" />
+            <p className="text-xs text-warning-700">Bạn không có lịch hôm nay. Attendance sẽ được ghi với schedule_id = null.</p>
           </div>
         )}
 
@@ -525,7 +545,7 @@ export default function CheckInPage() {
             <button
               onClick={handleCheckout}
               className="w-full py-4 rounded-2xl text-white text-lg font-bold flex items-center justify-center gap-3 shadow-lg transition-all active:scale-[0.98]"
-              style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+              style={{ background: 'linear-gradient(135deg, #F6C85F, #d97706)' }}
             >
               <LogOut size={24} />
               CHECK-OUT
@@ -546,9 +566,9 @@ export default function CheckInPage() {
 
         {/* Pending sync notice */}
         {pendingCount > 0 && (
-          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2">
-            <CloudOff size={14} className="text-amber-500 shrink-0" />
-            <p className="text-xs text-amber-700 flex-1">
+          <div className="mt-3 bg-warning-50 border border-warning-200 rounded-xl p-3 flex items-center gap-2">
+            <CloudOff size={14} className="text-warning-500 shrink-0" />
+            <p className="text-xs text-warning-700 flex-1">
               {pendingCount} chấm công chưa đồng bộ
             </p>
             {isOnline && (
@@ -556,10 +576,10 @@ export default function CheckInPage() {
                 onClick={() => {
                   const r = syncPendingCheckins()
                   if (r.synced > 0) setToast(`☁️ Đã đồng bộ ${r.synced} chấm công`)
-                  setPendingCount(getPendingCount(user?.id))
+                  setPendingCount(getPendingCount(currentUser.id))
                   setTimeout(() => setToast(null), 3000)
                 }}
-                className="text-xs font-medium text-amber-600 underline whitespace-nowrap"
+                className="text-xs font-medium text-warning-600 underline whitespace-nowrap"
               >
                 Thử đồng bộ
               </button>
@@ -570,9 +590,9 @@ export default function CheckInPage() {
         {/* Footer */}
         <p className="text-center text-xs text-gray-300 mt-4 flex items-center justify-center gap-2">
           {isOnline ? (
-            <Wifi size={10} className="text-green-400" />
+            <Wifi size={10} className="text-success-400" />
           ) : (
-            <WifiOff size={10} className="text-amber-400" />
+            <WifiOff size={10} className="text-warning-400" />
           )}
           GPS • {userPos ? `${userPos.lat.toFixed(4)}, ${userPos.lng.toFixed(4)}` : 'Chưa xác định'}
           {!isOnline && ' • Offline'}

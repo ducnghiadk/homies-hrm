@@ -1,5 +1,5 @@
-import { Employee, mockEmployees } from './mock-data'
-import { addDays, format, startOfWeek, endOfWeek, differenceInHours, parseISO, isSameDay } from 'date-fns'
+import { mockEmployees } from './mock-data'
+import { addDays, subWeeks, format, differenceInHours, parseISO } from 'date-fns'
 
 // --- Types ---
 
@@ -46,6 +46,7 @@ export type ScheduleShift = {
   position: 'barista' | 'cashier' | 'support' | 'store_manager'
   isOvertime: boolean
   breakMinutes: number
+  assignmentReason?: string
 }
 
 export type ScheduleStats = {
@@ -90,12 +91,19 @@ export type ScheduleResult = {
   warnings: Warning[]
   costBreakdown: CostBreakdown
   generatedAt: string
+  version?: number
+  versionLabel?: string
 }
 
 export type ComparisonResult = {
   costDiff: number
   hourDiff: number
+  coverageDiff: number
   efficiencyChange: number // % change
+  hasPrevious: boolean
+  previousCost?: number
+  previousHours?: number
+  previousCoverage?: number
 }
 
 // --- Mock Data Helpers ---
@@ -340,13 +348,65 @@ export function getOptimizationSuggestions(warnings: Warning[]): string[] {
   return warnings.map(w => w.suggestion || `Fix issue: ${w.message}`)
 }
 
+export function getPersistedSchedules(): ScheduleResult[] {
+  if (typeof window === 'undefined') return []
+  const data = localStorage.getItem('homies_smart_schedules')
+  if (!data) return []
+  try {
+    return JSON.parse(data)
+  } catch {
+    return []
+  }
+}
+
+export function saveSchedule(schedule: ScheduleResult) {
+  if (typeof window === 'undefined') return
+  const list = getPersistedSchedules()
+  const filtered = list.filter(s => s.weekStart !== schedule.weekStart)
+  filtered.push(schedule)
+  localStorage.setItem('homies_smart_schedules', JSON.stringify(filtered))
+}
+
+export function getPreviousWeekSchedule(current: ScheduleResult): ScheduleResult | null {
+  const prevWeekDate = subWeeks(parseISO(current.weekStart), 1)
+  const prevWeekStartStr = format(prevWeekDate, 'yyyy-MM-dd')
+  
+  const persisted = getPersistedSchedules()
+  const found = persisted.find(s => s.weekStart === prevWeekStartStr)
+  if (found) return found
+  return null
+}
+
 export function compareWithPreviousWeek(current: ScheduleResult): ComparisonResult {
-    // Mock comparison
+  const prev = getPreviousWeekSchedule(current)
+  if (!prev) {
     return {
-        costDiff: -500000,
-        hourDiff: -10,
-        efficiencyChange: 5
+      costDiff: 0,
+      hourDiff: 0,
+      coverageDiff: 0,
+      efficiencyChange: 0,
+      hasPrevious: false,
     }
+  }
+  const costDiff = current.stats.totalCost - prev.stats.totalCost
+  const hourDiff = current.stats.totalHours - prev.stats.totalHours
+  const coverageDiff = current.stats.coveragePercent - prev.stats.coveragePercent
+  
+  // Hiệu quả kinh tế: chênh lệch chi phí trung bình trên mỗi giờ làm việc
+  const currentRate = current.stats.totalHours > 0 ? current.stats.totalCost / current.stats.totalHours : 0
+  const prevRate = prev.stats.totalHours > 0 ? prev.stats.totalCost / prev.stats.totalHours : 0
+  const efficiencyChange = prevRate > 0 ? ((prevRate - currentRate) / prevRate) * 100 : 0
+
+  return {
+    costDiff,
+    hourDiff,
+    coverageDiff,
+    efficiencyChange,
+    hasPrevious: true,
+    previousCost: prev.stats.totalCost,
+    previousHours: prev.stats.totalHours,
+    previousCoverage: prev.stats.coveragePercent,
+  }
 }
 
 export const mockExportFile = (type: 'pdf' | 'excel', schedule: ScheduleResult): void => {

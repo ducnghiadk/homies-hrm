@@ -97,7 +97,7 @@ export default function ShiftEditModal({ shift, onSave, onDelete, onClose }: Shi
               ))}
             </select>
             {!isValid && (
-              <p className="text-xs text-red-500 mt-1">Giờ kết thúc phải sau giờ bắt đầu</p>
+              <p className="text-xs text-error-500 mt-1">Giờ kết thúc phải sau giờ bắt đầu</p>
             )}
           </div>
 
@@ -151,7 +151,7 @@ export default function ShiftEditModal({ shift, onSave, onDelete, onClose }: Shi
         <div className="p-4 border-t flex justify-between items-center">
           <button
             onClick={() => { if (confirm('Xóa ca này?')) onDelete(shift.id) }}
-            className="flex items-center gap-1.5 px-3 py-2 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-error-600 text-sm font-medium rounded-lg hover:bg-error-50 transition-colors"
           >
             <Trash2 size={16} /> Xóa ca này
           </button>

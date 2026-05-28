@@ -47,7 +47,7 @@ export default function WifiSimulator({ onWifiChange, currentWifi }: Props) {
     <div className="relative">
       {/* Label */}
       <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
-        <span className="bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded text-[9px] font-bold">DEMO</span>
+        <span className="bg-warning-100 text-warning-600 px-1.5 py-0.5 rounded text-[9px] font-bold">DEMO</span>
         WiFi đang kết nối (giả lập)
       </p>
 
@@ -57,7 +57,7 @@ export default function WifiSimulator({ onWifiChange, currentWifi }: Props) {
         className="w-full flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-left transition-colors hover:bg-gray-100"
       >
         {currentWifi ? (
-          <Wifi size={14} className="text-blue-500 shrink-0" />
+          <Wifi size={14} className="text-primary-500 shrink-0" />
         ) : (
           <WifiOff size={14} className="text-gray-400 shrink-0" />
         )}
@@ -76,14 +76,14 @@ export default function WifiSimulator({ onWifiChange, currentWifi }: Props) {
               onClick={() => handleSelect(opt.value)}
               className={`w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors ${
                 (currentWifi?.ssid === opt.value || (!currentWifi && opt.value === 'none'))
-                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  ? 'bg-primary-50 text-primary-700 font-medium'
                   : 'text-dark-700'
               }`}
             >
               {opt.value === 'none' ? (
                 <WifiOff size={14} className="text-gray-400" />
               ) : (
-                <Wifi size={14} className="text-blue-500" />
+                <Wifi size={14} className="text-primary-500" />
               )}
               {opt.label}
             </button>

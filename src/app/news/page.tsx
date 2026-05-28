@@ -2,9 +2,9 @@
 
 import AppShell from '@/components/layout/AppShell'
 import { mockNews, mockAnnouncements } from '@/lib/mock-data-communication'
-import { Pin, Eye } from 'lucide-react'
+import { Pin } from 'lucide-react'
 
-const priorityColor: Record<string, string> = { urgent: '#ef4444', high: '#f59e0b', normal: '#3b82f6', low: '#9ca3af' }
+const priorityColor: Record<string, string> = { urgent: '#D9381E', high: '#F6C85F', normal: '#2F6FA8', low: '#9ca3af' }
 
 export default function NewsPage() {
   return (
@@ -15,7 +15,7 @@ export default function NewsPage() {
           <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>📢 Thông báo quan trọng</h3>
           <div className="space-y-2">
             {mockAnnouncements.filter(a => a.is_active).map(a => {
-              const color = priorityColor[a.priority] || '#3b82f6'
+              const color = priorityColor[a.priority] || '#2F6FA8'
               return (
                 <div key={a.id} className="card" style={{ borderLeft: `4px solid ${color}` }}>
                   <div className="flex items-start gap-2">

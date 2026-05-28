@@ -11,7 +11,7 @@ interface Props {
 
 const severityConfig = {
   minor:    { label: 'Nhẹ',         bg: '#dbeafe', color: '#1d4ed8' },
-  medium:   { label: 'Trung bình',  bg: '#fef3c7', color: '#b45309' },
+  medium:   { label: 'Trung bình',  bg: '#FFF8E8', color: '#b45309' },
   major:    { label: 'Nặng',        bg: '#fed7aa', color: '#c2410c' },
   critical: { label: 'Nghiêm trọng', bg: '#fee2e2', color: '#b91c1c' },
 }
@@ -39,14 +39,14 @@ export default function ViolationRow({ violation, onEdit, onDelete, onToggle }: 
       </div>
 
       <div className="text-right flex-shrink-0">
-        <div className="text-sm font-bold text-red-600">-{violation.penalty_points}</div>
+        <div className="text-sm font-bold text-error-600">-{violation.penalty_points}</div>
         <div className="text-[10px] text-gray-400">điểm</div>
       </div>
 
       <button
         onClick={() => onToggle(violation.id, !violation.is_active)}
         className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 relative ${
-          violation.is_active ? 'bg-green-500' : 'bg-gray-300'
+          violation.is_active ? 'bg-success-500' : 'bg-gray-300'
         }`}
       >
         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
@@ -55,8 +55,8 @@ export default function ViolationRow({ violation, onEdit, onDelete, onToggle }: 
       </button>
 
       <div className="flex gap-1 flex-shrink-0">
-        <button onClick={() => onEdit(violation)} className="text-xs px-2 py-1 rounded-lg text-blue-600 hover:bg-blue-50">Sửa</button>
-        <button onClick={() => onDelete(violation.id)} className="text-xs px-2 py-1 rounded-lg text-red-500 hover:bg-red-50">Xóa</button>
+        <button onClick={() => onEdit(violation)} className="text-xs px-2 py-1 rounded-lg text-primary-600 hover:bg-primary-50">Sửa</button>
+        <button onClick={() => onDelete(violation.id)} className="text-xs px-2 py-1 rounded-lg text-error-500 hover:bg-error-50">Xóa</button>
       </div>
     </div>
   )

@@ -12,12 +12,12 @@ import { LEAVE_TYPE_MAP } from '@/lib/mock-data-leave'
 
 // Leave type dot colors
 const LEAVE_DOT_COLORS: Record<string, string> = {
-  annual: 'bg-blue-500',
-  sick: 'bg-red-500',
+  annual: 'bg-primary-500',
+  sick: 'bg-error-500',
   unpaid: 'bg-gray-400',
   wedding: 'bg-pink-500',
-  bereavement: 'bg-purple-500',
-  maternity: 'bg-amber-500',
+  bereavement: 'bg-primary-500',
+  maternity: 'bg-warning-500',
   personal: 'bg-cyan-500',
 }
 
@@ -47,7 +47,7 @@ export default function LeaveCalendar({ entries, blackoutDates = [], onDateSelec
 
   // Blackout dates as Date objects for highlights
   const blackoutHighlights = useMemo(() =>
-    blackoutDates.map(b => ({ date: parseISO(b.date), color: 'bg-red-50' })),
+    blackoutDates.map(b => ({ date: parseISO(b.date), color: 'bg-error-50' })),
     [blackoutDates],
   )
 
@@ -70,7 +70,7 @@ export default function LeaveCalendar({ entries, blackoutDates = [], onDateSelec
     return (
       <div className="flex flex-wrap gap-0.5 justify-center">
         {isBlackout && (
-          <div className="w-full h-0.5 bg-red-400 rounded-full mb-0.5" />
+          <div className="w-full h-0.5 bg-error-400 rounded-full mb-0.5" />
         )}
         {dayEntries.slice(0, 3).map((entry, i) => (
           <div
@@ -109,7 +109,7 @@ export default function LeaveCalendar({ entries, blackoutDates = [], onDateSelec
         ))}
         {blackoutDates.length > 0 && (
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <div className="w-3 h-0.5 rounded-full bg-red-400" />
+            <div className="w-3 h-0.5 rounded-full bg-error-400" />
             <span>Ngày cấm</span>
           </div>
         )}
@@ -125,17 +125,17 @@ export default function LeaveCalendar({ entries, blackoutDates = [], onDateSelec
 
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-blue-50 rounded-xl p-3 text-center">
-          <p className="text-lg font-bold text-blue-700">{stats.totalEntries}</p>
-          <p className="text-xs text-blue-600">Lượt nghỉ</p>
+        <div className="bg-primary-50 rounded-xl p-3 text-center">
+          <p className="text-lg font-bold text-primary-700">{stats.totalEntries}</p>
+          <p className="text-xs text-primary-600">Lượt nghỉ</p>
         </div>
         <div className="bg-emerald-50 rounded-xl p-3 text-center">
           <p className="text-lg font-bold text-emerald-700">{stats.uniqueEmployees}</p>
           <p className="text-xs text-emerald-600">Nhân viên</p>
         </div>
-        <div className="bg-red-50 rounded-xl p-3 text-center">
-          <p className="text-lg font-bold text-red-700">{stats.blackoutCount}</p>
-          <p className="text-xs text-red-600">Ngày cấm</p>
+        <div className="bg-error-50 rounded-xl p-3 text-center">
+          <p className="text-lg font-bold text-error-700">{stats.blackoutCount}</p>
+          <p className="text-xs text-error-600">Ngày cấm</p>
         </div>
       </div>
 
@@ -149,11 +149,11 @@ export default function LeaveCalendar({ entries, blackoutDates = [], onDateSelec
         <div className="p-4 space-y-4">
           {/* Blackout warning */}
           {selectedDateBlackout && (
-            <div className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-100">
-              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-3 bg-error-50 rounded-xl border border-error-100">
+              <AlertTriangle className="w-5 h-5 text-error-500 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-red-700">Ngày cấm nghỉ</p>
-                <p className="text-xs text-red-600 mt-0.5">{selectedDateBlackout.reason}</p>
+                <p className="text-sm font-semibold text-error-700">Ngày cấm nghỉ</p>
+                <p className="text-xs text-error-600 mt-0.5">{selectedDateBlackout.reason}</p>
               </div>
             </div>
           )}

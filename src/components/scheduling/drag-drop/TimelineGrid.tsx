@@ -43,7 +43,7 @@ export default function TimelineGrid({
             <div
               key={h}
               className={`flex-1 text-center py-2 text-xs font-semibold border-r border-gray-100 last:border-0
-                ${(h >= 11 && h <= 13) || (h >= 17 && h <= 20) ? 'text-red-500 bg-red-50/50' : 'text-gray-400'}
+                ${(h >= 11 && h <= 13) || (h >= 17 && h <= 20) ? 'text-error-500 bg-error-50/50' : 'text-gray-400'}
               `}
             >
               {h}h

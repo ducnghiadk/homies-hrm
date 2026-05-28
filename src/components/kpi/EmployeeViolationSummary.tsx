@@ -7,8 +7,8 @@ interface Props {
 }
 
 export default function EmployeeViolationSummary({ summary }: Props) {
-  const scoreColor = summary.violation_score >= 80 ? '#10b981'
-    : summary.violation_score >= 60 ? '#f59e0b' : '#ef4444'
+  const scoreColor = summary.violation_score >= 80 ? '#1E9E57'
+    : summary.violation_score >= 60 ? '#F6C85F' : '#D9381E'
   const pct = summary.violation_score
 
   return (
@@ -27,7 +27,7 @@ export default function EmployeeViolationSummary({ summary }: Props) {
       <div className="flex gap-2 text-center">
         {[
           { label: 'Tổng lỗi', value: summary.total_violations, color: 'var(--text-primary)' },
-          { label: 'Điểm trừ', value: summary.total_penalty_points, color: '#ef4444' },
+          { label: 'Điểm trừ', value: summary.total_penalty_points, color: '#D9381E' },
           { label: 'Đang KN', value: summary.pending_appeals, color: '#7c3aed' },
         ].map(s => (
           <div key={s.label} className="flex-1 py-1.5 rounded-lg" style={{ background: 'var(--gray-50)' }}>
@@ -40,10 +40,10 @@ export default function EmployeeViolationSummary({ summary }: Props) {
       {/* Severity breakdown */}
       <div className="flex gap-1">
         {[
-          { key: 'minor', label: 'Nhẹ', color: '#3b82f6' },
-          { key: 'medium', label: 'TB', color: '#f59e0b' },
+          { key: 'minor', label: 'Nhẹ', color: '#2F6FA8' },
+          { key: 'medium', label: 'TB', color: '#F6C85F' },
           { key: 'major', label: 'Nặng', color: '#f97316' },
-          { key: 'critical', label: 'N.Trọng', color: '#ef4444' },
+          { key: 'critical', label: 'N.Trọng', color: '#D9381E' },
         ].map(s => (
           <div key={s.key} className="flex-1 text-center py-1 rounded-lg text-[10px] font-semibold"
             style={{ background: `${s.color}10`, color: s.color }}>

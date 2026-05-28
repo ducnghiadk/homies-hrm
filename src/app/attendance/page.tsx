@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import { StatCard, Badge, SectionGroup, EmptyState } from '@/components/ui'
-import { mockAttendances, getShiftById } from '@/lib/mock-data'
+import { getShiftById } from '@/lib/mock-data'
+import { AttendanceService } from '@/lib/services/attendance-service'
 import { formatTime, formatHours, getStatusLabel } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, Clock, CheckCircle2, AlertTriangle, Timer, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -29,7 +30,11 @@ export default function AttendanceHistoryPage() {
     return d
   }, [monthOffset])
 
-  useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/login')
+    }
+  }, [isAuthenticated, router])
   if (!user) return null
 
   const year = currentMonth.getFullYear()
@@ -38,15 +43,15 @@ export default function AttendanceHistoryPage() {
   const firstDayOfWeek = (new Date(year, month, 1).getDay() + 6) % 7 // Mon=0
   const today = new Date().toISOString().split('T')[0]
 
-  const myAttendances = mockAttendances.filter(a => a.employee_id === user.id)
+  const myAttendances = AttendanceService.getEmployeeAttendances(user.id)
 
   const getAttForDate = (dateStr: string) => myAttendances.find(a => a.date === dateStr)
 
   const statusDotColor = (status?: string) => {
     switch (status) {
-      case 'on_time': return 'bg-green-500'
-      case 'late': return 'bg-red-500'
-      case 'early': return 'bg-amber-500'
+      case 'on_time': return 'bg-success-500'
+      case 'late': return 'bg-error-500'
+      case 'early': return 'bg-warning-500'
       case 'absent': return 'bg-gray-400'
       default: return 'bg-gray-200'
     }
@@ -100,28 +105,28 @@ export default function AttendanceHistoryPage() {
             icon={CheckCircle2}
             label="Đúng giờ"
             value={onTime}
-            iconColor="text-green-600"
-            iconBg="bg-green-100"
-            className="bg-green-50 border-green-200"
-            valueClassName="text-green-700"
+            iconColor="text-success-600"
+            iconBg="bg-success-100"
+            className="bg-success-50 border-success-200"
+            valueClassName="text-success-700"
           />
           <StatCard
             icon={AlertTriangle}
             label="Trễ"
             value={late}
-            iconColor="text-red-600"
-            iconBg="bg-red-100"
-            className="bg-red-50 border-red-200"
-            valueClassName="text-red-700"
+            iconColor="text-error-600"
+            iconBg="bg-error-100"
+            className="bg-error-50 border-error-200"
+            valueClassName="text-error-700"
           />
           <StatCard
             icon={Timer}
             label="Tổng giờ"
             value={formatHours(totalHours)}
-            iconColor="text-blue-600"
-            iconBg="bg-blue-100"
-            className="bg-blue-50 border-blue-200"
-            valueClassName="text-blue-700"
+            iconColor="text-primary-600"
+            iconBg="bg-primary-100"
+            className="bg-primary-50 border-primary-200"
+            valueClassName="text-primary-700"
           />
         </div>
 
@@ -162,8 +167,8 @@ export default function AttendanceHistoryPage() {
           {/* Legend */}
           <div className="flex gap-4 justify-center mt-3 pt-3 border-t border-gray-100">
             {[
-              { cls: 'bg-green-500', label: 'Đúng giờ' },
-              { cls: 'bg-red-500', label: 'Trễ' },
+              { cls: 'bg-success-500', label: 'Đúng giờ' },
+              { cls: 'bg-error-500', label: 'Trễ' },
               { cls: 'bg-gray-200', label: 'Không có' },
             ].map(({ cls, label }) => (
               <div key={label} className="flex items-center gap-1 text-xs text-gray-500">

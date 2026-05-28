@@ -99,13 +99,18 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 
 ### Noi quy nhan viec va onboarding
 - Mo ta: flow gui noi quy 2 nhip, setting toi thieu, xac nhan cua nhan vien, nhac day-1, va workspace onboard van hanh do quan ly cua hang cam chinh.
-- File chinh: `src/lib/services/onboarding-policy-service.ts`, `src/lib/services/onboarding-operations-service.ts`, `src/app/career-path/settings/page.tsx`, `src/app/career-path/onboarding/page.tsx`, `src/components/onboarding-operations/*`, `src/app/employees/contracts/[id]/page.tsx`, `src/app/employees/[id]/page.tsx`, `src/app/onboarding/page.tsx`
-- Dung khi: sua moc gui noi quy, nhac lai, xac nhan nhan vien, checklist onboarding ngay dau, rule block/can hoan tat som, danh sach nguoi sap vao lam, va checklist chi tiet theo tung nguoi
+- File chinh: `src/lib/services/onboarding-policy-service.ts`, `src/lib/services/onboarding-operations-service.ts`, `src/app/career-path/settings/page.tsx`, `src/app/career-path/onboarding/page.tsx`, `src/components/onboarding-operations/*`, `src/components/onboarding-operations/OnboardingSelfReviewSummary.tsx`, `src/components/onboarding-operations/OnboardingStageGatePanel.tsx`, `src/components/onboarding-employee/*`, `src/components/onboarding-employee/OnboardingSelfReviewCard.tsx`, `src/components/onboarding-employee/OnboardingStageGateStatusCard.tsx`, `src/app/employees/contracts/[id]/page.tsx`, `src/app/employees/[id]/page.tsx`, `src/app/onboarding/page.tsx`
+- Dung khi: sua moc gui noi quy, nhac lai, xac nhan nhan vien, checklist onboarding ngay dau, rule block/can hoan tat som, danh sach nguoi sap vao lam, checklist chi tiet theo tung nguoi, flow `tu danh gia theo chang`, hoac `gate tong ket chang`
+
+### Nen du lieu checklist onboarding mau
+- Mo ta: nhom nang luc mac dinh, template theo vi tri, chang onboarding, va item checklist co tieu chuan dat de sau nay gan cho nhan vien that.
+- File chinh: `src/lib/career-path-types.ts`, `src/lib/mock-data-career-path.ts`, `src/lib/career-path-service.ts`
+- Dung khi: sua cau truc du lieu onboarding mau cho `nhan vien quay`, `pha che`, `shift leader`, map checklist mau vao UI/employee plan sau nay, hoac luu/doc `self-review history` va `stage gate record` theo chang onboarding
 
 ### Spec flow va quyet dinh moi
 - Mo ta: cac spec nho de chot flow nghiep vu truoc khi code, nhu flow noi quy nhan viec, setting toi thieu, va cac quyet dinh scope tuong tu.
-- File chinh: `docs/superpowers/specs/*`, `docs/superpowers/specs/2026-05-25-noi-quy-onboarding-flow-design.md`, `docs/superpowers/specs/2026-05-27-setting-shortcut-full-web-backlog.md`
-- Dung khi: can xem lai quyet dinh da chot voi user truoc khi viet plan hoac sua UI/service
+- File chinh: `docs/superpowers/specs/*`, `docs/superpowers/specs/2026-05-25-noi-quy-onboarding-flow-design.md`, `docs/superpowers/specs/2026-05-27-setting-shortcut-full-web-backlog.md`, `docs/superpowers/specs/2026-05-28-onboarding-3-mat-design.md`, `docs/superpowers/specs/2026-05-28-onboarding-output-standard-design.md`, `docs/superpowers/specs/2026-05-28-onboarding-self-review-design.md`, `docs/superpowers/specs/2026-05-28-onboarding-stage-gate-design.md`
+- Dung khi: can xem lai quyet dinh da chot voi user truoc khi viet plan hoac sua UI/service, dac biet khi can chot `chuan dau ra onboarding theo vi tri`, `gate giao ca`, `muc dat khi co kem / dat tu lam`, `tu danh gia that cua nhan vien`, hoac `gate tong ket chang`
 
 ### Backlog map icon rang cua toan web
 - Mo ta: map man hinh nao nen co icon rang cua, dat o dau, va nhay toi route setting nao de rollout theo tung pass.
@@ -114,8 +119,8 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 
 ### Plan trien khai chi tiet
 - Mo ta: implementation plan chia task nho de code theo tung cum, bao gom file map, verify va commit checkpoint.
-- File chinh: `docs/superpowers/plans/*`, `docs/superpowers/plans/2026-05-25-noi-quy-onboarding-flow-plan.md`
-- Dung khi: da duyet spec va can bat dau code theo tung task co thu tu ro rang
+- File chinh: `docs/superpowers/plans/*`, `docs/superpowers/plans/2026-05-25-noi-quy-onboarding-flow-plan.md`, `docs/superpowers/plans/2026-05-28-onboarding-3-mat-plan.md`, `docs/superpowers/plans/2026-05-28-onboarding-output-standard-plan.md`, `docs/superpowers/plans/2026-05-28-onboarding-self-review-plan.md`, `docs/superpowers/plans/2026-05-28-onboarding-stage-gate-plan.md`
+- Dung khi: da duyet spec va can bat dau code theo tung task co thu tu ro rang, nhat la rollout `chuan dau ra onboarding theo vi tri` vao data mock, service, 3 man onboarding, hoac pass `self-review theo chang` / `gate tong ket chang`
 
 ## Script tien ich cuc bo
 ### Mo nhanh va restart dev server

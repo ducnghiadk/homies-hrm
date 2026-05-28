@@ -133,7 +133,7 @@ export function MonthCalendar({
             key={day}
             className={cn(
               'text-center text-xs font-semibold py-2',
-              index === 0 ? 'text-red-400' : 'text-gray-400',
+              index === 0 ? 'text-error-400' : 'text-gray-400',
             )}
           >
             {day}

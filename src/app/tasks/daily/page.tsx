@@ -46,15 +46,15 @@ export default function DailyTasksPage() {
                 <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{activeTask.employee_name}</span>
                 <span className="text-xs font-bold px-2 py-1 rounded-full"
                   style={{
-                    background: activeTask.status === 'completed' ? '#10b98120' : '#f59e0b20',
-                    color: activeTask.status === 'completed' ? '#10b981' : '#f59e0b',
+                    background: activeTask.status === 'completed' ? '#1E9E5720' : '#F6C85F20',
+                    color: activeTask.status === 'completed' ? '#1E9E57' : '#F6C85F',
                   }}>
                   {activeTask.status === 'completed' ? '✅ Hoàn thành' : `🔄 ${activeTask.progress}%`}
                 </span>
               </div>
               <div className="w-full h-2 rounded-full" style={{ background: 'var(--gray-100)' }}>
                 <div className="h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${activeTask.progress}%`, background: activeTask.progress === 100 ? '#10b981' : 'var(--primary)' }} />
+                  style={{ width: `${activeTask.progress}%`, background: activeTask.progress === 100 ? '#1E9E57' : 'var(--primary)' }} />
               </div>
               <div className="flex justify-between mt-1">
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{activeTask.items.filter(i => i.is_done).length}/{activeTask.items.length} mục</span>
@@ -64,7 +64,7 @@ export default function DailyTasksPage() {
 
             {/* Checklist */}
             <div className="space-y-2 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-              {activeTask.items.map((item, i) => (
+              {activeTask.items.map((item) => (
                 <div key={item.task_item_id} className="card flex items-start gap-3"
                   style={{ opacity: item.is_done ? 0.7 : 1 }}>
                   <button onClick={() => toggleItem(activeTask.id, item.task_item_id)} className="mt-0.5">
@@ -83,10 +83,10 @@ export default function DailyTasksPage() {
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       {item.is_required && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: '#ef444415', color: '#ef4444' }}>Bắt buộc</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: '#D9381E15', color: '#D9381E' }}>Bắt buộc</span>
                       )}
                       {item.requires_photo && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5" style={{ background: '#3b82f615', color: '#3b82f6' }}>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5" style={{ background: '#2F6FA815', color: '#2F6FA8' }}>
                           <Camera size={8} /> {item.photo_url ? '✓ Đã chụp' : 'Cần ảnh'}
                         </span>
                       )}

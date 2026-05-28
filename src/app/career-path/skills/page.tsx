@@ -1,33 +1,28 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   initCareerPathStores, getSkills, getEmployeeSkills, getSkillLevels,
   getEmployeeSkillLevel, checkSkillUnlockEligibility, getSkillEndorsements,
 } from '@/lib/career-path-service';
-import type { Skill, EmployeeSkill, SkillEndorsement } from '@/lib/career-path-types';
+import type { Skill, EmployeeSkill } from '@/lib/career-path-types';
 import SkillHexagon from '@/components/career-path/SkillHexagon';
-import ProgressBar from '@/components/career-path/ProgressBar';
 import ConditionChip from '@/components/career-path/ConditionChip';
 
 type ViewMode = 'grid' | 'list';
 type FilterCategory = 'all' | 'basic' | 'advanced' | 'management';
 
 export default function SkillsPage() {
-  const [skills, setSkills] = useState<Skill[]>([]);
-  const [empSkills, setEmpSkills] = useState<EmployeeSkill[]>([]);
+  const [skills] = useState<Skill[]>(() => {
+    initCareerPathStores();
+    return getSkills().filter(s => s.is_active);
+  });
+  const [empSkills] = useState<EmployeeSkill[]>(() => getEmployeeSkills('emp-001'));
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [filter, setFilter] = useState<FilterCategory>('all');
-  const [skillLevel, setSkillLevel] = useState(1);
-
-  useEffect(() => {
-    initCareerPathStores();
-    setSkills(getSkills().filter(s => s.is_active));
-    setEmpSkills(getEmployeeSkills('emp-001'));
-    setSkillLevel(getEmployeeSkillLevel('emp-001'));
-  }, []);
+  const [skillLevel] = useState(() => getEmployeeSkillLevel('emp-001'));
 
   const filtered = filter === 'all' ? skills : skills.filter(s => s.category === filter);
   const getStatus = (sid: string) => empSkills.find(es => es.skill_id === sid)?.status || 'locked';
@@ -194,7 +189,7 @@ export default function SkillsPage() {
                       {endorsements.map(e => (
                         <div key={e.id} style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0', fontSize: 12 }}>
                           <span>{'⭐'.repeat(e.rating)} — {e.endorsed_at}</span>
-                          {e.comment && <div style={{ color: '#666', marginTop: 2 }}>"{e.comment}"</div>}
+                          {e.comment && <div style={{ color: '#666', marginTop: 2 }}>&quot;{e.comment}&quot;</div>}
                         </div>
                       ))}
                     </div>

@@ -105,3 +105,77 @@ CREATE INDEX idx_ingredients_category ON ingredients(category);
 CREATE INDEX idx_stock_tx_ingredient ON stock_transactions(ingredient_id);
 CREATE INDEX idx_daily_revenue_date ON daily_revenue(date);
 CREATE INDEX idx_org_settings_key ON org_settings(org_id, key);
+
+-- ========== CONTRACTS ==========
+-- Dung text id de giu duoc luong mock hien tai trong luc chuyen dan sang backend that.
+
+CREATE TABLE contract_templates (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  employment_type VARCHAR(20) NOT NULL,
+  position_ids JSONB NOT NULL DEFAULT '[]',
+  store_scope VARCHAR(30) NOT NULL DEFAULT 'all',
+  status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'archived')),
+  version TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  blocks JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE employee_contracts (
+  id TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL REFERENCES contract_templates(id),
+  employee_id TEXT NOT NULL,
+  store_id TEXT NOT NULL,
+  position_id TEXT NOT NULL,
+  status VARCHAR(30) NOT NULL CHECK (status IN ('draft', 'pending_employee_sign', 'signed_by_employee', 'pending_hr_sign', 'active', 'rejected', 'expired', 'void', 'superseded')),
+  version TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE,
+  sent_at TIMESTAMPTZ,
+  activated_at TIMESTAMPTZ,
+  custom_fields JSONB NOT NULL DEFAULT '{}',
+  rendered_content TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE contract_signatures (
+  id TEXT PRIMARY KEY,
+  contract_id TEXT NOT NULL REFERENCES employee_contracts(id) ON DELETE CASCADE,
+  actor_id TEXT NOT NULL,
+  actor_name TEXT NOT NULL,
+  role VARCHAR(20) NOT NULL CHECK (role IN ('employee', 'hr')),
+  signed_at TIMESTAMPTZ NOT NULL,
+  method VARCHAR(20) NOT NULL CHECK (method IN ('app_confirm', 'otp_mock')),
+  evidence TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE contract_audit_logs (
+  id TEXT PRIMARY KEY,
+  contract_id TEXT NOT NULL REFERENCES employee_contracts(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  actor_name TEXT NOT NULL,
+  at TIMESTAMPTZ NOT NULL,
+  note TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE contract_snapshots (
+  id TEXT PRIMARY KEY,
+  contract_id TEXT NOT NULL REFERENCES employee_contracts(id) ON DELETE CASCADE,
+  version TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  note TEXT NOT NULL,
+  content TEXT NOT NULL
+);
+
+CREATE INDEX idx_contract_templates_status ON contract_templates(status);
+CREATE INDEX idx_employee_contracts_employee ON employee_contracts(employee_id);
+CREATE INDEX idx_employee_contracts_store_status ON employee_contracts(store_id, status);
+CREATE INDEX idx_contract_signatures_contract ON contract_signatures(contract_id, signed_at);
+CREATE INDEX idx_contract_audit_logs_contract ON contract_audit_logs(contract_id, at);
+CREATE INDEX idx_contract_snapshots_contract ON contract_snapshots(contract_id, created_at);

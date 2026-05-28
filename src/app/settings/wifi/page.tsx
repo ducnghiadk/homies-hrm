@@ -127,13 +127,13 @@ export default function WifiConfigPage() {
           <div
             key={cfg.id}
             className={`bg-white border rounded-2xl p-4 flex items-center gap-3 transition-all ${
-              cfg.is_active ? 'border-green-200' : 'border-gray-200 opacity-60'
+              cfg.is_active ? 'border-success-200' : 'border-gray-200 opacity-60'
             }`}
           >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              cfg.is_active ? 'bg-green-50' : 'bg-gray-100'
+              cfg.is_active ? 'bg-success-50' : 'bg-gray-100'
             }`}>
-              <Wifi size={20} className={cfg.is_active ? 'text-green-500' : 'text-gray-400'} />
+              <Wifi size={20} className={cfg.is_active ? 'text-success-500' : 'text-gray-400'} />
             </div>
 
             <div className="flex-1 min-w-0">
@@ -141,7 +141,7 @@ export default function WifiConfigPage() {
               <p className="text-xs text-gray-400 font-mono truncate">
                 {cfg.wifi_bssid || 'Không có BSSID'}
               </p>
-              <p className={`text-xs font-medium mt-0.5 ${cfg.is_active ? 'text-green-500' : 'text-gray-400'}`}>
+              <p className={`text-xs font-medium mt-0.5 ${cfg.is_active ? 'text-success-500' : 'text-gray-400'}`}>
                 {cfg.is_active ? 'Đang sử dụng' : 'Đã tắt'}
               </p>
             </div>
@@ -153,14 +153,14 @@ export default function WifiConfigPage() {
                 title={cfg.is_active ? 'Tắt' : 'Bật'}
               >
                 {cfg.is_active ? (
-                  <ToggleRight size={22} className="text-green-500" />
+                  <ToggleRight size={22} className="text-success-500" />
                 ) : (
                   <ToggleLeft size={22} className="text-gray-400" />
                 )}
               </button>
               <button
                 onClick={() => handleRemove(cfg.id)}
-                className="p-2 rounded-lg hover:bg-red-50 transition-colors text-gray-400 hover:text-red-500"
+                className="p-2 rounded-lg hover:bg-error-50 transition-colors text-gray-400 hover:text-error-500"
                 title="Xóa"
               >
                 <Trash2 size={16} />
@@ -226,9 +226,9 @@ export default function WifiConfigPage() {
       )}
 
       {/* Info note */}
-      <div className="mt-6 bg-blue-50 rounded-xl p-3">
-        <p className="text-xs text-blue-600 font-medium mb-1">💡 Hướng dẫn</p>
-        <ul className="text-xs text-blue-500 space-y-1">
+      <div className="mt-6 bg-primary-50 rounded-xl p-3">
+        <p className="text-xs text-primary-600 font-medium mb-1">💡 Hướng dẫn</p>
+        <ul className="text-xs text-primary-500 space-y-1">
           <li>• Nhân viên kết nối WiFi cửa hàng sẽ được xác nhận vị trí tự động</li>
           <li>• BSSID giúp phân biệt WiFi cửa hàng với WiFi giả mạo cùng tên</li>
           <li>• Tắt WiFi để tạm ngưng cho phép check-in qua WiFi đó</li>

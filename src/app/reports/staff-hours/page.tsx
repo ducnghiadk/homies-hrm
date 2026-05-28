@@ -11,7 +11,7 @@ export default function StaffHoursReportPage() {
     <AppShell title="Báo cáo giờ công">
       <div className="space-y-4">
         {/* Summary */}
-        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #3b82f6, #6366f1)', color: '#fff' }}>
+        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #2F6FA8, #6366f1)', color: '#fff' }}>
           <div className="text-xs opacity-80">Tháng {d.period}</div>
           <div className="text-xl font-bold mt-1">{d.total_actual.toLocaleString()}h tổng</div>
           <div className="grid grid-cols-3 gap-2 mt-3 text-center">
@@ -31,7 +31,7 @@ export default function StaffHoursReportPage() {
                   <th className="text-left py-2 font-bold" style={{ color: 'var(--text-primary)' }}>Ngày</th>
                   <th className="text-center py-2" style={{ color: 'var(--text-muted)' }}>KH</th>
                   <th className="text-center py-2" style={{ color: 'var(--primary)' }}>Thực tế</th>
-                  <th className="text-center py-2 text-amber-500">OT</th>
+                  <th className="text-center py-2 text-warning-500">OT</th>
                 </tr>
               </thead>
               <tbody>
@@ -40,7 +40,7 @@ export default function StaffHoursReportPage() {
                     <td className="py-2 font-medium" style={{ color: 'var(--text-primary)' }}>{row.date.slice(-2)}</td>
                     <td className="text-center py-2" style={{ color: 'var(--text-secondary)' }}>{row.scheduled_hours}h</td>
                     <td className="text-center py-2 font-medium" style={{ color: 'var(--primary)' }}>{row.actual_hours}h</td>
-                    <td className="text-center py-2 font-medium" style={{ color: row.ot_hours > 0 ? '#f59e0b' : 'var(--text-muted)' }}>{row.ot_hours}h</td>
+                    <td className="text-center py-2 font-medium" style={{ color: row.ot_hours > 0 ? '#F6C85F' : 'var(--text-muted)' }}>{row.ot_hours}h</td>
                   </tr>
                 ))}
               </tbody>

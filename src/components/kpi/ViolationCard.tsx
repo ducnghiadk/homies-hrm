@@ -14,7 +14,7 @@ interface Props {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
-  pending:          { label: 'Chờ xác nhận',  bg: '#fef3c7', color: '#92400e' },
+  pending:          { label: 'Chờ xác nhận',  bg: '#FFF8E8', color: '#92400e' },
   acknowledged:     { label: 'Đã xác nhận',   bg: '#dbeafe', color: '#1d4ed8' },
   appealed:         { label: 'Đang khiếu nại', bg: '#ede9fe', color: '#6d28d9' },
   appeal_approved:  { label: 'Chấp nhận KN',  bg: '#dcfce7', color: '#166534' },
@@ -24,7 +24,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }
 
 const SEV_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   minor:    { label: 'Nhẹ',           bg: '#dbeafe', color: '#1d4ed8' },
-  medium:   { label: 'Trung bình',    bg: '#fef3c7', color: '#b45309' },
+  medium:   { label: 'Trung bình',    bg: '#FFF8E8', color: '#b45309' },
   major:    { label: 'Nặng',          bg: '#fed7aa', color: '#c2410c' },
   critical: { label: 'Nghiêm trọng',  bg: '#fee2e2', color: '#b91c1c' },
 }
@@ -38,7 +38,7 @@ export default function ViolationCard({
   const sts = STATUS_CONFIG[record.status] || STATUS_CONFIG.pending
   const appealable = canAppeal(record)
   const deadline = getAppealDeadline(record)
-  const hoursLeft = Math.max(0, Math.round((deadline.getTime() - Date.now()) / 3600000))
+  const hoursLeft = Math.max(0, Math.round((deadline.getTime() - new Date().getTime()) / 3600000))
 
   return (
     <div className="card p-3 space-y-2">
@@ -57,7 +57,7 @@ export default function ViolationCard({
               {sts.label}
             </span>
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{
-              background: record.log_mode === 'realtime' ? '#dcfce7' : '#fef3c7',
+              background: record.log_mode === 'realtime' ? '#dcfce7' : '#FFF8E8',
               color: record.log_mode === 'realtime' ? '#166534' : '#92400e',
             }}>
               {record.log_mode === 'realtime' ? '⚡ Real-time' : '📅 Cuối tháng'}
@@ -65,7 +65,7 @@ export default function ViolationCard({
           </div>
         </div>
         <div className="text-right flex-shrink-0">
-          <div className="text-lg font-black text-red-600">-{record.penalty_points}</div>
+          <div className="text-lg font-black text-error-600">-{record.penalty_points}</div>
           <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>điểm</div>
         </div>
       </div>

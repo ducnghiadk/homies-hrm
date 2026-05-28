@@ -166,7 +166,7 @@ function ComparisonTable({
               >
                 {p.name}
                 {(p.badge?.includes('ĐỀ XUẤT') || p.badge?.includes('KHUYÊN DÙNG')) && (
-                  <Star size={12} className="ml-1 inline text-amber-400" fill="currentColor" />
+                  <Star size={12} className="ml-1 inline text-warning-400" fill="currentColor" />
                 )}
               </th>
             ))}
@@ -269,17 +269,17 @@ export default function FeaturedPlanCard({
             {/* Key metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <MetricCard
-                icon={<Briefcase size={18} className="text-blue-500" />}
+                icon={<Briefcase size={18} className="text-primary-500" />}
                 value={`${featuredPlan.fulltime.length}`}
                 label="FULL-TIME"
               />
               <MetricCard
-                icon={<Shirt size={18} className="text-purple-500" />}
+                icon={<Shirt size={18} className="text-primary-500" />}
                 value={`${featuredPlan.parttime.length}`}
                 label="PART-TIME"
               />
               <MetricCard
-                icon={<Banknote size={18} className="text-green-500" />}
+                icon={<Banknote size={18} className="text-success-500" />}
                 value={`${(featuredPlan.totalCost / 1000000).toFixed(0)}tr`}
                 label="/THÁNG"
                 trend={
@@ -302,7 +302,7 @@ export default function FeaturedPlanCard({
             <div className="space-y-2 mb-6">
               {featuredPlan.pros.map((pro, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                  <Check size={16} className="text-green-500 mt-0.5 shrink-0" />
+                  <Check size={16} className="text-success-500 mt-0.5 shrink-0" />
                   <span>{pro}</span>
                 </div>
               ))}
@@ -317,7 +317,7 @@ export default function FeaturedPlanCard({
                   flex items-center justify-center gap-2
                   transition-all duration-200 active:scale-[0.98]
                   ${currentSelected === featuredPlan.id
-                    ? 'bg-green-600 text-white shadow-md'
+                    ? 'bg-success-600 text-white shadow-md'
                     : 'bg-primary text-white shadow-md hover:bg-primary/90 hover:shadow-lg'
                   }
                 `}

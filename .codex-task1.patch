@@ -1,0 +1,261 @@
+*** Begin Patch
+*** Add File: src/lib/services/contract-template-placeholder.ts
++export type ContractPlaceholderGroup =
++  | 'employee'
++  | 'store'
++  | 'position'
++  | 'contract'
++  | 'salary'
++  | 'policy'
++  | 'company'
++  | 'job'
++
++export type ContractPlaceholderStatus =
++  | 'hop_le'
++  | 'thieu_du_lieu'
++  | 'field_la'
++  | 'trung_lap'
++
++export type ContractPlaceholderItem = {
++  key: string
++  group: ContractPlaceholderGroup | 'unknown'
++  field: string
++  occurrences: number
++  value: string
++  status: ContractPlaceholderStatus
++  note?: string
++}
++
++export const CONTRACT_PLACEHOLDER_CATALOG = {
++  employee: [
++    'full_name',
++    'employee_code',
++    'phone',
++    'email',
++    'address',
++    'date_of_birth',
++    'gender',
++    'cccd',
++    'cccd_issue_date',
++    'cccd_issue_place',
++    'tax_code',
++    'bank_name',
++    'bank_account',
++    'start_date',
++  ],
++  store: ['name', 'address', 'phone', 'manager_name'],
++  position: ['name', 'level'],
++  contract: [
++    'id',
++    'code',
++    'version',
++    'parent_contract_code',
++    'type',
++    'type_label',
++    'start_date',
++    'end_date',
++    'signing_date',
++    'signer_name',
++    'signer_title',
++  ],
++  salary: [
++    'official',
++    'probation',
++    'allowances',
++    'kpi',
++    'probation_period',
++    'payday',
++    'hourly_or_shift',
++  ],
++  policy: [
++    'work_rules',
++    'dress_code',
++    'cash_handling',
++    'food_safety',
++    'attendance',
++    'overtime',
++    'discipline',
++    'contract_note',
++  ],
++  company: ['name', 'address', 'tax_id', 'signer_name', 'signer_title'],
++  job: ['main_duties', 'working_schedule'],
++} as const
++
++const PLACEHOLDER_REGEX = /{{\s*([a-z0-9_]+)\.([a-z0-9_]+)\s*}}/g
++
++function isKnownGroup(group: string): group is ContractPlaceholderGroup {
++  return group in CONTRACT_PLACEHOLDER_CATALOG
++}
++
++export function scanContractPlaceholders(
++  sourceText: string,
++  values: Record<string, string> = {},
++): ContractPlaceholderItem[] {
++  const counts = new Map<string, number>()
++
++  for (const match of sourceText.matchAll(PLACEHOLDER_REGEX)) {
++    const key = `${match[1]}.${match[2]}`
++    counts.set(key, (counts.get(key) || 0) + 1)
++  }
++
++  return Array.from(counts.entries()).map(([key, occurrences]) => {
++    const [groupRaw, field] = key.split('.')
++    const group = isKnownGroup(groupRaw) ? groupRaw : 'unknown'
++    const allowed = group !== 'unknown' && CONTRACT_PLACEHOLDER_CATALOG[group].includes(field as never)
++    const value = String(values[key] || '').trim()
++
++    if (!allowed) {
++      return {
++        key,
++        group,
++        field,
++        occurrences,
++        value,
++        status: 'field_la',
++        note: 'Field khong nam trong bo chuan',
++      }
++    }
++
++    if (!value) {
++      return {
++        key,
++        group,
++        field,
++        occurrences,
++        value,
++        status: 'thieu_du_lieu',
++        note: 'Chua co gia tri de do vao hop dong',
++      }
++    }
++
++    if (occurrences > 1) {
++      return {
++        key,
++        group,
++        field,
++        occurrences,
++        value,
++        status: 'trung_lap',
++        note: 'Field xuat hien nhieu lan trong mau',
++      }
++    }
++
++    return {
++      key,
++      group,
++      field,
++      occurrences,
++      value,
++      status: 'hop_le',
++    }
++  })
++}
+*** Update File: src/lib/services/contract-service.ts
+@@
+ import type { AuthUser } from '@/store/auth-store'
++import type { ContractPlaceholderItem } from './contract-template-placeholder'
+ import {
+   defaultTemplates,
+   makeId,
+@@
+ export type ContractBlock = {
+@@
+   category: 'employee' | 'salary' | 'store_rules' | 'fnb_rules' | 'signing'
+ }
++
++export type ContractTemplatePlaceholderMeta = {
++  sourceFileName?: string
++  sourceKind: 'blocks' | 'docx_upload'
++  sourceText: string
++  scannedAt?: string
++  placeholders: ContractPlaceholderItem[]
++  blockingIssues: string[]
++  warningIssues: string[]
++}
+ 
+ export type ContractTemplate = {
+@@
+   version: string
+   updatedAt: string
+   blocks: ContractBlock[]
++  placeholderMeta: ContractTemplatePlaceholderMeta
+ }
+*** Update File: src/lib/services/contract-service-data.ts
+@@
+ import type {
+   ContractBlock,
+   ContractTemplate,
+   EmployeeContract,
+ } from './contract-service'
++import { scanContractPlaceholders } from './contract-template-placeholder'
+@@
+ export function defaultTemplates(): ContractTemplate[] {
+   const sharedBlocks = defaultBlocks()
++
++  const withPlaceholderMeta = (template: Omit<ContractTemplate, 'placeholderMeta'>): ContractTemplate => {
++    const sourceText = template.blocks.map((block) => block.content).join('\n\n')
++
++    return {
++      ...template,
++      placeholderMeta: {
++        sourceKind: 'blocks',
++        sourceText,
++        scannedAt: '2026-05-26T00:00:00.000Z',
++        placeholders: scanContractPlaceholders(sourceText),
++        blockingIssues: [],
++        warningIssues: [],
++      },
++    }
++  }
+ 
+   return [
+-    {
++    withPlaceholderMeta({
+       id: 'tpl-ldxdth-fulltime',
+       name: 'Hop dong lao dong xac dinh thoi han',
+       description: 'Dung cho nhan su full-time, shift leader, store manager va cac vi tri van hanh co thoi han ro rang.',
+@@
+       status: 'active',
+       version: 'HDLD-XDTH-2026.05',
+       updatedAt: '2026-05-24T09:00:00.000Z',
+       blocks: sharedBlocks,
+-    },
+-    {
++    }),
++    withPlaceholderMeta({
+       id: 'tpl-ldkxdth-fulltime',
+       name: 'Hop dong lao dong khong xac dinh thoi han',
+       description: 'Dung cho nhan su da on dinh, can ky khong xac dinh thoi han.',
+@@
+       status: 'active',
+       version: 'HDLD-KXDTH-2026.05',
+       updatedAt: '2026-05-24T09:00:00.000Z',
+       blocks: sharedBlocks,
+-    },
+-    {
++    }),
++    withPlaceholderMeta({
+       id: 'tpl-part-time-operational',
+       name: 'Hop dong lao dong part-time',
+       description: 'Dung cho barista, thu ngan, phuc vu va cac vi tri ca xoay.',
+@@
+               ].join('\n'),
+             }
+           : block
+       )),
+-    },
+-    {
++    }),
++    withPlaceholderMeta({
+       id: 'tpl-contract-appendix',
+       name: 'Phu luc dieu chinh luong / chuc danh',
+       description: 'Dung khi can dieu chinh luong, chuc danh hoac noi dung bo sung sau khi hop dong goc da ky.',
+@@
+         },
+         sharedBlocks[7],
+       ],
+-    },
++    }),
+   ]
+ }
+*** End Patch

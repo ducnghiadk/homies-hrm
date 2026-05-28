@@ -10,10 +10,10 @@ interface ProgressBarProps {
 }
 
 const colorStyles = {
-  default: 'bg-blue-500',
-  success: 'bg-green-500',
-  warning: 'bg-amber-500',
-  error: 'bg-red-500',
+  default: 'bg-primary-500',
+  success: 'bg-success-500',
+  warning: 'bg-warning-500',
+  error: 'bg-error-500',
 }
 
 export function ProgressBar({

@@ -109,7 +109,7 @@ export default function LeaveRequestCard({
             )}>
               {typeInfo.name}
               {r.isHalfDay && (
-                <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">
+                <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-warning-50 text-warning-600 font-medium">
                   Nửa ngày ({r.halfDayPeriod === 'morning' ? 'Sáng' : 'Chiều'})
                 </span>
               )}
@@ -141,9 +141,9 @@ export default function LeaveRequestCard({
 
         {/* Conflict warning — always visible */}
         {r.hasScheduleConflict && r.conflictingShifts && r.conflictingShifts.length > 0 && (
-          <div className="mt-3 p-2.5 bg-amber-50 rounded-xl flex items-start gap-2">
-            <AlertTriangle size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700">
+          <div className="mt-3 p-2.5 bg-warning-50 rounded-xl flex items-start gap-2">
+            <AlertTriangle size={14} className="text-warning-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-warning-700">
               Ảnh hưởng {r.conflictingShifts.length} ca làm
             </p>
           </div>
@@ -174,9 +174,9 @@ export default function LeaveRequestCard({
 
           {/* Conflict details */}
           {r.hasScheduleConflict && r.conflictingShifts && r.conflictingShifts.length > 0 && (
-            <div className="mt-3 px-3 py-2 rounded-xl bg-amber-50/50 border border-amber-100 space-y-1">
+            <div className="mt-3 px-3 py-2 rounded-xl bg-warning-50/50 border border-warning-100 space-y-1">
               {r.conflictingShifts.map((s, i) => (
-                <div key={i} className="text-xs text-amber-600">
+                <div key={i} className="text-xs text-warning-600">
                   • {formatDate(s.date).split(' ').slice(0, 2).join(' ')}: {s.time} ({s.position})
                 </div>
               ))}
@@ -200,13 +200,13 @@ export default function LeaveRequestCard({
           )}
 
           {r.status === 'rejected' && (
-            <div className="mt-3 px-3 py-2 rounded-xl bg-red-50 border border-red-100">
-              <div className="text-xs text-red-700 font-medium">
+            <div className="mt-3 px-3 py-2 rounded-xl bg-error-50 border border-error-100">
+              <div className="text-xs text-error-700 font-medium">
                 ✗ Từ chối{r.approver_name && `: ${r.approver_name}`}
-                {r.rejected_at && <span className="text-red-400"> • {timeAgo(r.rejected_at)}</span>}
+                {r.rejected_at && <span className="text-error-400"> • {timeAgo(r.rejected_at)}</span>}
               </div>
               {r.approver_comment && (
-                <div className="text-xs text-red-600 mt-0.5">{r.approver_comment}</div>
+                <div className="text-xs text-error-600 mt-0.5">{r.approver_comment}</div>
               )}
             </div>
           )}
@@ -238,7 +238,7 @@ export default function LeaveRequestCard({
                     onClick={(e) => { e.stopPropagation(); onReject?.(r.id) }}
                     className="flex-1 h-10 px-4 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold
                       flex items-center justify-center gap-2
-                      hover:bg-red-50 hover:text-red-600 active:scale-[0.98] transition-all"
+                      hover:bg-error-50 hover:text-error-600 active:scale-[0.98] transition-all"
                   >
                     <X size={16} /> Từ chối
                   </button>
@@ -250,7 +250,7 @@ export default function LeaveRequestCard({
                   onClick={(e) => { e.stopPropagation(); onCancel?.(r.id) }}
                   className="flex-1 h-10 px-4 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold
                     flex items-center justify-center gap-2
-                    hover:bg-red-50 hover:text-red-600 active:scale-[0.98] transition-all"
+                    hover:bg-error-50 hover:text-error-600 active:scale-[0.98] transition-all"
                 >
                   <Trash2 size={14} /> Hủy đơn
                 </button>

@@ -22,7 +22,7 @@ export default function GradeRow({ grade, onEdit }: Props) {
             {grade.min_score} – {grade.max_score} điểm
           </span>
           {grade.promotion_eligible && (
-            <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-50 text-green-700">
+            <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-success-50 text-success-700">
               Đủ ĐK thăng tiến
             </span>
           )}
@@ -36,7 +36,7 @@ export default function GradeRow({ grade, onEdit }: Props) {
 
       <button
         onClick={() => onEdit(grade)}
-        className="text-xs px-2 py-1 rounded-lg text-blue-600 hover:bg-blue-50 flex-shrink-0"
+        className="text-xs px-2 py-1 rounded-lg text-primary-600 hover:bg-primary-50 flex-shrink-0"
       >
         Sửa
       </button>

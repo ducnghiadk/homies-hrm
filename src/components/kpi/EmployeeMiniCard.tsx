@@ -44,7 +44,7 @@ export default function EmployeeMiniCard({
       </div>
       <div className="text-right shrink-0">
         <div className="text-sm font-black" style={{
-          color: score >= 85 ? '#10b981' : score >= 70 ? '#f59e0b' : '#ef4444',
+          color: score >= 85 ? '#1E9E57' : score >= 70 ? '#F6C85F' : '#D9381E',
         }}>{score}</div>
         {trend !== undefined && <TrendIndicator value={trend} size="sm" />}
       </div>

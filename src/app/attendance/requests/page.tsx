@@ -6,14 +6,14 @@ import { mockAttRequests } from '@/lib/mock-data-attendance'
 import { Clock, Edit2 } from 'lucide-react'
 
 const typeMap: Record<string, { label: string; color: string; icon: typeof Edit2 }> = {
-  check_in: { label: 'Sửa giờ vào', color: '#3b82f6', icon: Edit2 },
-  check_out: { label: 'Sửa giờ ra', color: '#8b5cf6', icon: Clock },
-  both: { label: 'Sửa cả hai', color: '#f59e0b', icon: Edit2 },
+  check_in: { label: 'Sửa giờ vào', color: '#2F6FA8', icon: Edit2 },
+  check_out: { label: 'Sửa giờ ra', color: '#001D3D', icon: Clock },
+  both: { label: 'Sửa cả hai', color: '#F6C85F', icon: Edit2 },
 }
 const statusMap = {
-  pending: { l: 'Chờ duyệt', c: '#f59e0b' },
-  approved: { l: 'Đã duyệt', c: '#10b981' },
-  rejected: { l: 'Từ chối', c: '#ef4444' },
+  pending: { l: 'Chờ duyệt', c: '#F6C85F' },
+  approved: { l: 'Đã duyệt', c: '#1E9E57' },
+  rejected: { l: 'Từ chối', c: '#D9381E' },
 }
 
 export default function AttendanceRequestsPage() {

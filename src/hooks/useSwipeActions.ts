@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useCallback, useState } from 'react'
+import { useRef, useCallback, useState } from 'react'
 
 interface SwipeActionsConfig {
   onSwipeLeft?: () => void

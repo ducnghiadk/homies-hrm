@@ -14,11 +14,11 @@ export function formatVND(n: number) {
 export type CourseCategory = 'operations' | 'service' | 'safety' | 'management' | 'product'
 
 export const COURSE_CATEGORIES = [
-  { key: 'operations' as CourseCategory, label: '⚙️ Vận hành', color: '#3b82f6' },
-  { key: 'service' as CourseCategory, label: '🤝 Dịch vụ KH', color: '#22c55e' },
-  { key: 'safety' as CourseCategory, label: '🛡️ An toàn', color: '#ef4444' },
-  { key: 'management' as CourseCategory, label: '📊 Quản lý', color: '#8b5cf6' },
-  { key: 'product' as CourseCategory, label: '🧋 Sản phẩm', color: '#f59e0b' },
+  { key: 'operations' as CourseCategory, label: '⚙️ Vận hành', color: '#2F6FA8' },
+  { key: 'service' as CourseCategory, label: '🤝 Dịch vụ KH', color: '#48C079' },
+  { key: 'safety' as CourseCategory, label: '🛡️ An toàn', color: '#D9381E' },
+  { key: 'management' as CourseCategory, label: '📊 Quản lý', color: '#001D3D' },
+  { key: 'product' as CourseCategory, label: '🧋 Sản phẩm', color: '#F6C85F' },
 ]
 
 export const mockCourses = [
@@ -57,10 +57,10 @@ export const mockSkillMatrix = [
 export type OnboardingPhase = 'day1' | 'week1' | 'month1' | 'month2'
 
 export const ONBOARDING_PHASES = [
-  { key: 'day1' as OnboardingPhase, label: '📅 Ngày 1', color: '#3b82f6', target: 'Ngày đầu' },
-  { key: 'week1' as OnboardingPhase, label: '📆 Tuần 1', color: '#22c55e', target: '7 ngày' },
-  { key: 'month1' as OnboardingPhase, label: '📋 Tháng 1', color: '#f59e0b', target: '30 ngày' },
-  { key: 'month2' as OnboardingPhase, label: '✅ Tháng 2', color: '#8b5cf6', target: '60 ngày' },
+  { key: 'day1' as OnboardingPhase, label: '📅 Ngày 1', color: '#2F6FA8', target: 'Ngày đầu' },
+  { key: 'week1' as OnboardingPhase, label: '📆 Tuần 1', color: '#48C079', target: '7 ngày' },
+  { key: 'month1' as OnboardingPhase, label: '📋 Tháng 1', color: '#F6C85F', target: '30 ngày' },
+  { key: 'month2' as OnboardingPhase, label: '✅ Tháng 2', color: '#001D3D', target: '60 ngày' },
 ]
 
 export const mockOnboardingTasks = [
@@ -89,7 +89,7 @@ export const mockOnboardingTasks = [
 export const mockOnboardingInfo = {
   employee_name: 'Đặng Minh Khoa',
   position: 'Phục vụ',
-  store: 'Boba House - Nguyễn Huệ',
+  store: 'Homies Milk Tea - Nguyễn Huệ',
   start_date: '2025-12-01',
   mentor: { name: 'Võ Thanh Bình', role: 'Pha chế Senior', avatar: 'VB' },
   probation_end: '2026-02-01',
@@ -108,9 +108,9 @@ export const mockStaffingForecast = [
 ]
 
 export const mockStaffingAlerts = [
-  { id: 'alert-001', type: 'under' as const, severity: 'high' as const, message: 'Thứ 7 thiếu 2 người tại Nguyễn Huệ', store: 'Boba House - Nguyễn Huệ', date: '2026-02-22' },
-  { id: 'alert-002', type: 'under' as const, severity: 'high' as const, message: 'CN thiếu 2 người tại Phạm Văn Đồng', store: 'Boba House - Phạm Văn Đồng', date: '2026-02-23' },
-  { id: 'alert-003', type: 'over' as const, severity: 'low' as const, message: 'Thứ 5 dư 1 người tại Lê Văn Sỹ', store: 'Boba House - Lê Văn Sỹ', date: '2026-02-20' },
+  { id: 'alert-001', type: 'under' as const, severity: 'high' as const, message: 'Thứ 7 thiếu 2 người tại Nguyễn Huệ', store: 'Homies Milk Tea - Nguyễn Huệ', date: '2026-02-22' },
+  { id: 'alert-002', type: 'under' as const, severity: 'high' as const, message: 'CN thiếu 2 người tại Phạm Văn Đồng', store: 'Homies Milk Tea - Phạm Văn Đồng', date: '2026-02-23' },
+  { id: 'alert-003', type: 'over' as const, severity: 'low' as const, message: 'Thứ 5 dư 1 người tại Lê Văn Sỹ', store: 'Homies Milk Tea - Lê Văn Sỹ', date: '2026-02-20' },
   { id: 'alert-004', type: 'event' as const, severity: 'medium' as const, message: 'Valentine trùng Thứ 6 → dự báo khách tăng 40%', store: 'Tất cả', date: '2026-02-14' },
 ]
 

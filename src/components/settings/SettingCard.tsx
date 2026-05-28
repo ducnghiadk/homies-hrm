@@ -17,18 +17,13 @@ export function SettingCard({ item }: SettingCardProps) {
   const st = statusConfig[item.status];
 
   return (
-    <Link
-      href={item.href}
-      className="block rounded-xl border p-4 transition-all group"
-      style={{
-        background: '#fff',
-        borderColor: '#f3f4f6',
-        '--hover-border': '#e9d5ff',
-      } as React.CSSProperties}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#d8b4fe'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(147,51,234,0.08)'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#f3f4f6'; (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
-    >
-      <div className="flex items-start gap-3">
+    <div className="rounded-xl border p-4 transition-all" style={{ background: '#fff', borderColor: '#f3f4f6' }}>
+      <Link
+        href={item.href}
+        className="flex items-start gap-3 group"
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
+      >
         {/* Icon */}
         <div className={`w-10 h-10 ${item.iconBg} rounded-xl flex items-center justify-center text-xl flex-shrink-0`}>
           {item.icon}
@@ -57,11 +52,28 @@ export function SettingCard({ item }: SettingCardProps) {
 
         {/* Arrow */}
         <span className="text-sm flex-shrink-0 mt-1 transition-colors" style={{ color: '#d1d5db' }}>→</span>
-      </div>
+      </Link>
+
+      {/* Sub Items */}
+      {item.subItems && item.subItems.length > 0 && (
+        <div className="mt-3 pt-3 space-y-1" style={{ borderTop: '1px solid #f3f4f6' }}>
+          {item.subItems.map((sub, idx) => (
+            <Link
+              key={idx}
+              href={sub.href}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-gray-600 hover:bg-gray-50 hover:text-primary-600 transition-colors"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+              <span>{sub.title}</span>
+              <span className="ml-auto text-gray-400">→</span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Quick Actions */}
       {item.quickActions && item.quickActions.length > 0 && (
-        <div className="mt-3 pt-3 flex items-center gap-2" style={{ borderTop: '1px solid #f3f4f6' }}>
+        <div className="mt-3 pt-3 flex items-center gap-2" style={{ borderTop: item.subItems ? 'none' : '1px solid #f3f4f6' }}>
           {item.quickActions.map((action, idx) => (
             <button
               key={idx}
@@ -77,6 +89,6 @@ export function SettingCard({ item }: SettingCardProps) {
           ))}
         </div>
       )}
-    </Link>
+    </div>
   );
 }
