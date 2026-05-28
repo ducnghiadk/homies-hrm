@@ -43,4 +43,4 @@ next-env.d.ts
 # agent and build outputs
 .agent/
 build-output.txt
-
+/.worktrees
