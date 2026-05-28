@@ -11,6 +11,9 @@ import type {
   SkillRefreshRecord, CrossTrainingRecord, CareerNotification,
   SettingsChangeLog, CareerPathTemplate, CareerPathSettings,
   LeaderboardEntry, CareerAnalytics, Achievement,
+  OnboardingCompetencyGroup, OnboardingChecklistTemplate,
+  OnboardingChecklistStage, OnboardingChecklistItemTemplate,
+  EmployeeOnboardingChecklistPlan, EmployeeOnboardingChecklistProgressItem,
 } from './career-path-types';
 
 // ─── Default Levels ──────────────────────────────────────────
@@ -192,6 +195,40 @@ export const defaultOnboardingSteps: OnboardingStep[] = [
 
 // ─── Settings ────────────────────────────────────────────────
 
+export const defaultOnboardingCompetencyGroups: OnboardingCompetencyGroup[] = [
+  { id: 'ocg-shift-discipline', code: 'shift_discipline', label: 'Kỷ luật ca', description: 'Giờ giấc, đồng phục, tác phong và rule ca.', active: true, sort_order: 1 },
+  { id: 'ocg-hygiene-safety', code: 'hygiene_safety', label: 'Vệ sinh và an toàn', description: 'ATTP, vệ sinh tay, quầy và dụng cụ.', active: true, sort_order: 2 },
+  { id: 'ocg-customer-service', code: 'customer_service', label: 'Dịch vụ khách hàng', description: 'Chào khách, xác nhận đơn, xử lý tình huống cơ bản.', active: true, sort_order: 3 },
+  { id: 'ocg-station-operation', code: 'station_operation', label: 'Thao tác vị trí', description: 'Kỹ năng thao tác đúng theo vị trí nhận việc.', active: true, sort_order: 4 },
+  { id: 'ocg-shift-coordination', code: 'shift_coordination', label: 'Phối hợp ca', description: 'Bàn giao, phối hợp quầy-bar và nhịp vận hành.', active: true, sort_order: 5 },
+];
+
+export const defaultOnboardingChecklistTemplates: OnboardingChecklistTemplate[] = [
+  { id: 'onb-template-counter-v1', role_code: 'counter_staff', role_label: 'Nhân viên quầy', version: 1, status: 'active', effective_from: '2026-05-27', created_by: 'hr_admin', updated_by: 'hr_admin', created_at: '2026-05-27', updated_at: '2026-05-27', notes: 'Template nền cho nhân viên quầy take-away.' },
+  { id: 'onb-template-barista-v1', role_code: 'barista', role_label: 'Pha chế', version: 1, status: 'active', effective_from: '2026-05-27', created_by: 'hr_admin', updated_by: 'hr_admin', created_at: '2026-05-27', updated_at: '2026-05-27', notes: 'Template nền cho vị trí pha chế take-away.' },
+  { id: 'onb-template-shift-leader-v1', role_code: 'shift_leader', role_label: 'Shift leader', version: 1, status: 'active', effective_from: '2026-05-27', created_by: 'hr_admin', updated_by: 'hr_admin', created_at: '2026-05-27', updated_at: '2026-05-27', notes: 'Template nền cho shift leader mới nhận vai.' },
+];
+
+export const defaultOnboardingChecklistStages: OnboardingChecklistStage[] = defaultOnboardingChecklistTemplates.flatMap((template) => [
+  { id: `${template.id}-pre-start`, template_id: template.id, code: 'pre_start', label: 'Trước ngày vào làm', sort_order: 1, goal_summary: 'Biết nơi làm, người kèm, giờ có mặt và rule cơ bản.', required_to_pass: true },
+  { id: `${template.id}-day-1`, template_id: template.id, code: 'day_1', label: 'Ngày đầu', sort_order: 2, goal_summary: 'Đi đúng nhịp ca đầu và hiểu luồng công việc chính.', required_to_pass: true },
+  { id: `${template.id}-day-2-3`, template_id: template.id, code: 'day_2_3', label: '3 ngày đầu', sort_order: 3, goal_summary: 'Làm được việc nền có buddy kèm.', required_to_pass: true },
+  { id: `${template.id}-week-1`, template_id: template.id, code: 'week_1', label: 'Tuần 1', sort_order: 4, goal_summary: 'Đứng vị trí ổn trong ca thật ở mức cơ bản.', required_to_pass: true },
+  { id: `${template.id}-week-2`, template_id: template.id, code: 'week_2', label: 'Tuần 2', sort_order: 5, goal_summary: 'Chốt đạt hay cần kèm thêm theo vị trí.', required_to_pass: true },
+]);
+
+export const defaultOnboardingChecklistItems: OnboardingChecklistItemTemplate[] = [
+  { id: 'counter-pre-start-basic', template_id: 'onb-template-counter-v1', stage_id: 'onb-template-counter-v1-pre-start', competency_group_id: 'ocg-shift-discipline', code: 'counter_pre_start_briefing', title: 'Nắm giờ có mặt, đồng phục, buddy và nhóm chat', instruction_text: 'Nhân viên quầy phải biết giờ có mặt, đúng đồng phục, ai kèm ca đầu và đã vào nhóm chat ca.', success_criteria: 'Nhắc lại đúng 4 thông tin cơ bản trước ngày vào làm.', training_method: 'read', evidence_type: 'buddy_check', is_required: true, requires_buddy_confirmation: true, requires_manager_confirmation: false, requires_quiz: false, estimated_minutes: 10, sort_order: 1, active: true },
+  { id: 'counter-day-1-order-flow', template_id: 'onb-template-counter-v1', stage_id: 'onb-template-counter-v1-day-1', competency_group_id: 'ocg-customer-service', code: 'counter_day_1_order_flow', title: 'Chào khách và xác nhận đơn đúng luồng', instruction_text: 'Buddy demo cách chào khách, hỏi size, đá, đường, topping rồi cho làm thử tại quầy.', success_criteria: 'Thực hiện đúng 5 lượt liên tiếp, không thiếu thông tin đơn.', training_method: 'hands_on', evidence_type: 'buddy_check', is_required: true, requires_buddy_confirmation: true, requires_manager_confirmation: false, requires_quiz: false, estimated_minutes: 20, sort_order: 2, active: true },
+  { id: 'counter-day-2-3-handover', template_id: 'onb-template-counter-v1', stage_id: 'onb-template-counter-v1-day-2-3', competency_group_id: 'ocg-shift-coordination', code: 'counter_day_2_3_handover', title: 'Bàn giao quầy và giao đơn không nhầm', instruction_text: 'Nhân viên quầy thực hành đóng ly, dán tem, giao đơn và bàn giao cho bar đúng thứ tự.', success_criteria: 'Xử lý 10 đơn mẫu không nhầm món hoặc topping.', training_method: 'observation', evidence_type: 'manager_check', is_required: true, requires_buddy_confirmation: true, requires_manager_confirmation: true, requires_quiz: false, estimated_minutes: 30, sort_order: 3, active: true },
+  { id: 'barista-day-1-safety-quiz', template_id: 'onb-template-barista-v1', stage_id: 'onb-template-barista-v1-day-1', competency_group_id: 'ocg-hygiene-safety', code: 'barista_day_1_safety_quiz', title: 'Hiểu vệ sinh tay, quầy và bảo quản topping', instruction_text: 'Đọc hướng dẫn ATTP và làm mini quiz ngắn trước khi đứng bar.', success_criteria: 'Qua bài test ngắn tối thiểu 8/10 câu và thao tác rửa tay đúng.', training_method: 'quiz', evidence_type: 'quiz_score', is_required: true, requires_buddy_confirmation: false, requires_manager_confirmation: true, requires_quiz: true, quiz_template_id: 'quiz-barista-safety-core', estimated_minutes: 15, sort_order: 1, active: true },
+  { id: 'barista-day-2-3-core-drinks', template_id: 'onb-template-barista-v1', stage_id: 'onb-template-barista-v1-day-2-3', competency_group_id: 'ocg-station-operation', code: 'barista_day_2_3_core_drinks', title: 'Pha đúng món core theo recipe card', instruction_text: 'Buddy demo các món core A/B/C, sau đó cho nhân viên pha lại theo recipe card.', success_criteria: 'Pha đúng 3 ly liên tiếp mỗi món, đúng định lượng và hình thức.', training_method: 'hands_on', evidence_type: 'buddy_check', is_required: true, requires_buddy_confirmation: true, requires_manager_confirmation: false, requires_quiz: false, estimated_minutes: 40, sort_order: 2, active: true },
+  { id: 'barista-week-1-rush-readiness', template_id: 'onb-template-barista-v1', stage_id: 'onb-template-barista-v1-week-1', competency_group_id: 'ocg-shift-coordination', code: 'barista_week_1_rush_readiness', title: 'Chạy bar cơ bản ở nhịp thật', instruction_text: 'Cho đứng bar ở giờ bình thường để kiểm tốc độ, phối hợp và giữ chất lượng đồ uống.', success_criteria: 'Hoàn thành lượt pha chế thử theo checklist, không lỗi nghiêm trọng về công thức.', training_method: 'observation', evidence_type: 'manager_check', is_required: true, requires_buddy_confirmation: true, requires_manager_confirmation: true, requires_quiz: false, estimated_minutes: 45, sort_order: 3, active: true },
+  { id: 'shift-leader-pre-start-role', template_id: 'onb-template-shift-leader-v1', stage_id: 'onb-template-shift-leader-v1-pre-start', competency_group_id: 'ocg-shift-discipline', code: 'shift_leader_pre_start_role', title: 'Nắm rõ trách nhiệm ca và checklist mở/đóng ca', instruction_text: 'Đọc khung trách nhiệm shift leader, checklist mở ca, cuối ca và rule escalation.', success_criteria: 'Nói lại đúng vai trò, luồng bàn giao và các điểm phải kiểm ca.', training_method: 'read', evidence_type: 'manager_check', is_required: true, requires_buddy_confirmation: false, requires_manager_confirmation: true, requires_quiz: false, estimated_minutes: 20, sort_order: 1, active: true },
+  { id: 'shift-leader-day-1-shadow', template_id: 'onb-template-shift-leader-v1', stage_id: 'onb-template-shift-leader-v1-day-1', competency_group_id: 'ocg-shift-coordination', code: 'shift_leader_day_1_shadow', title: 'Theo shadow 1 ca để học phân công và kiểm quầy', instruction_text: 'Đi cùng store manager hoặc shift leader cũ trong 1 ca để quan sát phân ca, kiểm quầy, xử lý phát sinh.', success_criteria: 'Nhắc lại đúng thứ tự đầu ca, giữa ca, cuối ca và ai phụ trách từng khu.', training_method: 'shadow', evidence_type: 'manager_check', is_required: true, requires_buddy_confirmation: false, requires_manager_confirmation: true, requires_quiz: false, estimated_minutes: 60, sort_order: 2, active: true },
+  { id: 'shift-leader-week-2-stage-review', template_id: 'onb-template-shift-leader-v1', stage_id: 'onb-template-shift-leader-v1-week-2', competency_group_id: 'ocg-customer-service', code: 'shift_leader_week_2_stage_review', title: 'Chốt ca thử và đánh giá nhân viên mới theo chặng', instruction_text: 'Tự điều phối 1 ca nhẹ, chốt follow-up người mới và báo cáo lại store manager.', success_criteria: 'Store manager đánh giá Đạt hoặc Cần kèm thêm với nhận xét rõ điểm mạnh, điểm hổng.', training_method: 'observation', evidence_type: 'manager_check', is_required: true, requires_buddy_confirmation: false, requires_manager_confirmation: true, requires_quiz: false, estimated_minutes: 60, sort_order: 3, active: true },
+];
+
 export const defaultSettings: CareerPathSettings = {
   buddy_system_enabled: true,
   leaderboard_enabled: true,
@@ -199,6 +236,14 @@ export const defaultSettings: CareerPathSettings = {
   endorsements_enabled: true,
   notifications_enabled: true,
   onboarding_enabled: true,
+  onboarding_policy_enabled: true,
+  onboarding_policy_summary_trigger: 'contract_send',
+  onboarding_policy_full_trigger: 'days_before_start',
+  onboarding_policy_full_days_before_start: 1,
+  onboarding_policy_require_ack: true,
+  onboarding_policy_max_reminders: 1,
+  onboarding_policy_template_id: 'default-policy-v1',
+  onboarding_policy_alert_scope: 'hr_and_store_manager',
   skill_refresh_enabled: false,
   cross_training_enabled: false,
   trial_duration_days: 14,
@@ -324,6 +369,126 @@ export const sampleEmployeeOnboarding: import('./career-path-types').EmployeeOnb
   },
 ];
 
+export const sampleEmployeeOnboardingChecklistPlans: EmployeeOnboardingChecklistPlan[] = [
+  {
+    id: 'onb-plan-007',
+    employee_id: 'emp-007',
+    template_id: 'onb-template-counter-v1',
+    role_code: 'counter_staff',
+    assigned_store_id: 'store-001',
+    assigned_buddy_id: 'emp-006',
+    assigned_buddy_name: 'Nguyễn Thị Mai',
+    assigned_manager_id: 'emp-002',
+    assigned_manager_name: 'Trần Thị Lan',
+    start_date: '2025-12-01',
+    current_stage_code: 'day_2_3',
+    status: 'in_progress',
+    overall_progress: 67,
+    overall_note: 'Đã qua ca đầu, đang cần kèm thêm phần bàn giao quầy.',
+    assigned_at: '2025-11-30',
+    created_at: '2025-11-30',
+    updated_at: '2025-12-03',
+  },
+  {
+    id: 'onb-plan-011',
+    employee_id: 'emp-011',
+    template_id: 'onb-template-counter-v1',
+    role_code: 'counter_staff',
+    assigned_store_id: 'store-002',
+    assigned_buddy_id: 'emp-009',
+    assigned_buddy_name: 'Tran Van Duc',
+    assigned_manager_id: 'emp-003',
+    assigned_manager_name: 'Le Hoang Nam',
+    start_date: '2025-01-10',
+    current_stage_code: 'day_2_3',
+    status: 'in_progress',
+    overall_progress: 67,
+    overall_note: 'Da xong huong dan co ban, dang cho quan ly chot item ban giao quay.',
+    assigned_at: '2025-01-10',
+    created_at: '2025-01-10',
+    updated_at: '2025-01-12',
+  },
+];
+
+export const sampleEmployeeOnboardingChecklistProgressItems: EmployeeOnboardingChecklistProgressItem[] = [
+  {
+    id: 'onb-plan-007-item-1',
+    onboarding_plan_id: 'onb-plan-007',
+    checklist_item_id: 'counter-pre-start-basic',
+    status: 'passed',
+    note: 'Đã xác nhận giờ có mặt và vào nhóm chat.',
+    started_at: '2025-11-30',
+    completed_at: '2025-11-30',
+    buddy_confirmed_by: 'emp-006',
+    buddy_confirmed_at: '2025-11-30',
+    quiz_score: null,
+  },
+  {
+    id: 'onb-plan-007-item-2',
+    onboarding_plan_id: 'onb-plan-007',
+    checklist_item_id: 'counter-day-1-order-flow',
+    status: 'passed',
+    note: 'Đứng quầy ổn ở khung vắng khách.',
+    started_at: '2025-12-01',
+    completed_at: '2025-12-01',
+    buddy_confirmed_by: 'emp-006',
+    buddy_confirmed_at: '2025-12-01',
+    quiz_score: null,
+  },
+  {
+    id: 'onb-plan-007-item-3',
+    onboarding_plan_id: 'onb-plan-007',
+    checklist_item_id: 'counter-day-2-3-handover',
+    status: 'in_progress',
+    note: 'Còn nhầm 1 đơn khi đông khách, cần kèm thêm cuối ca.',
+    started_at: '2025-12-02',
+    completed_at: null,
+    buddy_confirmed_by: null,
+    buddy_confirmed_at: null,
+    manager_confirmed_by: null,
+    manager_confirmed_at: null,
+    quiz_score: null,
+  },
+  {
+    id: 'onb-plan-011-item-1',
+    onboarding_plan_id: 'onb-plan-011',
+    checklist_item_id: 'counter-pre-start-basic',
+    status: 'passed',
+    note: 'Da biet gio co mat va buddy phu trach.',
+    started_at: '2025-01-10',
+    completed_at: '2025-01-10',
+    buddy_confirmed_by: 'emp-009',
+    buddy_confirmed_at: '2025-01-10',
+    quiz_score: null,
+  },
+  {
+    id: 'onb-plan-011-item-2',
+    onboarding_plan_id: 'onb-plan-011',
+    checklist_item_id: 'counter-day-1-order-flow',
+    status: 'passed',
+    note: 'Da qua duoc order flow trong khung khach vua.',
+    started_at: '2025-01-10',
+    completed_at: '2025-01-10',
+    buddy_confirmed_by: 'emp-009',
+    buddy_confirmed_at: '2025-01-10',
+    quiz_score: null,
+  },
+  {
+    id: 'onb-plan-011-item-3',
+    onboarding_plan_id: 'onb-plan-011',
+    checklist_item_id: 'counter-day-2-3-handover',
+    status: 'in_progress',
+    note: 'Buddy da xac nhan thao tac on, dang cho quan ly xem luc dong khach.',
+    started_at: '2025-01-11',
+    completed_at: '2025-01-11',
+    buddy_confirmed_by: 'emp-009',
+    buddy_confirmed_at: '2025-01-11',
+    manager_confirmed_by: null,
+    manager_confirmed_at: null,
+    quiz_score: null,
+  },
+];
+
 // ─── Sample Notifications ────────────────────────────────────
 
 export const sampleNotifications: CareerNotification[] = [
@@ -379,6 +544,12 @@ export const sampleTemplate: CareerPathTemplate = {
     buddy_rewards: defaultBuddyRewards,
     trial_checklist: defaultTrialChecklist,
     onboarding_steps: defaultOnboardingSteps,
+    onboarding_competency_groups: defaultOnboardingCompetencyGroups,
+    onboarding_checklist_templates: defaultOnboardingChecklistTemplates,
+    onboarding_checklist_stages: defaultOnboardingChecklistStages,
+    onboarding_checklist_items: defaultOnboardingChecklistItems,
+    onboarding_employee_plans: sampleEmployeeOnboardingChecklistPlans,
+    onboarding_employee_progress_items: sampleEmployeeOnboardingChecklistProgressItems,
   },
 };
 

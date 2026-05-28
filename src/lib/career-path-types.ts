@@ -17,6 +17,13 @@ export type OnboardingStepType = 'video' | 'document' | 'quiz' | 'task' | 'check
 export type OnboardingStepStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
 export type SkillRefreshStatus = 'valid' | 'expiring_soon' | 'expired';
 export type LeaderboardCategory = 'top_mentor' | 'streak' | 'skill_unlock' | 'drinks_made';
+export type OnboardingRoleCode = 'counter_staff' | 'barista' | 'shift_leader';
+export type OnboardingTemplateStatus = 'draft' | 'active' | 'archived';
+export type OnboardingStageCode = 'pre_start' | 'day_1' | 'day_2_3' | 'week_1' | 'week_2';
+export type OnboardingTrainingMethod = 'read' | 'watch_demo' | 'shadow' | 'hands_on' | 'observation' | 'quiz';
+export type OnboardingEvidenceType = 'none' | 'buddy_check' | 'manager_check' | 'quiz_score' | 'photo';
+export type EmployeeOnboardingChecklistPlanStatus = 'assigned' | 'in_progress' | 'completed' | 'extended' | 'cancelled';
+export type EmployeeOnboardingChecklistItemStatus = 'not_started' | 'in_progress' | 'passed' | 'need_more_coaching';
 
 // ─── 1. Career Level ─────────────────────────────────────────
 
@@ -241,6 +248,169 @@ export interface OnboardingStepProgress {
   score?: number; // for quiz
 }
 
+export interface OnboardingCompetencyGroup {
+  id: string;
+  code: 'shift_discipline' | 'hygiene_safety' | 'customer_service' | 'station_operation' | 'shift_coordination';
+  label: string;
+  description?: string;
+  active: boolean;
+  sort_order: number;
+}
+
+export interface OnboardingChecklistTemplate {
+  id: string;
+  role_code: OnboardingRoleCode;
+  role_label: string;
+  version: number;
+  status: OnboardingTemplateStatus;
+  effective_from?: string;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+  notes?: string;
+}
+
+export interface OnboardingChecklistStage {
+  id: string;
+  template_id: string;
+  code: OnboardingStageCode;
+  label: string;
+  sort_order: number;
+  goal_summary: string;
+  required_to_pass: boolean;
+}
+
+export interface OnboardingChecklistItemTemplate {
+  id: string;
+  template_id: string;
+  stage_id: string;
+  competency_group_id: string;
+  code: string;
+  title: string;
+  instruction_text: string;
+  success_criteria: string;
+  training_method: OnboardingTrainingMethod;
+  evidence_type: OnboardingEvidenceType;
+  is_required: boolean;
+  requires_buddy_confirmation: boolean;
+  requires_manager_confirmation: boolean;
+  requires_quiz: boolean;
+  quiz_template_id?: string;
+  estimated_minutes?: number;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface EmployeeOnboardingChecklistPlan {
+  id: string;
+  employee_id: string;
+  template_id: string;
+  role_code: OnboardingRoleCode;
+  assigned_store_id: string;
+  assigned_buddy_id?: string | null;
+  assigned_buddy_name?: string | null;
+  assigned_manager_id?: string | null;
+  assigned_manager_name?: string | null;
+  start_date: string;
+  current_stage_code: OnboardingStageCode;
+  status: EmployeeOnboardingChecklistPlanStatus;
+  overall_progress: number;
+  overall_note?: string;
+  assigned_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmployeeOnboardingChecklistProgressItem {
+  id: string;
+  onboarding_plan_id: string;
+  checklist_item_id: string;
+  status: EmployeeOnboardingChecklistItemStatus;
+  note?: string;
+  started_at: string | null;
+  completed_at: string | null;
+  buddy_confirmed_by?: string | null;
+  buddy_confirmed_at?: string | null;
+  manager_confirmed_by?: string | null;
+  manager_confirmed_at?: string | null;
+  quiz_score?: number | null;
+}
+
+export type OnboardingThreeViewItemStatus =
+  | 'not_started'
+  | 'learning'
+  | 'pending_review'
+  | 'passed'
+  | 'needs_coaching'
+  | 'not_applicable';
+
+export type OnboardingThreeViewActionOwner = 'employee' | 'buddy' | 'manager' | 'none';
+export type OnboardingThreeViewBlockerType = 'item' | 'owner' | 'stage_rule';
+export type OnboardingThreeViewBlockerSeverity = 'attention' | 'slow' | 'risk';
+export type OnboardingThreeViewStageStatus = 'locked' | 'current' | 'passed';
+
+export interface OnboardingThreeViewChecklistItem {
+  id: string;
+  stage_id: string;
+  stage_code: OnboardingStageCode;
+  title: string;
+  required: boolean;
+  employee_action: string;
+  buddy_action: string;
+  manager_check: string;
+  passing_standard: string;
+  status: OnboardingThreeViewItemStatus;
+  action_owner: OnboardingThreeViewActionOwner;
+  note?: string;
+}
+
+export interface OnboardingThreeViewBlocker {
+  id: string;
+  employee_id: string;
+  stage_id: string;
+  stage_code: OnboardingStageCode;
+  item_id?: string;
+  item_title?: string;
+  type: OnboardingThreeViewBlockerType;
+  severity: OnboardingThreeViewBlockerSeverity;
+  action_owner: OnboardingThreeViewActionOwner;
+  label: string;
+  detail: string;
+}
+
+export interface OnboardingThreeViewStageSummary {
+  id: string;
+  code: OnboardingStageCode;
+  label: string;
+  goal_summary: string;
+  status: OnboardingThreeViewStageStatus;
+  total_items: number;
+  passed_items: number;
+  required_items: number;
+  required_items_remaining: number;
+}
+
+export interface OnboardingThreeViewSnapshot {
+  employee_id: string;
+  employee_name: string;
+  role_code: OnboardingRoleCode;
+  assigned_store_id: string;
+  assigned_buddy_id?: string | null;
+  assigned_buddy_name?: string | null;
+  assigned_manager_id?: string | null;
+  assigned_manager_name?: string | null;
+  current_stage_code: OnboardingStageCode;
+  current_stage_label: string;
+  next_stage_code: OnboardingStageCode | null;
+  next_stage_label: string | null;
+  can_open_next_stage: boolean;
+  blockers: OnboardingThreeViewBlocker[];
+  items: OnboardingThreeViewChecklistItem[];
+  current_stage_items: OnboardingThreeViewChecklistItem[];
+  stages: OnboardingThreeViewStageSummary[];
+}
+
 // ─── 12. Career Goal ─────────────────────────────────────────
 
 export interface CareerGoal {
@@ -386,6 +556,12 @@ export interface CareerPathTemplate {
     buddy_rewards: BuddyRewardConfig[];
     trial_checklist: TrialChecklistItem[];
     onboarding_steps: OnboardingStep[];
+    onboarding_competency_groups?: OnboardingCompetencyGroup[];
+    onboarding_checklist_templates?: OnboardingChecklistTemplate[];
+    onboarding_checklist_stages?: OnboardingChecklistStage[];
+    onboarding_checklist_items?: OnboardingChecklistItemTemplate[];
+    onboarding_employee_plans?: EmployeeOnboardingChecklistPlan[];
+    onboarding_employee_progress_items?: EmployeeOnboardingChecklistProgressItem[];
   };
 }
 
