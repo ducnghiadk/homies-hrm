@@ -19,6 +19,12 @@ function getStatusLabel(status: OnboardingThreeViewSnapshot['current_stage_items
   return 'Chua lam'
 }
 
+function getTrackLabel(track?: OnboardingThreeViewSnapshot['primary_track']) {
+  if (track === 'barista') return 'Pha che'
+  if (track === 'shift_leader') return 'Shift leader'
+  return 'Thu ngan / phuc vu'
+}
+
 export function BuddyWorkview({
   snapshots,
   selectedEmployeeId,
@@ -32,8 +38,8 @@ export function BuddyWorkview({
   const stats = useMemo(() => ({
     total: snapshots.length,
     waitingBuddy: snapshots.flatMap((snapshot) => snapshot.current_stage_items).filter((item) => item.action_owner === 'buddy').length,
-    blockedByBuddy: snapshots.filter((snapshot) => snapshot.blockers.some((blocker) => blocker.action_owner === 'buddy')).length,
-    coaching: snapshots.flatMap((snapshot) => snapshot.current_stage_items).filter((item) => item.status === 'needs_coaching').length,
+    blockedByBuddy: snapshots.filter((snapshot) => snapshot.open_red_flags?.length).length,
+    coaching: snapshots.flatMap((snapshot) => snapshot.current_stage_items).filter((item) => item.quality_result === 'needs_retrain').length,
   }), [snapshots])
 
   return (
@@ -76,14 +82,14 @@ export function BuddyWorkview({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-sm font-bold text-[#001D3D]">{snapshot.employee_name}</div>
-                      <div className="mt-1 text-xs text-[#516273]">{snapshot.current_stage_label}</div>
+                      <div className="mt-1 text-xs text-[#516273]">{snapshot.current_stage_label} • {getTrackLabel(snapshot.primary_track)}</div>
                     </div>
-                    <span className="rounded-full bg-[#EEF4FB] px-3 py-1 text-[11px] font-bold text-[#2F6FA8]">
-                      {waitingCount} cho ban
+                    <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${snapshot.readiness_label === 'tu_lam' ? 'bg-[#DDF4EC] text-[#107C41]' : 'bg-[#FFF4D6] text-[#8A5B00]'}`}>
+                      {snapshot.readiness_label === 'tu_lam' ? 'Da len tu lam' : `${waitingCount} cho ban`}
                     </span>
                   </div>
                   <div className="mt-3 text-sm text-[#516273]">
-                    {snapshot.blockers[0]?.detail || 'Khong co blocker dang mo'}
+                    {snapshot.top_risk_label || snapshot.blockers[0]?.detail || 'Khong co blocker dang mo'}
                   </div>
                 </button>
               )
@@ -99,14 +105,14 @@ export function BuddyWorkview({
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7A6B53]">Chi tiet buddy</div>
                 <h2 className="mt-2 text-2xl font-extrabold text-[#001D3D]">{selectedSnapshot.employee_name}</h2>
-                <div className="mt-1 text-sm text-[#516273]">{selectedSnapshot.current_stage_label}</div>
+                <div className="mt-1 text-sm text-[#516273]">{selectedSnapshot.current_stage_label} • {getTrackLabel(selectedSnapshot.primary_track)}</div>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-[22px] bg-[#FFF8E8] p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A5B00]">Dang ket vi ban</div>
                   <div className="mt-2 text-sm font-semibold text-[#001D3D]">
-                    {selectedSnapshot.blockers.filter((blocker) => blocker.action_owner === 'buddy').map((blocker) => blocker.item_title || blocker.label).join(', ') || 'Khong co item nao dang ket vi buddy'}
+                    {selectedSnapshot.open_red_flags?.map((flag) => flag.label).join(', ') || selectedSnapshot.blockers.filter((blocker) => blocker.action_owner === 'buddy').map((blocker) => blocker.item_title || blocker.label).join(', ') || 'Khong co item nao dang ket vi buddy'}
                   </div>
                 </div>
                 <div className="rounded-[22px] bg-[#FFFDF9] p-4">
@@ -129,9 +135,14 @@ export function BuddyWorkview({
                           <div className="text-sm font-bold text-[#001D3D]">{item.title}</div>
                           <div className="mt-1 text-xs text-[#516273]">{item.passing_standard}</div>
                         </div>
-                        <span className="rounded-full bg-[#EEF4FB] px-3 py-1 text-[11px] font-bold text-[#2F6FA8]">
-                          {getStatusLabel(item.status)}
-                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-[#EEF4FB] px-3 py-1 text-[11px] font-bold text-[#2F6FA8]">
+                            {getStatusLabel(item.status)}
+                          </span>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${item.quality_result === 'met_independently' ? 'bg-[#DDF4EC] text-[#107C41]' : item.quality_result === 'needs_retrain' ? 'bg-[#FFF4D6] text-[#8A5B00]' : 'bg-[#FFFDF9] text-[#7A6B53]'}`}>
+                            {item.quality_result === 'met_independently' ? 'Dat tu lam' : item.quality_result === 'met_with_support' ? 'Dat khi co kem' : item.quality_result === 'needs_retrain' ? 'Can kem lai' : 'Chua dat'}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -144,6 +155,23 @@ export function BuddyWorkview({
                           <div className="mt-1">{item.buddy_action}</div>
                         </div>
                       </div>
+
+                      {item.self_check_prompt ? (
+                        <div className="mt-3 rounded-[18px] bg-[#FFF8E8] p-3 text-sm text-[#001D3D]">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A5B00]">Nhan vien tu nhin lai</div>
+                          <div className="mt-1">{item.self_check_prompt}</div>
+                        </div>
+                      ) : null}
+
+                      {item.red_flags?.length ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {item.red_flags.map((flag) => (
+                            <span key={flag.code} className="rounded-full bg-[#FFF4D6] px-3 py-1 text-[11px] font-bold text-[#8A5B00]">
+                              {flag.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
 
                       <textarea
                         value={draftNotes[draftKey] ?? item.note ?? ''}

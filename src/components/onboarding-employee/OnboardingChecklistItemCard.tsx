@@ -4,6 +4,8 @@ import { CheckCircle, Circle } from 'lucide-react'
 
 export type OnboardingChecklistProgressView = {
   status: 'not_started' | 'learning' | 'pending_review' | 'passed' | 'needs_coaching' | 'not_applicable'
+  qualityResult?: 'not_met' | 'met_with_support' | 'met_independently' | 'needs_retrain'
+  workflowStatus?: 'not_started' | 'learning' | 'pending_buddy_review' | 'pending_manager_gate' | 'completed' | 'not_applicable'
   note?: string
 }
 
@@ -13,6 +15,10 @@ type OnboardingChecklistItemCardProps = {
   buddyAction: string
   managerCheck: string
   successCriteria: string
+  supportedCriteria?: string
+  independentCriteria?: string
+  selfCheckPrompt?: string
+  redFlags?: Array<{ code: string; label: string }>
   actionOwnerLabel: string
   required: boolean
   progress: OnboardingChecklistProgressView
@@ -60,12 +66,31 @@ function getChecklistItemTone(status: OnboardingChecklistProgressView['status'])
   }
 }
 
+function getQualityResultLabel(value?: OnboardingChecklistProgressView['qualityResult']) {
+  if (value === 'met_independently') return 'Dat tu lam'
+  if (value === 'met_with_support') return 'Dat khi co kem'
+  if (value === 'needs_retrain') return 'Can kem lai'
+  return 'Chua dat'
+}
+
+function getWorkflowStatusLabel(value?: OnboardingChecklistProgressView['workflowStatus']) {
+  if (value === 'pending_buddy_review') return 'Cho buddy review'
+  if (value === 'pending_manager_gate') return 'Cho quan ly duyet gate'
+  if (value === 'completed') return 'Da xong'
+  if (value === 'learning') return 'Dang hoc'
+  return 'Chua chot'
+}
+
 export function OnboardingChecklistItemCard({
   title,
   employeeAction,
   buddyAction,
   managerCheck,
   successCriteria,
+  supportedCriteria,
+  independentCriteria,
+  selfCheckPrompt,
+  redFlags,
   actionOwnerLabel,
   required,
   progress,
@@ -106,6 +131,20 @@ export function OnboardingChecklistItemCard({
               {'\u0054\u0069\u00ea\u0075 \u0063\u0068\u0075\u1ea9\u006e \u0111\u1ea1t'}
             </div>
             <div className="mt-1 text-sm text-[#001D3D]">{successCriteria}</div>
+            {(supportedCriteria || independentCriteria) ? (
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                {supportedCriteria ? (
+                  <div className="rounded-xl bg-white px-3 py-2 text-xs text-[#516273]">
+                    <span className="font-semibold text-[#2F6FA8]">Muc co kem:</span> {supportedCriteria}
+                  </div>
+                ) : null}
+                {independentCriteria ? (
+                  <div className="rounded-xl bg-white px-3 py-2 text-xs text-[#516273]">
+                    <span className="font-semibold text-[#1E9E57]">Muc tu lam:</span> {independentCriteria}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-3 rounded-2xl bg-[#F7F9FC] px-3 py-3">
@@ -122,7 +161,37 @@ export function OnboardingChecklistItemCard({
             <span className="rounded-full bg-[#F5F5F5] px-3 py-1 font-semibold text-[#516273]">
               {actionOwnerLabel}
             </span>
+            <span className="rounded-full bg-[#EEF4FB] px-3 py-1 font-semibold text-[#2F6FA8]">
+              {getQualityResultLabel(progress.qualityResult)}
+            </span>
+            <span className="rounded-full bg-[#FFFDF9] px-3 py-1 font-semibold text-[#7A6B53]">
+              {getWorkflowStatusLabel(progress.workflowStatus)}
+            </span>
           </div>
+
+          {selfCheckPrompt ? (
+            <div className="mt-3 rounded-2xl bg-[#FFF8E8] px-3 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-[#8A5B00]">
+                Ban tu nhin lai
+              </div>
+              <div className="mt-1 text-sm text-[#001D3D]">{selfCheckPrompt}</div>
+            </div>
+          ) : null}
+
+          {redFlags?.length ? (
+            <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-[#8A5B00]">
+                Loi do can tranh
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {redFlags.map((flag) => (
+                  <span key={flag.code} className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#8A5B00]">
+                    {flag.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {(onStart || onRequestReview) ? (
             <div className="mt-4 flex flex-wrap gap-2">

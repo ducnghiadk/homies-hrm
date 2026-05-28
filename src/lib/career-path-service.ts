@@ -24,7 +24,7 @@ import {
   defaultPromotionConditions, defaultBuddyRewards, defaultTrialChecklist,
   defaultOnboardingSteps, defaultSettings, defaultOnboardingCompetencyGroups,
   defaultOnboardingChecklistTemplates, defaultOnboardingChecklistStages,
-  defaultOnboardingChecklistItems,
+  defaultOnboardingChecklistItems, onboardingOutputItemDefinitions,
   sampleEmployeeOnboardingChecklistPlans, sampleEmployeeOnboardingChecklistProgressItems,
   sampleEmployeeSkills, sampleBuddyAssignments, samplePromotionRequests,
   sampleTypeChangeRequests, sampleTrialEvaluations, sampleGoals,
@@ -679,6 +679,10 @@ export function getOnboardingChecklistItems(templateId: string): OnboardingCheck
   return _onboardingChecklistItems
     .filter(item => item.template_id === templateId && item.active)
     .sort((left, right) => left.sort_order - right.sort_order);
+}
+
+export function getOnboardingOutputItemDefinitions() {
+  return onboardingOutputItemDefinitions;
 }
 
 export function getOnboardingChecklistBundle(roleCode: OnboardingRoleCode) {

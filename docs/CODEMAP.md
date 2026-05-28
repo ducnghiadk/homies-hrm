@@ -98,14 +98,14 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - Dung khi: can huong dan nguoi van hanh bam tung man hinh theo dung flow
 
 ### Noi quy nhan viec va onboarding
-- Mo ta: flow gui noi quy 2 nhip, setting toi thieu, xac nhan cua nhan vien, nhac day-1, va workspace onboard van hanh do quan ly cua hang cam chinh.
+- Mo ta: flow gui noi quy 2 nhip, setting toi thieu, xac nhan cua nhan vien, nhac day-1, va workspace onboard van hanh do quan ly cua hang cam chinh. Cum nay hien da co them lop `output standard`: track `thu ngan / phuc vu`, `pha che`, muc `dat khi co kem / dat tu lam`, loi do, va gate giao ca co ban.
 - File chinh: `src/lib/services/onboarding-policy-service.ts`, `src/lib/services/onboarding-operations-service.ts`, `src/lib/services/onboarding-stage-service.ts`, `src/app/career-path/settings/page.tsx`, `src/app/career-path/onboarding/page.tsx`, `src/components/onboarding-operations/*`, `src/components/onboarding-employee/*`, `src/app/employees/contracts/[id]/page.tsx`, `src/app/employees/[id]/page.tsx`, `src/app/onboarding/page.tsx`
-- Dung khi: sua moc gui noi quy, nhac lai, xac nhan nhan vien, checklist onboarding ngay dau, rule block/can hoan tat som, danh sach nguoi sap vao lam, va checklist chi tiet theo tung nguoi
+- Dung khi: sua moc gui noi quy, nhac lai, xac nhan nhan vien, checklist onboarding ngay dau, rule block/can hoan tat som, danh sach nguoi sap vao lam, checklist chi tiet theo tung nguoi, va man hinh readiness / gate cho buddy - quan ly
 
 ### Nen du lieu checklist onboarding mau
-- Mo ta: nhom nang luc mac dinh, template theo vi tri, chang onboarding, va item checklist co tieu chuan dat de sau nay gan cho nhan vien that.
+- Mo ta: nhom nang luc mac dinh, template theo vi tri, chang onboarding, item checklist, va metadata output standard de suy ra self-check, red flag, muc `co kem / tu lam`.
 - File chinh: `src/lib/career-path-types.ts`, `src/lib/mock-data-career-path.ts`, `src/lib/career-path-service.ts`, `src/lib/services/onboarding-stage-service.ts`
-- Dung khi: sua cau truc du lieu onboarding mau cho `nhan vien quay`, `pha che`, `shift leader`, hoac map checklist mau vao UI/employee plan sau nay
+- Dung khi: sua cau truc du lieu onboarding mau cho `nhan vien quay`, `pha che`, `shift leader`, map checklist mau vao UI/employee plan, hoac tinh queue `can kem` / `san sang giao ca`
 
 ### Spec flow va quyet dinh moi
 - Mo ta: cac spec nho de chot flow nghiep vu truoc khi code, nhu flow noi quy nhan viec, setting toi thieu, va cac quyet dinh scope tuong tu.

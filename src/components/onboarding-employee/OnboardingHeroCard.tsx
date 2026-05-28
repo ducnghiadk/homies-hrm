@@ -17,6 +17,7 @@ type OnboardingHeroCardProps = {
   employeeName: string
   positionLabel: string
   storeLabel: string
+  trackLabel?: string
   headline: string
   startDateLabel: string
   buddyName: string
@@ -29,6 +30,7 @@ export function OnboardingHeroCard({
   employeeName,
   positionLabel,
   storeLabel,
+  trackLabel,
   headline,
   startDateLabel,
   buddyName,
@@ -52,6 +54,11 @@ export function OnboardingHeroCard({
             <p className="text-sm text-[#4B5563]">
               {positionLabel} {'\u2022'} {storeLabel}
             </p>
+            {trackLabel ? (
+              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#7A6B53]">
+                Track: {trackLabel}
+              </p>
+            ) : null}
           </div>
           <div className="rounded-2xl bg-[#F4F8FC] px-4 py-3 text-sm font-semibold text-[#001D3D] md:text-base">
             {headline}

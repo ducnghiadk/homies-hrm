@@ -1,5 +1,11 @@
 import type {
   EmployeeOnboardingChecklistProgressItem,
+  OnboardingOutputGateStatus,
+  OnboardingOutputQualityResult,
+  OnboardingOutputReadinessLabel,
+  OnboardingOutputSnapshotRedFlag,
+  OnboardingOutputTrack,
+  OnboardingOutputWorkflowStatus,
   OnboardingChecklistItemTemplate,
   OnboardingThreeViewActionOwner,
   OnboardingThreeViewBlocker,
@@ -11,6 +17,7 @@ import type {
 import {
   getEmployeeOnboardingChecklistBundleForEmployee,
   getEmployeeOnboardingChecklistPlan,
+  getOnboardingOutputItemDefinitions,
   updateEmployeeOnboardingChecklistProgressItem,
 } from '@/lib/career-path-service'
 import { mockEmployees } from '@/lib/mock-data'
@@ -19,6 +26,34 @@ type EmployeeChecklistBundle = NonNullable<ReturnType<typeof getEmployeeOnboardi
 
 function getEmployeeById(employeeId: string) {
   return mockEmployees.find((employee) => employee.id === employeeId) ?? null
+}
+
+function getPrimaryTrack(roleCode: string): OnboardingOutputTrack {
+  if (roleCode === 'barista') return 'barista'
+  if (roleCode === 'shift_leader') return 'shift_leader'
+  return 'cashier_service'
+}
+
+function getOutputDefinition(item: OnboardingChecklistItemTemplate, roleCode: string) {
+  const definitions = getOnboardingOutputItemDefinitions()
+  const direct = definitions[item.code]
+  if (direct) return direct
+
+  const track = getPrimaryTrack(roleCode)
+  return {
+    code: item.code,
+    track,
+    self_check_prompt: `Ban tu danh gia muc do tu tin voi item ${item.title} nhu the nao?`,
+    pass_standard_supported: `Dat item ${item.title} khi co buddy ho tro sat.`,
+    pass_standard_independent: item.success_criteria,
+    red_flags: [
+      {
+        code: `${item.code}_repeat_issue`,
+        label: 'Con lap lai loi co ban',
+        detail: `Item ${item.title} van con lap lai loi hoac can nhac qua nhieu lan.`,
+      },
+    ],
+  }
 }
 
 function deriveThreeViewStatus(
@@ -57,6 +92,53 @@ function deriveThreeViewStatus(
   }
 
   return 'not_started'
+}
+
+function deriveOutputWorkflowStatus(
+  item: OnboardingChecklistItemTemplate,
+  progress: EmployeeOnboardingChecklistProgressItem,
+): OnboardingOutputWorkflowStatus {
+  const status = deriveThreeViewStatus(item, progress)
+  if (status === 'passed') return 'completed'
+  if (status === 'pending_review') {
+    if (
+      item.requires_manager_confirmation
+      && Boolean(progress.completed_at)
+      && (!item.requires_buddy_confirmation || Boolean(progress.buddy_confirmed_at))
+      && !progress.manager_confirmed_at
+    ) {
+      return 'pending_manager_gate'
+    }
+
+    return 'pending_buddy_review'
+  }
+
+  if (status === 'learning' || status === 'needs_coaching') return 'learning'
+  return 'not_started'
+}
+
+function deriveOutputQualityResult(
+  item: OnboardingChecklistItemTemplate,
+  progress: EmployeeOnboardingChecklistProgressItem,
+): OnboardingOutputQualityResult {
+  const status = deriveThreeViewStatus(item, progress)
+  if (status === 'passed') {
+    if (item.requires_manager_confirmation || item.requires_buddy_confirmation) {
+      return 'met_independently'
+    }
+
+    return 'met_with_support'
+  }
+
+  if (status === 'pending_review' || status === 'learning') {
+    return 'met_with_support'
+  }
+
+  if (status === 'needs_coaching') {
+    return 'needs_retrain'
+  }
+
+  return 'not_met'
 }
 
 function resolveActionOwner(
@@ -101,8 +183,10 @@ function buildChecklistItems(bundle: EmployeeChecklistBundle): OnboardingThreeVi
 
   return bundle.items.map((item) => {
     const status = deriveThreeViewStatus(item, item.progress)
+    const definition = getOutputDefinition(item, bundle.plan.role_code)
     return {
       id: item.id,
+      code: item.code,
       stage_id: item.stage_id,
       stage_code: stageCodeByStageId.get(item.stage_id) ?? bundle.summary.current_stage_code,
       title: item.title,
@@ -113,7 +197,13 @@ function buildChecklistItems(bundle: EmployeeChecklistBundle): OnboardingThreeVi
         : `Buddy ho tro nhan vien luyen dung thao tac cua item ${item.title}.`,
       manager_check: buildManagerCheck(item),
       passing_standard: item.success_criteria,
+      pass_standard_supported: definition.pass_standard_supported,
+      pass_standard_independent: definition.pass_standard_independent,
+      self_check_prompt: definition.self_check_prompt,
       status,
+      quality_result: deriveOutputQualityResult(item, item.progress),
+      workflow_status: deriveOutputWorkflowStatus(item, item.progress),
+      red_flags: definition.red_flags,
       action_owner: resolveActionOwner(status, item, item.progress),
       note: item.progress.note,
     }
@@ -218,10 +308,51 @@ function buildBlockers(
   ]
 }
 
+function buildOpenRedFlags(items: OnboardingThreeViewChecklistItem[]): OnboardingOutputSnapshotRedFlag[] {
+  return items.flatMap((item) => {
+    if (item.quality_result !== 'needs_retrain' && item.quality_result !== 'not_met') {
+      return []
+    }
+
+    return (item.red_flags ?? []).map((flag) => ({
+      ...flag,
+      item_id: item.id,
+      item_title: item.title,
+    }))
+  })
+}
+
+function getSnapshotReadinessLabel(
+  items: OnboardingThreeViewChecklistItem[],
+  blockers: OnboardingThreeViewBlocker[],
+): OnboardingOutputReadinessLabel {
+  if (blockers.some((blocker) => blocker.severity === 'risk')) {
+    return 'can_kem_sat'
+  }
+
+  if (items.some((item) => item.quality_result === 'met_with_support' || item.quality_result === 'not_met')) {
+    return 'can_kem_nhe'
+  }
+
+  return 'tu_lam'
+}
+
+function getSnapshotGateStatus(
+  readinessLabel: OnboardingOutputReadinessLabel,
+  blockers: OnboardingThreeViewBlocker[],
+): OnboardingOutputGateStatus {
+  if (blockers.length > 0) return 'blocked'
+  if (readinessLabel === 'tu_lam') return 'independent_ready'
+  return 'supported_ready'
+}
+
 function buildSnapshot(bundle: EmployeeChecklistBundle): OnboardingThreeViewSnapshot {
   const items = buildChecklistItems(bundle)
   const stages = buildStageSummaries(bundle, items)
   const blockers = buildBlockers(bundle, items)
+  const openRedFlags = buildOpenRedFlags(items)
+  const readinessLabel = getSnapshotReadinessLabel(items, blockers)
+  const gateStatus = getSnapshotGateStatus(readinessLabel, blockers)
   const currentStage = stages.find((stage) => stage.code === bundle.summary.current_stage_code) ?? stages[0]
   const currentStageIndex = stages.findIndex((stage) => stage.code === currentStage?.code)
   const nextStage = currentStageIndex >= 0 ? stages[currentStageIndex + 1] ?? null : null
@@ -230,6 +361,7 @@ function buildSnapshot(bundle: EmployeeChecklistBundle): OnboardingThreeViewSnap
     employee_id: bundle.plan.employee_id,
     employee_name: getEmployeeById(bundle.plan.employee_id)?.full_name ?? bundle.plan.employee_id,
     role_code: bundle.plan.role_code,
+    primary_track: getPrimaryTrack(bundle.plan.role_code),
     assigned_store_id: bundle.plan.assigned_store_id,
     assigned_buddy_id: bundle.plan.assigned_buddy_id ?? null,
     assigned_buddy_name: bundle.plan.assigned_buddy_name ?? null,
@@ -240,6 +372,10 @@ function buildSnapshot(bundle: EmployeeChecklistBundle): OnboardingThreeViewSnap
     next_stage_code: nextStage?.code ?? null,
     next_stage_label: nextStage?.label ?? null,
     can_open_next_stage: blockers.length === 0,
+    readiness_label: readinessLabel,
+    gate_status: gateStatus,
+    top_risk_label: openRedFlags[0]?.label ?? null,
+    open_red_flags: openRedFlags,
     blockers,
     items,
     current_stage_items: items.filter((item) => item.stage_code === (currentStage?.code ?? bundle.summary.current_stage_code)),
@@ -286,6 +422,14 @@ export function getBuddyThreeViewQueue(buddyId: string): OnboardingThreeViewSnap
 
 export function getManagerThreeViewQueue(managerId: string): OnboardingThreeViewSnapshot[] {
   return listOnboardingThreeViewSnapshots().filter((snapshot) => snapshot.assigned_manager_id === managerId)
+}
+
+export function getBuddyOutputQueue(buddyId: string): OnboardingThreeViewSnapshot[] {
+  return getBuddyThreeViewQueue(buddyId)
+}
+
+export function getManagerOutputQueue(managerId: string): OnboardingThreeViewSnapshot[] {
+  return getManagerThreeViewQueue(managerId)
 }
 
 function getPlanAndBundle(employeeId: string) {

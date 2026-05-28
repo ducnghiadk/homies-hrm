@@ -13,7 +13,7 @@ import type {
   LeaderboardEntry, CareerAnalytics, Achievement,
   OnboardingCompetencyGroup, OnboardingChecklistTemplate,
   OnboardingChecklistStage, OnboardingChecklistItemTemplate,
-  EmployeeOnboardingChecklistPlan, EmployeeOnboardingChecklistProgressItem,
+  EmployeeOnboardingChecklistPlan, EmployeeOnboardingChecklistProgressItem, OnboardingOutputItemDefinition,
 } from './career-path-types';
 
 // ─── Default Levels ──────────────────────────────────────────
@@ -228,6 +228,99 @@ export const defaultOnboardingChecklistItems: OnboardingChecklistItemTemplate[] 
   { id: 'shift-leader-day-1-shadow', template_id: 'onb-template-shift-leader-v1', stage_id: 'onb-template-shift-leader-v1-day-1', competency_group_id: 'ocg-shift-coordination', code: 'shift_leader_day_1_shadow', title: 'Theo shadow 1 ca để học phân công và kiểm quầy', instruction_text: 'Đi cùng store manager hoặc shift leader cũ trong 1 ca để quan sát phân ca, kiểm quầy, xử lý phát sinh.', success_criteria: 'Nhắc lại đúng thứ tự đầu ca, giữa ca, cuối ca và ai phụ trách từng khu.', training_method: 'shadow', evidence_type: 'manager_check', is_required: true, requires_buddy_confirmation: false, requires_manager_confirmation: true, requires_quiz: false, estimated_minutes: 60, sort_order: 2, active: true },
   { id: 'shift-leader-week-2-stage-review', template_id: 'onb-template-shift-leader-v1', stage_id: 'onb-template-shift-leader-v1-week-2', competency_group_id: 'ocg-customer-service', code: 'shift_leader_week_2_stage_review', title: 'Chốt ca thử và đánh giá nhân viên mới theo chặng', instruction_text: 'Tự điều phối 1 ca nhẹ, chốt follow-up người mới và báo cáo lại store manager.', success_criteria: 'Store manager đánh giá Đạt hoặc Cần kèm thêm với nhận xét rõ điểm mạnh, điểm hổng.', training_method: 'observation', evidence_type: 'manager_check', is_required: true, requires_buddy_confirmation: false, requires_manager_confirmation: true, requires_quiz: false, estimated_minutes: 60, sort_order: 3, active: true },
 ];
+
+export const onboardingOutputItemDefinitions: Record<string, OnboardingOutputItemDefinition> = {
+  counter_pre_start_briefing: {
+    code: 'counter_pre_start_briefing',
+    track: 'cashier_service',
+    self_check_prompt: 'Em da nho ro gio co mat, dong phuc, buddy va nhom chat chua?',
+    pass_standard_supported: 'Nho duoc 4 thong tin co ban khi buddy goi y.',
+    pass_standard_independent: 'Chu dong vao ca dung gio, dung kenh va khong can nhac lai thong tin nen.',
+    red_flags: [
+      { code: 'miss_basic_briefing', label: 'Rot thong tin nen', detail: 'Khong nho gio co mat, buddy hoac kenh thong tin ca.' },
+    ],
+  },
+  counter_day_1_order_flow: {
+    code: 'counter_day_1_order_flow',
+    track: 'cashier_service',
+    self_check_prompt: 'Phan nao trong order em hay nham nhat: size, topping hay nhac lai cho khach?',
+    pass_standard_supported: 'Nhan dung order khi buddy dung gan va nhac diem de nham.',
+    pass_standard_independent: 'Nhan va xac nhan dung lien tiep cac order co ban ma khong bo sot thong tin.',
+    red_flags: [
+      { code: 'repeat_wrong_order', label: 'Sai order lap lai', detail: 'Bo sot size, topping hoac ghi sai order gay tra mon.' },
+    ],
+  },
+  counter_day_2_3_handover: {
+    code: 'counter_day_2_3_handover',
+    track: 'cashier_service',
+    self_check_prompt: 'Luc giao order sang quay pha che, em co biet mon nao can nhac ky khong?',
+    pass_standard_supported: 'Ban giao order dung thu tu va dung mon khi buddy canh sat.',
+    pass_standard_independent: 'Ban giao ngan gon, du thong tin va khong gay nghen giua hai dau quay.',
+    red_flags: [
+      { code: 'handover_confusion', label: 'Ban giao roi', detail: 'Chuyen order mo ho, thieu thong tin hoac giao nham line.' },
+    ],
+  },
+  barista_day_1_safety_quiz: {
+    code: 'barista_day_1_safety_quiz',
+    track: 'barista',
+    self_check_prompt: 'Quy tac ve sinh tay, quay va bao quan topping nao em van chua tu tin?',
+    pass_standard_supported: 'Qua mini test va thao tac dung khi buddy nhac lai buoc chinh.',
+    pass_standard_independent: 'Tu nhac lai duoc quy tac va thao tac dung ma khong can nhac lai.',
+    red_flags: [
+      { code: 'safety_gap', label: 'Hong nen ve sinh', detail: 'Bo qua buoc ve sinh tay, quay hoac bao quan topping quan trong.' },
+    ],
+  },
+  barista_day_2_3_core_drinks: {
+    code: 'barista_day_2_3_core_drinks',
+    track: 'barista',
+    self_check_prompt: 'Nhom mon nao em chua tu tin nhat ve dinh luong hoac thu tu thao tac?',
+    pass_standard_supported: 'Pha dung mon nen khi buddy dung kem tung ly.',
+    pass_standard_independent: 'Pha dung lien tiep cac mon core da giao, dung dinh luong va dung hinh thuc.',
+    red_flags: [
+      { code: 'repeat_recipe_error', label: 'Sai cong thuc lap lai', detail: 'Sai dinh luong, sai thu tu thao tac hoac ra ly sai chuan lap lai.' },
+    ],
+  },
+  barista_week_1_rush_readiness: {
+    code: 'barista_week_1_rush_readiness',
+    track: 'barista',
+    self_check_prompt: 'Luc line mon len nhe den vua, em hay rot nhip o dau?',
+    pass_standard_supported: 'Giu duoc line mon co ban khi buddy canh sat va nhac nhip.',
+    pass_standard_independent: 'Dung duoc station trong nhip that, vua pha vua giu quay sach va khong roi cong thuc.',
+    red_flags: [
+      { code: 'rush_breakdown', label: 'Vo nhip khi dong', detail: 'Line tang nhe la roi thao tac, sai mon hoac bo qua ve sinh station.' },
+    ],
+  },
+  shift_leader_pre_start_role: {
+    code: 'shift_leader_pre_start_role',
+    track: 'shift_leader',
+    self_check_prompt: 'Em da nam ro role shift leader va luong ban giao ca chua?',
+    pass_standard_supported: 'Nhac lai duoc trach nhiem ca khi duoc manager goi mo.',
+    pass_standard_independent: 'Tu dien giai duoc role, diem check va rule escalation cua ca.',
+    red_flags: [
+      { code: 'role_confusion', label: 'Mo ho vai tro', detail: 'Khong nam ro trach nhiem ca va diem kiem soat cua shift leader.' },
+    ],
+  },
+  shift_leader_day_1_shadow: {
+    code: 'shift_leader_day_1_shadow',
+    track: 'shift_leader',
+    self_check_prompt: 'Buoc nao trong dau ca, giua ca, cuoi ca em van chua hinh dung ro?',
+    pass_standard_supported: 'Theo duoc 1 ca shadow va nhac lai luong viec khi manager goi mo.',
+    pass_standard_independent: 'Tu tom tat duoc luong phan cong, kiem quay va xu ly phat sinh co ban cua ca.',
+    red_flags: [
+      { code: 'shadow_gap', label: 'Rot luong ca', detail: 'Theo shadow xong nhung van khong nhac lai duoc thu tu van hanh ca.' },
+    ],
+  },
+  shift_leader_week_2_stage_review: {
+    code: 'shift_leader_week_2_stage_review',
+    track: 'shift_leader',
+    self_check_prompt: 'Neu tu dieu phoi 1 ca nhe, em ngai nhat diem nao?',
+    pass_standard_supported: 'Chot duoc 1 ca nhe khi manager canh va nhac gate review.',
+    pass_standard_independent: 'Tu dieu phoi duoc 1 ca nhe, chot duoc diem manh - diem hong cua nhan vien moi.',
+    red_flags: [
+      { code: 'weak_gate_review', label: 'Chot gate mo ho', detail: 'Danh gia nhan vien moi khong ro diem dat / diem can kem.' },
+    ],
+  },
+};
 
 export const defaultSettings: CareerPathSettings = {
   buddy_system_enabled: true,

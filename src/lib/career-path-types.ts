@@ -355,12 +355,19 @@ export interface OnboardingThreeViewChecklistItem {
   stage_id: string;
   stage_code: OnboardingStageCode;
   title: string;
+  code?: string;
   required: boolean;
   employee_action: string;
   buddy_action: string;
   manager_check: string;
   passing_standard: string;
+  pass_standard_supported?: string;
+  pass_standard_independent?: string;
+  self_check_prompt?: string;
   status: OnboardingThreeViewItemStatus;
+  quality_result?: OnboardingOutputQualityResult;
+  workflow_status?: OnboardingOutputWorkflowStatus;
+  red_flags?: OnboardingOutputRedFlag[];
   action_owner: OnboardingThreeViewActionOwner;
   note?: string;
 }
@@ -395,6 +402,7 @@ export interface OnboardingThreeViewSnapshot {
   employee_id: string;
   employee_name: string;
   role_code: OnboardingRoleCode;
+  primary_track?: OnboardingOutputTrack;
   assigned_store_id: string;
   assigned_buddy_id?: string | null;
   assigned_buddy_name?: string | null;
@@ -405,10 +413,46 @@ export interface OnboardingThreeViewSnapshot {
   next_stage_code: OnboardingStageCode | null;
   next_stage_label: string | null;
   can_open_next_stage: boolean;
+  readiness_label?: OnboardingOutputReadinessLabel;
+  gate_status?: OnboardingOutputGateStatus;
+  top_risk_label?: string | null;
+  open_red_flags?: OnboardingOutputSnapshotRedFlag[];
   blockers: OnboardingThreeViewBlocker[];
   items: OnboardingThreeViewChecklistItem[];
   current_stage_items: OnboardingThreeViewChecklistItem[];
   stages: OnboardingThreeViewStageSummary[];
+}
+
+export type OnboardingOutputTrack = 'cashier_service' | 'barista' | 'shift_leader';
+export type OnboardingOutputQualityResult = 'not_met' | 'met_with_support' | 'met_independently' | 'needs_retrain';
+export type OnboardingOutputWorkflowStatus =
+  | 'not_started'
+  | 'learning'
+  | 'pending_buddy_review'
+  | 'pending_manager_gate'
+  | 'completed'
+  | 'not_applicable';
+export type OnboardingOutputReadinessLabel = 'can_kem_sat' | 'can_kem_nhe' | 'tu_lam';
+export type OnboardingOutputGateStatus = 'blocked' | 'supported_ready' | 'independent_ready';
+
+export interface OnboardingOutputRedFlag {
+  code: string;
+  label: string;
+  detail: string;
+}
+
+export interface OnboardingOutputSnapshotRedFlag extends OnboardingOutputRedFlag {
+  item_id: string;
+  item_title: string;
+}
+
+export interface OnboardingOutputItemDefinition {
+  code: string;
+  track: OnboardingOutputTrack;
+  self_check_prompt: string;
+  pass_standard_supported: string;
+  pass_standard_independent: string;
+  red_flags: OnboardingOutputRedFlag[];
 }
 
 // ─── 12. Career Goal ─────────────────────────────────────────

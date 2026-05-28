@@ -78,6 +78,19 @@ function getActionOwnerLabel(actionOwner: OnboardingThreeViewActionOwner) {
   return 'Khong con ai dang giu buoc nay'
 }
 
+function getTrackLabel(track?: OnboardingThreeViewSnapshot['primary_track']) {
+  if (track === 'barista') return 'Pha che'
+  if (track === 'shift_leader') return 'Shift leader'
+  if (track === 'cashier_service') return 'Thu ngan / phuc vu'
+  return ''
+}
+
+function getReadinessText(readiness?: OnboardingThreeViewSnapshot['readiness_label']) {
+  if (readiness === 'tu_lam') return 'Ban da len muc tu lam cho pham vi ca co ban.'
+  if (readiness === 'can_kem_nhe') return 'Ban da on nhieu muc, nhung van can buddy canh 1-2 diem.'
+  return 'Ban van dang can kem sat de tranh loi lap lai trong ca that.'
+}
+
 function mapStageItems(snapshot: OnboardingThreeViewSnapshot | null): OnboardingStageItemView[] {
   return (snapshot?.stages ?? []).map((stage) => ({
     id: stage.id,
@@ -90,7 +103,10 @@ function mapStageItems(snapshot: OnboardingThreeViewSnapshot | null): Onboarding
 }
 
 export default function OnboardingPage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const user = useAuthStore((state) => state.user)
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const isLoading = useAuthStore((state) => state.isLoading)
+  const hasHydrated = useAuthStore((state) => state.hasHydrated)
   const router = useRouter()
   const [selectedStageCode, setSelectedStageCode] = useState<string>('pre_start')
   const [state, dispatch] = useReducer(onboardingPageReducer, {
@@ -99,10 +115,10 @@ export default function OnboardingPage() {
   })
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (hasHydrated && !isLoading && !isAuthenticated) {
       router.push('/login')
     }
-  }, [isAuthenticated, router])
+  }, [hasHydrated, isAuthenticated, isLoading, router])
 
   const refreshSnapshot = () => {
     if (!user) return
@@ -136,6 +152,18 @@ export default function OnboardingPage() {
   )
 
   const stageItems = useMemo(() => mapStageItems(snapshot), [snapshot])
+
+  if (!hasHydrated || isLoading) {
+    return (
+      <AppShell title="Onboarding">
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-slate-200 bg-white px-4 py-5 text-sm font-semibold text-slate-700 shadow-sm">
+            Dang tai du lieu onboarding...
+          </div>
+        </div>
+      </AppShell>
+    )
+  }
 
   if (!user) return null
 
@@ -171,11 +199,13 @@ export default function OnboardingPage() {
       ? primaryBlocker.detail
       : 'Khong co cho xu ly gap'
 
-  const gateLabel = snapshot?.blockers.length
-    ? `Con ${snapshot.blockers.length} blocker truoc khi qua chang tiep`
-    : canOpenNextOnboardingStage(user.id)
-      ? 'Da du dieu kien mo chang tiep'
-      : 'Khong con blocker bat buoc'
+  const gateLabel = snapshot?.open_red_flags?.length
+    ? `Con ${snapshot.open_red_flags.length} loi do can xu ly truoc gate tiep theo`
+    : snapshot?.gate_status === 'independent_ready'
+      ? 'Ban da san sang xin quan ly duyet giao ca co ban'
+      : canOpenNextOnboardingStage(user.id)
+        ? 'Da du dieu kien mo chang tiep, tiep tuc day muc tu lam'
+        : 'Khong con blocker bat buoc'
 
   const handleAcknowledgePolicy = () => {
     const updatedRecord = OnboardingPolicyService.acknowledge(user.id, user)
@@ -198,12 +228,17 @@ export default function OnboardingPage() {
           employeeName={user.full_name}
           positionLabel={positionLabel}
           storeLabel={storeLabel}
+          trackLabel={getTrackLabel(snapshot?.primary_track)}
           headline={heroHeadline}
           startDateLabel={formatDateLabel(user.hire_date)}
           buddyName={snapshot?.assigned_buddy_name || 'Chua gan'}
           currentStageLabel={currentStage?.label || 'Chua co'}
-          nextStageLabel={snapshot?.next_stage_label ? `Sap mo: ${snapshot.next_stage_label}` : 'Chua co chang sau'}
-          stageStatusLabel={primaryBlocker ? primaryBlocker.label : 'Ban dang di dung huong'}
+          nextStageLabel={snapshot?.gate_status === 'independent_ready'
+            ? 'Gate tiep theo: Quan ly duyet giao ca'
+            : snapshot?.next_stage_label
+              ? `Sap mo: ${snapshot.next_stage_label}`
+              : 'Chua co chang sau'}
+          stageStatusLabel={snapshot ? getReadinessText(snapshot.readiness_label) : (primaryBlocker ? primaryBlocker.label : 'Ban dang di dung huong')}
         />
 
         <OnboardingTodayFocus
@@ -246,10 +281,16 @@ export default function OnboardingPage() {
                         buddyAction={task.buddy_action}
                         managerCheck={task.manager_check}
                         successCriteria={task.passing_standard}
+                        supportedCriteria={task.pass_standard_supported}
+                        independentCriteria={task.pass_standard_independent}
+                        selfCheckPrompt={task.self_check_prompt}
+                        redFlags={task.red_flags}
                         actionOwnerLabel={getActionOwnerLabel(task.action_owner)}
                         required={task.required}
                         progress={{
                           status: task.status,
+                          qualityResult: task.quality_result,
+                          workflowStatus: task.workflow_status,
                           note: task.note,
                         } satisfies OnboardingChecklistProgressView}
                         onStart={task.action_owner === 'employee' && (task.status === 'not_started' || task.status === 'needs_coaching') ? () => {

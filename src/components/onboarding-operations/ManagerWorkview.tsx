@@ -11,6 +11,19 @@ type ManagerWorkviewProps = {
   onNeedCoaching: (employeeId: string, itemId: string, note: string) => void
 }
 
+function getTrackLabel(track?: OnboardingThreeViewSnapshot['primary_track']) {
+  if (track === 'barista') return 'Pha che'
+  if (track === 'shift_leader') return 'Shift leader'
+  return 'Thu ngan / phuc vu'
+}
+
+function getQualityResultLabel(value?: OnboardingThreeViewSnapshot['current_stage_items'][number]['quality_result']) {
+  if (value === 'met_independently') return 'Dat tu lam'
+  if (value === 'met_with_support') return 'Dat khi co kem'
+  if (value === 'needs_retrain') return 'Can kem lai'
+  return 'Chua dat'
+}
+
 export function ManagerWorkview({
   snapshots,
   selectedEmployeeId,
@@ -22,19 +35,19 @@ export function ManagerWorkview({
   const selectedSnapshot = snapshots.find((snapshot) => snapshot.employee_id === selectedEmployeeId) ?? snapshots[0] ?? null
 
   const summary = useMemo(() => {
-    const blocked = snapshots.filter((snapshot) => snapshot.blockers.length > 0).length
-    const ready = snapshots.filter((snapshot) => snapshot.blockers.length === 0).length
-    const waitingManager = snapshots.flatMap((snapshot) => snapshot.current_stage_items).filter((item) => item.action_owner === 'manager').length
+    const blocked = snapshots.filter((snapshot) => (snapshot.open_red_flags?.length ?? 0) > 0).length
+    const readyForGate = snapshots.filter((snapshot) => snapshot.gate_status === 'independent_ready').length
+    const waitingManager = snapshots.flatMap((snapshot) => snapshot.current_stage_items).filter((item) => item.workflow_status === 'pending_manager_gate').length
     const buddyBottlenecks = snapshots.reduce<Record<string, number>>((acc, snapshot) => {
       const key = snapshot.assigned_buddy_name || 'Chua gan buddy'
-      const count = snapshot.blockers.filter((blocker) => blocker.action_owner === 'buddy').length
+      const count = snapshot.open_red_flags?.length ?? 0
       acc[key] = (acc[key] ?? 0) + count
       return acc
     }, {})
 
     return {
       blocked,
-      ready,
+      readyForGate,
       waitingManager,
       buddyBottlenecks: Object.entries(buddyBottlenecks).sort((left, right) => right[1] - left[1]).slice(0, 4),
     }
@@ -45,8 +58,8 @@ export function ManagerWorkview({
       <div className="grid gap-3 md:grid-cols-4">
         {[
           ['Tong dang onboarding', snapshots.length],
-          ['Dang block', summary.blocked],
-          ['Dang di dung huong', summary.ready],
+          ['Con loi do', summary.blocked],
+          ['San sang giao ca', summary.readyForGate],
           ['Cho quan ly duyet', summary.waitingManager],
         ].map(([label, value]) => (
           <div key={label} className="rounded-[24px] border border-[#E8E1D1] bg-white p-4 shadow-[0_8px_24px_rgba(0,29,61,0.06)]">
@@ -71,13 +84,13 @@ export function ManagerWorkview({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-sm font-bold text-[#001D3D]">{snapshot.employee_name}</div>
-                      <div className="mt-1 text-xs text-[#516273]">{snapshot.current_stage_label}</div>
+                      <div className="mt-1 text-xs text-[#516273]">{snapshot.current_stage_label} • {getTrackLabel(snapshot.primary_track)}</div>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${snapshot.blockers.length ? 'bg-[#FFF4D6] text-[#8A5B00]' : 'bg-[#DDF4EC] text-[#107C41]'}`}>
-                      {snapshot.blockers.length ? `${snapshot.blockers.length} block` : 'On dinh'}
+                    <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${snapshot.gate_status === 'independent_ready' ? 'bg-[#DDF4EC] text-[#107C41]' : 'bg-[#FFF4D6] text-[#8A5B00]'}`}>
+                      {snapshot.gate_status === 'independent_ready' ? 'San sang gate' : `${snapshot.open_red_flags?.length ?? snapshot.blockers.length} risk`}
                     </span>
                   </div>
-                  <div className="mt-3 text-sm text-[#516273]">{snapshot.blockers[0]?.detail || 'Khong co blocker dang mo'}</div>
+                  <div className="mt-3 text-sm text-[#516273]">{snapshot.top_risk_label || snapshot.blockers[0]?.detail || 'Khong co blocker dang mo'}</div>
                 </button>
               ))}
             </div>
@@ -89,7 +102,7 @@ export function ManagerWorkview({
               {summary.buddyBottlenecks.map(([name, count]) => (
                 <div key={name} className="flex items-center justify-between rounded-[18px] bg-[#FFFDF9] px-3 py-3 text-sm">
                   <span className="font-semibold text-[#001D3D]">{name}</span>
-                  <span className="rounded-full bg-[#EEF4FB] px-3 py-1 text-[11px] font-bold text-[#2F6FA8]">{count} item</span>
+                  <span className="rounded-full bg-[#EEF4FB] px-3 py-1 text-[11px] font-bold text-[#2F6FA8]">{count} risk</span>
                 </div>
               ))}
             </div>
@@ -98,34 +111,28 @@ export function ManagerWorkview({
 
         <section className="rounded-[28px] border border-[#E8E1D1] bg-white p-5 shadow-[0_10px_30px_rgba(0,29,61,0.06)]">
           {!selectedSnapshot ? (
-            <div className="text-sm text-[#516273]">Chon 1 nhan vien de xem ca block.</div>
+            <div className="text-sm text-[#516273]">Chon 1 nhan vien de xem gate giao ca.</div>
           ) : (
             <div className="space-y-4">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7A6B53]">Ca block</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7A6B53]">Gate giao ca</div>
                 <h2 className="mt-2 text-2xl font-extrabold text-[#001D3D]">{selectedSnapshot.employee_name}</h2>
                 <div className="mt-1 text-sm text-[#516273]">
-                  {selectedSnapshot.current_stage_label} • Buddy: {selectedSnapshot.assigned_buddy_name || 'Chua gan'}
+                  {selectedSnapshot.current_stage_label} • {getTrackLabel(selectedSnapshot.primary_track)} • Buddy: {selectedSnapshot.assigned_buddy_name || 'Chua gan'}
                 </div>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-[22px] bg-[#FFF8E8] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A5B00]">Ly do block</div>
+                <div className={`rounded-[22px] p-4 ${selectedSnapshot.gate_status === 'independent_ready' ? 'bg-[#DDF4EC]' : 'bg-[#FFF8E8]'}`}>
+                  <div className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${selectedSnapshot.gate_status === 'independent_ready' ? 'text-[#107C41]' : 'text-[#8A5B00]'}`}>San sang giao ca</div>
                   <div className="mt-2 text-sm font-semibold text-[#001D3D]">
-                    {selectedSnapshot.blockers.map((blocker) => blocker.label).join(', ') || 'Khong con block'}
+                    {selectedSnapshot.gate_status === 'independent_ready' ? 'Co the duyet giao ca co ban' : 'Chua du dieu kien giao ca'}
                   </div>
                 </div>
                 <div className="rounded-[22px] bg-[#FFFDF9] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#2F6FA8]">Dang cho ai</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#2F6FA8]">Top risk</div>
                   <div className="mt-2 text-sm font-semibold text-[#001D3D]">
-                    {selectedSnapshot.blockers[0]?.action_owner === 'manager'
-                      ? 'Dang cho quan ly quyet dinh'
-                      : selectedSnapshot.blockers[0]?.action_owner === 'buddy'
-                        ? 'Dang cho buddy xu ly'
-                        : selectedSnapshot.blockers[0]?.action_owner === 'employee'
-                          ? 'Dang cho nhan vien luyen tiep'
-                          : 'Khong co ai dang giu buoc nay'}
+                    {selectedSnapshot.top_risk_label || 'Khong co loi do dang mo'}
                   </div>
                 </div>
               </div>
@@ -142,15 +149,30 @@ export function ManagerWorkview({
                           <div className="text-sm font-bold text-[#001D3D]">{item.title}</div>
                           <div className="mt-1 text-xs text-[#516273]">{item.passing_standard}</div>
                         </div>
-                        <span className="rounded-full bg-[#EEF4FB] px-3 py-1 text-[11px] font-bold text-[#2F6FA8]">
-                          {item.action_owner === 'manager' ? 'Cho quan ly' : item.status}
-                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-[#EEF4FB] px-3 py-1 text-[11px] font-bold text-[#2F6FA8]">
+                            {item.action_owner === 'manager' ? 'Cho quan ly' : item.status}
+                          </span>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${item.quality_result === 'met_independently' ? 'bg-[#DDF4EC] text-[#107C41]' : item.quality_result === 'needs_retrain' ? 'bg-[#FFF4D6] text-[#8A5B00]' : 'bg-[#FFFDF9] text-[#7A6B53]'}`}>
+                            {getQualityResultLabel(item.quality_result)}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="mt-3 rounded-[18px] bg-white p-3 text-sm text-[#001D3D]">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#2F6FA8]">Quan ly can kiem</div>
                         <div className="mt-1">{item.manager_check}</div>
                       </div>
+
+                      {item.red_flags?.length ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {item.red_flags.map((flag) => (
+                            <span key={flag.code} className="rounded-full bg-[#FFF4D6] px-3 py-1 text-[11px] font-bold text-[#8A5B00]">
+                              {flag.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
 
                       <textarea
                         value={draftNotes[draftKey] ?? item.note ?? ''}
