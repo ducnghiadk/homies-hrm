@@ -1,0 +1,24 @@
+{
+  "name": "Homies Milk Tea HRM",
+  "short_name": "Homies HRM",
+  "description": "Hệ thống quản lý nhân sự chuyên nghiệp cho Homies Milk Tea",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F9FAFB",
+  "theme_color": "#FF6B35",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

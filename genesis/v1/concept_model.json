@@ -1,0 +1,500 @@
+{
+  "project": "HRM Trà Sữa",
+  "version": "v1",
+  "created_at": "2026-02-15",
+
+  "entities": [
+    {
+      "name": "Organization",
+      "type": "data",
+      "necessity": "required",
+      "description": "Tổ chức / chuỗi trà sữa (multi-tenant root)"
+    },
+    {
+      "name": "Store",
+      "type": "data",
+      "necessity": "required",
+      "description": "Cửa hàng vật lý, có tọa độ GPS và bán kính check-in"
+    },
+    {
+      "name": "Position",
+      "type": "data",
+      "necessity": "required",
+      "description": "Vị trí công việc (Pha chế, Thu ngân, Quản lý...) với level và lương cơ bản"
+    },
+    {
+      "name": "Employee",
+      "type": "data",
+      "necessity": "required",
+      "description": "Nhân viên - entity trung tâm, gắn với org/store/position, có role (ceo/manager/employee), gamification points & level"
+    },
+    {
+      "name": "Shift",
+      "type": "data",
+      "necessity": "required",
+      "description": "Ca làm việc template (Sáng/Chiều/Tối) với thời gian bắt đầu/kết thúc"
+    },
+    {
+      "name": "Schedule",
+      "type": "data",
+      "necessity": "required",
+      "description": "Lịch làm việc cụ thể: gán employee vào shift tại store vào ngày cụ thể"
+    },
+    {
+      "name": "Attendance",
+      "type": "data",
+      "necessity": "required",
+      "description": "Bản ghi chấm công: check-in/out với GPS, ảnh selfie, tính trạng thái (đúng giờ/trễ/sớm)"
+    },
+    {
+      "name": "ShiftRequest",
+      "type": "data",
+      "necessity": "required",
+      "description": "Yêu cầu đổi ca hoặc nghỉ phép, cần manager duyệt"
+    },
+    {
+      "name": "KPITemplate",
+      "type": "data",
+      "necessity": "phase2",
+      "description": "Mẫu KPI theo vị trí với trọng số (weight), mục tiêu (target)"
+    },
+    {
+      "name": "KPIScore",
+      "type": "data",
+      "necessity": "phase2",
+      "description": "Điểm KPI thực tế của nhân viên theo kỳ (tuần/tháng)"
+    },
+    {
+      "name": "RewardRule",
+      "type": "data",
+      "necessity": "phase2",
+      "description": "Quy tắc thưởng/phạt tự động dựa trên điều kiện (trễ X lần, KPI > Y%)"
+    },
+    {
+      "name": "RewardLog",
+      "type": "data",
+      "necessity": "phase2",
+      "description": "Lịch sử thưởng/phạt đã áp dụng"
+    },
+    {
+      "name": "EvaluationPeriod",
+      "type": "data",
+      "necessity": "phase2",
+      "description": "Đợt đánh giá 360° (quarterly)"
+    },
+    {
+      "name": "EvaluationForm",
+      "type": "data",
+      "necessity": "phase2",
+      "description": "Form đánh giá theo vị trí và loại (self/manager/peer)"
+    },
+    {
+      "name": "Evaluation",
+      "type": "data",
+      "necessity": "phase2",
+      "description": "Bản đánh giá cụ thể: ai đánh giá ai, điểm, nhận xét"
+    },
+    {
+      "name": "CareerPath",
+      "type": "data",
+      "necessity": "phase2",
+      "description": "Lộ trình thăng tiến: từ vị trí A → B với điều kiện"
+    },
+    {
+      "name": "PointsTransaction",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Lịch sử giao dịch điểm gamification (cộng/trừ)"
+    },
+    {
+      "name": "Badge",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Huy hiệu thành tích (Siêu đúng giờ, Vua bán hàng...)"
+    },
+    {
+      "name": "EmployeeBadge",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Huy hiệu nhân viên đã đạt được"
+    },
+    {
+      "name": "Recognition",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Lời khen/cảm ơn giữa đồng nghiệp (peer kudos)"
+    },
+    {
+      "name": "RewardsStore",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Cửa hàng đổi điểm: voucher, ngày nghỉ..."
+    },
+    {
+      "name": "RewardRedemption",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Lịch sử đổi thưởng từ điểm"
+    },
+    {
+      "name": "ChatRoom",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Phòng chat (store, direct, announcement)"
+    },
+    {
+      "name": "Message",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Tin nhắn trong phòng chat"
+    },
+    {
+      "name": "Announcement",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Thông báo từ CEO/Manager đến toàn bộ hoặc từng store"
+    },
+    {
+      "name": "ManagerLog",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Nhật ký bàn giao ca của quản lý"
+    },
+    {
+      "name": "MoodCheckin",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Ghi nhận tâm trạng hàng ngày (1-5 emoji)"
+    },
+    {
+      "name": "AnonymousFeedback",
+      "type": "data",
+      "necessity": "phase3",
+      "description": "Phản hồi ẩn danh từ nhân viên"
+    },
+    {
+      "name": "Course",
+      "type": "data",
+      "necessity": "phase4",
+      "description": "Khóa học e-learning"
+    },
+    {
+      "name": "CourseModule",
+      "type": "data",
+      "necessity": "phase4",
+      "description": "Module trong khóa học (video, tài liệu, quiz)"
+    },
+    {
+      "name": "Quiz",
+      "type": "data",
+      "necessity": "phase4",
+      "description": "Bài kiểm tra trong module"
+    },
+    {
+      "name": "CourseEnrollment",
+      "type": "data",
+      "necessity": "phase4",
+      "description": "Đăng ký và tiến độ học của nhân viên"
+    },
+    {
+      "name": "SkillMatrix",
+      "type": "data",
+      "necessity": "phase4",
+      "description": "Ma trận kỹ năng nhân viên (proficiency 1-5)"
+    },
+    {
+      "name": "StaffingForecast",
+      "type": "data",
+      "necessity": "phase4",
+      "description": "Dự báo nhân sự theo ngày/ca/store"
+    }
+  ],
+
+  "flows": [
+    {
+      "from": "Employee",
+      "action": "đăng nhập",
+      "to": "System",
+      "data": "Phone/Email + OTP",
+      "phase": 1
+    },
+    {
+      "from": "System",
+      "action": "phân quyền routing",
+      "to": "Dashboard",
+      "data": "Role (CEO/Manager/Employee)",
+      "phase": 1
+    },
+    {
+      "from": "Manager",
+      "action": "tạo/chỉnh sửa",
+      "to": "Employee",
+      "data": "Thông tin nhân viên, ảnh, vị trí",
+      "phase": 1
+    },
+    {
+      "from": "Employee",
+      "action": "check-in",
+      "to": "Attendance",
+      "data": "GPS coordinates + selfie photo + timestamp",
+      "phase": 1
+    },
+    {
+      "from": "System",
+      "action": "xác thực vị trí",
+      "to": "Store",
+      "data": "Tính khoảng cách GPS, so sánh bán kính 100m",
+      "phase": 1
+    },
+    {
+      "from": "System",
+      "action": "tính trạng thái",
+      "to": "Attendance",
+      "data": "So sánh check-in time vs shift start → on_time/late/early",
+      "phase": 1
+    },
+    {
+      "from": "Employee",
+      "action": "check-out",
+      "to": "Attendance",
+      "data": "GPS + timestamp → tính tổng giờ làm + OT",
+      "phase": 1
+    },
+    {
+      "from": "Manager",
+      "action": "xếp lịch",
+      "to": "Schedule",
+      "data": "Gán employee vào shift tại store theo ngày (drag & drop)",
+      "phase": 1
+    },
+    {
+      "from": "Employee",
+      "action": "đăng ký availability",
+      "to": "Schedule",
+      "data": "Ngày/ca có thể làm",
+      "phase": 1
+    },
+    {
+      "from": "Employee",
+      "action": "yêu cầu đổi ca",
+      "to": "ShiftRequest",
+      "data": "Swap với employee khác, cần duyệt",
+      "phase": 1
+    },
+    {
+      "from": "Employee",
+      "action": "xin nghỉ phép",
+      "to": "ShiftRequest",
+      "data": "Ngày nghỉ + lý do, cần duyệt",
+      "phase": 1
+    },
+    {
+      "from": "Manager",
+      "action": "duyệt/từ chối",
+      "to": "ShiftRequest",
+      "data": "Approve/Reject + note",
+      "phase": 1
+    },
+    {
+      "from": "Dashboard",
+      "action": "hiển thị báo cáo",
+      "to": "CEO/Manager/Employee",
+      "data": "Charts, KPI, attendance summary",
+      "phase": 1
+    },
+    {
+      "from": "Manager",
+      "action": "giao KPI target",
+      "to": "KPIScore",
+      "data": "Target theo vị trí + kỳ (tuần/tháng)",
+      "phase": 2
+    },
+    {
+      "from": "System",
+      "action": "auto tính KPI",
+      "to": "KPIScore",
+      "data": "Actual vs Target → weighted score",
+      "phase": 2
+    },
+    {
+      "from": "System",
+      "action": "auto áp dụng thưởng/phạt",
+      "to": "RewardLog",
+      "data": "Dựa trên rules + attendance/KPI data",
+      "phase": 2
+    },
+    {
+      "from": "Employee",
+      "action": "tự đánh giá",
+      "to": "Evaluation",
+      "data": "Trả lời form self-evaluation",
+      "phase": 2
+    },
+    {
+      "from": "Manager",
+      "action": "đánh giá nhân viên",
+      "to": "Evaluation",
+      "data": "Score + comments",
+      "phase": 2
+    },
+    {
+      "from": "Peer",
+      "action": "đánh giá ẩn danh",
+      "to": "Evaluation",
+      "data": "Score + anonymous comments",
+      "phase": 2
+    },
+    {
+      "from": "System",
+      "action": "đề xuất thăng tiến",
+      "to": "CareerPath",
+      "data": "Auto check điều kiện → suggest promotion",
+      "phase": 2
+    },
+    {
+      "from": "System",
+      "action": "cộng điểm",
+      "to": "PointsTransaction",
+      "data": "Check-in đúng giờ +10, Top sales +30...",
+      "phase": 3
+    },
+    {
+      "from": "System",
+      "action": "cấp badge",
+      "to": "EmployeeBadge",
+      "data": "Đạt criteria → earn badge",
+      "phase": 3
+    },
+    {
+      "from": "Employee",
+      "action": "gửi kudos",
+      "to": "Recognition",
+      "data": "Thank you + points cho đồng nghiệp",
+      "phase": 3
+    },
+    {
+      "from": "Employee",
+      "action": "đổi điểm",
+      "to": "RewardRedemption",
+      "data": "Points → voucher/ngày nghỉ",
+      "phase": 3
+    },
+    {
+      "from": "Employee",
+      "action": "ghi nhận tâm trạng",
+      "to": "MoodCheckin",
+      "data": "Daily mood 1-5 + note",
+      "phase": 3
+    },
+    {
+      "from": "System",
+      "action": "phát hiện burnout",
+      "to": "Alert",
+      "data": "Low mood trend + overtime → alert manager",
+      "phase": 3
+    },
+    {
+      "from": "Employee",
+      "action": "học khóa học",
+      "to": "CourseEnrollment",
+      "data": "Video, quiz, progress tracking",
+      "phase": 4
+    },
+    {
+      "from": "System",
+      "action": "dự báo nhân sự",
+      "to": "StaffingForecast",
+      "data": "AI suggest optimal schedule",
+      "phase": 4
+    }
+  ],
+
+  "missing_components": [
+    {
+      "component": "Multi-tenant isolation",
+      "category": "security",
+      "priority": "critical",
+      "reason": "Mỗi organization phải được cách ly dữ liệu hoàn toàn. RLS policies là bắt buộc."
+    },
+    {
+      "component": "GPS spoofing prevention",
+      "category": "security",
+      "priority": "high",
+      "reason": "Nhân viên có thể fake GPS để check-in từ xa. Cần verify bằng nhiều signal (GPS + photo + device info)."
+    },
+    {
+      "component": "Offline check-in queue",
+      "category": "reliability",
+      "priority": "high",
+      "reason": "Cửa hàng có thể mất mạng. Check-in phải queue locally và sync khi có mạng (PWA offline)."
+    },
+    {
+      "component": "Rate limiting",
+      "category": "security",
+      "priority": "high",
+      "reason": "OTP login cần rate limit để chống brute force. API cần throttle."
+    },
+    {
+      "component": "Photo storage & compression",
+      "category": "infrastructure",
+      "priority": "high",
+      "reason": "Selfie check-in hàng ngày × 50 nhân viên = nhiều ảnh. Cần compress trước khi upload lên Supabase Storage."
+    },
+    {
+      "component": "Timezone handling",
+      "category": "reliability",
+      "priority": "medium",
+      "reason": "Nếu chuỗi mở rộng ra nhiều vùng, timezone sẽ ảnh hưởng tính giờ làm. Cần lưu TIMESTAMPTZ."
+    },
+    {
+      "component": "Audit log",
+      "category": "compliance",
+      "priority": "medium",
+      "reason": "Cần ghi log ai đã thay đổi gì (schedule changes, approval, employee updates) cho mục đích kiểm toán."
+    },
+    {
+      "component": "Data backup & recovery",
+      "category": "reliability",
+      "priority": "medium",
+      "reason": "Supabase free tier không có automatic backup. Cần plan backup strategy."
+    },
+    {
+      "component": "Push notification service worker",
+      "category": "infrastructure",
+      "priority": "medium",
+      "reason": "Firebase FCM cần service worker đúng cách cho PWA. Conflict với next-pwa service worker."
+    },
+    {
+      "component": "Employee self-service password/phone change",
+      "category": "ux",
+      "priority": "medium",
+      "reason": "Nhân viên cần tự đổi số điện thoại/email khi thay sim."
+    },
+    {
+      "component": "Schedule conflict detection",
+      "category": "business_logic",
+      "priority": "high",
+      "reason": "Phải phát hiện khi xếp lịch trùng: 1 nhân viên 2 ca cùng ngày, hoặc ca quá sát nhau."
+    },
+    {
+      "component": "Payroll calculation engine",
+      "category": "business_logic",
+      "priority": "medium",
+      "reason": "Tổng hợp giờ làm + OT + thưởng/phạt → lương. Cần chính xác tuyệt đối, có thể cần audit trail."
+    },
+    {
+      "component": "Error monitoring (Sentry/similar)",
+      "category": "observability",
+      "priority": "low",
+      "reason": "PWA trên nhiều thiết bị khác nhau, cần tracking lỗi JavaScript ở production."
+    },
+    {
+      "component": "Database migration strategy",
+      "category": "infrastructure",
+      "priority": "medium",
+      "reason": "Schema sẽ evolve qua 4 phases. Cần migration plan (Supabase migrations hoặc manual SQL)."
+    }
+  ],
+
+  "questions_for_user": []
+}
