@@ -6,11 +6,18 @@ import type {
   OnboardingRoleSettings,
 } from '../src/lib/career-path-types'
 import {
-  initCareerPathStores,
+  buildTrialWorkflowReadinessReport,
   getOnboardingPlanRoleLabel,
+  getOnboardingRoleSettings,
+  importSettings,
+  initCareerPathStores,
   resolveOnboardingRoleForEmployee,
+  validateOnboardingRoleSettings,
 } from '../src/lib/career-path-service'
-import { defaultOnboardingRoleSettings } from '../src/lib/mock-data-career-path'
+import {
+  defaultOnboardingRoleSettings,
+  sampleEmployeeOnboardingChecklistPlans,
+} from '../src/lib/mock-data-career-path'
 
 function cloneRoleSettings(
   override?: Partial<OnboardingRoleSettings>,
@@ -33,7 +40,7 @@ test('resolver matches configured cashier role from settings', () => {
         role_code: 'counter_staff',
         label: 'Thu ngân',
         enabled: true,
-        template_id: 'onb-template-counter-v1',
+        template_id: 'onb-template-counter-published-v1',
         position_ids: ['pos-002'],
         sort_order: 1,
       },
@@ -55,7 +62,7 @@ test('resolver matches configured cashier role from settings', () => {
   assert.equal(result.source, 'settings')
   assert.equal(result.role_code, 'counter_staff')
   assert.equal(result.role_label, 'Thu ngân')
-  assert.equal(result.template_id, 'onb-template-counter-v1')
+  assert.equal(result.template_id, 'onb-template-counter-published-v1')
 })
 
 test('resolver returns unmatched when mapped role is disabled', () => {
@@ -66,7 +73,7 @@ test('resolver returns unmatched when mapped role is disabled', () => {
         role_code: 'counter_staff',
         label: 'Thu ngân',
         enabled: false,
-        template_id: 'onb-template-counter-v1',
+        template_id: 'onb-template-counter-published-v1',
         position_ids: ['pos-002'],
         sort_order: 1,
       },
@@ -87,7 +94,7 @@ test('resolver returns unmatched when mapped role is disabled', () => {
 
   assert.equal(result.source, 'unmatched')
   assert.equal(result.role_code, 'counter_staff')
-  assert.match(result.unmatched_reason ?? '', /dang bi tat/i)
+  assert.match(result.unmatched_reason ?? '', /\u0111ang b\u1ecb t\u1eaft/i)
 })
 
 test('legacy counter_staff plan renders Thu ngân display label', () => {
@@ -95,7 +102,7 @@ test('legacy counter_staff plan renders Thu ngân display label', () => {
   const legacyPlan: EmployeeOnboardingChecklistPlan = {
     id: 'onb-plan-legacy',
     employee_id: 'emp-legacy',
-    template_id: 'onb-template-counter-v1',
+    template_id: 'onb-template-counter-published-v1',
     role_code: 'counter_staff',
     role_label_snapshot: null,
     template_label_snapshot: null,
@@ -117,3 +124,88 @@ test('legacy counter_staff plan renders Thu ngân display label', () => {
   assert.equal(getOnboardingPlanRoleLabel(legacyPlan), 'Thu ngân')
 })
 
+test('validator rejects missing onboarding template', () => {
+  initCareerPathStores()
+  const issues = validateOnboardingRoleSettings(cloneRoleSettings({
+    roles: [
+      {
+        role_code: 'counter_staff',
+        label: 'Thu ngân',
+        enabled: true,
+        template_id: 'missing-template',
+        position_ids: ['pos-002'],
+        sort_order: 1,
+      },
+    ],
+  }))
+
+  assert.equal(issues.some((issue) => issue.code === 'template_not_found'), true)
+})
+
+test('validator rejects template assigned to different onboarding role', () => {
+  initCareerPathStores()
+  const issues = validateOnboardingRoleSettings(cloneRoleSettings({
+    roles: [
+      {
+        role_code: 'counter_staff',
+        label: 'Thu ngân',
+        enabled: true,
+        template_id: 'onb-template-barista-published-v1',
+        position_ids: ['pos-002'],
+        sort_order: 1,
+      },
+    ],
+  }))
+
+  assert.equal(issues.some((issue) => issue.code === 'template_role_mismatch'), true)
+})
+
+test('trial workflow readiness flags missing assignment group', () => {
+  initCareerPathStores()
+  const report = buildTrialWorkflowReadinessReport(cloneRoleSettings({
+    roles: [
+      {
+        role_code: 'counter_staff',
+        label: 'Thu ngân',
+        enabled: true,
+        template_id: 'onb-template-counter-published-v1',
+        position_ids: [],
+        sort_order: 1,
+      },
+    ],
+  }))
+
+  assert.equal(report.some((issue) => issue.message.includes('Chưa chọn nhóm áp dụng')), true)
+})
+
+test('import rejects onboarding settings when template role mismatches', () => {
+  initCareerPathStores()
+  const before = getOnboardingRoleSettings()
+  const success = importSettings(JSON.stringify({
+    settings: {
+      onboarding_role_settings: {
+        ...before,
+        roles: [
+          {
+            role_code: 'counter_staff',
+            label: 'Thu ngân',
+            enabled: true,
+            template_id: 'onb-template-barista-published-v1',
+            position_ids: ['pos-002'],
+            sort_order: 1,
+          },
+        ],
+      },
+    },
+  }))
+
+  assert.equal(success, false)
+  assert.equal(getOnboardingRoleSettings().roles[0].template_id, before.roles[0].template_id)
+})
+
+test('seed onboarding plans use current published template ids', () => {
+  const templateIds = sampleEmployeeOnboardingChecklistPlans.map((plan) => plan.template_id)
+
+  assert.equal(templateIds.includes('onb-template-counter-v1'), false)
+  assert.equal(templateIds.includes('onb-template-barista-v1'), false)
+})

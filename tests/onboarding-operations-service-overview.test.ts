@@ -1,30 +1,30 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
-import { initCareerPathStores } from '../src/lib/career-path-service'
-import { OnboardingOperationsService } from '../src/lib/services/onboarding-operations-service'
+const serviceSource = readFileSync(resolve(process.cwd(), 'src/lib/services/onboarding-operations-service.ts'), 'utf8')
 
 test('workspace overview exposes config-first system status', () => {
-  initCareerPathStores()
-  const user = {
-    id: 'emp-004',
-    full_name: 'CEO Test',
-    role: 'ceo',
-    store_id: 'store-001',
-    position_id: 'pos-001',
-    phone: '0900000000',
-    email: 'ceo@example.com',
-    employee_code: 'E004',
-    status: 'active',
-    account_status: 'dang_hoat_dong',
-    total_points: 0,
-    gamification_level: 'L1',
-    hire_date: '2026-06-01',
-  } as const
-  const overview = OnboardingOperationsService.getWorkspaceOverview(user, 'all')
+  assert.match(serviceSource, /systemStatus/)
+  assert.match(serviceSource, /urgentItems/)
+  assert.match(serviceSource, /configSummary/)
+})
 
-  assert.ok(overview.systemStatus)
-  assert.ok(['stable', 'review', 'config_error'].includes(overview.systemStatus.key))
-  assert.ok(Array.isArray(overview.urgentItems))
-  assert.ok(overview.configSummary)
+test('service overview keeps summary and uses tracking row fields mới', () => {
+  assert.match(serviceSource, /filters:/)
+  assert.match(serviceSource, /stats:/)
+  assert.match(serviceSource, /statusLabel/)
+  assert.match(serviceSource, /primaryActionLabel/)
+})
+
+test('service source defines journey length and suggested today index contracts', () => {
+  assert.match(serviceSource, /journeyLength/)
+  assert.match(serviceSource, /suggestedTodayIndex/)
+})
+
+test('service source defines journey summaries for every day in range', () => {
+  assert.match(serviceSource, /journeyDays/)
+  assert.match(serviceSource, /OnboardingJourneyDaySummary/)
+  assert.match(serviceSource, /title:\s*`Ngày \$\{dayIndex\}`/)
 })

@@ -1,7 +1,7 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import type { OnboardingChecklistTemplate, OnboardingRoleSetting, OnboardingRoleSettingsValidationIssue } from '@/lib/career-path-types'
 
-export const onboardingRoleCardActionLabels = ['Đổi checklist', 'Mở chi tiết', 'Tìm chức danh', 'Chưa có checklist'] as const
+export const onboardingRoleCardActionLabels = ['Đổi danh sách việc', 'Mở chi tiết', 'Tìm chức danh', 'Chưa có danh sách việc'] as const
 
 type PositionOption = {
   id: string
@@ -43,6 +43,8 @@ export function OnboardingRoleCard({
   const [positionFilter, setPositionFilter] = useState<PositionFilterKey>('all')
 
   const selectedTemplate = templates.find((template) => template.id === role.template_id) ?? null
+  const roleTemplates = templates.filter((template) => template.role_code === role.role_code)
+  const hasInvalidSelectedTemplate = Boolean(selectedTemplate && selectedTemplate.role_code !== role.role_code)
   const filteredPositions = positions.filter((position) => {
     const normalizedSearch = searchValue.trim().toLowerCase()
     const matchesSearch = normalizedSearch.length === 0 || `${position.name} ${position.id}`.toLowerCase().includes(normalizedSearch)
@@ -63,9 +65,9 @@ export function OnboardingRoleCard({
           <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>{role.label || role.role_code}</div>
           <div style={{ fontSize: 11, color: '#667085', marginTop: 2 }}>{role.role_code} • Thứ tự {role.sort_order}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-            <div style={statusBadgeStyle(role.enabled)}>{role.enabled ? 'Đang bật' : 'Đang tắt'}</div>
-            <div style={metaPillStyle}>{role.position_ids.length} chức danh</div>
-            <div style={metaPillStyle}>{selectedTemplate ? `${selectedTemplate.role_label} • v${selectedTemplate.version}` : 'Chưa có checklist'}</div>
+            <div style={statusBadgeStyle(role.enabled)}>{role.enabled ? 'Đang sử dụng' : 'Tạm tắt'}</div>
+            <div style={metaPillStyle}>{role.position_ids.length} nhóm áp dụng</div>
+            <div style={metaPillStyle}>{selectedTemplate ? `Danh sách việc cần làm đang dùng • v${selectedTemplate.version}` : 'Chưa có danh sách việc'}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', alignContent: 'flex-start' }}>
@@ -73,7 +75,7 @@ export function OnboardingRoleCard({
             {role.enabled ? 'Tắt' : 'Bật'}
           </button>
           <button type="button" onClick={() => setExpanded(true)} style={actionButtonStyle('#eef2ff', '#3646c5')}>
-            Đổi checklist
+            Đổi danh sách việc
           </button>
           <button type="button" onClick={() => setExpanded((current) => !current)} style={actionButtonStyle('#fff', '#344054')}>
             {expanded ? 'Thu gọn' : 'Mở chi tiết'}
@@ -105,30 +107,36 @@ export function OnboardingRoleCard({
             </label>
 
             <label style={{ display: 'grid', gap: 6 }}>
-              <div style={fieldLabelStyle}>Checklist áp dụng</div>
+              <div style={fieldLabelStyle}>Danh sách việc cần làm đang dùng</div>
               <select
                 value={role.template_id ?? ''}
                 onChange={(event) => onTemplateChange(event.target.value)}
                 style={fieldControlStyle}
               >
-                <option value="">Chưa có checklist</option>
-                {templates.map((template) => (
+                <option value="">Chưa có danh sách việc</option>
+                {roleTemplates.map((template) => (
                   <option key={template.id} value={template.id}>
                     {template.role_label} • v{template.version} • {template.id}
                   </option>
                 ))}
               </select>
             </label>
+
+            {hasInvalidSelectedTemplate ? (
+              <div style={{ fontSize: 11, color: '#b42318', lineHeight: 1.5 }}>
+                Danh sách việc hiện tại không thuộc đúng nhóm áp dụng này. Vui lòng chọn lại bản phù hợp.
+              </div>
+            ) : null}
           </div>
 
           <div style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <div style={fieldLabelStyle}>Chức danh áp dụng</div>
+              <div style={fieldLabelStyle}>Nhóm áp dụng</div>
               <input
                 type="text"
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
-                placeholder="Tìm chức danh"
+                placeholder="Tìm nhóm áp dụng hoặc chức danh"
                 style={{ ...fieldControlStyle, maxWidth: 260 }}
               />
             </div>
@@ -179,7 +187,7 @@ export function OnboardingRoleCard({
                       <div style={{ display: 'grid', gap: 2 }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>{position.name}</span>
                         <span style={{ fontSize: 10, color: '#667085' }}>{position.id}</span>
-                        {duplicate ? <span style={{ fontSize: 10, color: '#b42318' }}>Đang trùng ở nhiều role</span> : null}
+                        {duplicate ? <span style={{ fontSize: 10, color: '#b42318' }}>Đang trùng ở nhiều nhóm áp dụng</span> : null}
                       </div>
                     </label>
                   )

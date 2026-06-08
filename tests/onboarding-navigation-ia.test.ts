@@ -13,8 +13,19 @@ test('hr admin gets new-hires group with onboarding trio', () => {
     [
       '/career-path/onboarding/overview',
       '/career-path/onboarding',
-      '/career-path/settings',
+      '/career-path/onboarding/setup',
     ],
+  )
+})
+
+test('onboarding navigation uses two clear trial-workflow layers', () => {
+  const entries = getDesktopSidebarEntries('hr_admin')
+  const newHireGroup = entries.find((entry) => entry.id === 'new-hires')
+
+  assert.ok(newHireGroup)
+  assert.deepEqual(
+    newHireGroup.items?.map((item) => item.label),
+    ['Tổng quan thử việc', 'Theo dõi thử việc', 'Thiết lập quy trình thử việc'],
   )
 })
 

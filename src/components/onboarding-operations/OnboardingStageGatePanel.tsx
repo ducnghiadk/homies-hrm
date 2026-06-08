@@ -50,21 +50,21 @@ export function OnboardingStageGatePanel({
       }}
     >
       <div style={{ fontSize: 11, fontWeight: 800, color: '#7A6B53', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-        Gate tổng kết chặng
+        Tổng kết chặng cuối
       </div>
       <div style={{ fontSize: 12, color: '#5F6B7A', marginTop: 6, lineHeight: 1.45 }}>
-        Tự đánh giá là điều kiện vào gate. Buddy đề xuất, quản lý chốt bước cuối.
+        Tự đánh giá là điều kiện vào bước chốt cuối. Người kèm đề xuất, quản lý chốt kết quả thử việc.
       </div>
 
       <div style={{ marginTop: 10, fontSize: 13, color: '#334155', lineHeight: 1.6 }}>
         <div>Trạng thái: <strong>{getStatusLabel(detail.gateView.status)}</strong></div>
         <div>Đã có tự đánh giá: <strong>{detail.gateView.has_self_review ? 'Có' : 'Chưa'}</strong></div>
-        <div>Còn item bắt buộc đang vướng: <strong>{detail.gateView.blocked_item_ids.length}</strong></div>
+        <div>Còn mục bắt buộc đang vướng: <strong>{detail.gateView.blocked_item_ids.length}</strong></div>
       </div>
 
       {detail.gateView.buddy_note ? (
         <div style={{ marginTop: 10, fontSize: 13, color: '#334155' }}>
-          <strong>Ghi chú buddy:</strong> {detail.gateView.buddy_note}
+          <strong>Ghi chú người kèm:</strong> {detail.gateView.buddy_note}
         </div>
       ) : null}
 
@@ -81,7 +81,7 @@ export function OnboardingStageGatePanel({
             onChange={(event) => setBuddyNote(event.target.value)}
             rows={3}
             maxLength={280}
-            placeholder="Ghi ngắn vì sao buddy đề xuất qua gate."
+            placeholder="Ghi ngắn vì sao người kèm đề xuất qua bước chốt."
             style={{
               width: '100%',
               borderRadius: 14,
@@ -98,7 +98,7 @@ export function OnboardingStageGatePanel({
             }}
             style={actionButtonStyle('#001D3D')}
           >
-            Đề xuất qua gate
+            Đề xuất qua bước chốt
           </button>
         </div>
       ) : null}
@@ -147,7 +147,7 @@ export function OnboardingStageGatePanel({
               disabled={!managerNote.trim()}
               style={actionButtonStyle('#1E9E57', !managerNote.trim())}
             >
-              Duyệt gate
+              Duyệt bước chốt
             </button>
             <button
               type="button"
@@ -170,8 +170,8 @@ export function OnboardingStageGatePanel({
 
 function getStatusLabel(status: OnboardingStageGateStatus) {
   if (status === 'cho_quan_ly_duyet') return 'Chờ quản lý duyệt'
-  if (status === 'da_qua_gate') return 'Đã qua gate'
-  if (status === 'chua_qua_gate') return 'Chưa qua gate'
+  if (status === 'da_qua_gate') return 'Đã qua bước chốt'
+  if (status === 'chua_qua_gate') return 'Chưa qua bước chốt'
   return 'Chưa đề xuất'
 }
 

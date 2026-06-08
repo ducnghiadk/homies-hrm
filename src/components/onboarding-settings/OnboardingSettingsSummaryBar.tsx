@@ -1,10 +1,9 @@
-﻿import React from 'react'
+import React from 'react'
 
 export const onboardingSummaryMetricLabels = [
-  'Role đang dùng',
-  'Role thiếu checklist',
-  'Chức danh bị gán trùng',
-  'Nhân viên chưa khớp role',
+  'Phần đã xong',
+  'Chỗ còn thiếu',
+  'Sẵn sàng dùng',
 ] as const
 
 export type OnboardingSettingsSummaryMetric = {
@@ -28,7 +27,7 @@ const toneTextMap: Record<OnboardingSettingsSummaryMetric['tone'], string> = {
 
 export function OnboardingSettingsSummaryBar({ metrics }: { metrics: OnboardingSettingsSummaryMetric[] }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
       {metrics.map((metric) => (
         <a
           key={metric.label}
@@ -49,4 +48,3 @@ export function OnboardingSettingsSummaryBar({ metrics }: { metrics: OnboardingS
     </div>
   )
 }
-

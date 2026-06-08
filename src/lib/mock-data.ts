@@ -146,8 +146,8 @@ export const mockStores: Store[] = [
   {
     id: 'store-001',
     org_id: 'org-001',
-    name: 'Homies Milk Tea - Nguy?n Hu?',
-    address: '123 Nguy?n Hu?, Q.1, TP.HCM',
+    name: 'Homies Milk Tea - Nguyá»…n Huá»‡',
+    address: '123 Nguyá»…n Huá»‡, Q.1, TP.HCM',
     latitude: 10.7736,
     longitude: 106.7024,
     checkin_radius_meters: 100,
@@ -157,8 +157,8 @@ export const mockStores: Store[] = [
   {
     id: 'store-002',
     org_id: 'org-001',
-    name: 'Homies Milk Tea - Ph?m V?n ??ng',
-    address: '456 Ph?m V?n ??ng, Th? ??c, TP.HCM',
+    name: 'Homies Milk Tea - Pháº¡m VÄƒn Äá»“ng',
+    address: '456 Pháº¡m VÄƒn Äá»“ng, Thá»§ Äá»©c, TP.HCM',
     latitude: 10.8381,
     longitude: 106.6810,
     checkin_radius_meters: 100,
@@ -168,8 +168,8 @@ export const mockStores: Store[] = [
   {
     id: 'store-003',
     org_id: 'org-001',
-    name: 'Homies Milk Tea - L? V?n S?',
-    address: '789 L? V?n S?, Q.3, TP.HCM',
+    name: 'Homies Milk Tea - LÃª VÄƒn Sá»¹',
+    address: '789 LÃª VÄƒn Sá»¹, Q.3, TP.HCM',
     latitude: 10.7845,
     longitude: 106.6679,
     checkin_radius_meters: 100,
@@ -182,11 +182,11 @@ export const mockStores: Store[] = [
 // Positions (5 vá»‹ trÃ­)
 // ============================================
 export const mockPositions: Position[] = [
-  { id: 'pos-001', org_id: 'org-001', name: 'Pha ch?', level: 1, base_salary: 5500000 },
-  { id: 'pos-002', org_id: 'org-001', name: 'Thu ng?n', level: 1, base_salary: 5000000 },
-  { id: 'pos-003', org_id: 'org-001', name: 'Ph?c v?', level: 1, base_salary: 4500000 },
-  { id: 'pos-004', org_id: 'org-001', name: 'Ph? qu?n l?', level: 3, base_salary: 8000000 },
-  { id: 'pos-005', org_id: 'org-001', name: 'Qu?n l?', level: 4, base_salary: 12000000 },
+  { id: 'pos-001', org_id: 'org-001', name: 'Pha cháº¿', level: 1, base_salary: 5500000 },
+  { id: 'pos-002', org_id: 'org-001', name: 'Thu ngÃ¢n', level: 1, base_salary: 5000000 },
+  { id: 'pos-003', org_id: 'org-001', name: 'Phá»¥c vá»¥', level: 1, base_salary: 4500000 },
+  { id: 'pos-004', org_id: 'org-001', name: 'PhÃ³ quáº£n lÃ½', level: 3, base_salary: 8000000 },
+  { id: 'pos-005', org_id: 'org-001', name: 'Quáº£n lÃ½', level: 4, base_salary: 12000000 },
 ]
 
 // ============================================
@@ -196,49 +196,49 @@ export const mockEmployees: Employee[] = [
   // CEO
   {
     id: 'emp-001', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-005',
-    employee_code: 'BH-001', full_name: 'Nguy?n Minh Tu?n', phone: '0901234567',
+    employee_code: 'BH-001', full_name: 'Nguyễn Minh Tuấn', phone: '0901234567',
     email: 'tuan@bobahouse.vn', date_of_birth: '1990-05-15', gender: 'male',
-    address: '100 Nguy?n Du, Q.1, TP.HCM', role: 'ceo', status: 'active',
+    address: '100 Nguyễn Du, Q.1, TP.HCM', role: 'ceo', status: 'active',
     hire_date: '2023-01-01', total_points: 5200, gamification_level: 'platinum',
     kpi_level: 'L5',
   },
   // Managers (3)
   {
     id: 'emp-002', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-005',
-    employee_code: 'BH-002', full_name: 'Tr?n Th? Lan', phone: '0912345678',
+    employee_code: 'BH-002', full_name: 'Trần Thị Lan', phone: '0912345678',
     email: 'lan@bobahouse.vn', date_of_birth: '1995-08-20', gender: 'female',
-    address: '200 Tr?n H?ng ??o, Q.1, TP.HCM', role: 'store_manager', status: 'active',
+    address: '200 Trần Hưng Đạo, Q.1, TP.HCM', role: 'store_manager', status: 'active',
     hire_date: '2023-03-15', total_points: 3800, gamification_level: 'gold',
     kpi_level: 'L4',
   },
   {
     id: 'emp-003', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-005',
-    employee_code: 'BH-003', full_name: 'L? Ho?ng Nam', phone: '0923456789',
+    employee_code: 'BH-003', full_name: 'Lê Hoàng Nam', phone: '0923456789',
     email: 'nam@bobahouse.vn', date_of_birth: '1993-11-10', gender: 'male',
-    address: '300 Ph?m V?n ??ng, Th? ??c, TP.HCM', role: 'store_manager', status: 'active',
+    address: '300 Phạm Văn Đồng, Thủ Đức, TP.HCM', role: 'store_manager', status: 'active',
     hire_date: '2023-06-01', total_points: 2900, gamification_level: 'gold',
     kpi_level: 'L4',
   },
   {
     id: 'emp-004', org_id: 'org-001', store_id: 'store-003', position_id: 'pos-004',
-    employee_code: 'BH-004', full_name: 'Ph?m Th? H??ng', phone: '0934567890',
+    employee_code: 'BH-004', full_name: 'Phạm Thị Hương', phone: '0934567890',
     email: 'huong@bobahouse.vn', date_of_birth: '1996-03-25', gender: 'female',
-    address: '400 L? V?n S?, Q.3, TP.HCM', role: 'shift_leader', status: 'active',
+    address: '400 Lê Văn Sỹ, Q.3, TP.HCM', role: 'shift_leader', status: 'active',
     hire_date: '2024-01-10', total_points: 2100, gamification_level: 'silver',
     kpi_level: 'L3',
   },
   // Employees (11)
   {
     id: 'emp-005', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-001',
-    employee_code: 'BH-005', full_name: 'V? Thanh B?nh', phone: '0945678901',
+    employee_code: 'BH-005', full_name: 'Võ Thanh Bình', phone: '0945678901',
     email: 'binh@bobahouse.vn', date_of_birth: '2001-07-12', gender: 'male',
-    address: '50 B?i Vi?n, Q.1, TP.HCM', role: 'employee', status: 'active',
+    address: '50 Bùi Viện, Q.1, TP.HCM', role: 'employee', status: 'active',
     hire_date: '2024-06-01', total_points: 1500, gamification_level: 'silver',
     kpi_level: 'L1',
   },
   {
     id: 'emp-006', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-002',
-    employee_code: 'BH-006', full_name: 'Nguy?n Th? Mai', phone: '0956789012',
+    employee_code: 'BH-006', full_name: 'Nguyễn Thị Mai', phone: '0956789012',
     email: 'mai@bobahouse.vn', date_of_birth: '2002-09-30', gender: 'female',
     address: '60 ?? Th?m, Q.1, TP.HCM', role: 'employee', status: 'active',
     hire_date: '2024-07-15', total_points: 980, gamification_level: 'bronze',
@@ -246,9 +246,9 @@ export const mockEmployees: Employee[] = [
   },
   {
     id: 'emp-007', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-003',
-    employee_code: 'BH-007', full_name: '??ng Minh Khoa', phone: '0967890123',
+    employee_code: 'BH-007', full_name: 'Đặng Minh Khoa', phone: '0967890123',
     email: 'khoa@bobahouse.vn', date_of_birth: '2003-01-05', gender: 'male',
-    address: '70 Ph?m Ng? L?o, Q.1, TP.HCM', role: 'employee', status: 'probation',
+    address: '70 Phạm Ngũ Lão, Q.1, TP.HCM', role: 'employee', status: 'probation',
     hire_date: '2025-12-01', total_points: 320, gamification_level: 'bronze',
     kpi_level: 'L0',
   },
@@ -319,17 +319,17 @@ export const mockEmployees: Employee[] = [
   // === Demo onboarding employees ===
   {
     id: 'emp-017', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-002',
-    employee_code: 'BH-017', full_name: 'Tran Minh Thuy', phone: '0967788990',
+    employee_code: 'BH-017', full_name: 'Trần Minh Thủy', phone: '0967788990',
     email: 'thuy@bobahouse.vn', date_of_birth: '2003-07-15', gender: 'female',
-    address: '170 Dinh Cong, Q.3, TP.HCM', role: 'employee', status: 'probation',
+    address: '170 Đinh Công, Q.3, TP.HCM', role: 'employee', status: 'probation',
     hire_date: '2026-06-03', total_points: 0, gamification_level: 'bronze',
     kpi_level: 'L0',
   },
   {
     id: 'emp-018', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-001',
-    employee_code: 'BH-018', full_name: 'Le Phuong Nam', phone: '0978899001',
+    employee_code: 'BH-018', full_name: 'Lê Phương Nam', phone: '0978899001',
     email: 'nam.p@bobahouse.vn', date_of_birth: '2002-11-08', gender: 'male',
-    address: '180 Nguyen Trai, Q.5, TP.HCM', role: 'employee', status: 'probation',
+    address: '180 Nguyễn Trãi, Q.5, TP.HCM', role: 'employee', status: 'probation',
     hire_date: '2026-05-27', total_points: 50, gamification_level: 'bronze',
     kpi_level: 'L0',
   },
