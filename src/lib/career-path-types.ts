@@ -18,8 +18,8 @@ export type OnboardingStepStatus = 'pending' | 'in_progress' | 'completed' | 'sk
 export type SkillRefreshStatus = 'valid' | 'expiring_soon' | 'expired';
 export type LeaderboardCategory = 'top_mentor' | 'streak' | 'skill_unlock' | 'drinks_made';
 export type OnboardingRoleCode = string;
-export type OnboardingTemplateStatus = 'draft' | 'active' | 'archived';
-export type OnboardingStageCode = 'pre_start' | 'day_1' | 'day_2_3' | 'week_1' | 'week_2';
+export type OnboardingTemplateStatus = 'draft' | 'published' | 'archived';
+export type OnboardingStageCode = 'pre_start' | 'day_1' | 'day_2_3' | 'day_4_7' | 'week_2';
 export type OnboardingTrainingMethod = 'read' | 'watch_demo' | 'shadow' | 'hands_on' | 'observation' | 'quiz';
 export type OnboardingEvidenceType = 'none' | 'buddy_check' | 'manager_check' | 'quiz_score' | 'photo';
 export type EmployeeOnboardingChecklistPlanStatus = 'assigned' | 'in_progress' | 'completed' | 'extended' | 'cancelled';
@@ -286,13 +286,28 @@ export interface OnboardingCompetencyGroup {
   sort_order: number;
 }
 
+export interface OnboardingContentTopic {
+  id: string;
+  template_id: string;
+  code: string;
+  label: string;
+  sort_order: number;
+  active: boolean;
+}
+
 export interface OnboardingChecklistTemplate {
   id: string;
   role_code: OnboardingRoleCode;
   role_label: string;
+  name: string;
+  description: string;
   version: number;
   status: OnboardingTemplateStatus;
+  source_type: 'built_in' | 'custom' | 'duplicated';
   effective_from: string | null;
+  published_at: string | null;
+  published_by: string | null;
+  journey_length_days: number;
   created_by: string;
   updated_by: string;
   created_at: string;
@@ -321,10 +336,69 @@ export interface OnboardingRoleSettings {
 }
 
 export interface OnboardingRoleSettingsValidationIssue {
-  code: 'blank_label' | 'missing_template' | 'duplicate_position' | 'all_roles_disabled';
+  code: 'blank_label' | 'missing_template' | 'duplicate_position' | 'all_roles_disabled' | 'template_not_found' | 'template_role_mismatch';
   role_code?: OnboardingRoleSettingId;
   position_id?: string;
   message: string;
+}
+
+export type TrialWorkflowReadinessIssueCode =
+  | 'missing_stage'
+  | 'missing_task_list'
+  | 'missing_assignment_group';
+
+export interface TrialWorkflowReadinessIssue {
+  code: TrialWorkflowReadinessIssueCode;
+  message: string;
+}
+
+export interface OnboardingTemplateValidationIssue {
+  code: 'missing_topic' | 'missing_item' | 'missing_orientation' | 'missing_hygiene' | 'missing_service' | 'missing_follow_up';
+  template_id: string;
+  message: string;
+}
+
+export interface OnboardingPublishValidationReport {
+  template_id: string;
+  blocking_issues: OnboardingTemplateValidationIssue[];
+  warning_issues: OnboardingTemplateValidationIssue[];
+  checked_at: string;
+}
+
+export interface OnboardingTemplateDiffSummary {
+  template_id: string;
+  baseline_template_id: string | null;
+  topic_added: number;
+  topic_removed: number;
+  item_added: number;
+  item_removed: number;
+  required_item_changed: number;
+  stage_changed: number;
+  journey_length_changed: boolean;
+}
+
+export interface OnboardingSettingsAuditEntry {
+  id: string;
+  event_type: string;
+  entity_type: 'role_setting' | 'template' | 'topic' | 'stage' | 'item' | 'import_export';
+  entity_id: string;
+  summary: string;
+  changed_fields: string[];
+  actor: string;
+  created_at: string;
+}
+
+export interface OnboardingSettingsExportEnvelope {
+  schema_version: '2026-06-02';
+  module: 'onboarding_settings';
+  exported_at: string;
+  payload: {
+    role_settings: OnboardingRoleSettings;
+    templates: OnboardingChecklistTemplate[];
+    topics: OnboardingContentTopic[];
+    stages: OnboardingChecklistStage[];
+    items: OnboardingChecklistItemTemplate[];
+  };
 }
 
 export interface OnboardingChecklistStage {
@@ -341,6 +415,7 @@ export interface OnboardingChecklistItemTemplate {
   id: string;
   template_id: string;
   stage_id: string;
+  topic_id: string;
   competency_group_id: string;
   code: string;
   title: string;
@@ -348,12 +423,15 @@ export interface OnboardingChecklistItemTemplate {
   success_criteria: string;
   training_method: OnboardingTrainingMethod;
   evidence_type: OnboardingEvidenceType;
+  confirmer_role: 'employee' | 'buddy' | 'shift_leader' | 'store_manager' | 'hr_admin';
+  ops_visibility: 'employee_visible' | 'ops_only';
   is_required: boolean;
   requires_buddy_confirmation: boolean;
   requires_manager_confirmation: boolean;
   requires_quiz: boolean;
+  is_focus_block_eligible: boolean;
   quiz_template_id?: string;
-  estimated_minutes?: number;
+  estimated_minutes: number;
   sort_order: number;
   active: boolean;
 }
@@ -454,7 +532,7 @@ export interface OnboardingMiniQuizView {
   latest: OnboardingMiniQuizAttempt | null;
   history: OnboardingMiniQuizAttempt[];
   latest_wrong_question_ids: string[];
-  status_label: 'Chua lam mini test' | 'On phan nen' | 'Can on lai';
+  status_label: 'Chưa làm bài kiểm tra ngắn' | 'Ổn phần nền' | 'Cần ôn lại';
 }
 
 export type OnboardingEvaluationTimelineEntryType = 'self_review' | 'mini_quiz' | 'stage_gate';
@@ -652,6 +730,7 @@ export interface CareerPathTemplate {
     trial_checklist: TrialChecklistItem[];
     onboarding_steps: OnboardingStep[];
     onboarding_competency_groups?: OnboardingCompetencyGroup[];
+    onboarding_content_topics?: OnboardingContentTopic[];
     onboarding_checklist_templates?: OnboardingChecklistTemplate[];
     onboarding_checklist_stages?: OnboardingChecklistStage[];
     onboarding_checklist_items?: OnboardingChecklistItemTemplate[];
@@ -805,3 +884,4 @@ export interface CareerWarning {
   severity: 'high' | 'medium' | 'low';
   action_link?: string;
 }
+

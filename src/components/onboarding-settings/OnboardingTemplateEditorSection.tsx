@@ -53,8 +53,8 @@ export function OnboardingTemplateEditorSection({
   if (!template) {
     return (
       <div style={sectionStyle}>
-        <div style={titleStyle}>Trình sửa template</div>
-        <div style={subtitleStyle}>Chọn một template từ thư viện để mở vùng chỉnh sửa.</div>
+        <div style={titleStyle}>Biên tập nội dung</div>
+        <div style={subtitleStyle}>Ch?n m?t m?u t? th? vi?n ?? m? v?ng ch?nh s?a.</div>
       </div>
     )
   }
@@ -67,7 +67,7 @@ export function OnboardingTemplateEditorSection({
     onTemplateMutated?.(duplicated.id)
     setRevision((current) => current + 1)
     setMessageTone('success')
-    setMessage('Đã tạo bản nháp mới từ template đang chọn.')
+    setMessage('?? t?o b?n nh?p m?i t? m?u ?ang ch?n.')
   }
 
   const handlePublish = () => {
@@ -77,28 +77,28 @@ export function OnboardingTemplateEditorSection({
       onTemplateMutated?.(published.id)
       setRevision((current) => current + 1)
       setMessageTone('success')
-      setMessage('Đã phát hành template onboarding.')
+      setMessage('?? ??a m?u th? vi?c v?o d?ng.')
     } catch (error) {
       setMessageTone('error')
-      setMessage(error instanceof Error ? error.message : 'Không thể phát hành template.')
+      setMessage(error instanceof Error ? error.message : 'Kh?ng th? ??a m?u v?o d?ng.')
     }
   }
 
   const handleTemplateFieldUpdate = (patch: Parameters<typeof updateOnboardingChecklistTemplate>[1]) => {
     updateOnboardingChecklistTemplate(template.id, patch)
-    refresh({ tone: 'success', text: 'Đã lưu thay đổi metadata template.' })
+    refresh({ tone: 'success', text: '?? l?u th?ng tin m?u.' })
   }
 
   const handleItemUpdate = (itemId: string, patch: Partial<OnboardingChecklistItemTemplate>) => {
     updateOnboardingChecklistItem(itemId, patch)
-    refresh({ tone: 'success', text: 'Đã lưu thay đổi mục checklist.' })
+    refresh({ tone: 'success', text: '?? l?u vi?c c?n l?m.' })
   }
 
   return (
     <div style={sectionStyle}>
       <div style={headerStyle}>
         <div>
-          <div style={titleStyle}>Trình sửa template</div>
+          <div style={titleStyle}>Biên tập nội dung</div>
           <div style={subtitleStyle}>
             {template.role_label} • v{template.version} • {template.status === 'published' ? 'Đang phát hành' : template.status === 'draft' ? 'Nháp' : 'Lưu trữ'}
           </div>
@@ -110,7 +110,7 @@ export function OnboardingTemplateEditorSection({
             </button>
           ) : null}
           <button type="button" onClick={() => onSelectTemplate(null)} style={secondaryButtonStyle}>
-            Đóng editor
+            ??ng v?ng s?a
           </button>
         </div>
       </div>
@@ -123,14 +123,14 @@ export function OnboardingTemplateEditorSection({
 
       {!isDraft ? (
         <div style={readOnlyStyle}>
-          Template đang phát hành hoặc đã lưu trữ. Hãy tạo bản nháp trước khi chỉnh sửa nội dung.
+          M?u ?ang d?ng ho?c ?? l?u tr?. H?y t?o b?n nh?p tr??c khi ch?nh s?a n?i dung.
         </div>
       ) : null}
 
       <div style={metaCardStyle}>
         <div style={metaGridStyle}>
           <label style={fieldStyle}>
-            <span style={fieldLabelStyle}>Tên template</span>
+            <span style={fieldLabelStyle}>T?n m?u</span>
             <input
               type="text"
               value={template.name}
@@ -140,7 +140,7 @@ export function OnboardingTemplateEditorSection({
             />
           </label>
           <label style={fieldStyle}>
-            <span style={fieldLabelStyle}>Số ngày onboarding</span>
+            <span style={fieldLabelStyle}>S? ng?y th? vi?c</span>
             <input
               type="number"
               min={1}
@@ -161,12 +161,12 @@ export function OnboardingTemplateEditorSection({
             style={{ ...inputStyle, resize: 'vertical' }}
           />
         </label>
-        <div style={templateMetaStyle}>Template ID: {template.id}</div>
+        <div style={templateMetaStyle}>M? m?u: {template.id}</div>
       </div>
 
       <OnboardingPublishValidationPanel
         report={report}
-        onRefresh={() => refresh({ tone: 'idle', text: 'Đã làm mới báo cáo kiểm tra phát hành.' })}
+        onRefresh={() => refresh({ tone: 'idle', text: '?? l?m m?i b?o c?o tr??c khi d?ng.' })}
         onPublish={handlePublish}
         publishDisabled={!isDraft}
       />
@@ -176,7 +176,7 @@ export function OnboardingTemplateEditorSection({
           topics={topics}
           onAddTopic={() => {
             createOnboardingContentTopic(template.id)
-            refresh({ tone: 'success', text: 'Đã thêm chủ đề onboarding.' })
+            refresh({ tone: 'success', text: '?? th?m ch? ??.' })
           }}
           onRenameTopic={(topicId, label) => {
             updateOnboardingContentTopic(topicId, { label })
@@ -211,7 +211,7 @@ export function OnboardingTemplateEditorSection({
         stages={stages}
         onAddItem={() => {
           createOnboardingChecklistItem(template.id)
-          refresh({ tone: 'success', text: 'Đã thêm mục checklist mới.' })
+          refresh({ tone: 'success', text: '?? th?m vi?c c?n l?m m?i.' })
         }}
         onUpdateItem={handleItemUpdate}
       />

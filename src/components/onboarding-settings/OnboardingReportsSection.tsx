@@ -23,34 +23,34 @@ export function OnboardingReportsSection() {
 
   return (
     <div style={sectionStyle}>
-      <div style={titleStyle}>Báo cáo</div>
+      <div style={titleStyle}>Báo cáo mức sẵn sàng</div>
       <div style={gridStyle}>
-        <MetricCard label="Role lỗi checklist" value={String(roleIssueCount)} tone={roleIssueCount > 0 ? 'warning' : 'neutral'} />
-        <MetricCard label="Template phát hành" value={String(publishedCount)} tone="neutral" />
-        <MetricCard label="Template nháp" value={String(draftCount)} tone="neutral" />
-        <MetricCard label="Template lưu trữ" value={String(archivedCount)} tone="neutral" />
-        <MetricCard label="Nhân viên chưa khớp role" value={String(unmatchedEmployees.length)} tone={unmatchedEmployees.length > 0 ? 'warning' : 'neutral'} />
+        <MetricCard label="Nh?m l?i quy tr?nh" value={String(roleIssueCount)} tone={roleIssueCount > 0 ? 'warning' : 'neutral'} />
+        <MetricCard label="M?u ?ang d?ng" value={String(publishedCount)} tone="neutral" />
+        <MetricCard label="M?u nh?p" value={String(draftCount)} tone="neutral" />
+        <MetricCard label="M?u l?u tr?" value={String(archivedCount)} tone="neutral" />
+        <MetricCard label="Nh?n s? ch?a kh?p nh?m" value={String(unmatchedEmployees.length)} tone={unmatchedEmployees.length > 0 ? 'warning' : 'neutral'} />
       </div>
 
       <div style={splitGridStyle}>
         <div style={panelStyle}>
-          <div style={panelTitleStyle}>Vai trò cần xử lý</div>
+          <div style={panelTitleStyle}>Nh?m c?n x? l?</div>
           {issues.length > 0 ? issues.slice(0, 6).map((issue, index) => (
             <div key={`${issue.code}-${index}`} style={listItemStyle}>
               <div style={itemTitleStyle}>{issue.role_code ?? 'Cấu hình chung'}</div>
               <div style={itemMetaStyle}>{issue.message}</div>
             </div>
-          )) : <div style={emptyTextStyle}>Không có lỗi cấu hình role nào.</div>}
+          )) : <div style={emptyTextStyle}>Kh?ng c? l?i c?u h?nh nh?m n?o.</div>}
         </div>
 
         <div style={panelStyle}>
-          <div style={panelTitleStyle}>Nhân viên chưa có lộ trình</div>
+          <div style={panelTitleStyle}>Nh?n s? ch?a c? quy tr?nh</div>
           {unmatchedEmployees.length > 0 ? unmatchedEmployees.slice(0, 6).map((employee) => (
             <div key={employee.employee_id} style={listItemStyle}>
               <div style={itemTitleStyle}>{employee.employee_name}</div>
               <div style={itemMetaStyle}>{employee.position_name} • {employee.unmatched_reason}</div>
             </div>
-          )) : <div style={emptyTextStyle}>Tất cả nhân viên mới đều đã có lộ trình onboarding.</div>}
+          )) : <div style={emptyTextStyle}>T?t c? nh?n s? m?i ??u ?? c? quy tr?nh th? vi?c.</div>}
         </div>
       </div>
     </div>

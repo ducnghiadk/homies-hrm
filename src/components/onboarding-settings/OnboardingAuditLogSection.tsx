@@ -11,7 +11,7 @@ export function OnboardingAuditLogSection({
 
   return (
     <div style={sectionStyle}>
-      <div style={titleStyle}>Audit log</div>
+      <div style={titleStyle}>Lịch sử thay đổi</div>
       {rows.length > 0 ? (
         <div style={tableWrapperStyle}>
           <table style={tableStyle}>
@@ -38,7 +38,7 @@ export function OnboardingAuditLogSection({
           </table>
         </div>
       ) : (
-        <div style={emptyTextStyle}>Chưa có lịch sử thay đổi onboarding nào.</div>
+        <div style={emptyTextStyle}>Ch?a c? l?ch s? thay ??i th? vi?c n?o.</div>
       )}
     </div>
   )

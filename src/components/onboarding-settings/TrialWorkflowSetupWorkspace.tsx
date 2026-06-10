@@ -22,7 +22,13 @@ import type {
 import { mockPositions } from '@/lib/mock-data'
 import { OnboardingRoleCard } from '@/components/onboarding-settings/OnboardingRoleCard'
 import { OnboardingRoleFilters, type OnboardingRoleFilterKey } from '@/components/onboarding-settings/OnboardingRoleFilters'
+import { OnboardingSettingsSecondaryTools } from '@/components/onboarding-settings/OnboardingSettingsSecondaryTools'
 import { OnboardingSettingsSummaryBar } from '@/components/onboarding-settings/OnboardingSettingsSummaryBar'
+import { OnboardingTemplateEditorSection } from '@/components/onboarding-settings/OnboardingTemplateEditorSection'
+import { OnboardingTemplateLibrarySection } from '@/components/onboarding-settings/OnboardingTemplateLibrarySection'
+import { OnboardingTemplatePreviewSection } from '@/components/onboarding-settings/OnboardingTemplatePreviewSection'
+import { OnboardingReportsSection } from '@/components/onboarding-settings/OnboardingReportsSection'
+import { OnboardingAuditLogSection } from '@/components/onboarding-settings/OnboardingAuditLogSection'
 import { TrialWorkflowAssignmentsTab } from '@/components/onboarding-settings/TrialWorkflowAssignmentsTab'
 import { TrialWorkflowGateConditionsTab } from '@/components/onboarding-settings/TrialWorkflowGateConditionsTab'
 import { TrialWorkflowGeneralInfoTab } from '@/components/onboarding-settings/TrialWorkflowGeneralInfoTab'
@@ -37,6 +43,34 @@ type SaveState = {
   message: string | null
 }
 
+
+const secondaryToolItems = [
+  {
+    label: 'Thư viện mẫu quy trình',
+    description: 'Chọn đúng mẫu HR đang rà soát trước khi sửa sâu hơn.',
+    href: '#templates',
+  },
+  {
+    label: 'Biên tập nội dung',
+    description: 'Sửa tên mẫu, chặng, chủ đề và việc cần làm của bản đang mở.',
+    href: '#template-editor',
+  },
+  {
+    label: 'Xem trước trải nghiệm',
+    description: 'Xem nhanh hành trình nhân sự mới trước khi đưa vào dùng.',
+    href: '#preview',
+  },
+  {
+    label: 'Báo cáo mức sẵn sàng',
+    description: 'Rà các chỗ còn thiếu và chỗ lệch nhóm áp dụng.',
+    href: '#reports',
+  },
+  {
+    label: 'Lịch sử thay đổi',
+    description: 'Rà các lần cập nhật trước khi chốt bản dùng mới.',
+    href: '#audit-log',
+  },
+] as const
 
 const tabSections: Record<TrialWorkflowTabKey, { title: string; helper: string }> = {
   general: {
@@ -319,6 +353,35 @@ export function TrialWorkflowSetupWorkspace() {
           />
         ) : null}
       </TrialWorkflowWorkspacePanel>
+
+      <OnboardingSettingsSecondaryTools items={[...secondaryToolItems]} />
+
+      <OnboardingTemplateLibrarySection
+        templates={activeTemplates}
+        topicCountByTemplate={topicCountByTemplate}
+        selectedTemplateId={selectedTemplate?.id ?? null}
+        onSelectTemplate={setSelectedTemplateId}
+      />
+
+      <section id="template-editor">
+        <OnboardingTemplateEditorSection
+          selectedTemplateId={selectedTemplate?.id ?? null}
+          onSelectTemplate={setSelectedTemplateId}
+          onTemplateMutated={refreshTemplates}
+        />
+      </section>
+
+      <section id="preview">
+        <OnboardingTemplatePreviewSection template={selectedTemplate} />
+      </section>
+
+      <section id="reports">
+        <OnboardingReportsSection />
+      </section>
+
+      <section id="audit-log">
+        <OnboardingAuditLogSection />
+      </section>
     </div>
   )
 }

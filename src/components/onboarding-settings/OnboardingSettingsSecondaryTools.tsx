@@ -3,19 +3,29 @@ import React from 'react'
 export const DEFAULT_SECONDARY_TOOLS_TITLE = 'Công cụ hỗ trợ'
 export const DEFAULT_SECONDARY_TOOL_ITEMS = [
   {
-    label: 'Xem trước quy trình',
-    description: 'Mở nhanh preview để kiểm tra trải nghiệm nhân viên và vận hành.',
-    href: '#trial-workflow-active-tab',
+    label: 'Thư viện mẫu quy trình',
+    description: 'Mở nhanh mẫu HR đang rà soát trước khi chỉnh sửa.',
+    href: '#templates',
+  },
+  {
+    label: 'Biên tập nội dung',
+    description: 'Đi tới khu sửa tên mẫu, chặng, chủ đề và việc cần làm.',
+    href: '#template-editor',
+  },
+  {
+    label: 'Xem trước trải nghiệm',
+    description: 'Kiểm tra nhanh hành trình nhân sự mới trước khi áp dụng.',
+    href: '#preview',
   },
   {
     label: 'Báo cáo mức sẵn sàng',
-    description: 'Theo dõi nhóm thiếu danh sách việc, nhân viên lệch nhóm, và số bản mẫu đang dùng.',
-    href: '#trial-workflow-active-tab',
+    description: 'Rà các chỗ còn thiếu, lệch nhóm áp dụng, và bản nháp chưa chốt.',
+    href: '#reports',
   },
   {
     label: 'Lịch sử thay đổi',
-    description: 'Rà lại những lần cập nhật quy trình trước khi đưa bản mới vào sử dụng.',
-    href: '#trial-workflow-active-tab',
+    description: 'Xem các lần cập nhật gần nhất trước khi chốt bản dùng.',
+    href: '#audit-log',
   },
 ] as const
 

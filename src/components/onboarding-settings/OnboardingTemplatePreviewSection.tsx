@@ -12,7 +12,7 @@ export function OnboardingTemplatePreviewSection({
   if (!template) {
     return (
       <div style={sectionStyle}>
-        <div style={titleStyle}>Xem trước quy trình</div>
+        <div style={titleStyle}>Xem trước trải nghiệm</div>
         <div style={textStyle}>Chọn một mẫu quy trình để xem nhanh hành trình nhân viên và góc nhìn vận hành.</div>
       </div>
     )
@@ -28,7 +28,7 @@ export function OnboardingTemplatePreviewSection({
 
   return (
     <div style={sectionStyle}>
-      <div style={titleStyle}>Xem trước quy trình</div>
+      <div style={titleStyle}>Xem trước trải nghiệm</div>
       <div style={cardGridStyle}>
         <MetricCard label="Tổng số ngày" value={String(summary.total_days)} />
         <MetricCard label="Tổng số việc" value={String(summary.total_items)} />

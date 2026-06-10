@@ -1,4 +1,4 @@
-﻿# CODEMAP
+# CODEMAP
 
 Muc tieu: vao dung diem sua, giam doc full file, giam token.
 
@@ -98,26 +98,37 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - Dung khi: can huong dan nguoi van hanh bam tung man hinh theo dung flow
 
 ### Noi quy nhan viec va onboarding
-- Mo ta: flow gui noi quy 2 nhip, setting toi thieu, xac nhan cua nhan vien, nhac day-1, va workspace onboard van hanh do quan ly cua hang cam chinh.
-- File chinh: `src/lib/services/onboarding-policy-service.ts`, `src/lib/services/onboarding-operations-service.ts`, `src/app/career-path/settings/page.tsx`, `src/app/career-path/onboarding/page.tsx`, `src/components/onboarding-operations/*`, `src/components/onboarding-operations/OnboardingEvaluationTimelineSummary.tsx`, `src/components/onboarding-operations/OnboardingMiniQuizSummary.tsx`, `src/components/onboarding-operations/OnboardingSelfReviewSummary.tsx`, `src/components/onboarding-employee/*`, `src/components/onboarding-employee/OnboardingEvaluationTimelineCard.tsx`, `src/components/onboarding-employee/OnboardingSelfReviewCard.tsx`, `src/components/onboarding-employee/OnboardingMiniQuizCard.tsx`, `src/components/onboarding-employee/OnboardingStageGateStatusCard.tsx`, `src/app/employees/contracts/[id]/page.tsx`, `src/app/employees/[id]/page.tsx`, `src/app/onboarding/page.tsx`
+- Mo ta: flow gui noi quy 2 nhip, setting toi thieu, xac nhan cua nhan vien, nhac day-1, man thiet lap quy trinh thu viec, va man theo doi thu viec theo tung nhan vien.
+- File chinh: `src/lib/services/onboarding-policy-service.ts`, `src/lib/services/onboarding-operations-service.ts`, `src/lib/services/onboarding-content-runtime-service.ts`, `src/app/career-path/settings/page.tsx`, `src/app/career-path/onboarding/overview/page.tsx`, `src/app/career-path/onboarding/setup/page.tsx`, `src/app/career-path/onboarding/page.tsx`, `src/components/onboarding-settings/TrialWorkflowSetupWorkspace.tsx`, `src/components/onboarding-operations/*`, `src/components/onboarding-operations/OnboardingEvaluationTimelineSummary.tsx`, `src/components/onboarding-operations/OnboardingMiniQuizSummary.tsx`, `src/components/onboarding-operations/OnboardingSelfReviewSummary.tsx`, `src/components/onboarding-employee/*`, `src/components/onboarding-employee/OnboardingEvaluationTimelineCard.tsx`, `src/components/onboarding-employee/OnboardingSelfReviewCard.tsx`, `src/components/onboarding-employee/OnboardingMiniQuizCard.tsx`, `src/components/onboarding-employee/OnboardingStageGateStatusCard.tsx`, `src/app/employees/contracts/[id]/page.tsx`, `src/app/employees/[id]/page.tsx`, `src/app/onboarding/page.tsx`
+- Cai dat lo trinh nghe nghiep chung:
+  - Mo ta: `settings chỉ còn phần chung` cho cap bac, ky nang, dieu kien, nguoi dong hanh, va mot loi tat sang man thiet lap thu viec.
+  - File chinh: `src/app/career-path/settings/page.tsx`
+- Thiết lập quy trình thử việc dạng thẻ:
+  - Mo ta: man `/career-path/onboarding/setup` dung 5 tab chinh o tren va 5 cụm công cụ hỗ trợ o duoi gom `Thư viện mẫu quy trình`, `Biên tập nội dung`, `Xem trước trải nghiệm`, `Báo cáo mức sẵn sàng`, `Lịch sử thay đổi`.
+- File chinh: `src/app/career-path/onboarding/setup/page.tsx`, `src/components/onboarding-settings/TrialWorkflowSetupWorkspace.tsx`, `src/components/onboarding-settings/TrialWorkflowTabBar.tsx`, `src/components/onboarding-settings/TrialWorkflowWorkspacePanel.tsx`, `src/components/onboarding-settings/TrialWorkflowGeneralInfoTab.tsx`, `src/components/onboarding-settings/TrialWorkflowStagesTab.tsx`, `src/components/onboarding-settings/TrialWorkflowTasksTab.tsx`, `src/components/onboarding-settings/TrialWorkflowGateConditionsTab.tsx`, `src/components/onboarding-settings/TrialWorkflowAssignmentsTab.tsx`, `src/components/onboarding-settings/TrialWorkflowMissingItemsTable.tsx`, `src/components/onboarding-settings/OnboardingSettingsSecondaryTools.tsx`, `src/components/onboarding-settings/OnboardingTemplateLibrarySection.tsx`, `src/components/onboarding-settings/OnboardingTemplateEditorSection.tsx`, `src/components/onboarding-settings/OnboardingTemplatePreviewSection.tsx`, `src/components/onboarding-settings/OnboardingReportsSection.tsx`, `src/components/onboarding-settings/OnboardingAuditLogSection.tsx`, `src/components/onboarding-settings/buildTrialWorkflowSetupViewModel.ts`
+- Theo doi thu viec bang bang nhan su:
+  - Mo ta: man `/career-path/onboarding` dung thanh tom tat ngan, bang nhan su trung tam, va khung chi tiet 4 chang theo tung nhan su.
+  - File chinh: `src/app/career-path/onboarding/page.tsx`, `src/components/onboarding-operations/TrialTrackingSummaryBar.tsx`, `src/components/onboarding-operations/TrialTrackingEmployeeTable.tsx`, `src/components/onboarding-operations/TrialTrackingDetailPanel.tsx`, `src/components/onboarding-operations/TrialTrackingStageTabs.tsx`, `src/components/onboarding-operations/TrialTrackingStageTaskTable.tsx`
 - Route IA:
-  - `/onboarding` = `Onboarding cá»§a tÃ´i`
-  - `/career-path/onboarding/overview` = `NhÃ¢n sá»± má»›i > Tá»•ng quan onboarding`
-  - `/career-path/onboarding` = `Nhân sự mới > Vận hành onboarding`
-  - `src/app/career-path/settings/page.tsx` onboarding area = `Cấu hình onboarding`
+  - `/onboarding` = `Onboarding cua toi`
+  - `/career-path/onboarding/overview` = `Nhan su moi > Tong quan thu viec`
+  - `/career-path/onboarding` = `Nhan su moi > Theo doi thu viec`
+  - `/career-path/onboarding/setup` = `Nhan su moi > Thiet lap quy trinh thu viec`
+  - `src/app/career-path/settings/page.tsx` = `Loi tat sang thiet lap quy trinh thu viec`
   - `src/components/onboarding-settings/OnboardingSettingsSummaryBar.tsx` = summary metrics with jump links
-  - `src/components/onboarding-settings/OnboardingSettingsUrgentPanel.tsx` = urgent issue block for HR-first fixing
+  - `src/components/onboarding-settings/TrialWorkflowTabBar.tsx` = dai the ngang va bao cho con thieu theo tung the
+  - `src/components/onboarding-settings/TrialWorkflowMissingItemsTable.tsx` = bang gom cho con thieu o cuoi the dang mo
   - `src/components/onboarding-settings/OnboardingRoleFilters.tsx` = search and status filters for onboarding role cards
   - `src/components/onboarding-settings/OnboardingRoleCard.tsx` = unified role card with checklist assignment and collapsed position mapping
 - Shell rule:
   - Hub page dung `AppShell navMode="full"` de hien sidebar day du
   - Self-service va detail page uu tien `AppShell navMode="compact"` de giam nhieu
-- Dung khi: sua moc gui noi quy, nhac lai, xac nhan nhan vien, checklist onboarding ngay dau, role settings onboarding, map `position -> role onboarding -> template`, unmatched employee trong operations, rule block/can hoan tat som, danh sach nguoi sap vao lam, checklist chi tiet theo tung nguoi, flow `tu danh gia theo chang`, `mini test theo chang`, `timeline lich su danh gia theo chang`, hoac `gate tong ket chang`
+- Dung khi: sua moc gui noi quy, nhac lai, xac nhan nhan vien, checklist onboarding ngay dau, role settings onboarding, map `position -> role onboarding -> template`, content library `topic -> template -> journey rules -> operations consume`, runtime day journey cho operations, unmatched employee trong operations, rule block/can hoan tat som, danh sach nguoi sap vao lam, checklist chi tiet theo tung nguoi, flow `tu danh gia theo chang`, `mini test theo chang`, `timeline lich su danh gia theo chang`, hoac `gate tong ket chang`
 
 ### Nen du lieu checklist onboarding mau
 - Mo ta: nhom nang luc mac dinh, template theo vi tri, chang onboarding, va item checklist co tieu chuan dat de sau nay gan cho nhan vien that.
 - File chinh: `src/lib/career-path-types.ts`, `src/lib/mock-data-career-path.ts`, `src/lib/career-path-service.ts`
-- Dung khi: sua cau truc du lieu onboarding mau cho `Thu ngan`, `pha che`, `shift leader`, settings `onboarding_role_settings`, helper display-name trung tam cho `Thu ngÃ¢n` / `Pha cháº¿` / `Shift leader`, fail-closed resolver khi khong match role, map checklist mau vao UI/employee plan sau nay, hoac luu/doc `self-review history`, `mini quiz history`, va `stage gate record` theo chang onboarding
+- Dung khi: sua cau truc du lieu onboarding mau cho `Thu ngan`, `pha che`, `shift leader`, settings `onboarding_role_settings`, helper display-name trung tam cho `Thu ngÃƒÂ¢n` / `Pha chÃ¡ÂºÂ¿` / `Shift leader`, fail-closed resolver khi khong match role, map checklist mau vao UI/employee plan sau nay, hoac luu/doc `self-review history`, `mini quiz history`, va `stage gate record` theo chang onboarding
 
 ### Spec flow va quyet dinh moi
 - Mo ta: cac spec nho de chot flow nghiep vu truoc khi code, nhu flow noi quy nhan viec, setting toi thieu, va cac quyet dinh scope tuong tu.
