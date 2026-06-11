@@ -269,6 +269,16 @@ export function autoAssignFromPreferences(weekId: string): {
     return { success: false, assignmentsCount: 0, message: 'Không tìm thấy tuần đăng ký.' }
   }
 
+  // NEW: Check if week is already published - prevent overwriting
+  // Check RegistrationWeek.status directly (from registration weeks store)
+  if (week.status === 'published') {
+    return {
+      success: false,
+      assignmentsCount: 0,
+      message: 'Tuan ' + week.week_start_date + ' da duoc xuat ban. Khong the auto-assign. Vui long gan thu cong.'
+    }
+  }
+
   const quotas = getShiftQuotas(weekId)
   const weekStart = week.week_start_date
 

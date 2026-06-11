@@ -1,0 +1,27 @@
+Status: `DONE_WITH_CONCERNS`
+
+Đã sửa file:
+- `src/app/career-path/onboarding/setup/page.tsx`
+- `src/components/onboarding-settings/TrialWorkflowSetupWorkspace.tsx`
+- `src/components/onboarding-settings/TrialWorkflowWorkspaceHeader.tsx`
+- `src/components/onboarding-settings/buildTrialWorkflowSetupViewModel.ts`
+- `src/components/onboarding-settings/TrialWorkflowTabBar.tsx`
+- `src/components/onboarding-settings/TrialWorkflowMissingItemsTable.tsx`
+- `src/components/onboarding-settings/TrialWorkflowGeneralInfoTab.tsx`
+- `src/components/onboarding-settings/TrialWorkflowStagesTab.tsx`
+- `src/components/onboarding-settings/TrialWorkflowTasksTab.tsx`
+- `src/components/onboarding-settings/TrialWorkflowGateConditionsTab.tsx`
+- `src/components/onboarding-settings/TrialWorkflowAssignmentsTab.tsx`
+- `src/components/onboarding-settings/OnboardingSettingsSummaryBar.tsx`
+- `src/components/onboarding-settings/OnboardingSettingsAdminRail.tsx`
+- `src/components/onboarding-settings/OnboardingTemplateLibrarySection.tsx`
+- `src/components/onboarding-settings/OnboardingTemplatePreviewSection.tsx`
+- `tests/trial-workflow-tab-layout-contract.test.ts`
+- `tests/onboarding-settings-components-contract.test.ts`
+
+Kết quả test:
+- `npx tsx --test tests/trial-workflow-tab-layout-contract.test.ts tests/trial-workflow-setup-shell-contract.test.ts tests/onboarding-settings-components-contract.test.ts`
+- `7 pass, 0 fail`
+
+Concern:
+- Chưa chạy lint/build toàn repo. Chỉ xác nhận suite contract user yêu cầu.
