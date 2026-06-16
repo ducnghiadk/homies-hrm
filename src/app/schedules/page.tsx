@@ -7,7 +7,12 @@ import { ScheduleService, type AssignmentRecommendation, type ShiftDemand, type 
 import { ShiftTemplateService } from '@/lib/services/shift-template-service'
 import { getPositionById, getStoreById, mockStores } from '@/lib/mock-data'
 import { useAuthStore } from '@/store/auth-store'
-import { CalendarDays, ChevronLeft, ChevronRight, Copy, History, RefreshCcw, Save, Send, Settings2, TriangleAlert, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, History, RefreshCcw, Save, Send, Settings2, TriangleAlert, Users } from 'lucide-react'
+import { buildRecommendationSections, buildScheduleRows, buildWeekOverviewCards, filterRecommendationsBySearch } from '@/app/schedules/view-model'
+import { DAY_LABELS, getWeekDates, getWeekStart, parseDateKey, plusDays, resolveSchedulesQuery } from '@/app/schedules/schedules-query'
+import { WeeklyRhythmRail } from '@/app/schedules/_components/WeeklyRhythmRail'
+import { WeeklyBoardGrid } from '@/app/schedules/_components/WeeklyBoardGrid'
+import { AssignmentModal } from '@/app/schedules/_components/AssignmentModal'
 
 type PreferenceFormState = Record<string, ShiftRegistrationPreference>
 type DemandFormState = Record<string, number>
@@ -17,69 +22,6 @@ type PendingPublishedChange = {
   employeeId: string
   employeeName: string
   date: string
-}
-
-const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
-
-function parseDateKey(value: string) {
-  const [year, month, day] = value.split('-').map(Number)
-  return new Date(year, month - 1, day, 12, 0, 0, 0)
-}
-
-function formatDateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-function getWeekStart(date = new Date()) {
-  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0)
-  const day = monday.getDay()
-  monday.setDate(monday.getDate() - (day === 0 ? 6 : day - 1))
-  return formatDateKey(monday)
-}
-
-function plusDays(base: string, amount: number) {
-  const date = parseDateKey(base)
-  date.setDate(date.getDate() + amount)
-  return formatDateKey(date)
-}
-
-function isValidDateString(value: string | null) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
-  const date = parseDateKey(value)
-  return !Number.isNaN(date.getTime()) && formatDateKey(date) === value
-}
-
-function getWeekStartForDate(value: string) {
-  return getWeekStart(parseDateKey(value))
-}
-
-function resolveSchedulesQuery(searchParams: URLSearchParams) {
-  const explicitWeekStart = searchParams.get('weekStart')
-  const selectedDate = searchParams.get('selectedDate')
-  const legacyDate = searchParams.get('date')
-  const storeId = searchParams.get('storeId')
-  const normalizedExplicitWeekStart = isValidDateString(explicitWeekStart) ? explicitWeekStart : null
-  const fallbackDate = selectedDate || legacyDate
-  const normalizedSelectedDate = isValidDateString(fallbackDate) ? fallbackDate : null
-  const normalizedWeekStart = normalizedExplicitWeekStart
-    ? getWeekStartForDate(normalizedExplicitWeekStart)
-    : (normalizedSelectedDate ? getWeekStartForDate(normalizedSelectedDate) : null)
-
-  const canonicalParams = new URLSearchParams()
-  if (normalizedWeekStart) canonicalParams.set('weekStart', normalizedWeekStart)
-  if (normalizedSelectedDate) canonicalParams.set('selectedDate', normalizedSelectedDate)
-  if (storeId) canonicalParams.set('storeId', storeId)
-
-  return {
-    weekStart: normalizedWeekStart,
-    selectedDate: normalizedSelectedDate,
-    storeId,
-    canonicalSearch: canonicalParams.toString(),
-  }
-}
-
-function getWeekDates(weekStart: string) {
-  return Array.from({ length: 7 }, (_, index) => plusDays(weekStart, index))
 }
 
 function formatShortDate(value: string) {
@@ -328,6 +270,7 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
   const [showDemandEditor, setShowDemandEditor] = useState(false)
   const [pendingPublishedChange, setPendingPublishedChange] = useState<PendingPublishedChange | null>(null)
   const [publishedChangeReason, setPublishedChangeReason] = useState('')
+  const [recommendationSearch, setRecommendationSearch] = useState('')
 
   const stores = useMemo(() => {
     if (!user) return []
@@ -380,15 +323,45 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
 
   useEffect(() => {
     setSelectedSlot(null)
+    setRecommendationSearch('')
   }, [activeStoreId, activeWeekStart])
+
+  useEffect(() => {
+    setRecommendationSearch('')
+  }, [selectedSlot])
+
+  useEffect(() => {
+    if (!selectedSlot || !board) return
+    if (!board.demands.some(slot => slot.id === selectedSlot)) {
+      setSelectedSlot(null)
+    }
+  }, [board, selectedSlot])
 
   if (!user || !board) return null
 
   const validate = ScheduleService.validateWeekForPublish(user, activeStoreId, activeWeekStart)
-  const effectiveSelectedSlotId = board.demands.some(slot => slot.id === selectedSlot) ? selectedSlot : (board.demands[0]?.id || null)
-  const selectedSlotData = board.demands.find(slot => slot.id === effectiveSelectedSlotId) || null
+  const selectedSlotData = selectedSlot ? (board.demands.find(slot => slot.id === selectedSlot) || null) : null
   const slotRecommendations = selectedSlotData ? ScheduleService.getSlotRecommendations(board, selectedSlotData) : []
+  const filteredRecommendations = filterRecommendationsBySearch(slotRecommendations, recommendationSearch)
+  const recommendationSections = buildRecommendationSections(filteredRecommendations)
+  const overviewCards = buildWeekOverviewCards(board, weekDates)
+  const scheduleRows = buildScheduleRows({
+    board,
+    weekDates,
+    templates: templates.map(template => ({
+      id: template.id,
+      name: template.name,
+      start_time: template.start_time,
+      end_time: template.end_time,
+    })),
+  })
   const selectedStore = getStoreById(activeStoreId)
+  const selectedSlotKey = selectedSlotData ? `${selectedSlotData.date}__${selectedSlotData.shift_template_id}` : null
+  const selectedSlotTitle = selectedSlotData ? `${ShiftTemplateService.getById(selectedSlotData.shift_template_id)?.name || selectedSlotData.shift_template_id} ${getPositionById(selectedSlotData.position_id)?.name || selectedSlotData.position_id}` : ''
+  const selectedSlotSubtitle = selectedSlotData ? `${formatShortDate(selectedSlotData.date)} ? ${ShiftTemplateService.getById(selectedSlotData.shift_template_id)?.start_time || ''} - ${ShiftTemplateService.getById(selectedSlotData.shift_template_id)?.end_time || ''} ? Da xep ${selectedSlotData.filled_count}/${selectedSlotData.required_count}` : ''
+  const selectedSlotFilledLabel = selectedSlotData ? `${selectedSlotData.filled_count}/${selectedSlotData.required_count} nguoi` : undefined
+  const selectedSlotRegisteredLabel = selectedSlotData ? `${selectedSlotData.preferred_employee_ids.length + selectedSlotData.available_employee_ids.length} nguoi` : undefined
+  const selectedSlotPositionLabel = selectedSlotData ? (getPositionById(selectedSlotData.position_id)?.name || selectedSlotData.position_id) : undefined
   const totalDemand = board.demands.reduce((sum, slot) => sum + slot.required_count, 0)
   const totalAssigned = board.demands.reduce((sum, slot) => sum + slot.filled_count, 0)
   const scheduledEmployees = new Set(board.assignments.map(item => item.employee_id)).size
@@ -482,6 +455,37 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
     setPublishedChangeReason('')
   }
 
+  const handleModalAssign = (employeeId: string) => {
+    if (requiresPublishedReason && selectedSlotData) {
+      const recommendation = slotRecommendations.find(item => item.employee_id === employeeId)
+      openPublishedChangeModal({
+        action: 'assign',
+        employeeId,
+        employeeName: recommendation?.employee_name || employeeId,
+        date: selectedSlotData.date,
+      })
+      return
+    }
+
+    handleAssign(employeeId)
+  }
+
+  const handleModalRemove = (employeeId: string) => {
+    if (requiresPublishedReason && selectedSlotData) {
+      const recommendation = slotRecommendations.find(item => item.employee_id === employeeId)
+      openPublishedChangeModal({
+        action: 'remove',
+        employeeId,
+        employeeName: recommendation?.employee_name || employeeId,
+        date: selectedSlotData.date,
+      })
+      return
+    }
+
+    if (selectedSlotData) {
+      handleRemove(employeeId, selectedSlotData.date)
+    }
+  }
   const handleSaveDraftWeek = () => {
     const success = ScheduleService.saveDraftWeek(user, activeStoreId, weekDates)
     setMessage(success ? 'Đã lưu bản nháp tuần xếp lịch.' : 'Không thể lưu bản nháp tuần này.')
@@ -671,238 +675,58 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1.45fr_0.8fr]">
-          <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <CalendarDays size={16} className="text-primary-600" />
-              <div>
-                <h2 className="text-sm font-bold text-gray-800">Lịch tuần theo ca</h2>
-                <p className="text-xs text-gray-400">Hàng là ca, cột là ngày. Mỗi ô cho biết trạng thái chính và danh sách vị trí cần xếp.</p>
+        <div className="space-y-4">
+        <WeeklyRhythmRail
+          days={overviewCards}
+          selectedDate={selectedSlotData?.date || null}
+          onSelectDate={date => {
+            const firstSlot = board.demands.find(slot => slot.date === date)
+            setSelectedSlot(firstSlot?.id || null)
+          }}
+        />
+          {selectedSlotData ? (
+            <div className="mb-4 rounded-[22px] border border-[#e7d7c6] bg-[#fffaf4] px-4 py-3 text-sm text-[#6f6258]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-[#28445f]">Dang xem:</span>
+                <span>{ShiftTemplateService.getById(selectedSlotData.shift_template_id)?.name || selectedSlotData.shift_template_id}</span>
+                <span>?</span>
+                <span>{formatShortDate(selectedSlotData.date)}</span>
+                <span>?</span>
+                <span>{selectedSlotPositionLabel}</span>
+                <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${selectedSlotShortage > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  {selectedSlotShortage > 0 ? `Thieu ${selectedSlotShortage}` : 'Da du nguoi'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedSlot(null)}
+                  className="ml-auto rounded-full border border-[#eadbc9] px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-white"
+                >
+                  Dong xem nhanh
+                </button>
               </div>
             </div>
-            <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
-              <span className="rounded-full bg-rose-100 px-2.5 py-1 font-semibold text-rose-700">Đỏ nhạt: thiếu nhiều</span>
-              <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">Vàng nhạt: thiếu ít</span>
-              <span className="rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-700">Xanh nhạt: đủ người</span>
-              <span className="rounded-full bg-gray-100 px-2.5 py-1 font-semibold text-gray-600">Xám: chưa setup</span>
+          ) : (
+            <div className="mb-4 rounded-[22px] border border-dashed border-[#e7d7c6] bg-[#fffaf4] px-4 py-3 text-sm text-[#7c6e63]">
+              Chua chon o nao. Hay bam vao ca dang thieu hoac ca da co dang ky de mo popup xep nguoi.
             </div>
+          )}
 
-            <div className="overflow-x-auto">
-              <div className="min-w-[1100px] overflow-hidden rounded-3xl border border-gray-100">
-                <div className="grid grid-cols-[220px_repeat(7,minmax(0,1fr))] bg-gray-50">
-                  <div className="border-b border-r border-gray-100 px-4 py-3">
-                    <div className="text-xs font-bold uppercase tracking-wide text-gray-500">Ca / Ngày</div>
-                    <div className="mt-1 text-[11px] text-gray-400">Chọn ô để gán người</div>
-                  </div>
-                  {weekDates.map(date => (
-                    <div key={date} className="border-b border-r border-gray-100 px-3 py-3 text-center last:border-r-0">
-                      <div className="text-xs font-bold uppercase tracking-wide text-gray-500">{getDayLabel(date)}</div>
-                      <div className="mt-1 text-sm font-bold text-gray-800">{formatCalendarDate(date)}</div>
-                    </div>
-                  ))}
-                </div>
+          <WeeklyBoardGrid
+            dates={weekDates}
+            daySummaries={overviewCards}
+            rows={scheduleRows}
+            selectedSlotKey={selectedSlotKey}
+            onSelectCell={payload => setSelectedSlot(payload.slotId || null)}
+          />
+        </div>
 
-                {templates.map(template => (
-                  <div key={template.id} className="grid grid-cols-[220px_repeat(7,minmax(0,1fr))] bg-white">
-                    <div className="border-b border-r border-gray-100 px-4 py-4">
-                      <div className="text-sm font-bold text-gray-800">{template.name}</div>
-                      <div className="mt-1 text-xs text-gray-400">{template.start_time} - {template.end_time}</div>
-                      <div className="mt-2 inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600">
-                        Mặc định {template.min_headcount || 0}-{template.max_headcount || 0}
-                      </div>
-                    </div>
-
-                    {weekDates.map(date => {
-                      const slots = boardDemands
-                        .filter(slot => slot.date === date && slot.shift_template_id === template.id)
-                        .sort((left, right) => {
-                          const leftShortage = left.required_count - left.filled_count
-                          const rightShortage = right.required_count - right.filled_count
-                          if (rightShortage !== leftShortage) return rightShortage - leftShortage
-
-                          const leftName = getPositionById(left.position_id)?.name || left.position_id
-                          const rightName = getPositionById(right.position_id)?.name || right.position_id
-                          return leftName.localeCompare(rightName)
-                        })
-                      const shiftNeed = slots.reduce((sum, slot) => sum + slot.required_count, 0)
-                      const shiftAssigned = slots.reduce((sum, slot) => sum + slot.filled_count, 0)
-                      const coverageTone = getCoverageTone(shiftNeed, shiftAssigned)
-                      const isSelected = slots.some(slot => slot.id === effectiveSelectedSlotId)
-
-                      return (
-                        <div
-                          key={`${template.id}-${date}`}
-                          onClick={() => slots[0] && setSelectedSlot(slots[0].id)}
-                          className={`${getCoverageCellClass(coverageTone, isSelected)} ${slots.length > 0 ? 'cursor-pointer' : ''}`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-bold ${getCoveragePillClass(coverageTone)}`}>
-                              {getCoverageSummaryLabel(shiftNeed, shiftAssigned)}
-                            </span>
-                            <span className="text-xs font-bold text-gray-500">
-                              {shiftAssigned}/{shiftNeed}
-                            </span>
-                          </div>
-
-                          <div className="mt-3 space-y-1.5">
-                            {slots.length > 0 ? slots.map(slot => (
-                              <button
-                                key={slot.id}
-                                type="button"
-                                onClick={event => {
-                                  event.stopPropagation()
-                                  setSelectedSlot(slot.id)
-                                }}
-                                className={`flex w-full min-w-0 items-center gap-2 rounded-xl border px-2.5 py-1.5 text-[11px] font-semibold transition ${getSlotBadgeClass(
-                                  getCoverageTone(slot.required_count, slot.filled_count),
-                                  slot.id === effectiveSelectedSlotId,
-                                )}`}
-                              >
-                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${getCoverageDotClass(getCoverageTone(slot.required_count, slot.filled_count))}`} />
-                                <span className="min-w-0 flex-1 truncate text-left">{getPositionById(slot.position_id)?.name || slot.position_id}</span>
-                                <span className="shrink-0 text-[10px] font-bold text-current/75">
-                                  {slot.filled_count}/{slot.required_count}
-                                </span>
-                              </button>
-                            )) : (
-                              <div className="w-full rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center text-xs text-gray-400">
-                                Chưa setup nhu cầu
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-              <div className="mb-3 flex items-center gap-2">
-                <Users size={16} className="text-primary-600" />
-                <div>
-                  <h2 className="text-sm font-bold text-gray-800">Panel nhân viên phù hợp</h2>
-                  <p className="text-xs text-gray-400">Gợi ý theo đăng ký ca, tải tuần, cảnh báo ca cùng ngày và nút gán nhanh.</p>
-                </div>
-              </div>
-
-              {selectedSlotData ? (
-                <>
-                  <div className="rounded-2xl border border-primary-100 bg-primary-50 p-3">
-                    <div className="text-sm font-bold text-gray-800">
-                      {ShiftTemplateService.getById(selectedSlotData.shift_template_id)?.name || selectedSlotData.shift_template_id}
-                    </div>
-                    <div className="mt-1 text-xs text-gray-500">
-                      {formatShortDate(selectedSlotData.date)} · {getPositionById(selectedSlotData.position_id)?.name || selectedSlotData.position_id}
-                    </div>
-                    <div className="mt-2 text-xs font-semibold text-primary-700">
-                      Đã xếp / cần: {selectedSlotData.filled_count}/{selectedSlotData.required_count}
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                      <span className={`rounded-full px-2 py-1 font-bold ${selectedSlotShortage > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {selectedSlotShortage > 0 ? `Còn thiếu ${selectedSlotShortage}` : 'Đã đủ người'}
-                      </span>
-                      {requiresPublishedReason && (
-                        <span className="rounded-full bg-sky-100 px-2 py-1 font-bold text-sky-700">
-                          Sửa sau khi đã chốt sẽ bắt nhập lý do thay đổi
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 space-y-3">
-                    {slotRecommendations.length > 0 ? slotRecommendations.map(recommendation => (
-                      <div key={recommendation.employee_id} className={`rounded-2xl border p-3 ${getRecommendationCardClass(recommendation)}`}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="min-w-0 truncate font-bold text-gray-800">{recommendation.employee_name}</div>
-                              <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${getRecommendationBadgeClass(recommendation)}`}>
-                                {recommendation.label}
-                              </span>
-                            </div>
-                            <div className="mt-1 text-xs text-gray-500">
-                              {recommendation.position_name} · {recommendation.assigned_count} ca trong tuần
-                            </div>
-                            <div className="mt-1 text-xs text-gray-600">
-                              {recommendation.reason}
-                            </div>
-                            <div className="mt-1 text-[11px] text-gray-500">
-                              Ưu tiên: {recommendation.preference === 'unknown' ? 'Chưa đăng ký' : getPreferenceLabel(recommendation.preference)}
-                            </div>
-                          </div>
-                          <div className="shrink-0 text-right text-[11px] font-bold text-gray-500">
-                            Điểm {recommendation.score}
-                          </div>
-                        </div>
-                        <div className="mt-3 flex gap-2">
-                          {!recommendation.is_assigned ? (
-                            <button
-                              onClick={() => {
-                                if (requiresPublishedReason) {
-                                  openPublishedChangeModal({
-                                    action: 'assign',
-                                    employeeId: recommendation.employee_id,
-                                    employeeName: recommendation.employee_name,
-                                    date: selectedSlotData.date,
-                                  })
-                                  return
-                                }
-                                handleAssign(recommendation.employee_id)
-                              }}
-                              className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:opacity-90"
-                            >
-                              Gán nhanh
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                if (requiresPublishedReason) {
-                                  openPublishedChangeModal({
-                                    action: 'remove',
-                                    employeeId: recommendation.employee_id,
-                                    employeeName: recommendation.employee_name,
-                                    date: selectedSlotData.date,
-                                  })
-                                  return
-                                }
-                                handleRemove(recommendation.employee_id, selectedSlotData.date)
-                              }}
-                              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
-                            >
-                              Gỡ khỏi ca
-                            </button>
-                          )}
-                        </div>
-                        {recommendation.has_same_day_assignment && recommendation.same_day_shift_name && (
-                          <div className="mt-2 rounded-xl border border-amber-200 bg-white/80 px-3 py-2 text-[11px] text-amber-700">
-                            Đang có ca {recommendation.same_day_shift_name} cùng ngày. Gán lại sẽ chuyển lịch.
-                          </div>
-                        )}
-                      </div>
-                    )) : (
-                      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">
-                        Chưa có gợi ý cho slot này.
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">
-                  Chọn một slot ở board tuần để xem nhân viên phù hợp.
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-[28px] border border-[#efe2d3] bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-3 flex items-center gap-2">
                 <TriangleAlert size={16} className="text-amber-600" />
                 <div>
-                  <h2 className="text-sm font-bold text-gray-800">Cảnh báo trước khi chốt lịch</h2>
-                  <p className="text-xs text-gray-400">Lỗi chặn bắt buộc phải sửa, cảnh báo mềm chỉ là mục cần xem lại.</p>
+                  <h2 className="text-sm font-semibold text-[#28445f]">Cần chú ý trước khi chốt lịch</h2>
+                  <p className="text-xs text-[#7c6e63]">Lỗi chặn phải sửa trước. Cảnh báo mềm giúp rà lại cân bằng ca và xung đột nhẹ.</p>
                 </div>
               </div>
               <div className="mb-3 flex flex-wrap gap-2 text-[11px]">
@@ -915,24 +739,60 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
                   return (
                     <div
                       key={`${warning.type}-${warning.date}-${index}`}
-                      className={`rounded-2xl border px-3 py-2 text-xs ${isHardWarning ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}
+                      className={`rounded-[20px] border px-3 py-3 text-sm ${isHardWarning ? 'border-rose-200 bg-rose-50/80 text-rose-700' : 'border-amber-200 bg-amber-50/80 text-amber-700'}`}
                     >
-                      <div className="mb-1 font-semibold">
-                        {isHardWarning ? 'Cần sửa trước khi chốt lịch' : 'Cảnh báo cần xem lại'}
-                      </div>
+                      <div className="mb-1 text-xs font-bold uppercase tracking-[0.16em]">{isHardWarning ? 'Cần sửa ngay' : 'Nên rà soát'}</div>
                       <div>{warning.message}</div>
                     </div>
                   )
                 })}
                 {validate.hardWarnings.length + validate.softWarnings.length === 0 && (
-                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                    Chưa có cảnh báo đáng chú ý trong tuần này.
-                  </div>
+                  <div className="rounded-[20px] border border-emerald-200 bg-emerald-50/80 px-3 py-3 text-sm text-emerald-700">Tuần này chưa có cảnh báo đáng chú ý.</div>
                 )}
               </div>
             </div>
+
+            <div className="rounded-[28px] border border-[#efe2d3] bg-[linear-gradient(180deg,rgba(255,250,244,0.98),rgba(255,255,255,0.98))] p-4 shadow-sm sm:p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Users size={16} className="text-[#23425f]" />
+                <div>
+                  <h2 className="text-sm font-semibold text-[#28445f]">Tóm tắt vận hành tuần</h2>
+                  <p className="text-xs text-[#7c6e63]">Gợi ý nhanh để biết nên xử lý tuần này theo hướng nào trước.</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm text-[#6f6258]">
+                <div className="rounded-[20px] border border-white/80 bg-white/80 px-4 py-3 shadow-sm">
+                  <div className="font-semibold text-[#28445f]">{incompleteSlots > 0 ? 'Ưu tiên lấp các ô đang thiếu người' : 'Các ca đã được phủ khá tốt'}</div>
+                  <div className="mt-1 text-xs leading-5">{incompleteSlots > 0 ? `Hiện còn ${incompleteSlots} ô thiếu người và ${emptySlots} ô chưa có ai. Hãy mở từng ô đỏ hoặc vàng để gán nhanh.` : 'Bạn có thể chuyển sang rà cảnh báo, kiểm tra thay đổi sau chốt và gửi lịch cho đội ngũ.'}</div>
+                </div>
+                <div className="rounded-[20px] border border-white/80 bg-white/80 px-4 py-3 shadow-sm">
+                  <div className="font-semibold text-[#28445f]">Đăng ký của nhân viên đang hỗ trợ tốt?</div>
+                  <div className="mt-1 text-xs leading-5">{totalAssigned}/{totalDemand} lượt phân công đang lấp nhu cầu của tuần, với {scheduledEmployees} người đã có ca.</div>
+                </div>
+                <div className="rounded-[20px] border border-white/80 bg-white/80 px-4 py-3 shadow-sm">
+                  <div className="font-semibold text-[#28445f]">Sau khi chốt lịch</div>
+                  <div className="mt-1 text-xs leading-5">{requiresPublishedReason ? 'Mọi thay đổi sau khi chốt sẽ yêu cầu nhập lý do để lưu lịch sử điều chỉnh.' : 'Khi chốt lịch xong, hệ thống sẽ gửi thông báo cho nhân sự.'}</div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        <AssignmentModal
+          open={Boolean(selectedSlotData)}
+          slotTitle={selectedSlotTitle}
+          slotSubtitle={selectedSlotSubtitle}
+          shortageLabel={selectedSlotShortage > 0 ? `Con thieu ${selectedSlotShortage}` : 'Da du nguoi'}
+          search={recommendationSearch}
+          onSearchChange={setRecommendationSearch}
+          sections={recommendationSections}
+          requiresPublishedReason={requiresPublishedReason}
+          onAssign={handleModalAssign}
+          onRemove={handleModalRemove}
+          onClose={() => setSelectedSlot(null)}
+          positionLabel={selectedSlotPositionLabel}
+          filledCountLabel={selectedSlotFilledLabel}
+          registeredCountLabel={selectedSlotRegisteredLabel}
+        />
 
         {showDemandEditor && (
           <div className="fixed inset-0 z-50 flex justify-end bg-black/30">
@@ -1093,3 +953,13 @@ export default function SchedulesPage() {
     </Suspense>
   )
 }
+
+
+
+
+
+
+
+
+
+
