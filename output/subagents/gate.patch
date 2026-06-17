@@ -1,0 +1,49 @@
+﻿*** Begin Patch
+*** Add File: src/components/onboarding-settings/TrialWorkflowGateConditionsTab.tsx
++import React from 'react'
++import type { OnboardingPublishValidationReport } from '@/lib/career-path-types'
++import { OnboardingPublishValidationPanel } from './OnboardingPublishValidationPanel'
++import { TrialWorkflowMissingItemsTable, type TrialWorkflowMissingItem } from './TrialWorkflowMissingItemsTable'
++import type { TrialWorkflowTabKey } from './TrialWorkflowTabBar'
++
++export function TrialWorkflowGateConditionsTab({
++  report,
++  missingRows,
++  onSelect,
++  onRefresh,
++  onPublish,
++  publishDisabled,
++}: {
++  report: OnboardingPublishValidationReport | null
++  missingRows: TrialWorkflowMissingItem[]
++  onSelect: (tab: TrialWorkflowTabKey) => void
++  onRefresh: () => void
++  onPublish: () => void
++  publishDisabled: boolean
++}) {
++  return (
++    <div style={{ display: 'grid', gap: 16 }}>
++      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
++        <button type="button" onClick={() => onSelect('gates')} style={quickActionStyle}>Sửa điều kiện</button>
++        <button type="button" onClick={() => onSelect('assignments')} style={quickActionStyle}>Chọn người duyệt</button>
++        <button type="button" onClick={() => onSelect('tasks')} style={quickActionStyle}>Bỏ điều kiện</button>
++      </div>
++
++      <OnboardingPublishValidationPanel
++        report={report}
++        onRefresh={onRefresh}
++        onPublish={onPublish}
++        publishDisabled={publishDisabled}
++      />
++
++      <TrialWorkflowMissingItemsTable
++        title="Các chỗ thiếu cần xử lý tiếp theo"
++        rows={missingRows}
++        onSelect={onSelect}
++      />
++    </div>
++  )
++}
++
++const quickActionStyle: React.CSSProperties = { padding: '8px 10px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#344054', fontSize: 11, fontWeight: 600, cursor: 'pointer' }
+*** End Patch

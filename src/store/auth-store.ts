@@ -114,13 +114,13 @@ export const DEMO_ACCOUNTS = [
     email: 'tuan@bobahouse.vn',
     position: 'CEO',
     color: 'bg-primary-500',
-    icon: '👑',
+    icon: '📑',
   },
   {
     role: 'hr_admin' as UserRole,
     name: 'Hoàng Thị Yến',
     email: 'yen@bobahouse.vn',
-    position: 'HR Admin',
+    position: 'Phụ trách nhân sự',
     color: 'bg-primary-500',
     icon: '🛡️',
   },
@@ -150,22 +150,21 @@ export const DEMO_ACCOUNTS = [
   },
   {
     role: 'employee' as UserRole,
-    name: 'Tran Minh Thuy',
+    name: 'Trần Minh Thủy',
     email: 'thuy@bobahouse.vn',
-    position: 'Chuan bi onboarding',
+    position: 'Nhân sự mới chuẩn bị vào làm',
     color: 'bg-warning-500',
     icon: '🧋',
   },
   {
     role: 'employee' as UserRole,
-    name: 'Le Phuong Nam',
+    name: 'Lê Phương Nam',
     email: 'nam.p@bobahouse.vn',
-    position: 'Onboarding ngày 5',
+    position: 'Nhân sự đang ở ngày 5',
     color: 'bg-success-500',
-    icon: 'ðŸŒ¿',
+    icon: '🌿',
   },
 ]
-
 type AuthState = {
   user: AuthUser | null
   isAuthenticated: boolean
@@ -227,7 +226,7 @@ export const useAuthStore = create<AuthState>()(
         }
 
         if (user.status === 'inactive') {
-          set({ isLoading: false, loginError: 'Tài khoản đã bị khóa. Vui lòng liên hệ HR.' })
+          set({ isLoading: false, loginError: 'Tài khoản đã bị khóa. Vui lòng liên hệ bộ phận nhân sự.' })
           return { success: false, error: 'Tài khoản đã bị khóa' }
         }
 
@@ -370,7 +369,7 @@ export function getDashboardPath(role: UserRole): string {
 export function getRoleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
     ceo: 'CEO',
-    hr_admin: 'HR Admin',
+    hr_admin: 'Phụ trách nhân sự',
     store_manager: 'Quản lý cửa hàng',
     area_manager: 'Quản lý khu vực',
     shift_leader: 'Trưởng ca',

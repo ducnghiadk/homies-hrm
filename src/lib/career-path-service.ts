@@ -1,5 +1,5 @@
 // ============================================================
-// CAREER PATH MODULE — Core Service
+// CAREER PATH MODULE â€” Core Service
 // Genesis v3 | T1.1.3 | 100+ functions | localStorage persistence
 // ============================================================
 
@@ -22,6 +22,8 @@ import type {
   OnboardingStageEvaluationTimelineEntry, OnboardingStageEvaluationTimelineView,
   OnboardingStageGateCode, OnboardingStageGateRecord, OnboardingStageGateView,
   OnboardingRoleSetting, OnboardingRoleSettings, OnboardingRoleSettingsValidationIssue,
+  OnboardingContentTopic, OnboardingTemplateValidationIssue, OnboardingPublishValidationReport,
+  TrialWorkflowReadinessIssue, OnboardingSettingsAuditEntry, OnboardingSettingsExportEnvelope,
 } from './career-path-types';
 
 import {
@@ -29,7 +31,7 @@ import {
   defaultPromotionConditions, defaultBuddyRewards, defaultTrialChecklist,
   defaultOnboardingSteps, defaultSettings, defaultOnboardingCompetencyGroups,
   defaultOnboardingRoleSettings,
-  defaultOnboardingChecklistTemplates, defaultOnboardingChecklistStages,
+  defaultOnboardingChecklistTemplates, defaultOnboardingContentTopics, defaultOnboardingChecklistStages,
   defaultOnboardingChecklistItems,
   onboardingMiniQuizTemplates,
   sampleEmployeeOnboardingChecklistPlans, sampleEmployeeOnboardingChecklistProgressItems,
@@ -41,7 +43,7 @@ import {
 } from './mock-data-career-path';
 import { mockEmployees, mockPositions } from './mock-data';
 
-// ─── Storage Keys ────────────────────────────────────────────
+// â”€â”€â”€ Storage Keys â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const KEYS = {
   levels: 'cp_levels',
@@ -55,8 +57,10 @@ const KEYS = {
   onboardingSteps: 'cp_onboarding_steps',
   onboardingCompetencyGroups: 'cp_onboarding_competency_groups',
   onboardingChecklistTemplates: 'cp_onboarding_checklist_templates',
+  onboardingContentTopics: 'cp_onboarding_content_topics',
   onboardingChecklistStages: 'cp_onboarding_checklist_stages',
   onboardingChecklistItems: 'cp_onboarding_checklist_items',
+  onboardingAuditEntries: 'cp_onboarding_audit_entries',
   onboardingEmployeePlans: 'cp_onboarding_employee_plans',
   onboardingEmployeeProgressItems: 'cp_onboarding_employee_progress_items',
   miniQuizTemplates: 'cp_onboarding_mini_quiz_templates',
@@ -81,17 +85,17 @@ const KEYS = {
   crossTraining: 'cp_cross_training',
 } as const;
 
-// ─── localStorage helpers ────────────────────────────────────
+// â”€â”€â”€ localStorage helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const defaultOnboardingOperationsSettings: OnboardingOpsSettings = {
   enabled: true,
   lookahead_days: 7,
   rules: [
-    { key: 'first_shift', label: 'Ca dau va gio co mat', severity: 'attention', store_override_allowed: true },
-    { key: 'buddy', label: 'Nguoi kem / nguoi huong dan', severity: 'block', store_override_allowed: true },
-    { key: 'uniform_attendance_policy', label: 'Dong phuc, cham cong, noi quy tai quan', severity: 'attention', store_override_allowed: true },
-    { key: 'tools_and_group', label: 'Tai khoan, nhom chat, cong cu', severity: 'attention', store_override_allowed: true },
-    { key: 'first_shift_result', label: 'Xac nhan xong ca dau on', severity: 'attention', store_override_allowed: false },
+    { key: 'first_shift', label: 'Ca Ä‘áº§u vÃ  giá» cÃ³ máº·t', severity: 'attention', store_override_allowed: true },
+    { key: 'buddy', label: 'NgÆ°á»i kÃ¨m / ngÆ°á»i hÆ°á»›ng dáº«n', severity: 'block', store_override_allowed: true },
+    { key: 'uniform_attendance_policy', label: 'Äá»“ng phá»¥c, cháº¥m cÃ´ng, ná»™i quy táº¡i quÃ¡n', severity: 'attention', store_override_allowed: true },
+    { key: 'tools_and_group', label: 'TÃ i khoáº£n, nhÃ³m chat, cÃ´ng cá»¥', severity: 'attention', store_override_allowed: true },
+    { key: 'first_shift_result', label: 'XÃ¡c nháº­n xong ca Ä‘áº§u á»•n', severity: 'attention', store_override_allowed: false },
   ],
   store_overrides: [],
 };
@@ -141,14 +145,14 @@ const onboardingRoleDisplayNameByCode: Record<string, string> = {
   counter_staff: 'Thu ngân',
   cashier: 'Thu ngân',
   barista: 'Pha chế',
-  shift_leader: 'Shift leader',
+  shift_leader: 'Trưởng ca',
 }
 const onboardingRoleDisplayNameByLabel: Record<string, string> = {
   'Thu ngan': 'Thu ngân',
   'Thu ngân': 'Thu ngân',
   'Pha che': 'Pha chế',
   'Pha chế': 'Pha chế',
-  'Shift leader': 'Shift leader',
+  'Shift leader': 'Trưởng ca',
 }
 
 function nowIso(): string {
@@ -305,7 +309,7 @@ export function validateOnboardingRoleSettings(settings: OnboardingRoleSettings)
   if (enabledRoles.length === 0) {
     issues.push({
       code: 'all_roles_disabled',
-      message: 'At least one onboarding role must stay enabled.',
+      message: 'Pháº£i giá»¯ láº¡i Ã­t nháº¥t má»™t role onboarding Ä‘ang báº­t.',
     });
   }
 
@@ -314,7 +318,7 @@ export function validateOnboardingRoleSettings(settings: OnboardingRoleSettings)
       issues.push({
         code: 'blank_label',
         role_code: role.role_code,
-        message: 'Role label cannot be blank.',
+        message: 'TÃªn hiá»ƒn thá»‹ cá»§a role khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.',
       });
     }
 
@@ -322,8 +326,26 @@ export function validateOnboardingRoleSettings(settings: OnboardingRoleSettings)
       issues.push({
         code: 'missing_template',
         role_code: role.role_code,
-        message: 'Enabled onboarding roles must select a template.',
+        message: 'Role onboarding Ä‘ang báº­t pháº£i chá»n checklist Ã¡p dá»¥ng.',
       });
+    }
+
+    if (role.enabled && role.template_id) {
+      const template = getOnboardingChecklistTemplateById(role.template_id);
+
+      if (!template) {
+        issues.push({
+          code: 'template_not_found',
+          role_code: role.role_code,
+          message: 'Checklist onboarding Ä‘Ã£ chá»n khÃ´ng cÃ²n tá»“n táº¡i hoáº·c Ä‘Ã£ lÆ°u trá»¯.',
+        });
+      } else if (template.role_code !== role.role_code) {
+        issues.push({
+          code: 'template_role_mismatch',
+          role_code: role.role_code,
+          message: 'Checklist onboarding Ä‘Ã£ chá»n thuá»™c role khÃ¡c.',
+        });
+      }
     }
 
     if (!role.enabled) {
@@ -337,7 +359,7 @@ export function validateOnboardingRoleSettings(settings: OnboardingRoleSettings)
           code: 'duplicate_position',
           role_code: role.role_code,
           position_id: positionId,
-          message: `Position "${positionId}" is assigned to multiple enabled onboarding roles.`,
+          message: `Chá»©c danh "${positionId}" Ä‘ang Ä‘Æ°á»£c gÃ¡n cho nhiá»u role onboarding Ä‘ang báº­t.`,
         });
         return;
       }
@@ -345,6 +367,25 @@ export function validateOnboardingRoleSettings(settings: OnboardingRoleSettings)
       enabledPositionAssignments.set(positionId, role.role_code);
     });
   });
+
+  return issues;
+}
+
+export function buildTrialWorkflowReadinessReport(settings: OnboardingRoleSettings): TrialWorkflowReadinessIssue[] {
+  const issues: TrialWorkflowReadinessIssue[] = [];
+  const enabledRoles = settings.roles.filter(role => role.enabled);
+
+  if (enabledRoles.length === 0) {
+    issues.push({ code: 'missing_stage', message: 'ChÆ°a cÃ³ giai Ä‘oáº¡n nÃ o' });
+  }
+
+  if (enabledRoles.some(role => !role.template_id)) {
+    issues.push({ code: 'missing_task_list', message: 'CÃ³ giai Ä‘oáº¡n chÆ°a cÃ³ viá»‡c cáº§n lÃ m' });
+  }
+
+  if (enabledRoles.length > 0 && enabledRoles.every(role => role.position_ids.length === 0)) {
+    issues.push({ code: 'missing_assignment_group', message: 'Chưa chọn nhóm áp dụng' });
+  }
 
   return issues;
 }
@@ -380,9 +421,9 @@ export function getUnmatchedOnboardingEmployees(
       position_name: employee.position_name?.trim()
         || mockPositions.find((position) => position.id === employee.position_id)?.name
         || employee.position_id
-        || 'Chua co position',
+        || 'Ch?a c? v? tr?',
       store_id: employee.store_id ?? '',
-      unmatched_reason: resolution.unmatched_reason ?? 'Chua match role onboarding',
+      unmatched_reason: resolution.unmatched_reason ?? 'Ch?a gh?p ch?c danh th? vi?c',
     }))
     .sort((left, right) => left.employee_name.localeCompare(right.employee_name));
 }
@@ -543,12 +584,20 @@ function getExplicitlyDisabledOnboardingRoleSettingForEmployee(
   return settings.roles.find((role) => !role.enabled && role.position_ids.includes(positionId)) ?? null;
 }
 
-function getOnboardingChecklistTemplateById(templateId?: string | null): OnboardingChecklistTemplate | null {
+export function getOnboardingChecklistTemplateById(templateId?: string | null): OnboardingChecklistTemplate | null {
   if (!templateId) {
     return null;
   }
 
-  return getOnboardingChecklistTemplates().find((template) => template.id === templateId && template.status === 'active') ?? null;
+  return _onboardingChecklistTemplates.find((template) => template.id === templateId && template.status !== 'archived') ?? null;
+}
+
+export function getOnboardingChecklistTemplateSnapshotById(templateId?: string | null): OnboardingChecklistTemplate | null {
+  if (!templateId) {
+    return null;
+  }
+
+  return _onboardingChecklistTemplates.find((template) => template.id === templateId) ?? null;
 }
 
 function createResolvedOnboardingRoleAssignment(input: {
@@ -615,15 +664,15 @@ export function resolveOnboardingRoleForEmployee(
       source: 'unmatched',
       role_setting: disabledRole,
       role_code: disabledRole.role_code,
-      unmatched_reason: 'Role onboarding cho chuc danh nay dang bi tat trong settings.',
+      unmatched_reason: 'Quy trình thử việc cho chức danh này đang bị tắt trong thiết lập.',
     });
   }
 
   return createResolvedOnboardingRoleAssignment({
     source: 'unmatched',
     unmatched_reason: employee.position_id
-      ? 'Chuc danh nay chua duoc map vao role onboarding trong settings.'
-      : 'Nhan vien nay chua co position de map role onboarding.',
+      ? 'Ch?c danh n?y ch?a ???c gh?p v?o quy tr?nh th? vi?c trong thi?t l?p.'
+      : 'Nh?n s? n?y ch?a c? v? tr? ?? gh?p quy tr?nh th? vi?c.',
   });
 }
 
@@ -704,7 +753,7 @@ function getPlanStageAndProgress(
   };
 }
 
-// ─── Store Accessors ─────────────────────────────────────────
+// â”€â”€â”€ Store Accessors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 let _levels: CareerLevel[] = [];
 let _skills: Skill[] = [];
@@ -717,8 +766,10 @@ let _trialChecklist: TrialChecklistItem[] = [];
 let _onboardingSteps: OnboardingStep[] = [];
 let _onboardingCompetencyGroups: OnboardingCompetencyGroup[] = [];
 let _onboardingChecklistTemplates: OnboardingChecklistTemplate[] = [];
+let _onboardingContentTopics: OnboardingContentTopic[] = [];
 let _onboardingChecklistStages: OnboardingChecklistStage[] = [];
 let _onboardingChecklistItems: OnboardingChecklistItemTemplate[] = [];
+let _onboardingSettingsAuditEntries: OnboardingSettingsAuditEntry[] = [];
 let _onboardingEmployeePlans: EmployeeOnboardingChecklistPlan[] = [];
 let _onboardingEmployeeProgressItems: EmployeeOnboardingChecklistProgressItem[] = [];
 let _onboardingMiniQuizTemplates: OnboardingMiniQuizTemplate[] = [];
@@ -742,7 +793,7 @@ let _achievements: Achievement[] = [];
 let _refreshRecords: SkillRefreshRecord[] = [];
 let _crossTraining: CrossTrainingRecord[] = [];
 
-// ─── Init / Reset ────────────────────────────────────────────
+// â”€â”€â”€ Init / Reset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function initCareerPathStores(): void {
   _levels = load(KEYS.levels, defaultCareerLevels);
@@ -756,8 +807,10 @@ export function initCareerPathStores(): void {
   _onboardingSteps = load(KEYS.onboardingSteps, defaultOnboardingSteps);
   _onboardingCompetencyGroups = load(KEYS.onboardingCompetencyGroups, defaultOnboardingCompetencyGroups);
   _onboardingChecklistTemplates = load(KEYS.onboardingChecklistTemplates, defaultOnboardingChecklistTemplates);
+  _onboardingContentTopics = load(KEYS.onboardingContentTopics, defaultOnboardingContentTopics);
   _onboardingChecklistStages = load(KEYS.onboardingChecklistStages, defaultOnboardingChecklistStages);
   _onboardingChecklistItems = load(KEYS.onboardingChecklistItems, defaultOnboardingChecklistItems);
+  _onboardingSettingsAuditEntries = load(KEYS.onboardingAuditEntries, []);
   _onboardingEmployeePlans = load(KEYS.onboardingEmployeePlans, sampleEmployeeOnboardingChecklistPlans);
   _onboardingEmployeeProgressItems = load(KEYS.onboardingEmployeeProgressItems, sampleEmployeeOnboardingChecklistProgressItems);
   _onboardingMiniQuizTemplates = load(KEYS.miniQuizTemplates, onboardingMiniQuizTemplates);
@@ -787,9 +840,9 @@ export function resetCareerPathData(): void {
   initCareerPathStores();
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // LEVELS CRUD
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getLevels(): CareerLevel[] { return _levels; }
 export function getActiveLevels(): CareerLevel[] { return _levels.filter(l => l.is_active).sort((a, b) => a.order - b.order); }
@@ -797,13 +850,13 @@ export function getLevelById(id: string): CareerLevel | undefined { return _leve
 
 export function createLevel(data: Partial<CareerLevel>): CareerLevel {
   const level: CareerLevel = {
-    id: `level-${uid()}`, name: data.name || '', icon: data.icon || '📌', order: _levels.length,
+    id: `level-${uid()}`, name: data.name || '', icon: data.icon || 'ðŸ“Œ', order: _levels.length,
     description: data.description || '', color: data.color || '#607D8B', is_active: true,
     min_skills_required: data.min_skills_required || 0, min_months: data.min_months || 0,
     benefits: data.benefits || [], created_at: today(), updated_at: today(),
   };
   _levels.push(level); save(KEYS.levels, _levels);
-  logChange('level', level.id, 'create', '', JSON.stringify(level), `Tạo cấp bậc: ${level.name}`);
+  logChange('level', level.id, 'create', '', JSON.stringify(level), `Táº¡o cáº¥p báº­c: ${level.name}`);
   return level;
 }
 
@@ -813,7 +866,7 @@ export function updateLevel(id: string, data: Partial<CareerLevel>): CareerLevel
   const before = JSON.stringify(_levels[idx]);
   _levels[idx] = { ..._levels[idx], ...data, updated_at: today() };
   save(KEYS.levels, _levels);
-  logChange('level', id, 'update', before, JSON.stringify(_levels[idx]), `Cập nhật cấp bậc: ${_levels[idx].name}`);
+  logChange('level', id, 'update', before, JSON.stringify(_levels[idx]), `Cáº­p nháº­t cáº¥p báº­c: ${_levels[idx].name}`);
   return _levels[idx];
 }
 
@@ -824,7 +877,7 @@ export function toggleLevel(id: string): CareerLevel | null {
   level.is_active = !level.is_active;
   level.updated_at = today();
   save(KEYS.levels, _levels);
-  logChange('level', id, 'toggle', before, JSON.stringify({ is_active: level.is_active }), `${level.is_active ? 'Bật' : 'Tắt'} cấp bậc: ${level.name}`);
+  logChange('level', id, 'toggle', before, JSON.stringify({ is_active: level.is_active }), `${level.is_active ? 'Báº­t' : 'Táº¯t'} cáº¥p báº­c: ${level.name}`);
   return level;
 }
 
@@ -833,9 +886,9 @@ export function reorderLevels(ids: string[]): void {
   save(KEYS.levels, _levels);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // SKILLS CRUD
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getSkills(): Skill[] { return _skills; }
 export function getSkillsByCategory(cat: string): Skill[] { return _skills.filter(s => s.category === cat && s.is_active); }
@@ -843,13 +896,13 @@ export function getSkillById(id: string): Skill | undefined { return _skills.fin
 
 export function createSkill(data: Partial<Skill>): Skill {
   const skill: Skill = {
-    id: `skill-${uid()}`, name: data.name || '', icon: data.icon || '📌', category: data.category || 'basic',
+    id: `skill-${uid()}`, name: data.name || '', icon: data.icon || 'ðŸ“Œ', category: data.category || 'basic',
     description: data.description || '', unlock_conditions: data.unlock_conditions || [],
     is_active: true, requires_approval: data.requires_approval || false,
     order: _skills.length + 1, created_at: today(), updated_at: today(),
   };
   _skills.push(skill); save(KEYS.skills, _skills);
-  logChange('skill', skill.id, 'create', '', JSON.stringify(skill), `Tạo kỹ năng: ${skill.name}`);
+  logChange('skill', skill.id, 'create', '', JSON.stringify(skill), `Táº¡o ká»¹ nÄƒng: ${skill.name}`);
   return skill;
 }
 
@@ -859,7 +912,7 @@ export function updateSkill(id: string, data: Partial<Skill>): Skill | null {
   const before = JSON.stringify(_skills[idx]);
   _skills[idx] = { ..._skills[idx], ...data, updated_at: today() };
   save(KEYS.skills, _skills);
-  logChange('skill', id, 'update', before, JSON.stringify(_skills[idx]), `Cập nhật kỹ năng: ${_skills[idx].name}`);
+  logChange('skill', id, 'update', before, JSON.stringify(_skills[idx]), `Cáº­p nháº­t ká»¹ nÄƒng: ${_skills[idx].name}`);
   return _skills[idx];
 }
 
@@ -869,13 +922,13 @@ export function deleteSkill(id: string): boolean {
   const before = JSON.stringify(_skills[idx]);
   _skills.splice(idx, 1);
   save(KEYS.skills, _skills);
-  logChange('skill', id, 'delete', before, '', `Xóa kỹ năng`);
+  logChange('skill', id, 'delete', before, '', `XÃ³a ká»¹ nÄƒng`);
   return true;
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // EMPLOYEE SKILLS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getEmployeeSkills(empId: string): EmployeeSkill[] { return _employeeSkills.filter(es => es.employee_id === empId); }
 export function getSkillStatus(empId: string, skillId: string): EmployeeSkill | undefined { return _employeeSkills.find(es => es.employee_id === empId && es.skill_id === skillId); }
@@ -922,9 +975,9 @@ export function checkSkillUnlockEligibility(empId: string, skillId: string): { e
   return { eligible: results.every(r => r.met), conditions: results };
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // EMPLOYEE TYPE CONFIG
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getEmployeeTypes(): EmployeeTypeConfig[] { return _employeeTypes; }
 export function getEmployeeTypeConfig(type: string): EmployeeTypeConfig | undefined { return _employeeTypes.find(et => et.type === type); }
@@ -934,19 +987,19 @@ export function updateEmployeeTypeConfig(id: string, data: Partial<EmployeeTypeC
   const before = JSON.stringify(_employeeTypes[idx]);
   _employeeTypes[idx] = { ..._employeeTypes[idx], ...data };
   save(KEYS.employeeTypes, _employeeTypes);
-  logChange('employee_type', id, 'update', before, JSON.stringify(_employeeTypes[idx]), 'Cập nhật loại NV');
+  logChange('employee_type', id, 'update', before, JSON.stringify(_employeeTypes[idx]), 'Cáº­p nháº­t loáº¡i NV');
   return _employeeTypes[idx];
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // SKILL LEVELS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getSkillLevels(): SkillLevelConfig[] { return _skillLevels; }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PROMOTION CONDITIONS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getPromotionConditions(): PromotionCondition[] { return _conditions; }
 export function getConditionsForTransition(fromId: string, toId: string): PromotionCondition | undefined { return _conditions.find(c => c.from_level_id === fromId && c.to_level_id === toId); }
@@ -957,7 +1010,7 @@ export function createPromotionCondition(data: Partial<PromotionCondition>): Pro
     conditions: data.conditions || [], is_active: true, created_at: today(),
   };
   _conditions.push(cond); save(KEYS.conditions, _conditions);
-  logChange('condition', cond.id, 'create', '', JSON.stringify(cond), 'Tạo điều kiện thăng tiến');
+  logChange('condition', cond.id, 'create', '', JSON.stringify(cond), 'Táº¡o Ä‘iá»u kiá»‡n thÄƒng tiáº¿n');
   return cond;
 }
 
@@ -967,13 +1020,13 @@ export function updatePromotionCondition(id: string, data: Partial<PromotionCond
   const before = JSON.stringify(_conditions[idx]);
   _conditions[idx] = { ..._conditions[idx], ...data };
   save(KEYS.conditions, _conditions);
-  logChange('condition', id, 'update', before, JSON.stringify(_conditions[idx]), 'Cập nhật điều kiện');
+  logChange('condition', id, 'update', before, JSON.stringify(_conditions[idx]), 'Cáº­p nháº­t Ä‘iá»u kiá»‡n');
   return _conditions[idx];
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PROMOTION REQUESTS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getPromotionRequests(status?: string): PromotionRequest[] {
   return status ? _promoRequests.filter(r => r.status === status) : _promoRequests;
@@ -995,9 +1048,9 @@ export function reviewPromotionRequest(id: string, status: 'approved' | 'rejecte
   req.status = status; req.reviewed_at = today(); req.reviewed_by = reviewerId; req.review_note = note || null;
   save(KEYS.promotionRequests, _promoRequests);
   if (status === 'approved') {
-    addNotification(req.employee_id, 'promotion_approved', 'Chúc mừng thăng tiến!', `Yêu cầu thăng tiến đã được duyệt.`, '/career-path');
+    addNotification(req.employee_id, 'promotion_approved', 'ChÃºc má»«ng thÄƒng tiáº¿n!', `YÃªu cáº§u thÄƒng tiáº¿n Ä‘Ã£ Ä‘Æ°á»£c duyá»‡t.`, '/career-path');
   } else {
-    addNotification(req.employee_id, 'promotion_rejected', 'Yêu cầu bị từ chối', note || 'Yêu cầu thăng tiến chưa được duyệt.', '/career-path/promotion');
+    addNotification(req.employee_id, 'promotion_rejected', 'YÃªu cáº§u bá»‹ tá»« chá»‘i', note || 'YÃªu cáº§u thÄƒng tiáº¿n chÆ°a Ä‘Æ°á»£c duyá»‡t.', '/career-path/promotion');
   }
   return req;
 }
@@ -1020,9 +1073,9 @@ export function checkPromotionEligibility(empId: string, fromLevelId: string, to
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TYPE CHANGE REQUESTS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getTypeChangeRequests(status?: string): TypeChangeRequest[] {
   return status ? _typeChangeRequests.filter(r => r.status === status) : _typeChangeRequests;
@@ -1045,9 +1098,9 @@ export function reviewTypeChangeRequest(id: string, status: 'approved' | 'reject
   return req;
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // BUDDY SYSTEM
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getBuddyAssignments(storeId?: string): BuddyAssignment[] {
   return storeId ? _buddyAssignments.filter(b => b.store_id === storeId) : _buddyAssignments;
@@ -1092,9 +1145,9 @@ export function toggleBuddyReward(id: string): BuddyRewardConfig | null {
   return r;
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TRIAL EVALUATION
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getTrialChecklist(): TrialChecklistItem[] { return _trialChecklist; }
 export function getTrialEvaluations(): TrialEvaluation[] { return _trialEvaluations; }
@@ -1128,9 +1181,9 @@ export function createTrialChecklistItem(data: Partial<TrialChecklistItem>): Tri
   return item;
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // ONBOARDING
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getOnboardingSteps(): OnboardingStep[] { return _onboardingSteps.sort((a, b) => a.order - b.order); }
 
@@ -1142,8 +1195,197 @@ export function getOnboardingCompetencyGroups(): OnboardingCompetencyGroup[] {
 
 export function getOnboardingChecklistTemplates(): OnboardingChecklistTemplate[] {
   return [..._onboardingChecklistTemplates]
-    .filter(template => template.status !== 'archived')
-    .sort((left, right) => left.role_label.localeCompare(right.role_label));
+    .filter((template) => template.status !== 'archived')
+    .sort((left, right) => left.role_label.localeCompare(right.role_label) || left.version - right.version);
+}
+
+export function getOnboardingContentTopics(templateId: string): OnboardingContentTopic[] {
+  return _onboardingContentTopics
+    .filter((topic) => topic.template_id === templateId)
+    .sort((left, right) => left.sort_order - right.sort_order || left.label.localeCompare(right.label));
+}
+
+
+export function updateOnboardingChecklistTemplate(
+  templateId: string,
+  patch: Partial<Pick<OnboardingChecklistTemplate, 'name' | 'description' | 'journey_length_days' | 'notes'>>,
+): OnboardingChecklistTemplate | null {
+  const current = getOnboardingChecklistTemplateById(templateId);
+  if (!current) return null;
+
+  const nextTemplate = {
+    ...current,
+    ...patch,
+    updated_at: nowIso(),
+    updated_by: 'current_user',
+  } satisfies OnboardingChecklistTemplate;
+
+  _onboardingChecklistTemplates = _onboardingChecklistTemplates.map((template) =>
+    template.id === templateId ? nextTemplate : template,
+  );
+  save(KEYS.onboardingChecklistTemplates, _onboardingChecklistTemplates);
+
+  appendOnboardingAuditEntry(createOnboardingAuditEntry({
+    event_type: 'template_update',
+    entity_type: 'template',
+    entity_id: templateId,
+    summary: `Update template ${templateId}`,
+    changed_fields: Object.keys(patch),
+  }));
+
+  return nextTemplate;
+}
+
+export function createOnboardingContentTopic(templateId: string): OnboardingContentTopic {
+  const sortOrder = getOnboardingContentTopics(templateId).length + 1;
+  const topic: OnboardingContentTopic = {
+    id: `topic-${uid()}`,
+    template_id: templateId,
+    code: `topic_${sortOrder}`,
+    label: `Ch? ?? ${sortOrder}`,
+    sort_order: sortOrder,
+    active: true,
+  };
+
+  _onboardingContentTopics.push(topic);
+  save(KEYS.onboardingContentTopics, _onboardingContentTopics);
+  appendOnboardingAuditEntry(createOnboardingAuditEntry({
+    event_type: 'topic_create',
+    entity_type: 'topic',
+    entity_id: topic.id,
+    summary: `Create topic ${topic.label}`,
+    changed_fields: ['id', 'code', 'label', 'sort_order', 'active'],
+  }));
+
+  return topic;
+}
+
+export function updateOnboardingContentTopic(
+  topicId: string,
+  patch: Partial<Pick<OnboardingContentTopic, 'label' | 'active' | 'code' | 'sort_order'>>,
+): OnboardingContentTopic | null {
+  const current = _onboardingContentTopics.find((topic) => topic.id === topicId);
+  if (!current) return null;
+
+  const nextTopic = { ...current, ...patch } satisfies OnboardingContentTopic;
+  _onboardingContentTopics = _onboardingContentTopics.map((topic) =>
+    topic.id === topicId ? nextTopic : topic,
+  );
+  save(KEYS.onboardingContentTopics, _onboardingContentTopics);
+  appendOnboardingAuditEntry(createOnboardingAuditEntry({
+    event_type: 'topic_update',
+    entity_type: 'topic',
+    entity_id: topicId,
+    summary: `Update topic ${topicId}`,
+    changed_fields: Object.keys(patch),
+  }));
+
+  return nextTopic;
+}
+
+export function updateOnboardingChecklistStage(
+  stageId: string,
+  patch: Partial<Pick<OnboardingChecklistStage, 'label' | 'required_to_pass' | 'goal_summary' | 'sort_order'>>,
+): OnboardingChecklistStage | null {
+  const current = _onboardingChecklistStages.find((stage) => stage.id === stageId);
+  if (!current) return null;
+
+  const nextStage = { ...current, ...patch } satisfies OnboardingChecklistStage;
+  _onboardingChecklistStages = _onboardingChecklistStages.map((stage) =>
+    stage.id === stageId ? nextStage : stage,
+  );
+  save(KEYS.onboardingChecklistStages, _onboardingChecklistStages);
+  appendOnboardingAuditEntry(createOnboardingAuditEntry({
+    event_type: 'stage_update',
+    entity_type: 'stage',
+    entity_id: stageId,
+    summary: `Update stage ${stageId}`,
+    changed_fields: Object.keys(patch),
+  }));
+
+  return nextStage;
+}
+
+export function createOnboardingChecklistItem(templateId: string): OnboardingChecklistItemTemplate {
+  const stages = getOnboardingChecklistStages(templateId);
+  const topics = getOnboardingContentTopics(templateId);
+  const groups = getOnboardingCompetencyGroups();
+  const sortOrder = getOnboardingChecklistItems(templateId).length + 1;
+  const item: OnboardingChecklistItemTemplate = {
+    id: `item-${uid()}`,
+    template_id: templateId,
+    stage_id: stages[0]?.id ?? '',
+    topic_id: topics[0]?.id ?? '',
+    competency_group_id: groups[0]?.id ?? '',
+    code: `item_${sortOrder}`,
+    title: `M?c onboarding ${sortOrder}`,
+    instruction_text: '',
+    success_criteria: '',
+    training_method: 'shadow',
+    evidence_type: 'buddy_check',
+    confirmer_role: 'buddy',
+    ops_visibility: 'employee_visible',
+    is_required: true,
+    requires_buddy_confirmation: true,
+    requires_manager_confirmation: false,
+    requires_quiz: false,
+    is_focus_block_eligible: false,
+    estimated_minutes: 15,
+    sort_order: sortOrder,
+    active: true,
+  };
+
+  _onboardingChecklistItems.push(item);
+  save(KEYS.onboardingChecklistItems, _onboardingChecklistItems);
+  appendOnboardingAuditEntry(createOnboardingAuditEntry({
+    event_type: 'item_create',
+    entity_type: 'item',
+    entity_id: item.id,
+    summary: `Create checklist item ${item.title}`,
+    changed_fields: ['id', 'code', 'title', 'topic_id', 'stage_id', 'sort_order'],
+  }));
+
+  return item;
+}
+
+export function updateOnboardingChecklistItem(
+  itemId: string,
+  patch: Partial<OnboardingChecklistItemTemplate>,
+): OnboardingChecklistItemTemplate | null {
+  const current = _onboardingChecklistItems.find((item) => item.id === itemId);
+  if (!current) return null;
+
+  const nextItem = {
+    ...current,
+    ...patch,
+    estimated_minutes: Math.max(1, Number(patch.estimated_minutes ?? current.estimated_minutes)),
+  } satisfies OnboardingChecklistItemTemplate;
+
+  _onboardingChecklistItems = _onboardingChecklistItems.map((item) =>
+    item.id === itemId ? nextItem : item,
+  );
+  save(KEYS.onboardingChecklistItems, _onboardingChecklistItems);
+  appendOnboardingAuditEntry(createOnboardingAuditEntry({
+    event_type: 'item_update',
+    entity_type: 'item',
+    entity_id: itemId,
+    summary: `Update checklist item ${itemId}`,
+    changed_fields: Object.keys(patch),
+  }));
+
+  return nextItem;
+}
+
+export function getPublishedOnboardingChecklistTemplate(roleCode: OnboardingRoleCode): OnboardingChecklistTemplate | null {
+  return _onboardingChecklistTemplates
+    .filter((template) => template.role_code === roleCode && template.status === 'published')
+    .sort((left, right) => right.version - left.version)[0] ?? null;
+}
+
+export function getDraftOnboardingChecklistTemplate(roleCode: OnboardingRoleCode): OnboardingChecklistTemplate | null {
+  return _onboardingChecklistTemplates
+    .filter((template) => template.role_code === roleCode && template.status === 'draft')
+    .sort((left, right) => right.version - left.version)[0] ?? null;
 }
 
 export function getOnboardingChecklistTemplateByRole(roleCode: OnboardingRoleCode): OnboardingChecklistTemplate | undefined {
@@ -1153,6 +1395,155 @@ export function getOnboardingChecklistTemplateByRole(roleCode: OnboardingRoleCod
   }
 
   return getOnboardingChecklistTemplateById(roleSetting.template_id) ?? undefined;
+}
+
+export function validateOnboardingTemplateForPublish(templateId: string): OnboardingTemplateValidationIssue[] {
+  const topics = getOnboardingContentTopics(templateId).filter((topic) => topic.active);
+  const items = getOnboardingChecklistItems(templateId).filter((item) => item.active);
+  const issues: OnboardingTemplateValidationIssue[] = [];
+
+  if (topics.length === 0) {
+    issues.push({ code: 'missing_topic', template_id: templateId, message: 'Published template must have at least one active topic.' });
+  }
+
+  if (items.length === 0) {
+    issues.push({ code: 'missing_item', template_id: templateId, message: 'Published template must have at least one active item.' });
+  }
+
+  if (!items.some((item) => item.code.includes('orientation') || item.topic_id.includes('orientation'))) {
+    issues.push({ code: 'missing_orientation', template_id: templateId, message: 'At least one orientation item is required before publish.' });
+  }
+
+  if (!items.some((item) => item.topic_id.includes('hygiene'))) {
+    issues.push({ code: 'missing_hygiene', template_id: templateId, message: 'At least one hygiene item is required before publish.' });
+  }
+
+  if (!items.some((item) => item.topic_id.includes('service') || item.topic_id.includes('pos_payment'))) {
+    issues.push({ code: 'missing_service', template_id: templateId, message: 'At least one service item is required before publish.' });
+  }
+
+  if (!items.some((item) => item.topic_id.includes('review') || item.stage_id.endsWith('week-2'))) {
+    issues.push({ code: 'missing_follow_up', template_id: templateId, message: 'At least one shift readiness or follow-up item is required before publish.' });
+  }
+
+  return issues;
+}
+
+export function validateOnboardingTemplateForPublishReport(templateId: string): OnboardingPublishValidationReport {
+  const blocking_issues = validateOnboardingTemplateForPublish(templateId);
+
+  return {
+    template_id: templateId,
+    blocking_issues,
+    warning_issues: [],
+    checked_at: nowIso(),
+  };
+}
+
+export function duplicateOnboardingChecklistTemplate(templateId: string): OnboardingChecklistTemplate {
+  const source = getOnboardingChecklistTemplateById(templateId);
+  if (!source) {
+    throw new Error(`Template not found: ${templateId}`);
+  }
+
+  const nextTemplate: OnboardingChecklistTemplate = {
+    ...source,
+    id: `onb-template-${uid()}`,
+    version: source.version + 1,
+    status: 'draft',
+    source_type: 'duplicated',
+    effective_from: null,
+    published_at: null,
+    published_by: null,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+    updated_by: 'current_user',
+  };
+
+  const topicIdMap = new Map<string, string>();
+  const stageIdMap = new Map<string, string>();
+
+  const duplicatedTopics = getOnboardingContentTopics(source.id).map((topic) => {
+    const nextId = `topic-${uid()}`;
+    topicIdMap.set(topic.id, nextId);
+    return { ...topic, id: nextId, template_id: nextTemplate.id };
+  });
+
+  const duplicatedStages = getOnboardingChecklistStages(source.id).map((stage) => {
+    const nextId = `${nextTemplate.id}-${stage.code}`;
+    stageIdMap.set(stage.id, nextId);
+    return { ...stage, id: nextId, template_id: nextTemplate.id };
+  });
+
+  const duplicatedItems = getOnboardingChecklistItems(source.id).map((item) => ({
+    ...item,
+    id: `item-${uid()}`,
+    template_id: nextTemplate.id,
+    stage_id: stageIdMap.get(item.stage_id) ?? item.stage_id,
+    topic_id: topicIdMap.get(item.topic_id) ?? item.topic_id,
+  }));
+
+  _onboardingChecklistTemplates.push(nextTemplate);
+  _onboardingContentTopics.push(...duplicatedTopics);
+  _onboardingChecklistStages.push(...duplicatedStages);
+  _onboardingChecklistItems.push(...duplicatedItems);
+  save(KEYS.onboardingChecklistTemplates, _onboardingChecklistTemplates);
+  save(KEYS.onboardingContentTopics, _onboardingContentTopics);
+  save(KEYS.onboardingChecklistStages, _onboardingChecklistStages);
+  save(KEYS.onboardingChecklistItems, _onboardingChecklistItems);
+  return nextTemplate;
+}
+
+export function archiveOnboardingChecklistTemplate(templateId: string): void {
+  _onboardingChecklistTemplates = _onboardingChecklistTemplates.map((template) =>
+    template.id === templateId
+      ? { ...template, status: 'archived', updated_at: nowIso(), updated_by: 'current_user' }
+      : template,
+  );
+  save(KEYS.onboardingChecklistTemplates, _onboardingChecklistTemplates);
+}
+
+export function publishOnboardingChecklistTemplate(templateId: string): OnboardingChecklistTemplate {
+  const report = validateOnboardingTemplateForPublishReport(templateId);
+  if (report.blocking_issues.length > 0) {
+    throw new Error(report.blocking_issues.map((issue) => issue.message).join(' | '));
+  }
+
+  const draft = getOnboardingChecklistTemplateById(templateId);
+  if (!draft) {
+    throw new Error(`Template not found: ${templateId}`);
+  }
+
+  _onboardingChecklistTemplates = _onboardingChecklistTemplates.map((template) => {
+    if (template.role_code === draft.role_code && template.status === 'published') {
+      return { ...template, status: 'archived', updated_at: nowIso(), updated_by: 'current_user' };
+    }
+
+    if (template.id === draft.id) {
+      return {
+        ...template,
+        status: 'published',
+        published_at: nowIso(),
+        published_by: 'current_user',
+        updated_at: nowIso(),
+        updated_by: 'current_user',
+      };
+    }
+
+    return template;
+  });
+
+  save(KEYS.onboardingChecklistTemplates, _onboardingChecklistTemplates);
+
+  appendOnboardingAuditEntry(createOnboardingAuditEntry({
+    event_type: 'template_publish',
+    entity_type: 'template',
+    entity_id: templateId,
+    summary: `Publish template ${templateId}`,
+    changed_fields: ['status', 'published_at', 'published_by'],
+  }));
+
+  return getOnboardingChecklistTemplateById(templateId)!;
 }
 
 export function getOnboardingChecklistStages(templateId: string): OnboardingChecklistStage[] {
@@ -1176,6 +1567,7 @@ export function getOnboardingChecklistBundle(roleCode: OnboardingRoleCode) {
   return {
     template,
     competency_groups: getOnboardingCompetencyGroups(),
+    content_topics: getOnboardingContentTopics(template.id),
     stages: getOnboardingChecklistStages(template.id),
     items: getOnboardingChecklistItems(template.id),
   };
@@ -1208,8 +1600,8 @@ function getMiniQuizWrongQuestionIds(template: OnboardingMiniQuizTemplate, answe
 }
 
 function getMiniQuizStatusLabel(score?: number | null): OnboardingMiniQuizView['status_label'] {
-  if (score === null || score === undefined) return 'Chua lam mini test';
-  return score >= 80 ? 'On phan nen' : 'Can on lai';
+  if (score === null || score === undefined) return 'Chưa làm bài kiểm tra ngắn';
+  return score >= 80 ? 'Ổn phần nền' : 'Cần ôn lại';
 }
 
 export function submitOnboardingMiniQuizAttempt(input: {
@@ -1284,11 +1676,11 @@ function mapSelfReviewTimelineEntry(entry: OnboardingSelfReviewEntry): Onboardin
     stage_code: entry.stage_code,
     entry_type: 'self_review',
     occurred_at: entry.submitted_at,
-    headline: 'Tu danh gia moi',
+    headline: 'Tự đánh giá mới',
     summary_lines: [
-      `Tu tin nhat: ${entry.answers.confidence_tag}`,
-      `Can kem sat: ${entry.answers.coaching_tag}`,
-      `So nhat: ${entry.answers.fear_tag}`,
+      `Tự tin nhất: ${entry.answers.confidence_tag}`,
+      `Cần kèm sát: ${entry.answers.coaching_tag}`,
+      `Sợ nhất: ${entry.answers.fear_tag}`,
     ],
     status_tone: 'neutral',
     raw_ref: entry,
@@ -1307,10 +1699,10 @@ function mapMiniQuizTimelineEntry(
     stage_code: stageCode,
     entry_type: 'mini_quiz',
     occurred_at: attempt.submitted_at,
-    headline: `Mini test ${attempt.score}%`,
+    headline: `Bài kiểm tra ngắn ${attempt.score}%`,
     summary_lines: [
-      `Trang thai: ${getMiniQuizStatusLabel(attempt.score)}`,
-      wrongQuestionCount > 0 ? `Can on lai ${wrongQuestionCount} cau` : 'Khong co cau sai',
+      `Trạng thái: ${getMiniQuizStatusLabel(attempt.score)}`,
+      wrongQuestionCount > 0 ? `Cần ôn lại ${wrongQuestionCount} câu` : 'Không có câu sai',
     ],
     status_tone: attempt.score >= 80 ? 'good' : 'warning',
     raw_ref: attempt,
@@ -1325,14 +1717,14 @@ function mapStageGateTimelineEntry(record: OnboardingStageGateRecord): Onboardin
     occurred_at: record.decided_at ?? record.created_at,
     headline:
       record.status === 'da_qua_gate'
-        ? 'Gate: Da qua'
+        ? 'Bước chốt: Đã qua'
         : record.status === 'chua_qua_gate'
-          ? 'Gate: Chua qua'
-          : 'Gate: Cho duyet',
+          ? 'Bước chốt: Chưa qua'
+          : 'Bước chốt: Chờ duyệt',
     summary_lines: [
-      record.buddy_note ? `Buddy: ${record.buddy_note}` : 'Buddy: Chua co ghi chu',
-      record.manager_note ? `Quan ly: ${record.manager_note}` : 'Quan ly: Chua co ghi chu',
-      record.retry_item_ids.length > 0 ? `Can lam lai: ${record.retry_item_ids.length} muc` : 'Khong co muc lam lai',
+      record.buddy_note ? `Người kèm: ${record.buddy_note}` : 'Người kèm: Chưa có ghi chú',
+      record.manager_note ? `Quản lý: ${record.manager_note}` : 'Quản lý: Chưa có ghi chú',
+      record.retry_item_ids.length > 0 ? `Cần làm lại: ${record.retry_item_ids.length} mục` : 'Không có mục làm lại',
     ],
     status_tone:
       record.status === 'da_qua_gate'
@@ -1428,7 +1820,7 @@ export function getLatestOnboardingSelfReviewForPlan(
 
 export function resolveGateCodeForStage(stageCode: OnboardingStageCode): OnboardingStageGateCode | null {
   if (stageCode === 'day_2_3') return 'ready_for_live_shift';
-  if (stageCode === 'week_1') return 'ready_for_independent_shift';
+  if (stageCode === 'day_4_7') return 'ready_for_independent_shift';
   return null;
 }
 
@@ -1511,7 +1903,7 @@ function unlockNextStageFromGate(planId: string, gateCode: OnboardingStageGateCo
   if (planIndex === -1) return;
 
   const nextStageCode: OnboardingStageCode =
-    gateCode === 'ready_for_live_shift' ? 'week_1' : 'week_2';
+    gateCode === 'ready_for_live_shift' ? 'day_4_7' : 'week_2';
 
   _onboardingEmployeePlans[planIndex] = {
     ..._onboardingEmployeePlans[planIndex],
@@ -1804,9 +2196,9 @@ export function completeOnboardingStep(empId: string, stepId: string, score?: nu
   save(KEYS.onboardingProgress, _onboardingProgress);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // GOALS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getEmployeeGoals(empId: string): CareerGoal[] { return _goals.filter(g => g.employee_id === empId); }
 export function getActiveGoals(empId: string): CareerGoal[] { return _goals.filter(g => g.employee_id === empId && g.status === 'active'); }
@@ -1827,7 +2219,7 @@ export function achieveGoal(goalId: string): CareerGoal | null {
   if (!g) return null;
   g.status = 'achieved'; g.progress = 100; g.achieved_at = today();
   save(KEYS.goals, _goals);
-  addNotification(g.employee_id, 'goal_achieved', '🎯 Mục tiêu hoàn thành!', `Bạn đã đạt: ${g.title}`, '/career-path/goals');
+  addNotification(g.employee_id, 'goal_achieved', 'ðŸŽ¯ Má»¥c tiÃªu hoÃ n thÃ nh!', `Báº¡n Ä‘Ã£ Ä‘áº¡t: ${g.title}`, '/career-path/goals');
   return g;
 }
 
@@ -1863,16 +2255,16 @@ export function getSuggestedGoals(empId: string): Partial<CareerGoal>[] {
       const elig = checkSkillUnlockEligibility(empId, skill.id);
       const avgProg = elig.conditions.length > 0 ? elig.conditions.reduce((s, c) => s + c.progress, 0) / elig.conditions.length : 0;
       if (avgProg >= 50) {
-        suggestions.push({ type: 'skill', target_skill_id: skill.id, title: `Mở khóa "${skill.name}"`, progress: Math.round(avgProg) });
+        suggestions.push({ type: 'skill', target_skill_id: skill.id, title: `Má»Ÿ khÃ³a "${skill.name}"`, progress: Math.round(avgProg) });
       }
     }
   }
   return suggestions.sort((a, b) => (b.progress || 0) - (a.progress || 0)).slice(0, 5);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // ENDORSEMENTS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getSkillEndorsements(empId: string, skillId?: string): SkillEndorsement[] {
   return _endorsements.filter(e => e.employee_id === empId && (skillId ? e.skill_id === skillId : true));
@@ -1892,13 +2284,13 @@ export function endorseSkill(empId: string, skillId: string, endorserId: string,
     es.avg_endorsement_rating = Math.round(all.reduce((s, e) => s + e.rating, 0) / all.length * 10) / 10;
     save(KEYS.employeeSkills, _employeeSkills);
   }
-  addNotification(empId, 'endorsement_received', 'Kỹ năng được xác nhận!', `Kỹ năng của bạn được đánh giá ${rating}⭐`, '/career-path/skills');
+  addNotification(empId, 'endorsement_received', 'Ká»¹ nÄƒng Ä‘Æ°á»£c xÃ¡c nháº­n!', `Ká»¹ nÄƒng cá»§a báº¡n Ä‘Æ°á»£c Ä‘Ã¡nh giÃ¡ ${rating}â­`, '/career-path/skills');
   return end;
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // SKILL REFRESH
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getRefreshRecords(empId?: string): SkillRefreshRecord[] {
   return empId ? _refreshRecords.filter(r => r.employee_id === empId) : _refreshRecords;
@@ -1917,9 +2309,9 @@ export function refreshSkill(empId: string, skillId: string): SkillRefreshRecord
   return rec;
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // CROSS-TRAINING
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getCrossTrainingRecords(empId?: string): CrossTrainingRecord[] {
   return empId ? _crossTraining.filter(r => r.employee_id === empId) : _crossTraining;
@@ -1943,9 +2335,9 @@ export function completeCrossTraining(id: string, skillsLearned: string[]): Cros
   return rec;
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // NOTIFICATIONS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getNotifications(empId: string): CareerNotification[] { return _notifications.filter(n => n.employee_id === empId).sort((a, b) => b.created_at.localeCompare(a.created_at)); }
 export function getUnreadCount(empId: string): number { return _notifications.filter(n => n.employee_id === empId && !n.is_read).length; }
@@ -1966,17 +2358,17 @@ export function markAllNotificationsRead(empId: string): void {
   save(KEYS.notifications, _notifications);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // LEADERBOARD
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getLeaderboard(category: string, period: string): LeaderboardEntry[] {
   return _leaderboard.filter(l => l.category === category && l.period === period).sort((a, b) => b.score - a.score);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // SETTINGS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getSettings(): CareerPathSettings { return _settings; }
 export function getOnboardingRoleSettings(): OnboardingRoleSettings {
@@ -1993,7 +2385,7 @@ export function updateSettings(data: Partial<CareerPathSettings>): CareerPathSet
   const before = JSON.stringify(_settings);
   _settings = normalizeSettings({ ..._settings, ...data });
   save(KEYS.settings, _settings);
-  logChange('settings', 'global', 'update', before, JSON.stringify(_settings), 'Cập nhật cài đặt');
+  logChange('settings', 'global', 'update', before, JSON.stringify(_settings), 'Cáº­p nháº­t cÃ i Ä‘áº·t');
   return _settings;
 }
 
@@ -2024,7 +2416,7 @@ export function updateOnboardingRoleSettings(
     onboarding_role_settings: nextOnboardingRoleSettings,
   });
   save(KEYS.settings, _settings);
-  logChange('settings', 'global', 'update', before, JSON.stringify(_settings), 'Cập nhật role onboarding');
+  logChange('settings', 'global', 'update', before, JSON.stringify(_settings), 'Cáº­p nháº­t role onboarding');
 
   return {
     success: true,
@@ -2033,9 +2425,9 @@ export function updateOnboardingRoleSettings(
   };
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // CHANGE LOGS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function upsertOnboardingOperationsStoreOverride(input: OnboardingOpsStoreOverride): void {
   const settings = getSettings();
@@ -2067,13 +2459,13 @@ export function revertChange(logId: string): boolean {
   const log = _changeLogs.find(l => l.id === logId);
   if (!log || !log.before_snapshot) return false;
   // Simplified: just log the revert
-  logChange(log.entity_type, log.entity_id, 'update', log.after_snapshot, log.before_snapshot, `Hoàn tác: ${log.description}`);
+  logChange(log.entity_type, log.entity_id, 'update', log.after_snapshot, log.before_snapshot, `HoÃ n tÃ¡c: ${log.description}`);
   return true;
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TEMPLATES
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getTemplates(): CareerPathTemplate[] { return _templates; }
 
@@ -2090,6 +2482,7 @@ export function createTemplate(name: string, description: string, createdBy: str
       onboarding_steps: [..._onboardingSteps],
       onboarding_competency_groups: [..._onboardingCompetencyGroups],
       onboarding_checklist_templates: [..._onboardingChecklistTemplates],
+      onboarding_content_topics: [..._onboardingContentTopics],
       onboarding_checklist_stages: [..._onboardingChecklistStages],
       onboarding_checklist_items: [..._onboardingChecklistItems],
       onboarding_employee_plans: [..._onboardingEmployeePlans],
@@ -2109,23 +2502,100 @@ export function applyTemplate(templateId: string): boolean {
   return true;
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // ANALYTICS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getCareerAnalytics(storeId: string, period: string): CareerAnalytics | null {
   return _analytics.find(a => a.store_id === storeId && a.period === period) || null;
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // ACHIEVEMENTS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getAchievements(): Achievement[] { return _achievements; }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // EXPORT / IMPORT
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+export function createOnboardingAuditEntry(input: {
+  event_type: string;
+  entity_type: OnboardingSettingsAuditEntry['entity_type'];
+  entity_id: string;
+  summary: string;
+  changed_fields: string[];
+  actor?: string;
+}): OnboardingSettingsAuditEntry {
+  return {
+    id: `onb-audit-${uid()}`,
+    event_type: input.event_type,
+    entity_type: input.entity_type,
+    entity_id: input.entity_id,
+    summary: input.summary,
+    changed_fields: [...input.changed_fields],
+    actor: input.actor ?? 'current_user',
+    created_at: nowIso(),
+  };
+}
+
+export function getOnboardingAuditEntries(): OnboardingSettingsAuditEntry[] {
+  return [..._onboardingSettingsAuditEntries].sort((left, right) => right.created_at.localeCompare(left.created_at));
+}
+
+export function appendOnboardingAuditEntry(entry: OnboardingSettingsAuditEntry): void {
+  _onboardingSettingsAuditEntries = [entry, ..._onboardingSettingsAuditEntries];
+  save(KEYS.onboardingAuditEntries, _onboardingSettingsAuditEntries);
+}
+
+export function exportOnboardingSettingsBundle(): OnboardingSettingsExportEnvelope {
+  return {
+    schema_version: '2026-06-02',
+    module: 'onboarding_settings',
+    exported_at: nowIso(),
+    payload: {
+      role_settings: getOnboardingRoleSettings(),
+      templates: getOnboardingChecklistTemplates(),
+      topics: [..._onboardingContentTopics],
+      stages: [..._onboardingChecklistStages],
+      items: [..._onboardingChecklistItems],
+    },
+  };
+}
+
+export function importOnboardingSettingsBundle(bundle: OnboardingSettingsExportEnvelope): boolean {
+  if (bundle.schema_version !== '2026-06-02') return false;
+
+  const normalizedSettings = normalizeOnboardingRoleSettings(bundle.payload.role_settings);
+  const issues = validateOnboardingRoleSettings(normalizedSettings);
+  if (issues.length > 0) return false;
+
+  _onboardingChecklistTemplates = [...bundle.payload.templates];
+  _onboardingContentTopics = [...bundle.payload.topics];
+  _onboardingChecklistStages = [...bundle.payload.stages];
+  _onboardingChecklistItems = [...bundle.payload.items];
+  _settings = {
+    ..._settings,
+    onboarding_role_settings: normalizedSettings,
+  };
+
+  save(KEYS.onboardingChecklistTemplates, _onboardingChecklistTemplates);
+  save(KEYS.onboardingContentTopics, _onboardingContentTopics);
+  save(KEYS.onboardingChecklistStages, _onboardingChecklistStages);
+  save(KEYS.onboardingChecklistItems, _onboardingChecklistItems);
+  save(KEYS.settings, _settings);
+
+  appendOnboardingAuditEntry(createOnboardingAuditEntry({
+    event_type: 'settings_import',
+    entity_type: 'import_export',
+    entity_id: bundle.module,
+    summary: `Import onboarding settings schema ${bundle.schema_version}`,
+    changed_fields: ['role_settings', 'templates', 'topics', 'stages', 'items'],
+  }));
+
+  return true;
+}
 
 export function exportSettings(): string {
   return JSON.stringify({
@@ -2135,6 +2605,7 @@ export function exportSettings(): string {
     onboardingSteps: _onboardingSteps,
     onboardingCompetencyGroups: _onboardingCompetencyGroups,
     onboardingChecklistTemplates: _onboardingChecklistTemplates,
+    onboardingContentTopics: _onboardingContentTopics,
     onboardingChecklistStages: _onboardingChecklistStages,
     onboardingChecklistItems: _onboardingChecklistItems,
     onboardingEmployeePlans: _onboardingEmployeePlans,
@@ -2149,14 +2620,26 @@ export function importSettings(jsonString: string): boolean {
     if (data.levels) { _levels = data.levels; save(KEYS.levels, _levels); }
     if (data.skills) { _skills = data.skills; save(KEYS.skills, _skills); }
     if (data.conditions) { _conditions = data.conditions; save(KEYS.conditions, _conditions); }
-    if (data.settings) { _settings = normalizeSettings(data.settings); save(KEYS.settings, _settings); }
+    if (data.onboardingChecklistTemplates) { _onboardingChecklistTemplates = data.onboardingChecklistTemplates; save(KEYS.onboardingChecklistTemplates, _onboardingChecklistTemplates); }
+    if (data.onboardingContentTopics) { _onboardingContentTopics = data.onboardingContentTopics; save(KEYS.onboardingContentTopics, _onboardingContentTopics); }
+    if (data.onboardingChecklistStages) { _onboardingChecklistStages = data.onboardingChecklistStages; save(KEYS.onboardingChecklistStages, _onboardingChecklistStages); }
+    if (data.onboardingChecklistItems) { _onboardingChecklistItems = data.onboardingChecklistItems; save(KEYS.onboardingChecklistItems, _onboardingChecklistItems); }
+    if (data.settings) {
+      const normalizedSettings = normalizeSettings(data.settings);
+      const issues = validateOnboardingRoleSettings(normalizedSettings.onboarding_role_settings);
+      if (issues.length > 0) {
+        return false;
+      }
+      _settings = normalizedSettings;
+      save(KEYS.settings, _settings);
+    }
     return true;
   } catch { return false; }
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // CAREER PROGRESS (COMPUTED)
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getEmployeeCareerProgress(empId: string, currentLevelId: string): EmployeeCareerProgress {
   const currentLevel = getLevelById(currentLevelId) || getActiveLevels()[0];
@@ -2195,39 +2678,39 @@ export function getEmployeeCareerProgress(empId: string, currentLevelId: string)
   };
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // REPORTS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getCareerPathReport(storeId: string, period: string): CareerPathReport {
   const analytics = getCareerAnalytics(storeId, period) || sampleAnalytics;
   const warnings: CareerWarning[] = [
-    { type: 'trial_expiring', employee_id: 'emp-003', employee_name: 'Lan', message: 'Thử việc còn 4 ngày', severity: 'high', action_link: '/career-path/trial' },
-    { type: 'no_progress', employee_id: 'emp-006', employee_name: 'Tuấn', message: '3 tháng chưa mở skill mới', severity: 'medium', action_link: '/career-path/reports' },
+    { type: 'trial_expiring', employee_id: 'emp-003', employee_name: 'Lan', message: 'Thá»­ viá»‡c cÃ²n 4 ngÃ y', severity: 'high', action_link: '/career-path/trial' },
+    { type: 'no_progress', employee_id: 'emp-006', employee_name: 'Tuáº¥n', message: '3 thÃ¡ng chÆ°a má»Ÿ skill má»›i', severity: 'medium', action_link: '/career-path/reports' },
   ];
   return {
     store_id: storeId, period, generated_at: today(),
     summary: {
       total_employees: 8, pending_promotions: 1, pending_type_changes: 1, active_trials: 1, avg_skill_level: 1.8,
       by_level: [
-        { level_id: 'level-trial', level_name: 'Thử việc', count: 2 },
-        { level_id: 'level-staff', level_name: 'Nhân viên', count: 5 },
-        { level_id: 'level-manager', level_name: 'Quản lý', count: 1 },
+        { level_id: 'level-trial', level_name: 'Thá»­ viá»‡c', count: 2 },
+        { level_id: 'level-staff', level_name: 'NhÃ¢n viÃªn', count: 5 },
+        { level_id: 'level-manager', level_name: 'Quáº£n lÃ½', count: 1 },
       ],
       by_type: [{ type: 'full_time', count: 6 }, { type: 'part_time', count: 2 }],
     },
     upcoming_promotions: [
-      { employee_id: 'emp-004', employee_name: 'Nam', to_level: 'Trợ lý QL', progress_percent: 75, estimated_date: '2026-04-15' },
-      { employee_id: 'emp-001', employee_name: 'Minh', to_level: 'Trợ lý QL', progress_percent: 42, estimated_date: '2026-08-01' },
+      { employee_id: 'emp-004', employee_name: 'Nam', to_level: 'Trá»£ lÃ½ QL', progress_percent: 75, estimated_date: '2026-04-15' },
+      { employee_id: 'emp-001', employee_name: 'Minh', to_level: 'Trá»£ lÃ½ QL', progress_percent: 42, estimated_date: '2026-08-01' },
     ],
     warnings,
     analytics,
   };
 }
 
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // SMART SUGGESTIONS
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 export function getSmartSuggestions(empId: string): SmartSuggestion[] {
   const suggestions: SmartSuggestion[] = [];
@@ -2240,8 +2723,8 @@ export function getSmartSuggestions(empId: string): SmartSuggestion[] {
       if (avgProg >= 70) {
         suggestions.push({
           id: `sug-${skill.id}`, type: 'skill_unlock', priority: avgProg >= 90 ? 'high' : 'medium',
-          title: `Sắp mở được "${skill.name}"!`, description: `Bạn đã đạt ${Math.round(avgProg)}% điều kiện`,
-          action_label: 'Xem điều kiện', action_link: '/career-path/skills',
+          title: `Sáº¯p má»Ÿ Ä‘Æ°á»£c "${skill.name}"!`, description: `Báº¡n Ä‘Ã£ Ä‘áº¡t ${Math.round(avgProg)}% Ä‘iá»u kiá»‡n`,
+          action_label: 'Xem Ä‘iá»u kiá»‡n', action_link: '/career-path/skills',
         });
       }
     }
@@ -2251,9 +2734,16 @@ export function getSmartSuggestions(empId: string): SmartSuggestion[] {
   if (buddyCount === 0 && countUnlockedSkills(empId) >= 4) {
     suggestions.push({
       id: 'sug-buddy', type: 'buddy', priority: 'low',
-      title: 'Trở thành Mentor!', description: 'Hướng dẫn NV mới để nhận phần thưởng',
-      action_label: 'Tìm hiểu', action_link: '/career-path',
+      title: 'Trá»Ÿ thÃ nh Mentor!', description: 'HÆ°á»›ng dáº«n NV má»›i Ä‘á»ƒ nháº­n pháº§n thÆ°á»Ÿng',
+      action_label: 'TÃ¬m hiá»ƒu', action_link: '/career-path',
     });
   }
   return suggestions.sort((a, b) => { const p = { high: 0, medium: 1, low: 2 }; return p[a.priority] - p[b.priority]; });
 }
+
+
+
+
+
+
+

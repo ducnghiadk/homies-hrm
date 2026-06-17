@@ -1,4 +1,4 @@
-﻿import test from 'node:test'
+import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -15,13 +15,15 @@ const operationsPageSource = readFileSync(
 
 test('overview page exposes final CTA contracts', () => {
   assert.match(overviewPageSource, /\/career-path\/onboarding\?filter=all/)
-  assert.match(overviewPageSource, /\/career-path\/onboarding\?filter=block_day_one/)
-  assert.match(overviewPageSource, /\/career-path\/settings#exceptions/)
-  assert.match(overviewPageSource, /\/career-path\/settings#roles/)
+  assert.match(overviewPageSource, /\/career-path\/onboarding\?filter=urgent/)
+  assert.match(overviewPageSource, /\/career-path\/onboarding\/setup/)
+  assert.match(overviewPageSource, /Bảng nhân sự thử việc/)
+  assert.match(overviewPageSource, /Mở theo dõi thử việc/)
+  assert.match(overviewPageSource, /Mở thiết lập quy trình thử việc/)
 })
 
 test('operations page reads filter from url and offers overview return path', () => {
   assert.match(operationsPageSource, /searchParams\.get\('filter'\)/)
   assert.match(operationsPageSource, /setActiveFilter\(/)
-  assert.match(operationsPageSource, /Quay lại Tổng quan onboarding/)
+  assert.match(operationsPageSource, /Quay lại Tổng quan thử việc/)
 })

@@ -1,0 +1,27 @@
+SPEC_FAIL
+
+1. `src/components/onboarding-settings/TrialWorkflowSetupWorkspace.tsx:51`, `src/components/onboarding-settings/buildTrialWorkflowSetupViewModel.ts:231`, `tests/trial-workflow-tab-layout-contract.test.ts:17` dùng `Bản chứng thử việc`. Đặc tả đã duyệt chốt tab 2 là `Bốn chặng thử việc`. Code lệch. Contract cũng lệch.
+
+2. `src/components/onboarding-settings/buildTrialWorkflowSetupViewModel.ts:80` dựng tab `Thông tin chung` bằng 4 dòng tóm tắt: thời gian, mẫu, nhóm áp dụng, readiness. Thiếu các mục bắt buộc `mốc bắt đầu tính thử việc`, `người theo dõi chính`, `người phối hợp`, `nguyên tắc chốt cuối kỳ`, `nơi lưu ghi nhận cuối kỳ`. `src/components/onboarding-settings/TrialWorkflowGeneralInfoTab.tsx:13` cũng không có danh sách thiếu ở cuối thẻ như đặc tả yêu cầu.
+
+3. `src/components/onboarding-settings/buildTrialWorkflowSetupViewModel.ts:53` và `:115` model hóa 4 `bản chứng`, không phải 4 `chặng`. `src/components/onboarding-settings/TrialWorkflowStagesTab.tsx:35` render cột `Bản chứng thử việc` và `Khung hiện tại`, thiếu các trường bắt buộc của thẻ `Bốn chặng thử việc`: `tên chặng`, `mục tiêu chặng`, `người phụ trách chính`, `mốc thời gian`, `trạng thái hoàn tất`.
+
+4. `src/components/onboarding-settings/buildTrialWorkflowSetupViewModel.ts:129` và `src/components/onboarding-settings/TrialWorkflowTasksTab.tsx:33` chỉ render bảng tóm tắt generic. Thiếu các cột bắt buộc của thẻ `Việc cần làm`: `người làm chính`, `kết quả cần có`, `có bắt buộc hay không`, `hạn hoàn tất`. `src/components/onboarding-settings/TrialWorkflowTasksTab.tsx:54` gắn `OnboardingTemplatePreviewSection` thay vì danh sách việc còn thiếu ở cuối thẻ.
+
+5. `src/components/onboarding-settings/TrialWorkflowGateConditionsTab.tsx:30` không có bảng `Điều kiện qua chặng`. Thẻ này chỉ mount `OnboardingPublishValidationPanel` và bảng thiếu chung. `src/components/onboarding-settings/OnboardingPublishValidationPanel.tsx:41` hiển thị lỗi publish, không phải các cột bắt buộc `điều kiện phải có`, `kết quả hiện tại`, `mức bắt buộc/hỗ trợ`, `người duyệt qua chặng`.
+
+6. `src/components/onboarding-settings/buildTrialWorkflowSetupViewModel.ts:43` và `src/components/onboarding-settings/TrialWorkflowAssignmentsTab.tsx:40` thiếu trường bắt buộc `ngày bắt đầu dùng` trong thẻ `Áp dụng quy trình`.
+
+7. `src/components/onboarding-settings/TrialWorkflowSetupWorkspace.tsx:79` và `src/components/onboarding-settings/buildTrialWorkflowSetupViewModel.ts:219` kéo dữ liệu vận hành theo từng nhân sự vào màn setup: `nhân sự mới chưa khớp nhóm áp dụng`. Đặc tả chốt rõ màn này là nơi dựng quy trình chuẩn cho HR, không phải nơi theo dõi từng nhân sự.
+
+8. `src/components/onboarding-settings/TrialWorkflowSetupWorkspace.tsx:277` chỉ có thao tác mức toàn màn `Xem chỗ còn thiếu` và `Lưu thay đổi`. Thiếu `Lưu bản nháp` và `Đưa vào áp dụng` đúng đặc tả. `src/components/onboarding-settings/OnboardingPublishValidationPanel.tsx:34` còn đổi copy thành `Đưa vào sử dụng`, lại bị nhét xuống thẻ `Điều kiện qua chặng`, không còn là thao tác mức toàn màn.
+
+9. `src/components/onboarding-settings/OnboardingSettingsSecondaryTools.tsx:8` vẫn trỏ tới `#trial-workflow-step-2` và `#trial-workflow-step-3`. Shell mới không render các section đó nữa. Các id này chỉ còn nằm trong component cũ `src/components/onboarding-settings/TrialWorkflowTaskAuthoringSection.tsx:17` và `src/components/onboarding-settings/TrialWorkflowAssignmentPublishSection.tsx:17`. Đây là refactor dở, link chết, trái yêu cầu “đường đi rõ ràng”.
+
+10. Contract tests không bám đúng đặc tả. `tests/trial-workflow-tab-layout-contract.test.ts:17` khóa sai label tab 2. Cả 3 file test chỉ string-match copy shell: `tests/trial-workflow-tab-layout-contract.test.ts:15`, `tests/trial-workflow-setup-shell-contract.test.ts:11`, `tests/onboarding-settings-components-contract.test.ts:39`. Chúng không kiểm tra nội dung bắt buộc từng thẻ, cấu trúc bảng, danh sách thiếu cuối thẻ, hay link chết. `7 pass, 0 fail` không chứng minh spec đúng.
+
+Kiểm chứng đã chạy:
+`npx tsx --test tests/trial-workflow-tab-layout-contract.test.ts tests/trial-workflow-setup-shell-contract.test.ts tests/onboarding-settings-components-contract.test.ts`
+Kết quả thực: `7 pass, 0 fail`.
+
+Phần đúng có thật: `src/components/onboarding-settings/TrialWorkflowSetupWorkspace.tsx:84` giữ đúng cơ chế chỉ mở 1 thẻ tại 1 thời điểm, và `src/app/career-path/onboarding/setup/page.tsx:13` không còn copy `Bước 1/2/3`. Nhưng tổng thể vẫn lệch đặc tả đã duyệt.

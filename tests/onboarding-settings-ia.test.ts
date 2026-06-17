@@ -8,28 +8,24 @@ const settingsPageSource = readFileSync(
   'utf8',
 )
 
-test('settings page uses onboarding task-first header copy', () => {
-  assert.match(settingsPageSource, /Cấu hình onboarding cho nhân sự mới/)
-  assert.match(
-    settingsPageSource,
-    /Thiết lập nhóm onboarding, checklist áp dụng và xử lý lỗi cấu hình trước ngày vào làm\./,
-  )
-  assert.doesNotMatch(
-    settingsPageSource,
-    /Quản lý role onboarding, template checklist, và các ngoại lệ cần xử lý trước ngày vào làm\./,
-  )
+test('settings page dùng lối tắt sang setup thay cho tab thử việc', () => {
+  assert.match(settingsPageSource, /Thiết lập quy trình thử việc/)
+  assert.match(settingsPageSource, /\/career-path\/onboarding\/setup/)
+  assert.doesNotMatch(settingsPageSource, /\{ id: 'onboarding'/)
+  assert.doesNotMatch(settingsPageSource, /\{ id: 'roles'/)
+  assert.doesNotMatch(settingsPageSource, /activeTab === 'onboarding'/)
+  assert.doesNotMatch(settingsPageSource, /activeTab === 'roles'/)
 })
 
-test('settings page exposes task-first sections', () => {
-  assert.match(settingsPageSource, /id="summary"/)
-  assert.match(settingsPageSource, /id="urgent-issues"/)
-  assert.match(settingsPageSource, /id="role-filters"/)
-  assert.match(settingsPageSource, /id="roles"/)
-  assert.match(settingsPageSource, /OnboardingSettingsAdminRail/)
-  assert.match(settingsPageSource, />Cần xử lý ngay</)
-  assert.match(settingsPageSource, />Thiết lập nhóm onboarding</)
+test('settings page no longer inlines setup workspace sections', () => {
+  assert.doesNotMatch(settingsPageSource, /id="overview"/)
+  assert.doesNotMatch(settingsPageSource, /id="content-library"/)
+  assert.doesNotMatch(settingsPageSource, /id="templates"/)
+  assert.doesNotMatch(settingsPageSource, /id="journey-rules"/)
 })
 
-test('settings page no longer renders duplicate template-only section heading', () => {
-  assert.doesNotMatch(settingsPageSource, />Template checklist</)
+test('settings page no longer carries task-first setup copy', () => {
+  assert.doesNotMatch(settingsPageSource, /Thư viện nội dung onboarding/)
+  assert.doesNotMatch(settingsPageSource, /Content Library/)
+  assert.doesNotMatch(settingsPageSource, /Journey Rules/)
 })

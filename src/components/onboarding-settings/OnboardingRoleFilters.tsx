@@ -1,12 +1,12 @@
-﻿import React from 'react'
+import React from 'react'
 
 export type OnboardingRoleFilterKey = 'all' | 'enabled' | 'issues' | 'missing_template'
 
 const filterOptions: Array<{ key: OnboardingRoleFilterKey; label: string }> = [
   { key: 'all', label: 'Tất cả' },
-  { key: 'enabled', label: 'Đang bật' },
-  { key: 'issues', label: 'Có lỗi' },
-  { key: 'missing_template', label: 'Chưa có checklist' },
+  { key: 'enabled', label: 'Đang sử dụng' },
+  { key: 'issues', label: 'Cần hoàn thiện' },
+  { key: 'missing_template', label: 'Chưa có danh sách việc' },
 ]
 
 export function OnboardingRoleFilters({
@@ -50,7 +50,7 @@ export function OnboardingRoleFilters({
         type="text"
         value={searchValue}
         onChange={(event) => onSearchChange(event.target.value)}
-        placeholder="Tìm role hoặc chức danh"
+        placeholder="Tìm nhóm áp dụng hoặc chức danh"
         style={{
           width: '100%',
           padding: '8px 10px',

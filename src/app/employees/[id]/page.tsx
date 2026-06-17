@@ -952,7 +952,7 @@ export default function EmployeeDetailPage() {
                 </p>
               </div>
               <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-left">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Sinh nháº­t</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Sinh nhật</p>
                 {birthdaySummary ? (
                   <>
                     <p className="mt-1 text-sm font-semibold text-gray-900">{birthdaySummary.label}</p>
@@ -1654,7 +1654,7 @@ export default function EmployeeDetailPage() {
                 <div className={`mb-5 rounded-2xl border px-4 py-4 ${birthdaySummary?.tone || 'border-dashed border-gray-200 bg-gray-50 text-gray-600'}`}>
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide">Countdown sinh nháº­t</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide">Countdown sinh nhật</p>
                       <p className="mt-1 text-base font-semibold">
                         {birthdaySummary ? birthdaySummary.label : 'Chưa có ngày sinh để đếm ngược'}
                       </p>

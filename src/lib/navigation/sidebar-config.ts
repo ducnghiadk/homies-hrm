@@ -68,9 +68,9 @@ const SIDEBAR_ENTRIES: SidebarEntry[] = [
     icon: Users,
     roles: ONBOARDING_ADMIN_ROLES,
     items: [
-      { href: '/career-path/onboarding/overview', label: 'Tổng quan onboarding', roles: ['hr_admin', 'ceo'] },
-      { href: '/career-path/onboarding', label: 'Vận hành onboarding', roles: ONBOARDING_ADMIN_ROLES },
-      { href: '/career-path/settings', label: 'Cấu hình onboarding', roles: ['store_manager', 'hr_admin', 'ceo'] },
+      { href: '/career-path/onboarding/overview', label: 'Tổng quan thử việc', roles: ['hr_admin', 'ceo'] },
+      { href: '/career-path/onboarding', label: 'Theo dõi thử việc', roles: ONBOARDING_ADMIN_ROLES },
+      { href: '/career-path/onboarding/setup', label: 'Thiết lập quy trình thử việc', roles: ['store_manager', 'hr_admin', 'ceo'] },
     ],
   },
   {
