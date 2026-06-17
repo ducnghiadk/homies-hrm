@@ -216,6 +216,100 @@ describe('schedules view model', () => {
     })
   })
 
+  it('keeps every position slot in same shift-day cell so manager can switch positions inside popup', () => {
+    const board = createBoard()
+    board.demands = [
+      createSlot({
+        id: 'slot-mon-morning-cashier',
+        shift_template_id: 'shift-morning',
+        position_id: 'cashier',
+        required_count: 1,
+        min_count: 1,
+        assigned_employee_ids: ['emp-1'],
+        filled_count: 1,
+        missing_count: 0,
+      }),
+      createSlot({
+        id: 'slot-mon-morning-barista',
+        shift_template_id: 'shift-morning',
+        position_id: 'barista',
+        required_count: 2,
+        min_count: 1,
+        preferred_employee_ids: ['emp-3'],
+        missing_count: 2,
+      }),
+    ]
+
+    const rows = buildScheduleRows({
+      board,
+      weekDates: ['2026-06-22'],
+      templates: [
+        { id: 'shift-morning', name: 'Ca sang', start_time: '08:30', end_time: '12:00' },
+      ],
+    })
+
+    expect(rows[0]?.cells[0]).toMatchObject({
+      slotIds: ['slot-mon-morning-barista', 'slot-mon-morning-cashier'],
+      filledCount: 1,
+      requiredCount: 3,
+      shortageCount: 2,
+      headline: 'Nguyen Thi Phuong Thao +1',
+    })
+  })
+
+  it('keeps primary position label aligned with primary person instead of first sorted slot', () => {
+    const board = createBoard()
+    board.demands = [
+      createSlot({
+        id: 'slot-mon-morning-barista',
+        shift_template_id: 'shift-morning',
+        position_id: 'pos-001',
+        required_count: 2,
+        min_count: 1,
+        preferred_employee_ids: ['emp-3'],
+        missing_count: 2,
+      }),
+      createSlot({
+        id: 'slot-mon-morning-cashier',
+        shift_template_id: 'shift-morning',
+        position_id: 'pos-002',
+        required_count: 1,
+        min_count: 1,
+        assigned_employee_ids: ['emp-1'],
+        filled_count: 1,
+        missing_count: 0,
+      }),
+    ]
+    board.employees[0]!.employee.position_id = 'pos-002'
+    board.employees[2]!.employee.position_id = 'pos-001'
+
+    const rows = buildScheduleRows({
+      board,
+      weekDates: ['2026-06-22'],
+      templates: [{ id: 'shift-morning', name: 'Ca sang', start_time: '08:30', end_time: '12:00' }],
+    })
+
+    expect(rows[0]?.cells[0]).toMatchObject({
+      primaryLabel: 'Nguyen Thi Phuong Thao',
+      primaryPositionLabel: 'Thu ngan',
+      previewNames: ['Nguyen Thi Phuong Thao', 'Nguyen Trinh'],
+      previewAssignments: [
+        {
+          employeeId: 'emp-1',
+          employeeName: 'Nguyen Thi Phuong Thao',
+          positionLabel: 'Thu ngan',
+          source: 'assigned',
+        },
+        {
+          employeeId: 'emp-3',
+          employeeName: 'Nguyen Trinh',
+          positionLabel: 'Pha chế',
+          source: 'registered',
+        },
+      ],
+    })
+  })
+
   it('groups recommendations for popup by registered candidates first and backups later', () => {
     const recommendations: AssignmentRecommendation[] = [
       {
@@ -262,10 +356,9 @@ describe('schedules view model', () => {
 
     const sections = buildRecommendationSections(recommendations)
 
-    expect(sections.map(section => section.id)).toEqual(['registered', 'review', 'backup'])
-    expect(sections[0].items.map(item => item.employee_name)).toEqual(['Nguyen Thi Phuong Thao'])
-    expect(sections[1].items.map(item => item.employee_name)).toEqual(['Nguyen Trinh'])
-    expect(sections[2].items.map(item => item.employee_name)).toEqual(['Tran Cong Huy'])
+    expect(sections.map(section => section.id)).toEqual(['registered', 'backup'])
+    expect(sections[0].items.map(item => item.employee_name)).toEqual(['Nguyen Thi Phuong Thao', 'Nguyen Trinh'])
+    expect(sections[1].items.map(item => item.employee_name)).toEqual(['Tran Cong Huy'])
   })
 
   it('filters recommendations by Vietnamese name and position keyword for popup search', () => {
@@ -300,6 +393,8 @@ describe('schedules view model', () => {
 
     expect(filterRecommendationsBySearch(recommendations, 'thao').map(item => item.employee_id)).toEqual(['emp-1'])
     expect(filterRecommendationsBySearch(recommendations, 'pha che').map(item => item.employee_id)).toEqual(['emp-2'])
+    expect(filterRecommendationsBySearch(recommendations, 'ngan').map(item => item.employee_id)).toEqual(['emp-1'])
+    expect(filterRecommendationsBySearch(recommendations, 'ng\u00e2n').map(item => item.employee_id)).toEqual(['emp-1'])
     expect(filterRecommendationsBySearch(recommendations, 'khong ton tai')).toEqual([])
   })
 })

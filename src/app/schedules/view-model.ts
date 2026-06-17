@@ -260,8 +260,8 @@ function normalizeSearchText(value: string) {
   return value
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
+    .replace(/Ä‘/g, 'd')
+    .replace(/Ä/g, 'D')
     .toLowerCase()
     .trim()
 }
@@ -285,7 +285,7 @@ export function filterRecommendationsBySearch(recommendations: AssignmentRecomme
 
 function buildCompactReason(item: AssignmentRecommendation) {
   if (item.is_assigned) return 'Dang giu ca nay'
-  if (item.has_same_day_assignment) return Can kiem tra 
+  if (item.has_same_day_assignment) return `Can kiem tra ${item.same_day_shift_name?.toLowerCase() || 'ca cung ngay'}`
   if (item.preference === 'preferred' || item.preference === 'available') return 'Da dang ky truoc'
   return 'Co the bo sung neu can'
 }
