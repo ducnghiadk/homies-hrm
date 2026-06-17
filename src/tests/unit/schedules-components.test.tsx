@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+ï»¿import { describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { ScheduleToolbar } from '@/app/schedules/_components/ScheduleToolbar'
@@ -49,7 +49,7 @@ describe('schedules extracted components', () => {
     expect(markup).toContain('Thieu 1 ca')
   })
 
-  it('renders compact weekly board cells with headline and action label', () => {
+  it('renders compact weekly board cells with position for each visible person', () => {
     const rows: ScheduleRowViewModel[] = [
       {
         templateId: 'shift-morning',
@@ -66,6 +66,11 @@ describe('schedules extracted components', () => {
             tone: 'critical',
             primaryLabel: 'Nguyen Thi Phuong Thao',
             headline: 'Nguyen Thi Phuong Thao +1',
+            previewNames: ['Nguyen Thi Phuong Thao', 'Le Giau'],
+            previewAssignments: [
+              { employeeId: 'emp-1', employeeName: 'Nguyen Thi Phuong Thao', positionLabel: 'Thu ngan', source: 'assigned' },
+              { employeeId: 'emp-2', employeeName: 'Le Giau', positionLabel: 'Pha che', source: 'registered' },
+            ],
             source: 'registered',
             secondaryCount: 1,
             statusLabel: 'Con thieu 2',
@@ -85,15 +90,17 @@ describe('schedules extracted components', () => {
       />,
     )
 
-    expect(markup).toContain('Nguyen Thi Phuong Thao +1')
-    expect(markup).toContain('Mo xep nguoi')
+    expect(markup).toContain('Nguyen Thi Phuong Thao')
+    expect(markup).toContain('Thu ngan')
+    expect(markup).toContain('Le Giau')
+    expect(markup).toContain('Pha che')
   })
 
-  it('renders centered assignment modal with grouped recommendation sections', () => {
+  it('renders task-first assignment modal with compact groups and no right rail copy', () => {
     const sections: RecommendationSection[] = [
       {
         id: 'registered',
-        title: 'Da dang ky phu hop',
+        title: 'Da dang ky va phu hop',
         description: 'Uu tien nguoi da dang ky truoc.',
         items: [
           {
@@ -104,10 +111,31 @@ describe('schedules extracted components', () => {
             assigned_count: 1,
             preference: 'preferred',
             score: 98,
-            label: 'Uu tien',
-            reason: 'Da dang ky ca nay',
-            is_assigned: false,
+            label: 'Dang giu ca',
+            reason: 'Dang giu ca nay',
+            is_assigned: true,
             has_same_day_assignment: false,
+          },
+        ],
+      },
+      {
+        id: 'backup',
+        title: 'Co the bo sung',
+        description: 'Nguon tang cuong neu nhom uu tien chua du.',
+        items: [
+          {
+            employee_id: 'emp-2',
+            employee_name: 'Le Phuong Nam',
+            position_id: 'barista',
+            position_name: 'Pha che',
+            assigned_count: 1,
+            preference: 'available',
+            score: -18,
+            label: 'Can can nhac',
+            reason: 'Can kiem tra ca chieu cung ngay',
+            is_assigned: false,
+            has_same_day_assignment: true,
+            same_day_shift_name: 'Ca chieu',
           },
         ],
       },
@@ -116,21 +144,34 @@ describe('schedules extracted components', () => {
     const markup = renderToStaticMarkup(
       <AssignmentModal
         open
-        slotTitle="Ca sang Thu ngan"
-        slotSubtitle="Thu 2 - 22/06/2026 · 08:30 - 12:00 · Da xep 1/3"
-        shortageLabel="Con thieu 2"
+        slotTitle="Ca sang - T2 22/06"
+        slotSubtitle="08:30 - 12:00 - Pha che - Thieu 1 nguoi"
+        shortageLabel="Thieu 1 nguoi"
         search=""
         onSearchChange={vi.fn()}
         sections={sections}
-        requiresPublishedReason={false}
+        requiresPublishedReason
         onAssign={vi.fn()}
         onRemove={vi.fn()}
         onClose={vi.fn()}
+        filledCountLabel="1/2 nguoi"
       />,
     )
 
-    expect(markup).toContain('Ca sang Thu ngan')
-    expect(markup).toContain('Da dang ky phu hop')
-    expect(markup).toContain('Nguyen Thi Phuong Thao')
+    expect(markup).toContain('Ca sang - T2 22/06')
+    expect(markup).toContain('08:30 - 12:00 - Pha che - Thieu 1 nguoi')
+    expect(markup).toContain('1/2 nguoi')
+    expect(markup).toContain('Sua sau khi chot se can ly do thay doi')
+    expect(markup).toContain('Da dang ky va phu hop')
+    expect(markup).toContain('Co the bo sung')
+    expect(markup).toContain('Dang giu ca nay')
+    expect(markup).toContain('Can kiem tra ca chieu cung ngay')
+    expect(markup).toContain('Gan vao ca')
+    expect(markup).toContain('Go khoi ca')
+    expect(markup).not.toContain('Vi tri trong ca nay')
+    expect(markup).not.toContain('Tinh trang o dang xem')
+    expect(markup).not.toContain('Meo thao tac')
+    expect(markup).not.toContain('Thu ngan - 1 ca trong tuan')
+    expect(markup).not.toContain('\\uFFFD')
   })
 })
