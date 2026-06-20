@@ -8,10 +8,10 @@ import type {
 } from '@/lib/types/settings';
 
 export const settingCategories: SettingCategory[] = [
-  { id: 'organization', icon: '🏬', label: 'Cơ cấu cửa hàng', description: 'Thương hiệu, cửa hàng, điểm làm việc' },
-  { id: 'hr', icon: '👥', label: 'Nhân sự & ca làm', description: 'Vị trí vận hành, ca kíp, định biên' },
-  { id: 'finance', icon: '📋', label: 'Chính sách nhân sự', description: 'Nghỉ phép, phê duyệt, lương thưởng' },
-  { id: 'system', icon: '⚙️', label: 'Quản trị hệ thống', description: 'Phân quyền, thiết bị, cấu hình' },
+  { id: 'organization', icon: 'STORE', label: 'Cơ cấu cửa hàng', description: 'Thương hiệu, cửa hàng, điểm làm việc' },
+  { id: 'hr', icon: 'HR', label: 'Nhân sự & ca làm', description: 'Vị trí vận hành, ca kíp, định biên' },
+  { id: 'finance', icon: 'POLICY', label: 'Chính sách nhân sự', description: 'Nghỉ phép, phê duyệt, lương thưởng' },
+  { id: 'system', icon: 'SYS', label: 'Quản trị hệ thống', description: 'Phân quyền, thiết bị, cấu hình' },
 ];
 
 export const settingsWorkspaceTabs: SettingsWorkspaceTab[] = [
@@ -74,31 +74,31 @@ export const settingsWorkspaceTabs: SettingsWorkspaceTab[] = [
 
 export const settingItems: SettingItem[] = [
   {
-    id: 'brand-profile', category: 'organization', icon: '🏪', iconBg: 'bg-primary-100',
+    id: 'brand-profile', category: 'organization', icon: 'STORE', iconBg: 'bg-primary-100',
     title: 'Thương hiệu & pháp nhân', description: 'Tên thương hiệu, múi giờ, tiền tệ, thông tin doanh nghiệp',
     href: '/settings#co-cau-cua-hang', status: 'completed', statusText: 'Homies Milk Tea',
     isRequired: true, setupOrder: 1,
   },
   {
-    id: 'store-network', category: 'organization', icon: '📍', iconBg: 'bg-primary-100',
+    id: 'store-network', category: 'organization', icon: 'MAP', iconBg: 'bg-primary-100',
     title: 'Cửa hàng & điểm làm việc', description: 'Danh sách cửa hàng, địa chỉ, bán kính check-in',
     href: '/settings#co-cau-cua-hang', status: 'completed', statusText: '3 cửa hàng',
     isRequired: true, setupOrder: 2,
   },
   {
-    id: 'workforce-structure', category: 'hr', icon: '🧋', iconBg: 'bg-success-100',
+    id: 'workforce-structure', category: 'hr', icon: 'ROLE', iconBg: 'bg-success-100',
     title: 'Vị trí vận hành & ca làm', description: 'Vị trí pha chế, thu ngân, ca mở cửa, ca đóng cửa',
     href: '/settings#nhan-su-va-ca-lam', status: 'completed', statusText: '3 ca làm việc',
     isRequired: true, setupOrder: 3,
   },
   {
-    id: 'scheduling', category: 'hr', icon: '📆', iconBg: 'bg-success-100',
+    id: 'scheduling', category: 'hr', icon: 'SCHED', iconBg: 'bg-success-100',
     title: 'Quy tắc xếp ca', description: 'Chu kỳ xếp ca, quy tắc đăng ký, ràng buộc lịch làm việc',
     href: '/settings/schedule-rules', status: 'completed', statusText: 'Đã cấu hình',
     isRequired: true, setupOrder: 4,
   },
   {
-    id: 'preferences', category: 'hr', icon: '❤️', iconBg: 'bg-pink-100',
+    id: 'preferences', category: 'hr', icon: 'PREF', iconBg: 'bg-pink-100',
     title: 'Đăng ký ca mong muốn', description: 'Cấu hình preference và tổng quan đăng ký ca của nhân sự',
     href: '/settings/schedule-rules/preferences', status: 'completed', statusText: 'Ưu tiên theo ca',
     isRequired: false, setupOrder: 5,
@@ -108,55 +108,55 @@ export const settingItems: SettingItem[] = [
     ],
   },
   {
-    id: 'staffing', category: 'hr', icon: '📊', iconBg: 'bg-success-100',
+    id: 'staffing', category: 'hr', icon: 'PLAN', iconBg: 'bg-success-100',
     title: 'Định biên nhân sự', description: 'Nhu cầu nhân sự theo lưu lượng, giờ cao điểm và năng suất',
     href: '/settings/staffing', status: 'completed', statusText: 'Đã cấu hình',
     isRequired: false, setupOrder: 6,
   },
   {
-    id: 'leave', category: 'finance', icon: '🏖️', iconBg: 'bg-teal-100',
+    id: 'leave', category: 'finance', icon: 'LEAVE', iconBg: 'bg-teal-100',
     title: 'Nghỉ phép & quy định nghỉ', description: 'Loại phép, quota, quy định áp dụng cho nhân sự cửa hàng',
     href: '/leave', status: 'completed', statusText: '12 ngày/năm',
     isRequired: true, setupOrder: 7,
   },
   {
-    id: 'career-path', category: 'finance', icon: '🚀', iconBg: 'bg-primary-100',
+    id: 'career-path', category: 'finance', icon: 'LEVEL', iconBg: 'bg-primary-100',
     title: 'Lộ trình phát triển', description: 'Cấp bậc, kỹ năng, điều kiện thăng tiến và thử việc',
     href: '/career-path/settings', status: 'not_started', statusText: 'Chưa thiết lập',
     isRequired: true, setupOrder: 8,
   },
   {
-    id: 'kpi', category: 'finance', icon: '🎯', iconBg: 'bg-indigo-100',
+    id: 'kpi', category: 'finance', icon: 'KPI', iconBg: 'bg-indigo-100',
     title: 'Đánh giá KPI', description: 'Tiêu chí, thang điểm, chu kỳ đánh giá cho đội cửa hàng',
     href: '/kpi/settings', status: 'completed', statusText: '3 tiêu chí',
     isRequired: true, setupOrder: 9,
   },
   {
-    id: 'payroll', category: 'finance', icon: '💵', iconBg: 'bg-warning-100',
+    id: 'payroll', category: 'finance', icon: 'PAY', iconBg: 'bg-warning-100',
     title: 'Cấu hình lương', description: 'Kỳ lương, phụ cấp, chế độ trả lương và dữ liệu tính công',
     href: '/settings/payroll', status: 'completed', statusText: 'Ngày 5 hàng tháng',
     isRequired: true, setupOrder: 10,
   },
   {
-    id: 'labor-cost', category: 'finance', icon: '🧾', iconBg: 'bg-warning-100',
+    id: 'labor-cost', category: 'finance', icon: 'COST', iconBg: 'bg-warning-100',
     title: 'Labor cost', description: 'Theo dõi chi phí lao động theo cửa hàng và ca làm',
     href: '/settings/labor-cost', status: 'not_started', statusText: 'Chưa thiết lập',
     isRequired: false, setupOrder: 11,
   },
   {
-    id: 'wifi', category: 'system', icon: '📶', iconBg: 'bg-cyan-100',
+    id: 'wifi', category: 'system', icon: 'WIFI', iconBg: 'bg-cyan-100',
     title: 'WiFi check-in', description: 'Thiết bị và WiFi dùng cho chấm công tại cửa hàng',
     href: '/settings/wifi', status: 'completed', statusText: '2 WiFi đã cài',
     isRequired: false, setupOrder: 12,
   },
   {
-    id: 'permissions', category: 'system', icon: '🔐', iconBg: 'bg-error-100',
+    id: 'permissions', category: 'system', icon: 'LOCK', iconBg: 'bg-error-100',
     title: 'Phân quyền', description: 'Vai trò, quyền truy cập và phạm vi quản lý',
     href: '/settings/permissions', status: 'completed', statusText: '3 vai trò',
     isRequired: false, setupOrder: 13,
   },
   {
-    id: 'system', category: 'system', icon: '⚙️', iconBg: 'bg-gray-100',
+    id: 'system', category: 'system', icon: 'GEAR', iconBg: 'bg-gray-100',
     title: 'Hệ thống', description: 'Ngôn ngữ, theme và cấu hình vận hành chung',
     href: '/settings/system', status: 'completed', statusText: 'Tiếng Việt',
     isRequired: false, setupOrder: 14,
@@ -164,7 +164,7 @@ export const settingItems: SettingItem[] = [
 ];
 
 export function getSettingsByCategory(category: SettingCategoryId): SettingItem[] {
-  return settingItems.filter(item => item.category === category);
+  return settingItems.filter((item) => item.category === category);
 }
 
 export function getSettingsWorkspaceTab(id: SettingsWorkspaceTabId): SettingsWorkspaceTab {
@@ -174,19 +174,52 @@ export function getSettingsWorkspaceTab(id: SettingsWorkspaceTabId): SettingsWor
 }
 
 export function getSetupProgress(): SetupProgress {
-  const required = settingItems.filter(item => item.isRequired);
-  const completed = required.filter(item => item.status === 'completed');
+  const required = settingItems.filter((item) => item.isRequired);
+  const completed = required.filter((item) => item.status === 'completed');
   const percentage = Math.round((completed.length / required.length) * 100);
   const nextStep = required
-    .filter(item => item.status !== 'completed')
+    .filter((item) => item.status !== 'completed')
     .sort((a, b) => a.setupOrder - b.setupOrder)[0] || null;
   return { completed: completed.length, total: required.length, percentage, nextStep };
 }
 
 export function searchSettings(query: string): SettingItem[] {
   const q = query.toLowerCase();
-  return settingItems.filter(item =>
+  return settingItems.filter((item) =>
     item.title.toLowerCase().includes(q) ||
     item.description.toLowerCase().includes(q)
   );
+}
+
+export function searchWorkspaceSettings(query: string): SettingItem[] {
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+
+  const workspaceItems: SettingItem[] = settingsWorkspaceTabs.flatMap((tab) => {
+    const cards = [...tab.primaryCards, ...tab.secondaryBlocks];
+
+    return cards.map((card, index) => ({
+      id: `workspace-${tab.id}-${card.id}`,
+      category: tab.id === 'stores' ? 'organization' : tab.id === 'workforce' ? 'hr' : tab.id === 'policies' ? 'finance' : 'system',
+      icon: tab.id === 'stores' ? 'STORE' : tab.id === 'workforce' ? 'HR' : tab.id === 'policies' ? 'POLICY' : 'SYS',
+      iconBg: tab.id === 'stores' ? 'bg-primary-100' : tab.id === 'workforce' ? 'bg-success-100' : tab.id === 'policies' ? 'bg-warning-100' : 'bg-gray-100',
+      title: card.title,
+      description: `${tab.label}: ${card.description}`,
+      href: '/settings',
+      status: 'completed',
+      statusText: tab.label,
+      isRequired: false,
+      setupOrder: 100 + index,
+    }));
+  });
+
+  const deduped = new Map<string, SettingItem>();
+  [...settingItems, ...workspaceItems].forEach((item) => {
+    const haystack = `${item.title} ${item.description}`.toLowerCase();
+    if (haystack.includes(q) && !deduped.has(item.title)) {
+      deduped.set(item.title, item);
+    }
+  });
+
+  return [...deduped.values()];
 }
