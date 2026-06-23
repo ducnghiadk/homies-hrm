@@ -128,7 +128,7 @@ function ShiftPreferencesPageContent() {
       }))
     )
     setNote(existing[0]?.note ?? '')
-    setStatus(existing[0]?.status ?? 'none')
+    setStatus(existing[0]?.status === 'withdrawn' ? 'none' : (existing[0]?.status ?? 'none'))
   }, [user, weekDates, weekStart])
 
   if (!user) return null

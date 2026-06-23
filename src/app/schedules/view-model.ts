@@ -46,6 +46,11 @@ export type ScheduleCellViewModel = {
   actionLabel: string
   isSetup: boolean
   primaryPositionLabel?: string
+  staffingLabel?: string
+  shortageBadges?: Array<{
+    label: string
+    tone: 'full' | 'shortage' | 'overflow'
+  }>
 }
 
 export type ScheduleRowViewModel = {
@@ -252,6 +257,11 @@ export function buildScheduleRows(input: {
         actionLabel: previewNames.length > 0 ? 'Mo xep nguoi' : 'Bam de xep nguoi',
         isSetup: slots.length > 0,
         primaryPositionLabel,
+        staffingLabel: `${filledCount}/${requiredCount} nguoi`,
+        shortageBadges: [{
+          label: shortageCount > 0 ? `Thieu ${shortageCount}` : 'Du nguoi',
+          tone: shortageCount > 0 ? 'shortage' : 'full',
+        }],
       }
     }),
   }))

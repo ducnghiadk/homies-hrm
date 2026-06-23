@@ -21,7 +21,7 @@ import {
   removeDraftAssignment,
   upsertDraftAssignment,
 } from '@/lib/mock-data-schedule-weeks'
-import { getShiftById, getStoreById, mockEmployees, mockShifts, type Schedule } from '@/lib/mock-data'
+import { getPositionById, getShiftById, getStoreById, mockEmployees, mockShifts, type Schedule } from '@/lib/mock-data'
 import { ShiftTemplateService } from '@/lib/services/shift-template-service'
 import { getInitials } from '@/lib/utils'
 import { checkScheduleWarnings, scanWeekWarnings } from '@/lib/mock-data-schedule-rules'
@@ -360,7 +360,7 @@ function AdminReviewContent() {
                           </div>
                           <div>
                             <p className="line-clamp-1 text-xs font-bold text-gray-800">{employee.full_name}</p>
-                            <p className="mt-0.5 text-[9px] font-bold text-gray-400">{employee.position || 'Nhan vien'}</p>
+                            <p className="mt-0.5 text-[9px] font-bold text-gray-400">{getPositionById(employee.position_id)?.name || employee.position_id || 'Nhan vien'}</p>
                           </div>
                         </div>
                       </td>

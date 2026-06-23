@@ -18,6 +18,17 @@ type AssignmentModalProps = {
   onRemove: (employeeId: string) => void
   onClose: () => void
   filledCountLabel?: string
+  headcountLimitLabel?: string
+  warningMessage?: string | null
+  warningTitle?: string | null
+  positionOptions?: Array<{
+    id: string
+    label: string
+    filledCountLabel: string
+    shortageLabel: string
+  }>
+  activePositionId?: string | null
+  onPositionChange?: (slotId: string) => void
 }
 
 export function AssignmentModal({
@@ -33,6 +44,12 @@ export function AssignmentModal({
   onRemove,
   onClose,
   filledCountLabel,
+  headcountLimitLabel,
+  warningMessage,
+  warningTitle,
+  positionOptions,
+  activePositionId,
+  onPositionChange,
 }: AssignmentModalProps) {
   if (!open) return null
 
@@ -46,6 +63,7 @@ export function AssignmentModal({
             <p className="mt-1 text-sm text-[#6f6258]">{slotSubtitle}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
               {filledCountLabel && <span className="rounded-full bg-white/90 px-2.5 py-1 font-semibold text-slate-700">{filledCountLabel}</span>}
+              {headcountLimitLabel && <span className="rounded-full bg-stone-100 px-2.5 py-1 font-semibold text-stone-700">{headcountLimitLabel}</span>}
               <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">{shortageLabel}</span>
               {requiresPublishedReason && <span className="rounded-full bg-sky-100 px-2.5 py-1 font-semibold text-sky-700">Sua sau khi chot se can ly do thay doi</span>}
             </div>
@@ -61,6 +79,32 @@ export function AssignmentModal({
         </div>
 
         <div className="max-h-[calc(90vh-148px)] overflow-y-auto p-5">
+          {warningMessage && (
+            <div className="mb-4 rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {warningTitle ? <div className="font-semibold text-amber-900">{warningTitle}</div> : null}
+              <div className={warningTitle ? 'mt-1' : ''}>{warningMessage}</div>
+            </div>
+          )}
+
+          {positionOptions && positionOptions.length > 1 && onPositionChange ? (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {positionOptions.map(option => {
+                const isActive = option.id === activePositionId
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => onPositionChange(option.id)}
+                    className={`rounded-2xl border px-3 py-2 text-left text-xs transition ${isActive ? 'border-[#23425f] bg-[#23425f] text-white' : 'border-[#eadbc9] bg-[#fffaf4] text-slate-700 hover:bg-white'}`}
+                  >
+                    <div className="font-semibold">{repairPositionLabel(option.label)}</div>
+                    <div className={`mt-1 ${isActive ? 'text-white/80' : 'text-[#7c6e63]'}`}>{option.filledCountLabel} · {option.shortageLabel}</div>
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+
           <div className="flex flex-col gap-3">
             <input
               value={search}

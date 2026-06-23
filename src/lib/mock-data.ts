@@ -12,6 +12,7 @@ export type Store = {
   id: string
   org_id: string
   name: string
+  code?: string
   address: string
   latitude: number
   longitude: number
@@ -632,8 +633,29 @@ export function getEmployeeById(id: string) {
   return mockEmployees.find(e => e.id === id)
 }
 
+export const STORE_STORAGE_KEY = 'hrm_stores_db'
+
+export function getAllStores() {
+  if (typeof window === 'undefined') return mockStores
+
+  const stored = localStorage.getItem(STORE_STORAGE_KEY)
+  if (!stored) return mockStores
+
+  try {
+    const parsed = JSON.parse(stored) as Store[]
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : mockStores
+  } catch {
+    return mockStores
+  }
+}
+
+export function saveStoresToStorage(stores: Store[]) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(STORE_STORAGE_KEY, JSON.stringify(stores))
+}
+
 export function getStoreById(id: string) {
-  return mockStores.find(s => s.id === id)
+  return getAllStores().find(s => s.id === id)
 }
 
 export function getPositionById(id: string) {

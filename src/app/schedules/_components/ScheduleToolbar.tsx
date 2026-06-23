@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, History, Save, Send, Settings2 } from 'lucide-react'
+import type { HeaderMetric, HeaderWarningPill } from '@/app/schedules/dashboard-summary'
 
 type StoreOption = { id: string; name: string }
 
@@ -20,6 +21,8 @@ type ScheduleToolbarProps = {
   weekStateTone?: string
   weekStateDescription?: string
   publishedAtLabel?: string | null
+  primaryMetrics?: HeaderMetric[]
+  warningPill?: HeaderWarningPill
   scheduledEmployees?: number
   totalDemand?: number
   totalAssigned?: number
@@ -46,6 +49,8 @@ export function ScheduleToolbar({
   weekStateTone,
   weekStateDescription,
   publishedAtLabel,
+  primaryMetrics,
+  warningPill,
   scheduledEmployees,
   totalDemand,
   totalAssigned,
@@ -53,6 +58,12 @@ export function ScheduleToolbar({
   hardWarningCount,
   softWarningCount,
 }: ScheduleToolbarProps) {
+  const warningPillClass = warningPill?.tone === 'emerald'
+    ? 'bg-emerald-50 text-emerald-700'
+    : warningPill?.tone === 'rose'
+      ? 'bg-rose-50 text-rose-700'
+      : 'bg-orange-50 text-orange-700'
+
   return (
     <div className="rounded-[28px] border border-[#eadbc9] bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -116,6 +127,10 @@ export function ScheduleToolbar({
             {selectedStoreName && <span className="rounded-full bg-stone-100 px-2.5 py-1 font-semibold text-stone-700">{selectedStoreName}</span>}
             {weekStateLabel && <span className={`rounded-full px-2.5 py-1 font-semibold ${weekStateTone || 'bg-stone-100 text-stone-700'}`}>{weekStateLabel}</span>}
             {publishedAtLabel && <span className="rounded-full bg-sky-50 px-2.5 py-1 font-semibold text-sky-700">{publishedAtLabel}</span>}
+            {primaryMetrics?.map(metric => (
+              <span key={metric.label} className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">{metric.label} {metric.value}</span>
+            ))}
+            {warningPill && <span className={`rounded-full px-2.5 py-1 font-semibold ${warningPillClass}`}>{warningPill.label} {warningPill.value}</span>}
             {typeof scheduledEmployees === 'number' && <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">Nhan su da xep {scheduledEmployees}</span>}
             {typeof totalDemand === 'number' && <span className="rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-700">Nhu cau {totalDemand}</span>}
             {typeof totalAssigned === 'number' && <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">Da gan {totalAssigned}</span>}
