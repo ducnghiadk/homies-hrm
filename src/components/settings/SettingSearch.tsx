@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { searchSettings } from '@/lib/mock-data/settings';
+import { searchWorkspaceSettings } from '@/lib/mock-data/settings';
 import type { SettingItem } from '@/lib/types/settings';
 
 interface Props {
@@ -13,7 +13,7 @@ export function SettingSearch({ onSearch }: Props) {
 
   const handleChange = (value: string) => {
     setQuery(value);
-    onSearch(value.trim() ? searchSettings(value) : null);
+    onSearch(value.trim() ? searchWorkspaceSettings(value) : null);
   };
 
   return (

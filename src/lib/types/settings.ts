@@ -2,6 +2,8 @@ export type SettingCategoryId = 'organization' | 'hr' | 'finance' | 'system';
 
 export type SetupStatus = 'not_started' | 'in_progress' | 'completed';
 
+export type SettingsWorkspaceTabId = 'stores' | 'workforce' | 'policies' | 'system_access';
+
 export interface SettingSubItem {
   title: string;
   href: string;
@@ -40,6 +42,23 @@ export interface SettingCategory {
   icon: string;
   label: string;
   description: string;
+}
+
+export interface SettingsWorkspaceCard {
+  id: string;
+  title: string;
+  description: string;
+  emphasis?: 'default' | 'success' | 'warning';
+}
+
+export interface SettingsWorkspaceTab {
+  id: SettingsWorkspaceTabId;
+  label: string;
+  description: string;
+  statusLabel: string;
+  actionLabel: string;
+  primaryCards: SettingsWorkspaceCard[];
+  secondaryBlocks: SettingsWorkspaceCard[];
 }
 
 export interface SetupProgress {

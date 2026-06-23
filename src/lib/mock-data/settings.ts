@@ -1,154 +1,225 @@
-import type { SettingItem, SettingCategory, SettingCategoryId, SetupProgress } from '@/lib/types/settings';
+import type {
+  SettingCategory,
+  SettingCategoryId,
+  SettingItem,
+  SettingsWorkspaceTab,
+  SettingsWorkspaceTabId,
+  SetupProgress,
+} from '@/lib/types/settings';
 
 export const settingCategories: SettingCategory[] = [
-  { id: 'organization', icon: '🏢', label: 'Tổ chức', description: 'Thông tin doanh nghiệp, chi nhánh' },
-  { id: 'hr', icon: '👥', label: 'Nhân sự', description: 'Lộ trình, KPI, xếp ca, nghỉ phép' },
-  { id: 'finance', icon: '💰', label: 'Tài chính', description: 'Lương, phụ cấp, chi phí' },
-  { id: 'system', icon: '⚡', label: 'Hệ thống', description: 'WiFi, thông báo, bảo mật' },
+  { id: 'organization', icon: 'STORE', label: 'Cơ cấu cửa hàng', description: 'Thương hiệu, cửa hàng, điểm làm việc' },
+  { id: 'hr', icon: 'HR', label: 'Nhân sự & ca làm', description: 'Vị trí vận hành, ca kíp, định biên' },
+  { id: 'finance', icon: 'POLICY', label: 'Chính sách nhân sự', description: 'Nghỉ phép, phê duyệt, lương thưởng' },
+  { id: 'system', icon: 'SYS', label: 'Quản trị hệ thống', description: 'Phân quyền, thiết bị, cấu hình' },
+];
+
+export const settingsWorkspaceTabs: SettingsWorkspaceTab[] = [
+  {
+    id: 'stores',
+    label: 'Cửa hàng',
+    description: 'Mạng lưới vận hành điểm bán',
+    statusLabel: '1 việc cần xử lý',
+    actionLabel: 'Thêm chi nhánh',
+    primaryCards: [
+      { id: 'store-network', title: 'Mạng lưới cửa hàng', description: 'Danh sách cửa hàng đang hoạt động' },
+      { id: 'departments', title: 'Bộ phận & điểm làm việc', description: 'Bộ phận theo cửa hàng' },
+      { id: 'store-sync', title: 'Đồng bộ từ file nhân sự', description: 'Upload, preview, áp dụng đồng bộ' },
+    ],
+    secondaryBlocks: [],
+  },
+  {
+    id: 'workforce',
+    label: 'Nhân sự & ca làm',
+    description: 'Cấu trúc vận hành hằng ngày',
+    statusLabel: 'Đã cấu hình nền tảng',
+    actionLabel: 'Cấu hình ca làm',
+    primaryCards: [
+      { id: 'positions', title: 'Vị trí vận hành', description: 'Vai trò làm việc tại cửa hàng' },
+      { id: 'shifts', title: 'Ca làm', description: 'Khung giờ và ca đang áp dụng' },
+      { id: 'schedule-rules', title: 'Quy tắc xếp ca', description: 'Ràng buộc và chu kỳ xếp ca' },
+      { id: 'staffing', title: 'Định biên nhân sự', description: 'Nhu cầu nhân sự theo lưu lượng' },
+    ],
+    secondaryBlocks: [
+      { id: 'preferences', title: 'Đăng ký ca mong muốn', description: 'Preference trước khi xếp ca' },
+    ],
+  },
+  {
+    id: 'policies',
+    label: 'Chính sách nhân sự',
+    description: 'Quy định quyền lợi và quy trình áp dụng',
+    statusLabel: 'Đang theo dõi 1 mục cần chuẩn hóa',
+    actionLabel: 'Cập nhật quy trình duyệt',
+    primaryCards: [
+      { id: 'leave-types', title: 'Loại nghỉ phép', description: 'Danh mục loại nghỉ và quota áp dụng' },
+      { id: 'levels', title: 'Cấp bậc & khung áp dụng', description: 'Khung cấp bậc và điều kiện áp dụng' },
+      { id: 'workflows', title: 'Quy trình duyệt', description: 'Luồng duyệt cho các yêu cầu nhân sự' },
+    ],
+    secondaryBlocks: [],
+  },
+  {
+    id: 'system_access',
+    label: 'Hệ thống & phân quyền',
+    description: 'Thiết lập nhạy cảm và quyền truy cập',
+    statusLabel: '3 nhóm cấu hình đang hoạt động',
+    actionLabel: 'Rà soát phân quyền',
+    primaryCards: [
+      { id: 'permissions', title: 'Phân quyền vai trò', description: 'Vai trò và phạm vi truy cập' },
+      { id: 'system-settings', title: 'Thiết lập hệ thống', description: 'Ngôn ngữ, theme và cấu hình vận hành' },
+      { id: 'device-security', title: 'Tích hợp / thiết bị / bảo mật', description: 'WiFi, thiết bị và cấu hình bảo mật' },
+    ],
+    secondaryBlocks: [],
+  },
 ];
 
 export const settingItems: SettingItem[] = [
-  // === TỔ CHỨC ===
   {
-    id: 'org-info', category: 'organization', icon: '🏪', iconBg: 'bg-primary-100',
-    title: 'Thông tin doanh nghiệp', description: 'Tên, logo, múi giờ, tiền tệ',
-    href: '/settings/organization', status: 'completed', statusText: 'Homies Milk Tea',
+    id: 'brand-profile', category: 'organization', icon: 'STORE', iconBg: 'bg-primary-100',
+    title: 'Thương hiệu & pháp nhân', description: 'Tên thương hiệu, múi giờ, tiền tệ, thông tin doanh nghiệp',
+    href: '/settings#co-cau-cua-hang', status: 'completed', statusText: 'Homies Milk Tea',
     isRequired: true, setupOrder: 1,
   },
   {
-    id: 'branches', category: 'organization', icon: '🏬', iconBg: 'bg-primary-100',
-    title: 'Chi nhánh & Cửa hàng', description: 'Quản lý các địa điểm kinh doanh',
-    href: '/settings/branches', status: 'completed', statusText: '2 chi nhánh',
+    id: 'store-network', category: 'organization', icon: 'MAP', iconBg: 'bg-primary-100',
+    title: 'Cửa hàng & điểm làm việc', description: 'Danh sách cửa hàng, địa chỉ, bán kính check-in',
+    href: '/settings#co-cau-cua-hang', status: 'completed', statusText: '3 cửa hàng',
     isRequired: true, setupOrder: 2,
   },
   {
-    id: 'master-data', category: 'organization', icon: '📁', iconBg: 'bg-slate-100',
-    title: 'Dữ liệu gốc', description: 'Phòng ban, chức vụ, loại hợp đồng',
-    href: '/settings/master-data', status: 'completed', statusText: '5 phòng ban',
+    id: 'workforce-structure', category: 'hr', icon: 'ROLE', iconBg: 'bg-success-100',
+    title: 'Vị trí vận hành & ca làm', description: 'Vị trí pha chế, thu ngân, ca mở cửa, ca đóng cửa',
+    href: '/settings#nhan-su-va-ca-lam', status: 'completed', statusText: '3 ca làm việc',
     isRequired: true, setupOrder: 3,
   },
-    // === NHÂN SỰ ===
   {
-    id: 'scheduling', category: 'hr', icon: '📅', iconBg: 'bg-success-100',
-    title: 'Xếp ca & Định biên', description: 'Ca làm việc, quy tắc xếp ca',
-    href: '/settings/schedule-rules/shifts', status: 'completed', statusText: '3 ca làm việc',
+    id: 'scheduling', category: 'hr', icon: 'SCHED', iconBg: 'bg-success-100',
+    title: 'Quy tắc xếp ca', description: 'Chu kỳ xếp ca, quy tắc đăng ký, ràng buộc lịch làm việc',
+    href: '/settings/schedule-rules', status: 'completed', statusText: 'Đã cấu hình',
     isRequired: true, setupOrder: 4,
   },
-    {
-    id: 'preferences', category: 'hr', icon: '❤️', iconBg: 'bg-pink-100',
-    title: 'Đăng ký ca mong muốn', description: 'Cấu hình preference cho nhân viên',
-    href: '/settings/schedule-rules/preferences', status: 'completed', statusText: 'Ưu tiên ca đăng ký',
-    isRequired: false, setupOrder: 4.5,
+  {
+    id: 'preferences', category: 'hr', icon: 'PREF', iconBg: 'bg-pink-100',
+    title: 'Đăng ký ca mong muốn', description: 'Cấu hình preference và tổng quan đăng ký ca của nhân sự',
+    href: '/settings/schedule-rules/preferences', status: 'completed', statusText: 'Ưu tiên theo ca',
+    isRequired: false, setupOrder: 5,
     subItems: [
       { title: 'Cài đặt preference', href: '/settings/schedule-rules/preferences' },
       { title: 'Tổng quan đăng ký', href: '/settings/schedule-rules/preferences/overview' },
     ],
   },
   {
-    id: 'staffing', category: 'hr', icon: '📊', iconBg: 'bg-success-100',
-    title: 'Định biên nhân sự', description: 'Tính toán số lượng nhân viên tối ưu',
+    id: 'staffing', category: 'hr', icon: 'PLAN', iconBg: 'bg-success-100',
+    title: 'Định biên nhân sự', description: 'Nhu cầu nhân sự theo lưu lượng, giờ cao điểm và năng suất',
     href: '/settings/staffing', status: 'completed', statusText: 'Đã cấu hình',
-    isRequired: false, setupOrder: 5,
+    isRequired: false, setupOrder: 6,
   },
   {
-    id: 'leave', category: 'hr', icon: '🏖️', iconBg: 'bg-teal-100',
-    title: 'Nghỉ phép & Phúc lợi', description: 'Loại phép, quota, quy định',
+    id: 'leave', category: 'finance', icon: 'LEAVE', iconBg: 'bg-teal-100',
+    title: 'Nghỉ phép & quy định nghỉ', description: 'Loại phép, quota, quy định áp dụng cho nhân sự cửa hàng',
     href: '/leave', status: 'completed', statusText: '12 ngày/năm',
-    isRequired: true, setupOrder: 6,
-  },
-  {
-    id: 'career-path', category: 'hr', icon: '🚀', iconBg: 'bg-primary-100',
-    title: 'Lộ trình thăng tiến', description: 'Cấp bậc, kỹ năng, điều kiện thăng tiến',
-    href: '/career-path/settings', status: 'not_started', statusText: 'Chưa thiết lập',
     isRequired: true, setupOrder: 7,
   },
   {
-    id: 'kpi', category: 'hr', icon: '🎯', iconBg: 'bg-indigo-100',
-    title: 'Đánh giá KPI', description: 'Tiêu chí, thang điểm, chu kỳ đánh giá',
-    href: '/kpi/settings', status: 'completed', statusText: '3 tiêu chí',
+    id: 'career-path', category: 'finance', icon: 'LEVEL', iconBg: 'bg-primary-100',
+    title: 'Lộ trình phát triển', description: 'Cấp bậc, kỹ năng, điều kiện thăng tiến và thử việc',
+    href: '/career-path/settings', status: 'not_started', statusText: 'Chưa thiết lập',
     isRequired: true, setupOrder: 8,
   },
-  // === TÀI CHÍNH ===
   {
-    id: 'payroll', category: 'finance', icon: '💵', iconBg: 'bg-warning-100',
-    title: 'Bảng lương & Phụ cấp', description: 'Ngày trả lương, năm tài chính',
-    href: '/settings/payroll', status: 'completed', statusText: 'Ngày 5 hàng tháng',
+    id: 'kpi', category: 'finance', icon: 'KPI', iconBg: 'bg-indigo-100',
+    title: 'Đánh giá KPI', description: 'Tiêu chí, thang điểm, chu kỳ đánh giá cho đội cửa hàng',
+    href: '/kpi/settings', status: 'completed', statusText: '3 tiêu chí',
     isRequired: true, setupOrder: 9,
   },
   {
-    id: 'labor-cost', category: 'finance', icon: '🧾', iconBg: 'bg-warning-100',
-    title: 'Chi phí lao động', description: 'Cài đặt lương, phụ cấp, OT',
-    href: '/settings/labor-cost', status: 'not_started', statusText: 'Chưa thiết lập',
-    isRequired: false, setupOrder: 10,
+    id: 'payroll', category: 'finance', icon: 'PAY', iconBg: 'bg-warning-100',
+    title: 'Cấu hình lương', description: 'Kỳ lương, phụ cấp, chế độ trả lương và dữ liệu tính công',
+    href: '/settings/payroll', status: 'completed', statusText: 'Ngày 5 hàng tháng',
+    isRequired: true, setupOrder: 10,
   },
-  // === HỆ THỐNG ===
   {
-    id: 'wifi', category: 'system', icon: '📶', iconBg: 'bg-cyan-100',
-    title: 'WiFi Check-in', description: 'Cài đặt WiFi cho chấm công',
-    href: '/settings/wifi', status: 'completed', statusText: '2 WiFi đã cài',
+    id: 'labor-cost', category: 'finance', icon: 'COST', iconBg: 'bg-warning-100',
+    title: 'Labor cost', description: 'Theo dõi chi phí lao động theo cửa hàng và ca làm',
+    href: '/settings/labor-cost', status: 'not_started', statusText: 'Chưa thiết lập',
     isRequired: false, setupOrder: 11,
   },
   {
-    id: 'system', category: 'system', icon: '⚙️', iconBg: 'bg-gray-100',
-    title: 'Cài đặt hệ thống', description: 'Ngôn ngữ, theme, thông tin chung',
-    href: '/settings/system', status: 'completed', statusText: 'Tiếng Việt',
+    id: 'wifi', category: 'system', icon: 'WIFI', iconBg: 'bg-cyan-100',
+    title: 'WiFi check-in', description: 'Thiết bị và WiFi dùng cho chấm công tại cửa hàng',
+    href: '/settings/wifi', status: 'completed', statusText: '2 WiFi đã cài',
     isRequired: false, setupOrder: 12,
   },
   {
-    id: 'notifications', category: 'system', icon: '🔔', iconBg: 'bg-pink-100',
-    title: 'Thông báo', description: 'Push, Email, Zalo',
-    href: '/settings/notifications', status: 'completed', statusText: 'Push + Email',
-    isRequired: false, setupOrder: 13,
-    quickActions: [
-      { label: 'Push', action: 'toggle', value: true },
-      { label: 'Email', action: 'toggle', value: true },
-      { label: 'Zalo', action: 'toggle', value: false },
-    ],
-  },
-  {
-    id: 'permissions', category: 'system', icon: '🔐', iconBg: 'bg-error-100',
-    title: 'Phân quyền & Bảo mật', description: 'Vai trò, quyền truy cập',
+    id: 'permissions', category: 'system', icon: 'LOCK', iconBg: 'bg-error-100',
+    title: 'Phân quyền', description: 'Vai trò, quyền truy cập và phạm vi quản lý',
     href: '/settings/permissions', status: 'completed', statusText: '3 vai trò',
+    isRequired: false, setupOrder: 13,
+  },
+  {
+    id: 'system', category: 'system', icon: 'GEAR', iconBg: 'bg-gray-100',
+    title: 'Hệ thống', description: 'Ngôn ngữ, theme và cấu hình vận hành chung',
+    href: '/settings/system', status: 'completed', statusText: 'Tiếng Việt',
     isRequired: false, setupOrder: 14,
-  },
-  {
-    id: 'rbac-demo', category: 'system', icon: '🛡️', iconBg: 'bg-indigo-100',
-    title: 'Demo Phân Quyền (RBAC)', description: 'Giả lập và so sánh quyền các vai trò',
-    href: '/rbac', status: 'completed', statusText: 'Chế độ Demo',
-    isRequired: false, setupOrder: 14.5,
-  },
-  {
-    id: 'offline-demo', category: 'system', icon: '📶', iconBg: 'bg-warning-100',
-    title: 'Demo Chế độ Ngoại tuyến', description: 'Trải nghiệm Offline-first & Sync dữ liệu',
-    href: '/offline-demo', status: 'completed', statusText: 'Chế độ Demo',
-    isRequired: false, setupOrder: 14.7,
-  },
-  {
-    id: 'backup', category: 'system', icon: '📤', iconBg: 'bg-gray-100',
-    title: 'Sao lưu & Xuất dữ liệu', description: 'Export, import, backup',
-    href: '/settings/backup', status: 'completed', statusText: 'Lần cuối: Hôm nay',
-    isRequired: false, setupOrder: 15,
   },
 ];
 
 export function getSettingsByCategory(category: SettingCategoryId): SettingItem[] {
-  return settingItems.filter(item => item.category === category);
+  return settingItems.filter((item) => item.category === category);
+}
+
+export function getSettingsWorkspaceTab(id: SettingsWorkspaceTabId): SettingsWorkspaceTab {
+  const tab = settingsWorkspaceTabs.find((item) => item.id === id);
+  if (!tab) throw new Error(`Unknown settings workspace tab: ${id}`);
+  return tab;
 }
 
 export function getSetupProgress(): SetupProgress {
-  const required = settingItems.filter(item => item.isRequired);
-  const completed = required.filter(item => item.status === 'completed');
+  const required = settingItems.filter((item) => item.isRequired);
+  const completed = required.filter((item) => item.status === 'completed');
   const percentage = Math.round((completed.length / required.length) * 100);
   const nextStep = required
-    .filter(item => item.status !== 'completed')
+    .filter((item) => item.status !== 'completed')
     .sort((a, b) => a.setupOrder - b.setupOrder)[0] || null;
   return { completed: completed.length, total: required.length, percentage, nextStep };
 }
 
 export function searchSettings(query: string): SettingItem[] {
   const q = query.toLowerCase();
-  return settingItems.filter(item =>
+  return settingItems.filter((item) =>
     item.title.toLowerCase().includes(q) ||
     item.description.toLowerCase().includes(q)
   );
+}
+
+export function searchWorkspaceSettings(query: string): SettingItem[] {
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+
+  const workspaceItems: SettingItem[] = settingsWorkspaceTabs.flatMap((tab) => {
+    const cards = [...tab.primaryCards, ...tab.secondaryBlocks];
+
+    return cards.map((card, index) => ({
+      id: `workspace-${tab.id}-${card.id}`,
+      category: tab.id === 'stores' ? 'organization' : tab.id === 'workforce' ? 'hr' : tab.id === 'policies' ? 'finance' : 'system',
+      icon: tab.id === 'stores' ? 'STORE' : tab.id === 'workforce' ? 'HR' : tab.id === 'policies' ? 'POLICY' : 'SYS',
+      iconBg: tab.id === 'stores' ? 'bg-primary-100' : tab.id === 'workforce' ? 'bg-success-100' : tab.id === 'policies' ? 'bg-warning-100' : 'bg-gray-100',
+      title: card.title,
+      description: `${tab.label}: ${card.description}`,
+      href: '/settings',
+      status: 'completed',
+      statusText: tab.label,
+      isRequired: false,
+      setupOrder: 100 + index,
+    }));
+  });
+
+  const deduped = new Map<string, SettingItem>();
+  [...settingItems, ...workspaceItems].forEach((item) => {
+    const haystack = `${item.title} ${item.description}`.toLowerCase();
+    if (haystack.includes(q) && !deduped.has(item.title)) {
+      deduped.set(item.title, item);
+    }
+  });
+
+  return [...deduped.values()];
 }

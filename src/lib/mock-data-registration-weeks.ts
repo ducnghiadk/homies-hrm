@@ -4,12 +4,14 @@
 
 import { mockShifts, mockEmployees, mockSchedules, initSchedules, saveSchedulesToStorage } from './mock-data'
 import { getAllPreferencesForWeek, getShiftPreferenceAvailability, type ShiftPreference } from './mock-data-preferences'
+import { SettingsService } from './services/settings-service'
 
 export interface RegistrationWeek {
   id: string
   org_id: string
   store_id: string
   week_start_date: string // Monday's date in yyyy-MM-dd format
+  week_end_date?: string // Sunday date in yyyy-MM-dd format
   status: 'closed' | 'open' | 'reviewing' | 'published'
   registration_open_date: string // yyyy-MM-dd
   registration_deadline: string // yyyy-MM-ddTHH:mm
@@ -24,6 +26,7 @@ export interface ShiftQuota {
   registration_week_id: string
   shift_id: string
   date: string // yyyy-MM-dd
+  position_id?: string
   min_staff: number
   max_staff: number
   notes?: string
@@ -41,15 +44,25 @@ export function formatDateString(d: Date): string {
   return d.toISOString().split('T')[0]
 }
 
+export function getWeekDateRange(weekStartDate: string): { week_start_date: string; week_end_date: string } {
+  const monday = new Date(`${weekStartDate}T00:00:00`)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+
+  return {
+    week_start_date: formatDateString(monday),
+    week_end_date: formatDateString(sunday),
+  }
+}
+
 // ─── In-memory Storage with LocalStorage persistence helper ───
 let registrationWeeks: RegistrationWeek[] = []
 let shiftQuotas: ShiftQuota[] = []
 let initialized = false
 
 function initData() {
-  if (initialized) return
-  
-  // Check client-side storage
+  // Always try to load from localStorage first - this ensures
+  // newly created registration weeks are visible to other modules
   if (typeof window !== 'undefined') {
     const savedWeeks = localStorage.getItem('homies_registration_weeks')
     const savedQuotas = localStorage.getItem('homies_shift_quotas')
@@ -57,10 +70,19 @@ function initData() {
       registrationWeeks = JSON.parse(savedWeeks)
       shiftQuotas = JSON.parse(savedQuotas)
       initialized = true
+      // Expose for cross-module access (e.g. savePreferences)
+      if (typeof window !== 'undefined') {
+        ;(window as any).__registrationWeeks__ = registrationWeeks
+        ;(window as any).__shiftQuotas__ = shiftQuotas
+        ;(window as any).__initPrefs__ = initData
+      }
       return
     }
   }
 
+  // Only seed if nothing in localStorage AND not yet initialized
+  if (initialized) return
+  
   // Seed default data if not in localStorage
   const today = new Date()
   const thisMonday = getMondayOfDate(today)
@@ -82,6 +104,7 @@ function initData() {
     org_id: 'org-001',
     store_id: 'store-001',
     week_start_date: thisMondayStr,
+    week_end_date: getWeekDateRange(thisMondayStr).week_end_date,
     status: 'published',
     registration_open_date: formatDateString(open1),
     registration_deadline: formatDateString(deadline1) + 'T23:59',
@@ -103,6 +126,7 @@ function initData() {
     org_id: 'org-001',
     store_id: 'store-001',
     week_start_date: nextMondayStr,
+    week_end_date: getWeekDateRange(nextMondayStr).week_end_date,
     status: 'open',
     registration_open_date: formatDateString(open2),
     registration_deadline: formatDateString(deadline2) + 'T23:59',
@@ -139,21 +163,72 @@ function saveToStorage() {
   }
 }
 
+export function syncRegistrationWeekStatuses(now = new Date()): RegistrationWeek[] {
+  initData()
+
+  let changed = false
+  registrationWeeks = registrationWeeks.map(week => {
+    if (week.status !== 'open') return week
+
+    const deadline = new Date(week.registration_deadline)
+    if (deadline.getTime() <= now.getTime()) {
+      changed = true
+      return {
+        ...week,
+        status: 'reviewing',
+        updated_at: now.toISOString(),
+      }
+    }
+
+    return week
+  })
+
+  if (changed) {
+    saveToStorage()
+  }
+
+  return registrationWeeks
+}
+
+
 // ─── Service API Functions ───
 
 export function getRegistrationWeeks(storeId: string): RegistrationWeek[] {
-  initData()
+  syncRegistrationWeekStatuses()
   return registrationWeeks.filter(w => w.store_id === storeId)
 }
 
 export function getRegistrationWeekById(id: string): RegistrationWeek | undefined {
-  initData()
+  syncRegistrationWeekStatuses()
   return registrationWeeks.find(w => w.id === id)
 }
 
 export function getRegistrationWeekByWeek(storeId: string, weekStartDate: string): RegistrationWeek | undefined {
-  initData()
+  syncRegistrationWeekStatuses()
   return registrationWeeks.find(w => w.store_id === storeId && w.week_start_date === weekStartDate)
+}
+
+export function assertRegistrationWeekOpen(storeId: string, weekStartDate: string, now = new Date()): RegistrationWeek {
+  const week = getRegistrationWeekByWeek(storeId, weekStartDate)
+  if (!week) {
+    throw new Error('Registration week not found.')
+  }
+
+  if (week.status !== 'open') {
+    throw new Error(`Registration week is not open. Current status: ${week.status}`)
+  }
+
+  if (new Date(week.registration_deadline).getTime() < now.getTime()) {
+    throw new Error('Registration deadline has passed.')
+  }
+
+  return week
+}
+
+// Expose registration weeks array for cross-module access (e.g. savePreferences deadline check)
+export function getRegistrationWeeksArray(): RegistrationWeek[] {
+  syncRegistrationWeekStatuses()
+  return registrationWeeks
 }
 
 export function createOrUpdateRegistrationWeek(
@@ -161,6 +236,9 @@ export function createOrUpdateRegistrationWeek(
 ): RegistrationWeek {
   initData()
   const now = new Date().toISOString()
+  const existingIndexByWeek = registrationWeeks.findIndex(
+    w => w.store_id === data.store_id && w.week_start_date === data.week_start_date
+  )
   
   if (data.id) {
     const idx = registrationWeeks.findIndex(w => w.id === data.id)
@@ -175,12 +253,24 @@ export function createOrUpdateRegistrationWeek(
     }
   }
 
+  if (existingIndexByWeek !== -1) {
+    registrationWeeks[existingIndexByWeek] = {
+      ...registrationWeeks[existingIndexByWeek],
+      ...data,
+      week_end_date: data.week_end_date || getWeekDateRange(data.week_start_date).week_end_date,
+      updated_at: now,
+    } as RegistrationWeek
+    saveToStorage()
+    return registrationWeeks[existingIndexByWeek]
+  }
+
   // Create new
   const newWeek: RegistrationWeek = {
     id: data.id || `reg-week-${Date.now()}`,
     org_id: data.org_id || 'org-001',
     store_id: data.store_id,
     week_start_date: data.week_start_date,
+    week_end_date: data.week_end_date || getWeekDateRange(data.week_start_date).week_end_date,
     status: data.status || 'closed',
     registration_open_date: data.registration_open_date,
     registration_deadline: data.registration_deadline,
@@ -209,6 +299,12 @@ export function createOrUpdateRegistrationWeek(
   })
 
   saveToStorage()
+  // Expose to window for cross-module access
+  if (typeof window !== 'undefined') {
+    ;(window as any).__registrationWeeks__ = registrationWeeks
+    ;(window as any).__shiftQuotas__ = shiftQuotas
+    ;(window as any).__initPrefs__ = initData
+  }
   return newWeek
 }
 
@@ -256,6 +352,19 @@ export function updateRegistrationStatus(
   return registrationWeeks[idx]
 }
 
+export function updateRegistrationStatusByWeekStart(
+  storeId: string,
+  weekStartDate: string,
+  status: RegistrationWeek['status']
+): RegistrationWeek {
+  const week = getRegistrationWeekByWeek(storeId, weekStartDate)
+  if (!week) {
+    throw new Error('Registration week not found')
+  }
+
+  return updateRegistrationStatus(week.id, status)
+}
+
 // ─── Auto Assign Matching Algorithm ───
 export function autoAssignFromPreferences(weekId: string): { 
   success: boolean
@@ -275,7 +384,7 @@ export function autoAssignFromPreferences(weekId: string): {
     return {
       success: false,
       assignmentsCount: 0,
-      message: 'Tuan ' + week.week_start_date + ' da duoc xuat ban. Khong the auto-assign. Vui long gan thu cong.'
+      message: `Tuan ${week.week_start_date} da duoc xuat ban. Khong the auto-assign. Vui long gan thu cong.`
     }
   }
 
@@ -291,6 +400,7 @@ export function autoAssignFromPreferences(weekId: string): {
   allPrefs.forEach(p => {
     prefMap.set(`${p.user_id}_${p.date}`, p)
   })
+  const autoAssignSettings = SettingsService.getAutoAssign()
 
   // Clear existing schedules for this store and week to prevent duplicates
   // In real life this would delete draft schedule rows. Let's simulate:
@@ -319,27 +429,24 @@ export function autoAssignFromPreferences(weekId: string): {
     dailyQuotas.forEach(quota => {
       const shiftId = quota.shift_id
 
-      // Find employees who:
-      // 1. Belong to this store
-      // 2. Are available on this date for this shift
-      // 3. Haven't been assigned to another shift on this day yet
-      const availableEmployees = storeEmployees.filter(emp => {
+      const eligibleEmployees = storeEmployees.filter(emp => {
         const key = `${emp.id}_${date}`
         const pref = prefMap.get(key)
-        if (!pref) return false
-        
-        // Check if employee is available for this shift type
-        const isAvail = getShiftPreferenceAvailability(pref, shiftId)
-        
-        // Verify not already scheduled on this day
+
         const alreadyScheduled = mockSchedules.some(s => s.employee_id === emp.id && s.date === date)
-        
-        return isAvail && !alreadyScheduled
+        if (alreadyScheduled) return false
+
+        const assignedThisWeek = mockSchedules.filter(s => s.employee_id === emp.id && weekDates.includes(s.date)).length
+        if (assignedThisWeek >= autoAssignSettings.max_shifts_per_employee_per_week) return false
+
+        if (!pref) return autoAssignSettings.fallback_to_available
+
+        return getShiftPreferenceAvailability(pref, shiftId)
       })
 
       // Assign up to max_staff
       const targetCount = quota.max_staff
-      const toAssign = availableEmployees.slice(0, targetCount)
+      const toAssign = eligibleEmployees.slice(0, targetCount)
 
       toAssign.forEach(emp => {
         mockSchedules.push({
@@ -364,3 +471,4 @@ export function autoAssignFromPreferences(weekId: string): {
     message: `Đã tự động sắp xếp thành công ${assignedCount} ca làm việc dựa trên đăng ký nguyện vọng của nhân viên.`
   }
 }
+
