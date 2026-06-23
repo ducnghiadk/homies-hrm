@@ -73,6 +73,15 @@ export function getEmployeeShiftRegistrationsForWeek(employeeId: string, weekSta
     .sort((left, right) => left.date.localeCompare(right.date))
 }
 
+export function getSubmittedShiftRegistrationsForWeek(storeId: string, weekStartDate: string): ShiftRegistration[] {
+  initShiftRegistrations()
+  return registrations
+    .filter(
+      (row) => row.store_id === storeId && row.week_start_date === weekStartDate && row.status === 'submitted'
+    )
+    .sort((left, right) => left.date.localeCompare(right.date))
+}
+
 export function saveShiftRegistrations(
   employeeId: string,
   storeId: string,
