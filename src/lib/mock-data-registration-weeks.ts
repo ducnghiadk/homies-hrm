@@ -236,6 +236,9 @@ export function createOrUpdateRegistrationWeek(
 ): RegistrationWeek {
   initData()
   const now = new Date().toISOString()
+  const existingIndexByWeek = registrationWeeks.findIndex(
+    w => w.store_id === data.store_id && w.week_start_date === data.week_start_date
+  )
   
   if (data.id) {
     const idx = registrationWeeks.findIndex(w => w.id === data.id)
@@ -248,6 +251,17 @@ export function createOrUpdateRegistrationWeek(
       saveToStorage()
       return registrationWeeks[idx]
     }
+  }
+
+  if (existingIndexByWeek !== -1) {
+    registrationWeeks[existingIndexByWeek] = {
+      ...registrationWeeks[existingIndexByWeek],
+      ...data,
+      week_end_date: data.week_end_date || getWeekDateRange(data.week_start_date).week_end_date,
+      updated_at: now,
+    } as RegistrationWeek
+    saveToStorage()
+    return registrationWeeks[existingIndexByWeek]
   }
 
   // Create new
@@ -336,6 +350,19 @@ export function updateRegistrationStatus(
   
   saveToStorage()
   return registrationWeeks[idx]
+}
+
+export function updateRegistrationStatusByWeekStart(
+  storeId: string,
+  weekStartDate: string,
+  status: RegistrationWeek['status']
+): RegistrationWeek {
+  const week = getRegistrationWeekByWeek(storeId, weekStartDate)
+  if (!week) {
+    throw new Error('Registration week not found')
+  }
+
+  return updateRegistrationStatus(week.id, status)
 }
 
 // ─── Auto Assign Matching Algorithm ───

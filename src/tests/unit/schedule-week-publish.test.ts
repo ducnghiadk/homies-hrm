@@ -5,6 +5,9 @@ import {
   bulkApproveRegistrationsToDraft,
   clearScheduleWeekStore,
   getDraftAssignmentsForWeek,
+  getPublishedAssignmentsForEmployee,
+  publishScheduleWeek,
+  updatePublishedAssignment,
 } from '@/lib/mock-data-schedule-weeks'
 
 describe('bulkApproveRegistrationsToDraft', () => {
@@ -44,5 +47,65 @@ describe('bulkApproveRegistrationsToDraft', () => {
       employee_id: 'emp-005',
       shift_id: 'shift-001',
     })
+  })
+
+  it('publishes draft assignments and marks them employee-visible', () => {
+    createOrUpdateRegistrationWeek({
+      org_id: 'org-001',
+      store_id: 'store-001',
+      week_start_date: '2026-06-29',
+      status: 'open',
+      registration_open_date: '2026-06-23',
+      registration_deadline: '2026-06-27T23:59',
+      created_by: 'emp-002',
+    })
+
+    saveShiftRegistrations(
+      'emp-005',
+      'store-001',
+      '2026-06-29',
+      [{ date: '2026-06-29', shift_id: 'shift-001' }],
+      'submitted'
+    )
+    bulkApproveRegistrationsToDraft('store-001', '2026-06-29', 'emp-002')
+
+    const published = publishScheduleWeek('store-001', '2026-06-29', 'emp-002')
+
+    expect(published.status).toBe('published')
+    expect(getPublishedAssignmentsForEmployee('emp-005', '2026-06-29')[0]).toMatchObject({
+      status: 'published',
+      shift_id: 'shift-001',
+    })
+  })
+
+  it('requires change reason after publish', () => {
+    createOrUpdateRegistrationWeek({
+      org_id: 'org-001',
+      store_id: 'store-001',
+      week_start_date: '2026-06-29',
+      status: 'open',
+      registration_open_date: '2026-06-23',
+      registration_deadline: '2026-06-27T23:59',
+      created_by: 'emp-002',
+    })
+
+    saveShiftRegistrations(
+      'emp-005',
+      'store-001',
+      '2026-06-29',
+      [{ date: '2026-06-29', shift_id: 'shift-001' }],
+      'submitted'
+    )
+    bulkApproveRegistrationsToDraft('store-001', '2026-06-29', 'emp-002')
+    publishScheduleWeek('store-001', '2026-06-29', 'emp-002')
+
+    const assignment = getPublishedAssignmentsForEmployee('emp-005', '2026-06-29')[0]
+
+    expect(() => updatePublishedAssignment({
+      assignmentId: assignment.id,
+      nextShiftId: 'shift-002',
+      actorId: 'emp-002',
+      changeReason: '',
+    })).toThrow('Change reason is required after publish.')
   })
 })

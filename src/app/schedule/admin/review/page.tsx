@@ -11,12 +11,12 @@ import {
   formatDateString,
   getRegistrationWeeks,
   getShiftQuotas,
-  updateRegistrationStatus,
 } from '@/lib/mock-data-registration-weeks'
 import { getSubmittedShiftRegistrationsForWeek } from '@/lib/mock-data-shift-registrations'
 import {
   bulkApproveRegistrationsToDraft,
   getDraftAssignmentsForWeek,
+  publishScheduleWeek,
   removeDraftAssignment,
   upsertDraftAssignment,
 } from '@/lib/mock-data-schedule-weeks'
@@ -179,18 +179,18 @@ function AdminReviewContent() {
       return
     }
 
-    updateRegistrationStatus(activeWeek.id, 'published')
+    const published = publishScheduleWeek(activeWeek.store_id, activeWeek.week_start_date, user.id)
     notifySchedulePublished({
       userIds: storeEmployees.map((employee) => employee.id),
-      weekStart: weekDates[0] || activeWeek.week_start_date,
-      weekEnd: weekDates[6] || activeWeek.week_start_date,
+      weekStart: published.week_start,
+      weekEnd: published.week_end,
       storeId: activeWeek.store_id,
       storeName: getStoreById(activeWeek.store_id)?.name || 'cua hang cua ban',
       publishedByName: user.full_name,
     })
     setRefreshTrigger((value) => value + 1)
-    toast.success('Da danh dau dot lich la published', {
-      description: 'Task publish assignment se duoc hoan thien o buoc ke tiep.',
+    toast.success('Da publish lich lam viec tuan', {
+      description: 'Nhan vien nay da co the xem lich chinh thuc trong man Lich cua toi.',
     })
   }
 

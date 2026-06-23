@@ -1,4 +1,4 @@
-import { getRegistrationWeekByWeek, getWeekDateRange } from './mock-data-registration-weeks'
+import { getRegistrationWeekByWeek, getWeekDateRange, updateRegistrationStatusByWeekStart } from './mock-data-registration-weeks'
 import { getSubmittedShiftRegistrationsForWeek } from './mock-data-shift-registrations'
 
 export interface ScheduleWeek {
@@ -32,20 +32,35 @@ export interface ScheduleAssignment {
   updated_at: string
 }
 
+export interface ScheduleChangeLog {
+  id: string
+  assignment_id: string
+  action: 'create' | 'update' | 'cancel' | 'delete'
+  before_state: ScheduleAssignment | null
+  after_state: ScheduleAssignment | null
+  changed_by: string
+  changed_at: string
+  reason: string
+}
+
 const WEEKS_KEY = 'homies_schedule_weeks'
 const ASSIGNMENTS_KEY = 'homies_schedule_assignments'
+const CHANGE_LOGS_KEY = 'homies_schedule_change_logs'
 
 let scheduleWeeks: ScheduleWeek[] = []
 let assignments: ScheduleAssignment[] = []
+let changeLogs: ScheduleChangeLog[] = []
 let initialized = false
 
 function initScheduleWeekStore() {
   if (typeof window !== 'undefined') {
     const savedWeeks = localStorage.getItem(WEEKS_KEY)
     const savedAssignments = localStorage.getItem(ASSIGNMENTS_KEY)
+    const savedChangeLogs = localStorage.getItem(CHANGE_LOGS_KEY)
     if (savedWeeks && savedAssignments) {
       scheduleWeeks = JSON.parse(savedWeeks)
       assignments = JSON.parse(savedAssignments)
+      changeLogs = savedChangeLogs ? JSON.parse(savedChangeLogs) : []
       initialized = true
       return
     }
@@ -57,6 +72,7 @@ function initScheduleWeekStore() {
 
   scheduleWeeks = []
   assignments = []
+  changeLogs = []
   initialized = true
 }
 
@@ -64,6 +80,7 @@ function persistScheduleWeeks() {
   if (typeof window !== 'undefined') {
     localStorage.setItem(WEEKS_KEY, JSON.stringify(scheduleWeeks))
     localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignments))
+    localStorage.setItem(CHANGE_LOGS_KEY, JSON.stringify(changeLogs))
   }
 }
 
@@ -74,11 +91,13 @@ function buildAssignmentId(employeeId: string, date: string) {
 export function clearScheduleWeekStore() {
   scheduleWeeks = []
   assignments = []
+  changeLogs = []
   initialized = false
 
   if (typeof window !== 'undefined') {
     localStorage.removeItem(WEEKS_KEY)
     localStorage.removeItem(ASSIGNMENTS_KEY)
+    localStorage.removeItem(CHANGE_LOGS_KEY)
   }
 }
 
@@ -199,4 +218,91 @@ export function bulkApproveRegistrationsToDraft(storeId: string, weekStart: stri
     created: created.length,
     scheduleWeek,
   }
+}
+
+export function publishScheduleWeek(storeId: string, weekStart: string, actorId: string): ScheduleWeek {
+  initScheduleWeekStore()
+  const scheduleWeek = ensureDraftScheduleWeek(storeId, weekStart, actorId)
+  const now = new Date().toISOString()
+
+  scheduleWeeks = scheduleWeeks.map((row) =>
+    row.id === scheduleWeek.id
+      ? {
+          ...row,
+          status: 'published',
+          published_at: now,
+          published_by: actorId,
+          updated_at: now,
+        }
+      : row
+  )
+
+  assignments = assignments.map((row) =>
+    row.schedule_week_id === scheduleWeek.id && row.status === 'draft'
+      ? { ...row, status: 'published', updated_at: now, updated_by: actorId }
+      : row
+  )
+
+  updateRegistrationStatusByWeekStart(storeId, weekStart, 'published')
+  persistScheduleWeeks()
+
+  return scheduleWeeks.find((row) => row.id === scheduleWeek.id)!
+}
+
+export function getPublishedAssignmentsForEmployee(employeeId: string, weekStart: string): ScheduleAssignment[] {
+  initScheduleWeekStore()
+  return assignments
+    .filter(
+      (row) => row.employee_id === employeeId && row.status === 'published' && row.date >= weekStart && row.date <= getWeekDateRange(weekStart).week_end_date
+    )
+    .sort((left, right) => left.date.localeCompare(right.date))
+}
+
+export function updatePublishedAssignment(input: {
+  assignmentId: string
+  nextShiftId: string | null
+  actorId: string
+  changeReason: string
+}) {
+  initScheduleWeekStore()
+
+  if (!input.changeReason.trim()) {
+    throw new Error('Change reason is required after publish.')
+  }
+
+  const assignmentIndex = assignments.findIndex((row) => row.id === input.assignmentId)
+  if (assignmentIndex < 0) {
+    throw new Error('Published assignment not found.')
+  }
+
+  const current = assignments[assignmentIndex]
+  if (current.status !== 'published') {
+    throw new Error('Only published assignments can be updated here.')
+  }
+
+  const now = new Date().toISOString()
+  const nextAssignment: ScheduleAssignment = {
+    ...current,
+    shift_id: input.nextShiftId || current.shift_id,
+    status: input.nextShiftId ? 'published' : 'cancelled',
+    modified_after_publish: true,
+    change_reason: input.changeReason,
+    updated_by: input.actorId,
+    updated_at: now,
+  }
+
+  assignments[assignmentIndex] = nextAssignment
+  changeLogs.push({
+    id: `schedule-change-${current.id}-${changeLogs.length + 1}`,
+    assignment_id: current.id,
+    action: input.nextShiftId ? 'update' : 'cancel',
+    before_state: current,
+    after_state: nextAssignment,
+    changed_by: input.actorId,
+    changed_at: now,
+    reason: input.changeReason,
+  })
+  persistScheduleWeeks()
+
+  return nextAssignment
 }
