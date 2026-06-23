@@ -306,3 +306,20 @@ export function updatePublishedAssignment(input: {
 
   return nextAssignment
 }
+
+export function getReviewSummary(storeId: string, weekStart: string) {
+  const registrations = getSubmittedShiftRegistrationsForWeek(storeId, weekStart)
+  const draftAssignments = getDraftAssignmentsForWeek(storeId, weekStart)
+  const assignmentKey = new Set(
+    draftAssignments.map((row) => `${row.employee_id}:${row.date}:${row.shift_id}`)
+  )
+
+  return {
+    totalRegistrations: registrations.length,
+    draftAssignments: draftAssignments.length,
+    skippedRegistrations: registrations.filter(
+      (row) => !assignmentKey.has(`${row.employee_id}:${row.date}:${row.shift_id}`)
+    ).length,
+    unassignedEmployees: 0,
+  }
+}

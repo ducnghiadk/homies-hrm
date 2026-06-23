@@ -16,6 +16,7 @@ import { getSubmittedShiftRegistrationsForWeek } from '@/lib/mock-data-shift-reg
 import {
   bulkApproveRegistrationsToDraft,
   getDraftAssignmentsForWeek,
+  getReviewSummary,
   publishScheduleWeek,
   removeDraftAssignment,
   upsertDraftAssignment,
@@ -91,6 +92,10 @@ function AdminReviewContent() {
   )
   const draftAssignments = useMemo(
     () => (activeWeek ? getDraftAssignmentsForWeek(activeWeek.store_id, activeWeek.week_start_date) : []),
+    [activeWeek, refreshTrigger]
+  )
+  const reviewSummary = useMemo(
+    () => (activeWeek ? getReviewSummary(activeWeek.store_id, activeWeek.week_start_date) : null),
     [activeWeek, refreshTrigger]
   )
   const scheduleLikeAssignments = useMemo<Schedule[]>(() => {
@@ -301,6 +306,27 @@ function AdminReviewContent() {
             <p className="text-sm font-bold text-gray-700">Chua tim thay tuan can duyet</p>
           </div>
         )}
+
+        {reviewSummary ? (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[var(--shadow-card)]">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Dang ky</p>
+              <p className="mt-1 text-2xl font-extrabold text-gray-800">{reviewSummary.totalRegistrations}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[var(--shadow-card)]">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Lich nhap</p>
+              <p className="mt-1 text-2xl font-extrabold text-primary-600">{reviewSummary.draftAssignments}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[var(--shadow-card)]">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Bo qua</p>
+              <p className="mt-1 text-2xl font-extrabold text-warning-600">{reviewSummary.skippedRegistrations}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[var(--shadow-card)]">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Can xep them</p>
+              <p className="mt-1 text-2xl font-extrabold text-emerald-600">{reviewSummary.unassignedEmployees}</p>
+            </div>
+          </div>
+        ) : null}
 
         {activeWeek && weekDates.length > 0 ? (
           <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-[var(--shadow-card)]">
