@@ -12,9 +12,12 @@ import { DAY_LABELS, getWeekDates, getWeekStart, parseDateKey, plusDays, resolve
 import { ScheduleToolbar } from '@/app/schedules/_components/ScheduleToolbar'
 import { WeeklyBoardGrid } from '@/app/schedules/_components/WeeklyBoardGrid'
 import { AssignmentModal } from '@/app/schedules/_components/AssignmentModal'
+import { buildAssignmentFailureMessage, buildAssignmentHeadcountLimitLabel, buildAssignmentModalSubtitle, buildShiftDemandCapacityWarning } from '@/app/schedules/assignment-modal-copy'
+import { buildHeaderMetrics } from '@/app/schedules/dashboard-summary'
 
 type PreferenceFormState = Record<string, ShiftRegistrationPreference>
 type DemandFormState = Record<string, number>
+type DemandCapacityFormState = Record<string, number>
 type PendingPublishedChange = {
   action: 'assign' | 'remove'
   employeeId: string
@@ -65,6 +68,7 @@ function EmployeeScheduleRegistration({ query }: { query: ReturnType<typeof reso
   const weekDates = useMemo(() => getWeekDates(weekStart), [weekStart])
   const [refreshKey, setRefreshKey] = useState(0)
   const [message, setMessage] = useState<string | null>(null)
+  const [popupMessage, setPopupMessage] = useState<string | null>(null)
 
   const week = useMemo(() => {
     void refreshKey
@@ -190,6 +194,7 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [popupMessage, setPopupMessage] = useState<string | null>(null)
   const [showDemandEditor, setShowDemandEditor] = useState(false)
   const [pendingPublishedChange, setPendingPublishedChange] = useState<PendingPublishedChange | null>(null)
   const [publishedChangeReason, setPublishedChangeReason] = useState('')
@@ -229,11 +234,21 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
     return nextState
   }, [boardDemands, templates, weekDates])
 
+  const capacityForm = useMemo(() => {
+    const nextState: DemandCapacityFormState = {}
+    templates.forEach(template => {
+      nextState[template.id] = template.max_headcount ?? 0
+    })
+    return nextState
+  }, [templates])
+
   const [draftDemand, setDraftDemand] = useState<DemandFormState>({})
+  const [draftCapacity, setDraftCapacity] = useState<DemandCapacityFormState>({})
 
   useEffect(() => { setDraftDemand(demandForm) }, [demandForm])
-  useEffect(() => { setSelectedSlot(null); setRecommendationSearch('') }, [activeStoreId, activeWeekStart])
-  useEffect(() => { setRecommendationSearch('') }, [selectedSlot])
+  useEffect(() => { setDraftCapacity(capacityForm) }, [capacityForm])
+  useEffect(() => { setSelectedSlot(null); setRecommendationSearch(''); setPopupMessage(null) }, [activeStoreId, activeWeekStart])
+  useEffect(() => { setRecommendationSearch(''); setPopupMessage(null) }, [selectedSlot])
   useEffect(() => {
     if (!selectedSlot || !board) return
     if (!board.demands.some(slot => slot.id === selectedSlot)) setSelectedSlot(null)
@@ -266,18 +281,34 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
   const selectedSlotGroupFilledCount = selectedSlotGroup.reduce((sum, slot) => sum + slot.filled_count, 0)
   const selectedSlotGroupRequiredCount = selectedSlotGroup.reduce((sum, slot) => sum + slot.required_count, 0)
   const selectedSlotTitle = selectedSlotData ? `${selectedShiftTemplate?.name || selectedSlotData.shift_template_id} - ${formatShortDate(selectedSlotData.date)}` : ''
-  const selectedSlotSubtitle = selectedSlotData ? `${selectedShiftTemplate?.start_time || ''} - ${selectedShiftTemplate?.end_time || ''} - Da xep ${selectedSlotGroupFilledCount}/${selectedSlotGroupRequiredCount} nguoi` : ''
+  const selectedSlotSubtitle = selectedSlotData ? buildAssignmentModalSubtitle({
+    startTime: selectedShiftTemplate?.start_time,
+    endTime: selectedShiftTemplate?.end_time,
+    positionLabel: getDisplayPositionName(selectedSlotData.position_id),
+    filledCount: selectedSlotData.filled_count,
+    requiredCount: selectedSlotData.required_count,
+  }) : ''
   const selectedSlotFilledLabel = selectedSlotData ? formatFilledCountLabel(selectedSlotData.filled_count, selectedSlotData.required_count) : undefined
+  const selectedSlotHeadcountLimitLabel = buildAssignmentHeadcountLimitLabel(selectedShiftTemplate?.max_headcount)
+  const selectedSlotCapacityWarning = buildShiftDemandCapacityWarning(selectedSlotGroupRequiredCount, selectedShiftTemplate?.max_headcount)
+  const selectedSlotWarningMessage = popupMessage || selectedSlotCapacityWarning || null
 
   const totalDemand = board.demands.reduce((sum, slot) => sum + slot.required_count, 0)
   const totalAssigned = board.demands.reduce((sum, slot) => sum + slot.filled_count, 0)
   const scheduledEmployees = new Set(board.assignments.map(item => item.employee_id)).size
   const emptySlots = board.demands.filter(slot => slot.filled_count === 0).length
-  const incompleteSlots = board.demands.filter(slot => slot.filled_count < slot.required_count).length
   const weekLabel = `${formatShortDate(weekDates[0])} - ${formatShortDate(weekDates[6])}`
   const requiresPublishedReason = board.week.status === 'published' || board.week.cycle_status === 'published'
+  const headerMetrics = buildHeaderMetrics({
+    scheduledEmployees,
+    totalDemand,
+    totalAssigned,
+    emptySlots,
+    hardWarningCount: validate.hardWarnings.length,
+    softWarningCount: validate.softWarnings.length,
+  })
 
-  const saveDemandState = (nextForm: DemandFormState, messageText: string) => {
+  const saveDemandState = (nextForm: DemandFormState, nextCapacity: DemandCapacityFormState, messageText: string) => {
     const nextDemands: ShiftDemand[] = Object.entries(nextForm).map(([key, requiredCount]) => {
       const [date, shiftTemplateId, positionId] = key.split('__')
       const template = templates.find(item => item.id === shiftTemplateId)
@@ -296,6 +327,13 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
       }
     })
 
+    templates.forEach(template => {
+      ShiftTemplateService.upsert({
+        ...template,
+        max_headcount: Math.max(Number(nextCapacity[template.id] ?? template.max_headcount ?? 0), 0),
+      })
+    })
+
     ScheduleService.saveShiftDemand(user, activeStoreId, activeWeekStart, nextDemands)
     setRefreshKey(value => value + 1)
     setMessage(messageText)
@@ -310,15 +348,16 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
     if (!selectedSlotData) return
     const result = ScheduleService.assignEmployeeToSlot({ currentUser: user, storeId: activeStoreId, weekStart: activeWeekStart, employeeId, date: selectedSlotData.date, shiftTemplateId: selectedSlotData.shift_template_id, changeReason })
     if (!result.schedule) {
-      setMessage('Khong xep duoc nhan su vao ca. Hay kiem tra dieu kien va thu lai.')
+      setPopupMessage(buildAssignmentFailureMessage(result.warnings))
       return
     }
     setRefreshKey(prev => prev + 1)
     if (result.warnings.length > 0) {
       const warningSummary = result.warnings.map(warning => warning.message).slice(0, 2).join(' | ')
-      setMessage(`Da gan nhan su vao ca, nhung can xem lai: ${warningSummary}`)
+      setPopupMessage(`Da gan nhan su vao ca, nhung can xem lai: ${warningSummary}`)
       return
     }
+    setPopupMessage(null)
     setMessage('Da gan nhan su vao ca thanh cong.')
   }
 
@@ -414,7 +453,8 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
 
   const resetDemand = () => {
     setDraftDemand(demandForm)
-    setMessage('Da reset nhu cau ve mac dinh.')
+    setDraftCapacity(capacityForm)
+    setMessage('Da reset cau hinh ve mac dinh.')
   }
 
   return (
@@ -433,16 +473,8 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
           onPublish={handlePublish}
           canSelectStore={stores.length > 1}
           selectedStoreName={selectedStore?.name || activeStoreId}
-          weekStateLabel={weekStateMeta?.label}
-          weekStateTone={weekStateMeta?.tone}
-          weekStateDescription={weekStateMeta?.description}
-          publishedAtLabel={board.week.published_at ? `Da chot ${board.week.published_at.slice(0, 16).replace('T', ' ')}` : null}
-          scheduledEmployees={scheduledEmployees}
-          totalDemand={totalDemand}
-          totalAssigned={totalAssigned}
-          emptySlots={emptySlots}
-          hardWarningCount={validate.hardWarnings.length}
-          softWarningCount={validate.softWarnings.length}
+          primaryMetrics={headerMetrics.primary}
+          warningPill={headerMetrics.warning}
         />
 
         {message && <div className="rounded-2xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700">{message}</div>}
@@ -455,38 +487,11 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
           onSelectCell={payload => setSelectedSlot(payload.slotId || null)}
         />
 
-        <div className="grid gap-4 xl:grid-cols-2">
-          <div className="rounded-[28px] border border-[#efe2d3] bg-white p-4 shadow-sm sm:p-5">
-            <h2 className="text-sm font-semibold text-[#28445f]">Can chu y truoc khi chot lich</h2>
-            <div className="mt-3 space-y-2">
-              {[...validate.hardWarnings, ...validate.softWarnings].slice(0, 6).map((warning, index) => {
-                const isHardWarning = index < validate.hardWarnings.length
-                return <div key={`${warning.type}-${warning.date}-${index}`} className={`rounded-[20px] border px-3 py-3 text-sm ${isHardWarning ? 'border-rose-200 bg-rose-50/80 text-rose-700' : 'border-amber-200 bg-amber-50/80 text-amber-700'}`}>{warning.message}</div>
-              })}
-              {validate.hardWarnings.length + validate.softWarnings.length === 0 && <div className="rounded-[20px] border border-emerald-200 bg-emerald-50/80 px-3 py-3 text-sm text-emerald-700">Tuan nay chua co canh bao dang chu y.</div>}
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-[#efe2d3] bg-[linear-gradient(180deg,rgba(255,250,244,0.98),rgba(255,255,255,0.98))] p-4 shadow-sm sm:p-5">
-            <h2 className="text-sm font-semibold text-[#28445f]">Tom tat van hanh tuan</h2>
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              <div className="rounded-[20px] border border-[#efe2d3] bg-[#fffaf4] px-4 py-3 text-sm text-[#6f6258]">
-                <div className="font-semibold text-[#28445f]">Uu tien tiep theo</div>
-                <div className="mt-1 text-xs leading-5">{incompleteSlots > 0 ? `Con ${incompleteSlots} o thieu nguoi va ${emptySlots} o trong. Mo truc tiep o do tren bang de gan nhanh.` : 'Bang hien da on. Neu can, chi can ra soat canh bao va chot lich.'}</div>
-              </div>
-              <div className="rounded-[20px] border border-[#efe2d3] bg-[#fffaf4] px-4 py-3 text-sm text-[#6f6258]">
-                <div className="font-semibold text-[#28445f]">Sau khi chot</div>
-                <div className="mt-1 text-xs leading-5">{requiresPublishedReason ? 'Moi thay doi sau khi chot se bat nhap ly do de luu lich su dieu chinh.' : 'Khi chot xong, he thong se gui thong bao cho nhan su.'}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <AssignmentModal
           open={Boolean(selectedSlotData)}
           slotTitle={selectedSlotTitle}
           slotSubtitle={selectedSlotSubtitle}
-          shortageLabel={getShortageLabel(selectedSlotGroupRequiredCount, selectedSlotGroupFilledCount)}
+          shortageLabel={selectedSlotData ? getShortageLabel(selectedSlotData.required_count, selectedSlotData.filled_count) : ''}
           search={recommendationSearch}
           onSearchChange={setRecommendationSearch}
           sections={recommendationSections}
@@ -495,6 +500,17 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
           onRemove={handleModalRemove}
           onClose={() => setSelectedSlot(null)}
           filledCountLabel={selectedSlotFilledLabel}
+          headcountLimitLabel={selectedSlotHeadcountLimitLabel}
+          warningMessage={selectedSlotWarningMessage}
+          warningTitle={selectedSlotWarningMessage ? 'Can xem lai cau hinh ca' : null}
+          positionOptions={selectedSlotGroup.map(slot => ({
+            id: slot.id,
+            label: getDisplayPositionName(slot.position_id),
+            filledCountLabel: formatFilledCountLabel(slot.filled_count, slot.required_count),
+            shortageLabel: getShortageLabel(slot.required_count, slot.filled_count),
+          }))}
+          activePositionId={selectedSlot}
+          onPositionChange={slotId => setSelectedSlot(slotId)}
         />
 
         {showDemandEditor && (
@@ -502,17 +518,17 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
             <div className="h-full w-full max-w-3xl overflow-y-auto bg-white p-5 shadow-2xl">
               <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-800">Thiet lap nhu cau tuan</h2>
+                  <h2 className="text-lg font-bold text-gray-800">Cau hinh nhan su theo ca</h2>
                   <p className="mt-1 text-xs text-gray-400">{selectedStore?.name || activeStoreId} - Tuan {board.week.week_start} - {board.week.week_end}</p>
                 </div>
                 <button onClick={() => setShowDemandEditor(false)} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">Dong</button>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <button onClick={copyFromPreviousWeek} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">Copy tu tuan truoc</button>
-                <button onClick={() => applyTemplateDemand('weekday')} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">Mau ngay thuong</button>
-                <button onClick={() => applyTemplateDemand('weekend')} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">Mau cuoi tuan</button>
-                <button onClick={resetDemand} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">Reset mac dinh</button>
+                <button onClick={copyFromPreviousWeek} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">Lay tuan truoc</button>
+                <button onClick={() => applyTemplateDemand('weekday')} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">Ap dung ngay thuong</button>
+                <button onClick={() => applyTemplateDemand('weekend')} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">Ap dung cuoi tuan</button>
+                <button onClick={resetDemand} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">Tra ve mac dinh</button>
               </div>
 
               <div className="mt-5 grid gap-4">
@@ -520,11 +536,30 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
                   <div key={date} className="rounded-3xl border border-gray-100 bg-gray-50 p-4">
                     <div className="mb-3 text-sm font-bold text-gray-800">{formatShortDate(date)}</div>
                     <div className="space-y-3">
-                      {templates.map(template => (
+                      {templates.map(template => {
+                        const templateTotalDemand = (template.allowed_position_ids || []).reduce((sum, positionId) => {
+                          const key = `${date}__${template.id}__${positionId}`
+                          return sum + Number(draftDemand[key] ?? 0)
+                        }, 0)
+                        const templateCapacity = Math.max(Number(draftCapacity[template.id] ?? template.max_headcount ?? 0), 0)
+                        const templateCapacityWarning = buildShiftDemandCapacityWarning(templateTotalDemand, templateCapacity)
+
+                        return (
                         <div key={`${date}-${template.id}`} className="rounded-2xl border border-white bg-white p-3">
                           <div className="mb-3">
                             <div className="font-bold text-gray-800">{template.name}</div>
                             <div className="text-xs text-gray-400">{template.start_time} - {template.end_time}</div>
+                            <div className="mt-3 grid gap-2 md:grid-cols-[minmax(180px,220px)_1fr]">
+                              <label className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                                <div className="mb-1 text-xs text-gray-500">Suc chua ca</div>
+                                <input type="number" min={0} value={templateCapacity} onChange={event => setDraftCapacity(prev => ({ ...prev, [template.id]: Number(event.target.value) }))} className="w-full bg-transparent font-bold outline-none" />
+                              </label>
+                              <div className="rounded-xl border border-[#eadbc9] bg-[#fffaf4] px-3 py-2 text-sm text-[#6f6258]">
+                                <div className="text-xs text-[#8e8072]">Tong nhan su can</div>
+                                <div className="mt-1 text-base font-bold text-[#28445f]">{templateTotalDemand}/{templateCapacity} nguoi</div>
+                              </div>
+                            </div>
+                            {templateCapacityWarning ? <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">{templateCapacityWarning}</div> : null}
                           </div>
                           <div className="grid gap-2 md:grid-cols-3">
                             {(template.allowed_position_ids || []).map(positionId => {
@@ -538,7 +573,8 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
                             })}
                           </div>
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 ))}
@@ -546,7 +582,7 @@ function ManagerSchedulingBoard({ query }: { query: ReturnType<typeof resolveSch
 
               <div className="sticky bottom-0 mt-5 flex justify-end gap-2 border-t border-gray-100 bg-white pt-4">
                 <button onClick={() => setShowDemandEditor(false)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">Huy</button>
-                <button onClick={() => { saveDemandState(draftDemand, 'Da luu nhu cau tuan.'); setShowDemandEditor(false) }} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:opacity-90">Luu nhu cau tuan</button>
+                <button onClick={() => { saveDemandState(draftDemand, draftCapacity, 'Da luu cau hinh nhan su.'); setShowDemandEditor(false) }} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:opacity-90">Luu cau hinh</button>
               </div>
             </div>
           </div>
