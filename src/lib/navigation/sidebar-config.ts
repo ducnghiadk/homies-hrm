@@ -197,7 +197,6 @@ const SIDEBAR_ENTRIES: SidebarEntry[] = [
     roles: MANAGER_ROLES,
     items: [
       { href: '/settings', label: 'Cài đặt chung', roles: MANAGER_ROLES },
-      { href: '/settings/master-data', label: 'Danh mục nền', roles: ADMIN_ROLES },
       { href: '/settings/permissions', label: 'Phân quyền', roles: ADMIN_ROLES },
       { href: '/settings/payroll', label: 'Cấu hình lương', roles: ADMIN_ROLES },
       { href: '/settings/labor-cost', label: 'Labor cost', roles: ADMIN_ROLES },

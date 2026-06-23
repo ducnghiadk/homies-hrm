@@ -90,6 +90,7 @@ function getStatusLabel(tone: WeekOverviewTone, shortageCount: number) {
 
 function repairPositionLabel(value: string) {
   if (value.startsWith('Thu ng') && value.endsWith('n')) return 'Thu ngan'
+  if (value.includes('Pha chá')) return 'Pha chế'
   return value
 }
 
