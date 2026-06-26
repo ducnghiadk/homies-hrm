@@ -32,6 +32,39 @@ export interface ScheduleAssignment {
   updated_at: string
 }
 
+export interface ScheduleEditLog {
+  id: string
+  schedule_week_id: string
+  assignment_id?: string
+  employee_id: string
+  date: string
+  action: 'create' | 'update' | 'remove' | 'approve_from_registration'
+  source: 'registration_review' | 'published_schedule_edit'
+  before_state: ScheduleAssignment | null
+  after_state: ScheduleAssignment | null
+  changed_by: string
+  changed_at: string
+  reason?: string
+}
+
+export interface ScheduleApprovalLog {
+  id: string
+  schedule_week_id: string
+  registration_week_id: string
+  approved_by: string
+  approved_at: string
+  draft_change_count: number
+  approved_assignment_count: number
+  notes?: string
+  snapshot: {
+    totalRegistrations: number
+    copiedFromRegistrations: number
+    manualChanges: number
+    skippedRegistrations: number
+    finalPublishedAssignments: number
+  }
+}
+
 export interface ScheduleChangeLog {
   id: string
   assignment_id: string
@@ -45,10 +78,14 @@ export interface ScheduleChangeLog {
 
 const WEEKS_KEY = 'homies_schedule_weeks'
 const ASSIGNMENTS_KEY = 'homies_schedule_assignments'
+const EDIT_LOGS_KEY = 'homies_schedule_edit_logs'
+const APPROVAL_LOGS_KEY = 'homies_schedule_approval_logs'
 const CHANGE_LOGS_KEY = 'homies_schedule_change_logs'
 
 let scheduleWeeks: ScheduleWeek[] = []
 let assignments: ScheduleAssignment[] = []
+let editLogs: ScheduleEditLog[] = []
+let approvalLogs: ScheduleApprovalLog[] = []
 let changeLogs: ScheduleChangeLog[] = []
 let initialized = false
 
@@ -56,10 +93,14 @@ function initScheduleWeekStore() {
   if (typeof window !== 'undefined') {
     const savedWeeks = localStorage.getItem(WEEKS_KEY)
     const savedAssignments = localStorage.getItem(ASSIGNMENTS_KEY)
+    const savedEditLogs = localStorage.getItem(EDIT_LOGS_KEY)
+    const savedApprovalLogs = localStorage.getItem(APPROVAL_LOGS_KEY)
     const savedChangeLogs = localStorage.getItem(CHANGE_LOGS_KEY)
     if (savedWeeks && savedAssignments) {
       scheduleWeeks = JSON.parse(savedWeeks)
       assignments = JSON.parse(savedAssignments)
+      editLogs = savedEditLogs ? JSON.parse(savedEditLogs) : []
+      approvalLogs = savedApprovalLogs ? JSON.parse(savedApprovalLogs) : []
       changeLogs = savedChangeLogs ? JSON.parse(savedChangeLogs) : []
       initialized = true
       return
@@ -72,6 +113,8 @@ function initScheduleWeekStore() {
 
   scheduleWeeks = []
   assignments = []
+  editLogs = []
+  approvalLogs = []
   changeLogs = []
   initialized = true
 }
@@ -80,6 +123,8 @@ function persistScheduleWeeks() {
   if (typeof window !== 'undefined') {
     localStorage.setItem(WEEKS_KEY, JSON.stringify(scheduleWeeks))
     localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignments))
+    localStorage.setItem(EDIT_LOGS_KEY, JSON.stringify(editLogs))
+    localStorage.setItem(APPROVAL_LOGS_KEY, JSON.stringify(approvalLogs))
     localStorage.setItem(CHANGE_LOGS_KEY, JSON.stringify(changeLogs))
   }
 }
@@ -91,14 +136,38 @@ function buildAssignmentId(employeeId: string, date: string) {
 export function clearScheduleWeekStore() {
   scheduleWeeks = []
   assignments = []
+  editLogs = []
+  approvalLogs = []
   changeLogs = []
   initialized = false
 
   if (typeof window !== 'undefined') {
     localStorage.removeItem(WEEKS_KEY)
     localStorage.removeItem(ASSIGNMENTS_KEY)
+    localStorage.removeItem(EDIT_LOGS_KEY)
+    localStorage.removeItem(APPROVAL_LOGS_KEY)
     localStorage.removeItem(CHANGE_LOGS_KEY)
   }
+}
+
+function buildEditLogId(scheduleWeekId: string) {
+  return `schedule-edit-${scheduleWeekId}-${editLogs.length + 1}`
+}
+
+function buildApprovalLogId(scheduleWeekId: string) {
+  return `schedule-approval-${scheduleWeekId}-${approvalLogs.length + 1}`
+}
+
+function appendEditLog(input: Omit<ScheduleEditLog, 'id' | 'changed_at'>) {
+  editLogs.unshift({
+    ...input,
+    id: buildEditLogId(input.schedule_week_id),
+    changed_at: new Date().toISOString(),
+  })
+}
+
+function getScheduleWeekForStoreWeek(storeId: string, weekStart: string) {
+  return scheduleWeeks.find((row) => row.store_id === storeId && row.week_start === weekStart)
 }
 
 export function ensureDraftScheduleWeek(storeId: string, weekStart: string, actorId: string): ScheduleWeek {
@@ -133,7 +202,7 @@ export function ensureDraftScheduleWeek(storeId: string, weekStart: string, acto
 
 export function getDraftAssignmentsForWeek(storeId: string, weekStart: string): ScheduleAssignment[] {
   initScheduleWeekStore()
-  const scheduleWeek = scheduleWeeks.find((row) => row.store_id === storeId && row.week_start === weekStart)
+  const scheduleWeek = getScheduleWeekForStoreWeek(storeId, weekStart)
   if (!scheduleWeek) {
     return []
   }
@@ -141,6 +210,26 @@ export function getDraftAssignmentsForWeek(storeId: string, weekStart: string): 
   return assignments.filter(
     (row) => row.schedule_week_id === scheduleWeek.id && row.status === 'draft'
   )
+}
+
+export function getScheduleEditLogsForWeek(storeId: string, weekStart: string): ScheduleEditLog[] {
+  initScheduleWeekStore()
+  const scheduleWeek = getScheduleWeekForStoreWeek(storeId, weekStart)
+  if (!scheduleWeek) {
+    return []
+  }
+
+  return editLogs.filter((row) => row.schedule_week_id === scheduleWeek.id)
+}
+
+export function getScheduleApprovalLogsForWeek(storeId: string, weekStart: string): ScheduleApprovalLog[] {
+  initScheduleWeekStore()
+  const scheduleWeek = getScheduleWeekForStoreWeek(storeId, weekStart)
+  if (!scheduleWeek) {
+    return []
+  }
+
+  return approvalLogs.filter((row) => row.schedule_week_id === scheduleWeek.id)
 }
 
 export function upsertDraftAssignment(input: {
@@ -157,6 +246,7 @@ export function upsertDraftAssignment(input: {
   const existingIndex = assignments.findIndex(
     (row) => row.schedule_week_id === input.schedule_week_id && row.employee_id === input.employee_id && row.date === input.date
   )
+  const beforeState = existingIndex >= 0 ? assignments[existingIndex] : null
 
   const nextAssignment: ScheduleAssignment = {
     id: buildAssignmentId(input.employee_id, input.date),
@@ -180,20 +270,53 @@ export function upsertDraftAssignment(input: {
     assignments.push(nextAssignment)
   }
 
+  appendEditLog({
+    schedule_week_id: input.schedule_week_id,
+    assignment_id: nextAssignment.id,
+    employee_id: nextAssignment.employee_id,
+    date: nextAssignment.date,
+    action: beforeState ? 'update' : 'create',
+    source: 'registration_review',
+    before_state: beforeState,
+    after_state: nextAssignment,
+    changed_by: input.actor_id,
+  })
+
   persistScheduleWeeks()
   return nextAssignment
 }
 
-export function removeDraftAssignment(storeId: string, weekStart: string, employeeId: string, date: string) {
+export function removeDraftAssignment(storeId: string, weekStart: string, employeeId: string, date: string, actorId?: string) {
   initScheduleWeekStore()
-  const scheduleWeek = scheduleWeeks.find((row) => row.store_id === storeId && row.week_start === weekStart)
+  const scheduleWeek = getScheduleWeekForStoreWeek(storeId, weekStart)
   if (!scheduleWeek) {
+    return
+  }
+
+  const existingAssignment = assignments.find(
+    (row) => row.schedule_week_id === scheduleWeek.id && row.employee_id === employeeId && row.date === date && row.status === 'draft'
+  )
+
+  if (!existingAssignment) {
     return
   }
 
   assignments = assignments.filter(
     (row) => !(row.schedule_week_id === scheduleWeek.id && row.employee_id === employeeId && row.date === date && row.status === 'draft')
   )
+
+  appendEditLog({
+    schedule_week_id: scheduleWeek.id,
+    assignment_id: existingAssignment.id,
+    employee_id: existingAssignment.employee_id,
+    date: existingAssignment.date,
+    action: 'remove',
+    source: 'registration_review',
+    before_state: existingAssignment,
+    after_state: null,
+    changed_by: actorId || existingAssignment.updated_by,
+  })
+
   persistScheduleWeeks()
 }
 
@@ -214,6 +337,15 @@ export function bulkApproveRegistrationsToDraft(storeId: string, weekStart: stri
     })
   )
 
+  const createdIds = new Set(created.map((assignment) => assignment.id))
+  editLogs = editLogs.map((row) =>
+    row.schedule_week_id === scheduleWeek.id && row.action === 'create' && row.assignment_id && createdIds.has(row.assignment_id)
+      ? { ...row, action: 'approve_from_registration' }
+      : row
+  )
+
+  persistScheduleWeeks()
+
   return {
     created: created.length,
     scheduleWeek,
@@ -224,6 +356,17 @@ export function publishScheduleWeek(storeId: string, weekStart: string, actorId:
   initScheduleWeekStore()
   const scheduleWeek = ensureDraftScheduleWeek(storeId, weekStart, actorId)
   const now = new Date().toISOString()
+  const registrations = getSubmittedShiftRegistrationsForWeek(storeId, weekStart)
+  const draftAssignments = assignments.filter(
+    (row) => row.schedule_week_id === scheduleWeek.id && row.status === 'draft'
+  )
+  const copiedFromRegistrations = draftAssignments.filter(
+    (row) => row.source_registration_id && registrations.some((registration) => registration.id === row.source_registration_id && registration.shift_id === row.shift_id)
+  ).length
+  const skippedRegistrations = registrations.filter(
+    (registration) => !draftAssignments.some((assignment) => assignment.source_registration_id === registration.id && assignment.shift_id === registration.shift_id)
+  ).length
+  const manualChanges = Math.max(draftAssignments.length - copiedFromRegistrations, 0)
 
   scheduleWeeks = scheduleWeeks.map((row) =>
     row.id === scheduleWeek.id
@@ -242,6 +385,27 @@ export function publishScheduleWeek(storeId: string, weekStart: string, actorId:
       ? { ...row, status: 'published', updated_at: now, updated_by: actorId }
       : row
   )
+
+  const publishedAssignments = assignments.filter(
+    (row) => row.schedule_week_id === scheduleWeek.id && row.status === 'published'
+  )
+
+  approvalLogs.unshift({
+    id: buildApprovalLogId(scheduleWeek.id),
+    schedule_week_id: scheduleWeek.id,
+    registration_week_id: scheduleWeek.registration_week_id,
+    approved_by: actorId,
+    approved_at: now,
+    draft_change_count: editLogs.filter((row) => row.schedule_week_id === scheduleWeek.id).length,
+    approved_assignment_count: publishedAssignments.length,
+    snapshot: {
+      totalRegistrations: registrations.length,
+      copiedFromRegistrations,
+      manualChanges,
+      skippedRegistrations,
+      finalPublishedAssignments: publishedAssignments.length,
+    },
+  })
 
   updateRegistrationStatusByWeekStart(storeId, weekStart, 'published')
   persistScheduleWeeks()
