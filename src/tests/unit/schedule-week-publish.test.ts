@@ -237,4 +237,12 @@ describe('bulkApproveRegistrationsToDraft', () => {
     expect(source).toContain('Da sua')
     expect(source).toContain('Lich su thao tac')
   })
+
+  it('wires schedule history page to review audit logs', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/schedule/history/page.tsx'), 'utf8')
+
+    expect(source).toContain('getScheduleEditLogsForWeek')
+    expect(source).toContain('getScheduleApprovalLogsForWeek')
+    expect(source).toContain('approve_from_registration')
+  })
 })
