@@ -251,8 +251,8 @@ function AdminReviewContent() {
       <div className="space-y-5 animate-fade-in pb-24">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-gray-800">Duyet dang ky va xep lich nhap</h1>
-            <p className="mt-0.5 text-xs text-gray-400">Lop 1 la dang ky nhan vien. Lop 2 la lich nhap quan ly sap publish.</p>
+            <h1 className="text-xl font-bold tracking-tight text-gray-800">Duyệt lịch làm việc</h1>
+            <p className="mt-0.5 text-xs text-gray-400">Từ đăng ký của nhân sự sang lịch làm việc chính thức: duyệt, sửa tay, ghi log, và publish.</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -272,19 +272,19 @@ function AdminReviewContent() {
 
         <div className="flex rounded-2xl border border-gray-200/50 bg-gray-100 p-1">
           <button
+            onClick={() => router.push('/schedule/by-shift')}
+            className="flex-1 rounded-xl px-3 py-2 text-xs font-bold text-gray-500 transition-all hover:text-gray-700"
+          >
+            Lịch làm việc theo ca
+          </button>
+          <button
             onClick={() => router.push('/schedule/manage')}
             className="flex-1 rounded-xl px-3 py-2 text-xs font-bold text-gray-500 transition-all hover:text-gray-700"
           >
-            Quan ly phan ca
-          </button>
-          <button
-            onClick={() => router.push('/schedule/admin/registration')}
-            className="flex-1 rounded-xl px-3 py-2 text-xs font-bold text-gray-500 transition-all hover:text-gray-700"
-          >
-            Cau hinh mo ca
+            Lịch làm việc theo nhân sự
           </button>
           <button className="flex-1 rounded-xl bg-white px-3 py-2 text-xs font-bold text-gray-800 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-            Duyet ca va xep lich
+            Duyệt lịch làm việc
           </button>
         </div>
 
@@ -532,7 +532,7 @@ function AdminReviewContent() {
                       <span className="rounded-full bg-white px-2 py-1 text-[10px] font-extrabold uppercase text-gray-600">{log.action}</span>
                       <span className="text-[10px] font-bold text-gray-400">{new Date(log.changed_at).toLocaleString('vi-VN')}</span>
                     </div>
-                    <p className="mt-2 text-xs font-bold text-gray-800">{log.employee_id} � {log.date}</p>
+                    <p className="mt-2 text-xs font-bold text-gray-800">{log.employee_id} � {log.date}</p>
                     <p className="mt-1 text-[11px] text-gray-500">Truoc: {log.before_state?.shift_id || 'trong'} {'->'} Sau: {log.after_state?.shift_id || 'trong'}</p>
                   </div>
                 )) : <div className="rounded-2xl border border-dashed border-gray-200 p-4 text-xs font-bold text-gray-400">Chua co log phu hop bo loc.</div>}

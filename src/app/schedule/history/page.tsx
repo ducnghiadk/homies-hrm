@@ -182,8 +182,8 @@ function ScheduleHistoryPageContent() {
 
   if (user.role === 'employee') {
     return (
-      <AppShell title="Lich su duyet lich" contentWidth="full" contentInset="flush">
-        <div className="py-20 text-center text-gray-500">Ban khong co quyen xem lich su duyet lich.</div>
+      <AppShell title="Lịch sử duyệt lịch" contentWidth="full" contentInset="flush">
+        <div className="py-20 text-center text-gray-500">{'B\u1ea1n kh\u00f4ng c\u00f3 quy\u1ec1n xem l\u1ecbch s\u1eed duy\u1ec7t l\u1ecbch.'}</div>
       </AppShell>
     )
   }
@@ -199,9 +199,9 @@ function ScheduleHistoryPageContent() {
         </button>
 
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-gray-800">Lich su duyet lich</h1>
+          <h1 className="text-xl font-bold tracking-tight text-gray-800">Lịch sử duyệt lịch</h1>
           <p className="mt-0.5 text-xs text-gray-400">
-            Theo doi approve tu dang ky, sua tay trong ban nhap, va lan duyet thanh lich lam viec.
+            Theo dõi approve từ đăng ký, sửa tay trong bản nhập, và lần duyệt thành lịch làm việc.
           </p>
         </div>
 

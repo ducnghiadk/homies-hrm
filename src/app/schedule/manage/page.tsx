@@ -352,28 +352,28 @@ function ScheduleManagePageContent() {
     <AppShell showNav>
       <div className="animate-fade-in space-y-5 pb-20">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-gray-800">Xếp lịch làm việc</h1>
-          <p className="mt-0.5 text-xs text-gray-400">Bảng phân ca hàng tuần cho nhân viên</p>
+          <h1 className="text-xl font-bold tracking-tight text-gray-800">Lịch làm việc theo nhân sự</h1>
+          <p className="mt-0.5 text-xs text-gray-400">Xem và điều phối lịch làm việc theo từng nhân sự, để đối soát phân ca và cân bằng tải ca.</p>
         </div>
 
         <div className="flex w-full gap-1 rounded-2xl border border-gray-200/50 bg-gray-100 p-1">
           <button
+            onClick={() => router.push('/schedule/by-shift')}
+            className="flex-1 px-3 py-2 text-xs font-bold text-gray-500 transition-all hover:text-gray-700"
+          >
+            Lịch làm việc theo ca
+          </button>
+          <button
             onClick={() => router.push('/schedule/manage')}
             className="flex-1 rounded-xl bg-white px-3 py-2 text-xs font-bold text-gray-800 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all"
           >
-            Quản lý phân ca
-          </button>
-          <button
-            onClick={() => router.push('/schedule/admin/registration')}
-            className="flex-1 px-3 py-2 text-xs font-bold text-gray-500 transition-all hover:text-gray-700"
-          >
-            Cấu hình mở ca
+            Lịch làm việc theo nhân sự
           </button>
           <button
             onClick={() => router.push(`/schedule/admin/review?weekStart=${weekStrs[0]}`)}
             className="flex-1 px-3 py-2 text-xs font-bold text-gray-500 transition-all hover:text-gray-700"
           >
-            Duyệt ca & Sắp xếp
+            Duyệt lịch làm việc
           </button>
         </div>
 
