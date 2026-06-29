@@ -1,74 +1,55 @@
 'use client'
 
 import { Suspense, useMemo, useState } from 'react'
-import { useAuthStore } from '@/store/auth-store'
 import { useRouter, useSearchParams } from 'next/navigation'
-import AppShell from '@/components/layout/AppShell'
-import { ScheduleService, type ScheduleChangeLogFeed } from '@/lib/services/schedule-service'
-import { EmployeeService } from '@/lib/services/employee-service'
-import { getShiftById, getStoreById } from '@/lib/mock-data'
 import { ArrowLeft, Building2, Calendar, Clock3, History, UserCog } from 'lucide-react'
+import AppShell from '@/components/layout/AppShell'
+import { useAuthStore } from '@/store/auth-store'
+import {
+  type ScheduleApprovalLog,
+  type ScheduleEditLog,
+  getScheduleApprovalLogsForWeek,
+  getScheduleEditLogsForWeek,
+} from '@/lib/mock-data-schedule-weeks'
+import { getPositionById, getShiftById, getStoreById, mockEmployees } from '@/lib/mock-data'
+import { getRegistrationWeekByWeek } from '@/lib/mock-data-registration-weeks'
 
-function getActionMeta(log: ScheduleChangeLogFeed) {
-  const changedAfterPublish =
-    Boolean(log.after_state?.modified_after_publish) ||
-    Boolean(log.before_state?.modified_after_publish)
+type ReviewHistoryAction = ScheduleEditLog['action'] | 'publish'
 
-  if (log.action === 'publish') {
-    return {
-      badgeLabel: 'CHỐT LỊCH',
-      badgeClassName: 'bg-emerald-50 text-emerald-700',
-      title: 'Đã chốt lịch tuần',
-      description: 'Nhân viên đã có thể xem lịch chính thức.',
-      reasonLabel: 'Tóm tắt chốt lịch',
-    }
-  }
+type ReviewHistoryRow = {
+  id: string
+  action: ReviewHistoryAction
+  employee_id: string | null
+  employee_name: string
+  actor_id: string
+  actor_name: string
+  store_id: string
+  store_name: string
+  date: string
+  changed_at: string
+  before_shift_id: string | null
+  after_shift_id: string | null
+  reason: string
+  summary: string
+}
 
-  if (changedAfterPublish) {
-    return {
-      badgeLabel: 'SỬA SAU KHI CHỐT',
-      badgeClassName: 'bg-amber-50 text-amber-700',
-      title: log.action === 'cancel' ? 'Hủy ca sau khi đã chốt' : 'Điều chỉnh ca sau khi đã chốt',
-      description: 'Thay đổi này xảy ra sau khi lịch đã chốt và nhân viên có thể đã xem lịch cũ.',
-      reasonLabel: 'Lý do thay đổi',
-    }
-  }
+function getEmployeeName(employeeId: string | null) {
+  if (!employeeId) return 'Cap tuan / he thong'
+  return mockEmployees.find((employee) => employee.id === employeeId)?.full_name || employeeId
+}
 
-  const actionMap: Record<Exclude<ScheduleChangeLogFeed['action'], 'publish'>, {
-    badgeLabel: string
-    title: string
-    description: string
-    reasonLabel: string
-  }> = {
-    create: {
-      badgeLabel: 'TẠO CA',
-      title: 'Tạo ca mới trong bản nháp',
-      description: 'Ca được thêm trước khi chốt lịch.',
-      reasonLabel: 'Ghi chú',
-    },
-    update: {
-      badgeLabel: 'SỬA CA',
-      title: 'Cập nhật ca trong bản nháp',
-      description: 'Ca được chỉnh sửa trước khi chốt lịch.',
-      reasonLabel: 'Ghi chú',
-    },
-    cancel: {
-      badgeLabel: 'HỦY CA',
-      title: 'Hủy ca trong bản nháp',
-      description: 'Ca bị hủy trước khi chốt lịch.',
-      reasonLabel: 'Ghi chú',
-    },
-    delete: {
-      badgeLabel: 'GỠ CA',
-      title: 'Gỡ ca khỏi bản nháp',
-      description: 'Ca bị xóa trước khi chốt lịch.',
-      reasonLabel: 'Ghi chú',
-    },
-  }
-
-  return {
-    ...actionMap[log.action],
-    badgeClassName: 'bg-primary-50 text-primary-700',
+function getActionMeta(action: ReviewHistoryAction) {
+  switch (action) {
+    case 'approve_from_registration':
+      return { badgeLabel: 'DUYET TU DANG KY', badgeClassName: 'bg-sky-50 text-sky-700', title: 'Copy dang ky sang lich nhap' }
+    case 'create':
+      return { badgeLabel: 'THEM NHAP', badgeClassName: 'bg-emerald-50 text-emerald-700', title: 'Them ca trong ban nhap' }
+    case 'update':
+      return { badgeLabel: 'SUA NHAP', badgeClassName: 'bg-amber-50 text-amber-700', title: 'Sua ca trong ban nhap' }
+    case 'remove':
+      return { badgeLabel: 'XOA NHAP', badgeClassName: 'bg-rose-50 text-rose-700', title: 'Xoa ca khoi ban nhap' }
+    case 'publish':
+      return { badgeLabel: 'DUYET LICH', badgeClassName: 'bg-violet-50 text-violet-700', title: 'Duyet lich lam viec' }
   }
 }
 
@@ -95,147 +76,193 @@ function toDateInputValue(value: string) {
   return `${year}-${month}-${day}`
 }
 
+function describeShift(shiftId: string | null) {
+  if (!shiftId) return '-'
+  const shift = getShiftById(shiftId)
+  return shift ? `${shift.name} (${shift.start_time} - ${shift.end_time})` : shiftId
+}
+
+function buildSummary(log: ScheduleEditLog) {
+  if (log.action === 'approve_from_registration') return 'Lay dang ky nhan vien lam ban nhap ban dau.'
+  if (log.action === 'create') return 'Quan ly them ca moi vao lich nhap.'
+  if (log.action === 'update') return 'Quan ly doi ca trong lich nhap.'
+  return 'Quan ly go ca khoi lich nhap.'
+}
+
+function mapEditLog(storeId: string, log: ScheduleEditLog): ReviewHistoryRow {
+  return {
+    id: log.id,
+    action: log.action,
+    employee_id: log.employee_id,
+    employee_name: getEmployeeName(log.employee_id),
+    actor_id: log.changed_by,
+    actor_name: getEmployeeName(log.changed_by),
+    store_id: storeId,
+    store_name: getStoreById(storeId)?.name || storeId,
+    date: log.date,
+    changed_at: log.changed_at,
+    before_shift_id: log.before_state?.shift_id || null,
+    after_shift_id: log.after_state?.shift_id || null,
+    reason: log.reason || buildSummary(log),
+    summary: buildSummary(log),
+  }
+}
+
+function mapApprovalLog(storeId: string, weekStart: string, log: ScheduleApprovalLog): ReviewHistoryRow {
+  return {
+    id: log.id,
+    action: 'publish',
+    employee_id: null,
+    employee_name: 'Lich lam viec tuan',
+    actor_id: log.approved_by,
+    actor_name: getEmployeeName(log.approved_by),
+    store_id: storeId,
+    store_name: getStoreById(storeId)?.name || storeId,
+    date: weekStart,
+    changed_at: log.approved_at,
+    before_shift_id: null,
+    after_shift_id: null,
+    reason: `Tong ${log.snapshot.totalRegistrations} dang ky. ${log.snapshot.manualChanges} thay doi tay. ${log.snapshot.finalPublishedAssignments} ca duoc chot.`,
+    summary: 'Duyet lich lam viec tu ban nhap sang lich chinh thuc.',
+  }
+}
+
 function ScheduleHistoryPageContent() {
   const { user } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [actionFilter, setActionFilter] = useState<'all' | 'create' | 'update' | 'cancel' | 'delete' | 'publish'>('all')
+  const [actionFilter, setActionFilter] = useState<'all' | ReviewHistoryAction>('all')
   const [employeeFilter, setEmployeeFilter] = useState('all')
   const [actorFilter, setActorFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('')
 
-  const requestedStoreId = searchParams.get('storeId') || undefined
-  const requestedWeekStart = searchParams.get('weekStart') || undefined
+  const requestedStoreId = searchParams.get('storeId') || user?.store_id || 'store-001'
+  const requestedWeekStart = searchParams.get('weekStart') || ''
 
-  const weekStateMeta = useMemo(() => {
-    if (!user || !requestedStoreId || !requestedWeekStart) return null
-    const week = ScheduleService.getScheduleWeek(requestedStoreId, requestedWeekStart)
-    return week ? ScheduleService.getWeekStateMeta(week) : null
-  }, [requestedStoreId, requestedWeekStart, user])
+  const registrationWeek = useMemo(
+    () => (requestedWeekStart ? getRegistrationWeekByWeek(requestedStoreId, requestedWeekStart) : null),
+    [requestedStoreId, requestedWeekStart]
+  )
 
-  const allLogs = useMemo<ScheduleChangeLogFeed[]>(() => {
-    if (!user) return []
-    return ScheduleService.getChangeLogFeed(user, {
-      storeId: requestedStoreId,
-      weekStart: requestedWeekStart,
-    })
-  }, [requestedStoreId, requestedWeekStart, user])
+  const allLogs = useMemo<ReviewHistoryRow[]>(() => {
+    if (!requestedWeekStart) return []
 
-  const logs = useMemo<ScheduleChangeLogFeed[]>(() => {
-    return allLogs.filter(log => {
+    const editLogs = getScheduleEditLogsForWeek(requestedStoreId, requestedWeekStart).map((log) =>
+      mapEditLog(requestedStoreId, log)
+    )
+    const approvalLogs = getScheduleApprovalLogsForWeek(requestedStoreId, requestedWeekStart).map((log) =>
+      mapApprovalLog(requestedStoreId, requestedWeekStart, log)
+    )
+
+    return [...approvalLogs, ...editLogs].sort((left, right) => right.changed_at.localeCompare(left.changed_at))
+  }, [requestedStoreId, requestedWeekStart])
+
+  const logs = useMemo(
+    () => allLogs.filter((log) => {
       const matchAction = actionFilter === 'all' || log.action === actionFilter
       const matchEmployee = employeeFilter === 'all' || log.employee_id === employeeFilter
-      const matchActor = actorFilter === 'all' || log.changed_by === actorFilter
+      const matchActor = actorFilter === 'all' || log.actor_id === actorFilter
       const matchDate = !dateFilter || toDateInputValue(log.changed_at) === dateFilter
       return matchAction && matchEmployee && matchActor && matchDate
-    })
-  }, [actionFilter, actorFilter, allLogs, dateFilter, employeeFilter])
+    }),
+    [actionFilter, actorFilter, allLogs, dateFilter, employeeFilter]
+  )
 
   const employeeOptions = useMemo(() => {
-    const ids = Array.from(new Set(allLogs.map(log => log.employee_id).filter(Boolean)))
-    return ids
-      .map(id => ({ id, name: EmployeeService.getEmployeeById(id)?.full_name || id }))
-      .sort((left, right) => left.name.localeCompare(right.name))
+    const ids = Array.from(new Set(allLogs.map((log) => log.employee_id).filter(Boolean))) as string[]
+    return ids.map((id) => ({ id, name: getEmployeeName(id) })).sort((left, right) => left.name.localeCompare(right.name))
   }, [allLogs])
 
   const actorOptions = useMemo(() => {
-    const ids = Array.from(new Set(allLogs.map(log => log.changed_by).filter(Boolean)))
-    return ids
-      .map(id => ({ id, name: EmployeeService.getEmployeeById(id)?.full_name || id }))
-      .sort((left, right) => left.name.localeCompare(right.name))
+    const ids = Array.from(new Set(allLogs.map((log) => log.actor_id).filter(Boolean)))
+    return ids.map((id) => ({ id, name: getEmployeeName(id) })).sort((left, right) => left.name.localeCompare(right.name))
   }, [allLogs])
 
   if (!user) return null
 
   if (user.role === 'employee') {
     return (
-      <AppShell title="Lịch sử thay đổi lịch">
-        <div className="py-20 text-center text-gray-500">Bạn không có quyền xem lịch sử thay đổi lịch tổng.</div>
+      <AppShell title="Lịch sử duyệt lịch" contentWidth="full" contentInset="flush">
+        <div className="py-20 text-center text-gray-500">{'B\u1ea1n kh\u00f4ng c\u00f3 quy\u1ec1n xem l\u1ecbch s\u1eed duy\u1ec7t l\u1ecbch.'}</div>
       </AppShell>
     )
   }
 
   return (
-    <AppShell showNav>
+    <AppShell showNav contentWidth="full" contentInset="flush">
       <div className="space-y-5 pb-20">
         <button
           onClick={() => router.back()}
           className="flex items-center gap-1 text-sm font-medium text-primary-500 hover:text-primary-600"
         >
-          <ArrowLeft size={16} /> Quay lại
+          <ArrowLeft size={16} /> Quay lai
         </button>
 
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-gray-800">Lịch sử thay đổi lịch</h1>
+          <h1 className="text-xl font-bold tracking-tight text-gray-800">Lịch sử duyệt lịch</h1>
           <p className="mt-0.5 text-xs text-gray-400">
-            Theo dõi ai đã tạo, sửa, hủy hoặc chốt lịch để dễ đối soát vận hành.
+            Theo dõi approve từ đăng ký, sửa tay trong bản nhập, và lần duyệt thành lịch làm việc.
           </p>
         </div>
 
-        <div className="grid gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:grid-cols-3">
+        <div className="grid gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:grid-cols-4">
           <div className="rounded-xl bg-gray-50 p-3">
-            <p className="text-xs uppercase tracking-wide text-gray-400">Chi nhánh</p>
+            <p className="text-xs uppercase tracking-wide text-gray-400">Chi nhanh</p>
             <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-gray-800">
               <Building2 size={14} className="text-gray-400" />
-              {requestedStoreId ? getStoreById(requestedStoreId)?.name || requestedStoreId : 'Tất cả chi nhánh'}
+              {getStoreById(requestedStoreId)?.name || requestedStoreId}
             </p>
           </div>
           <div className="rounded-xl bg-gray-50 p-3">
-            <p className="text-xs uppercase tracking-wide text-gray-400">Tuần đang xem</p>
+            <p className="text-xs uppercase tracking-wide text-gray-400">Tuan dang xem</p>
             <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-gray-800">
               <Calendar size={14} className="text-gray-400" />
-              {requestedWeekStart || 'Tất cả'}
+              {requestedWeekStart || 'Chua chon tuan'}
             </p>
           </div>
           <div className="rounded-xl bg-gray-50 p-3">
-            <p className="text-xs uppercase tracking-wide text-gray-400">Tổng log</p>
+            <p className="text-xs uppercase tracking-wide text-gray-400">Trang thai dot</p>
+            <p className="mt-1 text-sm font-semibold text-gray-800">{registrationWeek?.status || 'khong ro'}</p>
+          </div>
+          <div className="rounded-xl bg-gray-50 p-3">
+            <p className="text-xs uppercase tracking-wide text-gray-400">Tong log</p>
             <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-gray-800">
               <History size={14} className="text-gray-400" />
-              {logs.length} thay đổi
+              {logs.length} su kien
             </p>
           </div>
         </div>
-
-        {weekStateMeta && (
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${weekStateMeta.tone}`}>{weekStateMeta.label}</span>
-              <span className="text-sm font-semibold text-gray-800">Trạng thái tuần đang xem</span>
-            </div>
-            <p className="mt-2 text-sm text-gray-600">{weekStateMeta.description}</p>
-          </div>
-        )}
 
         <div className="grid gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-4">
           <select
             value={actionFilter}
-            onChange={event => setActionFilter(event.target.value as typeof actionFilter)}
+            onChange={(event) => setActionFilter(event.target.value as typeof actionFilter)}
             className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
           >
-            <option value="all">Tất cả thao tác</option>
-            <option value="publish">Chốt lịch</option>
-            <option value="create">Tạo ca</option>
-            <option value="update">Sửa ca</option>
-            <option value="cancel">Hủy ca</option>
-            <option value="delete">Gỡ ca</option>
+            <option value="all">Tat ca thao tac</option>
+            <option value="publish">Duyet lich</option>
+            <option value="approve_from_registration">Approve tu dang ky</option>
+            <option value="create">Them nhap</option>
+            <option value="update">Sua nhap</option>
+            <option value="remove">Xoa nhap</option>
           </select>
           <select
             value={employeeFilter}
-            onChange={event => setEmployeeFilter(event.target.value)}
+            onChange={(event) => setEmployeeFilter(event.target.value)}
             className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
           >
-            <option value="all">Tất cả nhân viên</option>
-            {employeeOptions.map(option => (
+            <option value="all">Tat ca nhan su</option>
+            {employeeOptions.map((option) => (
               <option key={option.id} value={option.id}>{option.name}</option>
             ))}
           </select>
           <select
             value={actorFilter}
-            onChange={event => setActorFilter(event.target.value)}
+            onChange={(event) => setActorFilter(event.target.value)}
             className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
           >
-            <option value="all">Tất cả người sửa</option>
-            {actorOptions.map(option => (
+            <option value="all">Tat ca nguoi sua</option>
+            {actorOptions.map((option) => (
               <option key={option.id} value={option.id}>{option.name}</option>
             ))}
           </select>
@@ -244,25 +271,26 @@ function ScheduleHistoryPageContent() {
             <input
               type="date"
               value={dateFilter}
-              onChange={event => setDateFilter(event.target.value)}
+              onChange={(event) => setDateFilter(event.target.value)}
               className="w-full bg-transparent outline-none"
             />
           </label>
         </div>
 
         <div className="space-y-3">
-          {logs.length === 0 && (
+          {logs.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-12 text-center text-sm text-gray-400">
-              Chưa có lịch sử thay đổi nào trong phạm vi đang xem.
+              Chua co lich su thao tac nao cho tuan nay.
             </div>
-          )}
+          ) : null}
 
-          {logs.map(log => {
-            const employee = log.employee_id ? EmployeeService.getEmployeeById(log.employee_id) : null
-            const beforeShift = log.before_state?.shift_id ? getShiftById(log.before_state.shift_id) : null
-            const afterShift = log.after_state?.shift_id ? getShiftById(log.after_state.shift_id) : null
-            const actionMeta = getActionMeta(log)
-            const displayReason = log.reason?.trim() || (log.action === 'publish' ? 'Đã chốt lịch tuần.' : 'Không có lý do được ghi lại.')
+          {logs.map((log) => {
+            const actionMeta = getActionMeta(log.action)
+            const beforeShift = describeShift(log.before_shift_id)
+            const afterShift = describeShift(log.after_shift_id)
+            const employeePosition = log.employee_id
+              ? getPositionById(mockEmployees.find((employee) => employee.id === log.employee_id)?.position_id || '')?.name
+              : null
 
             return (
               <div key={log.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -272,45 +300,42 @@ function ScheduleHistoryPageContent() {
                       <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${actionMeta.badgeClassName}`}>
                         {actionMeta.badgeLabel}
                       </span>
-                      <span className="text-sm font-semibold text-gray-900">
-                        {log.employee_name || employee?.full_name || 'Thay đổi cấp tuần / hệ thống'}
-                      </span>
+                      <span className="text-sm font-semibold text-gray-900">{log.employee_name}</span>
+                      {employeePosition ? <span className="text-xs font-bold text-gray-400">{employeePosition}</span> : null}
                     </div>
 
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-gray-800">{actionMeta.title}</p>
-                      <p className="text-xs text-gray-500">{actionMeta.description}</p>
+                      <p className="text-xs text-gray-500">{log.summary}</p>
                     </div>
 
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                       <span>{log.store_name}</span>
-                      <span>Ngày áp dụng: {log.date}</span>
+                      <span>Ngay ap dung: {log.date}</span>
                       <span className="inline-flex items-center gap-1">
                         <Clock3 size={12} />
-                        Lúc sửa: {formatDateTime(log.changed_at)}
+                        {formatDateTime(log.changed_at)}
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <UserCog size={12} />
-                        Người sửa: {log.actor_name}
+                        {log.actor_name}
                       </span>
                     </div>
 
                     <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        {actionMeta.reasonLabel}
-                      </p>
-                      <p className="mt-1 text-sm text-gray-700">{displayReason}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Ghi chu</p>
+                      <p className="mt-1 text-sm text-gray-700">{log.reason}</p>
                     </div>
                   </div>
 
-                  <div className="grid min-w-[240px] grid-cols-1 gap-2 rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
+                  <div className="grid min-w-[260px] grid-cols-1 gap-2 rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
                     <div>
-                      <p className="font-semibold text-gray-500">Trước</p>
-                      <p>{log.before_shift_name || (beforeShift ? `${beforeShift.name} (${beforeShift.start_time} - ${beforeShift.end_time})` : '-')}</p>
+                      <p className="font-semibold text-gray-500">Truoc</p>
+                      <p>{beforeShift}</p>
                     </div>
                     <div>
                       <p className="font-semibold text-gray-500">Sau</p>
-                      <p>{log.after_shift_name || (afterShift ? `${afterShift.name} (${afterShift.start_time} - ${afterShift.end_time})` : '-')}</p>
+                      <p>{afterShift}</p>
                     </div>
                   </div>
                 </div>
@@ -325,7 +350,7 @@ function ScheduleHistoryPageContent() {
 
 export default function ScheduleHistoryPage() {
   return (
-    <Suspense fallback={<div className="py-20 text-center text-gray-500">Đang tải lịch sử thay đổi...</div>}>
+    <Suspense fallback={<div className="py-20 text-center text-gray-500">Dang tai lich su...</div>}>
       <ScheduleHistoryPageContent />
     </Suspense>
   )

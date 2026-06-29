@@ -75,18 +75,14 @@ const SIDEBAR_ENTRIES: SidebarEntry[] = [
   },
   {
     id: 'schedule',
-    label: 'Lịch làm việc',
+    label: 'L\u1ecbch l\u00e0m vi\u1ec7c',
     icon: CalendarDays,
     roles: MANAGER_ROLES,
     items: [
-      { href: '/schedules', label: 'Board tuần', roles: MANAGER_ROLES },
-      { href: '/settings/schedule-rules/shifts', label: 'Cài đặt ca', roles: ['store_manager', 'hr_admin', 'ceo'] },
-      { href: '/settings/schedule-rules', label: 'Quy tắc xếp ca', roles: MANAGER_ROLES },
-      { href: '/settings/schedule-rules/preferences', label: 'Preference ca', roles: MANAGER_ROLES },
-      { href: '/settings/staffing', label: 'Định biên và staffing', roles: MANAGER_ROLES },
-      { href: '/schedule/open-shifts', label: 'Ca trống', roles: MANAGER_ROLES },
-      { href: '/schedule/swap/list', label: 'Đổi ca', roles: MANAGER_ROLES },
-      { href: '/schedule/history', label: 'Lịch sử publish', roles: MANAGER_ROLES },
+      { href: '/schedule/by-shift', label: 'Lịch làm việc theo ca', roles: MANAGER_ROLES },
+      { href: '/schedule/manage', label: 'Lịch làm việc theo nhân sự', roles: MANAGER_ROLES },
+      { href: '/schedule/admin/review', label: 'Duyệt lịch làm việc', roles: MANAGER_ROLES },
+      { href: '/schedule/history', label: 'Lịch sử duyệt lịch', roles: MANAGER_ROLES },
     ],
   },
   {

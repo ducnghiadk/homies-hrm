@@ -15,7 +15,10 @@ import {
 import { getSubmittedShiftRegistrationsForWeek } from '@/lib/mock-data-shift-registrations'
 import {
   bulkApproveRegistrationsToDraft,
+  ensureDraftScheduleWeek,
   getDraftAssignmentsForWeek,
+  getScheduleApprovalLogsForWeek,
+  getScheduleEditLogsForWeek,
   getReviewSummary,
   publishScheduleWeek,
   removeDraftAssignment,
@@ -38,6 +41,8 @@ function AdminReviewContent() {
   const [selectedWeekId, setSelectedWeekId] = useState('')
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [editingCell, setEditingCell] = useState<{ empId: string; date: string } | null>(null)
+  const [showLogDrawer, setShowLogDrawer] = useState(false)
+  const [logFilter, setLogFilter] = useState<'all' | 'approve_from_registration' | 'create' | 'update' | 'remove'>('all')
 
   useEffect(() => {
     if (!isAuthenticated) router.push('/login')
@@ -98,6 +103,18 @@ function AdminReviewContent() {
     () => (activeWeek ? getReviewSummary(activeWeek.store_id, activeWeek.week_start_date) : null),
     [activeWeek, refreshTrigger]
   )
+  const editLogs = useMemo(
+    () => (activeWeek ? getScheduleEditLogsForWeek(activeWeek.store_id, activeWeek.week_start_date) : []),
+    [activeWeek, refreshTrigger]
+  )
+  const approvalLogs = useMemo(
+    () => (activeWeek ? getScheduleApprovalLogsForWeek(activeWeek.store_id, activeWeek.week_start_date) : []),
+    [activeWeek, refreshTrigger]
+  )
+  const filteredEditLogs = useMemo(
+    () => (logFilter === 'all' ? editLogs : editLogs.filter((row) => row.action === logFilter)),
+    [editLogs, logFilter]
+  )
   const scheduleLikeAssignments = useMemo<Schedule[]>(() => {
     if (!activeWeek) return []
     return draftAssignments.map((assignment) => ({
@@ -117,7 +134,7 @@ function AdminReviewContent() {
 
   if (!user || user.role === 'employee') {
     return (
-      <AppShell title="Duyet dang ky ca">
+      <AppShell title="Duyet dang ky ca" contentWidth="full" contentInset="flush">
         <div className="flex flex-col items-center justify-center py-20 text-gray-500">
           <AlertCircle size={48} className="mb-4 text-error-500" />
           <p className="text-lg font-bold">Khong co quyen truy cap</p>
@@ -154,7 +171,7 @@ function AdminReviewContent() {
         return
       }
 
-      const scheduleWeek = bulkApproveRegistrationsToDraft(activeWeek.store_id, activeWeek.week_start_date, user.id).scheduleWeek
+      const scheduleWeek = ensureDraftScheduleWeek(activeWeek.store_id, activeWeek.week_start_date, user.id)
       upsertDraftAssignment({
         schedule_week_id: scheduleWeek.id,
         employee_id: empId,
@@ -165,7 +182,7 @@ function AdminReviewContent() {
         actor_id: user.id,
       })
     } else {
-      removeDraftAssignment(activeWeek.store_id, activeWeek.week_start_date, empId, date)
+      removeDraftAssignment(activeWeek.store_id, activeWeek.week_start_date, empId, date, user.id)
     }
 
     setRefreshTrigger((value) => value + 1)
@@ -230,12 +247,12 @@ function AdminReviewContent() {
   }
 
   return (
-    <AppShell showNav>
+    <AppShell showNav contentWidth="full" contentInset="flush">
       <div className="space-y-5 animate-fade-in pb-24">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-gray-800">Duyet dang ky va xep lich nhap</h1>
-            <p className="mt-0.5 text-xs text-gray-400">Lop 1 la dang ky nhan vien. Lop 2 la lich nhap quan ly sap publish.</p>
+            <h1 className="text-xl font-bold tracking-tight text-gray-800">Duyệt lịch làm việc</h1>
+            <p className="mt-0.5 text-xs text-gray-400">Từ đăng ký của nhân sự sang lịch làm việc chính thức: duyệt, sửa tay, ghi log, và publish.</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -255,19 +272,19 @@ function AdminReviewContent() {
 
         <div className="flex rounded-2xl border border-gray-200/50 bg-gray-100 p-1">
           <button
+            onClick={() => router.push('/schedule/by-shift')}
+            className="flex-1 rounded-xl px-3 py-2 text-xs font-bold text-gray-500 transition-all hover:text-gray-700"
+          >
+            Lịch làm việc theo ca
+          </button>
+          <button
             onClick={() => router.push('/schedule/manage')}
             className="flex-1 rounded-xl px-3 py-2 text-xs font-bold text-gray-500 transition-all hover:text-gray-700"
           >
-            Quan ly phan ca
-          </button>
-          <button
-            onClick={() => router.push('/schedule/admin/registration')}
-            className="flex-1 rounded-xl px-3 py-2 text-xs font-bold text-gray-500 transition-all hover:text-gray-700"
-          >
-            Cau hinh mo ca
+            Lịch làm việc theo nhân sự
           </button>
           <button className="flex-1 rounded-xl bg-white px-3 py-2 text-xs font-bold text-gray-800 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
-            Duyet ca va xep lich
+            Duyệt lịch làm việc
           </button>
         </div>
 
@@ -292,6 +309,12 @@ function AdminReviewContent() {
                   <ClipboardCheck size={14} /> Duyet tat ca theo dang ky
                 </button>
                 <button
+                  onClick={() => setShowLogDrawer(true)}
+                  className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-700 transition-all hover:border-gray-300 hover:text-gray-900"
+                >
+                  Xem log
+                </button>
+                <button
                   onClick={handlePublish}
                   className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-[0_4px_12px_rgba(16,185,129,0.2)] transition-all hover:bg-emerald-700"
                 >
@@ -308,7 +331,7 @@ function AdminReviewContent() {
         )}
 
         {reviewSummary ? (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[var(--shadow-card)]">
               <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Dang ky</p>
               <p className="mt-1 text-2xl font-extrabold text-gray-800">{reviewSummary.totalRegistrations}</p>
@@ -324,6 +347,11 @@ function AdminReviewContent() {
             <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[var(--shadow-card)]">
               <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Can xep them</p>
               <p className="mt-1 text-2xl font-extrabold text-emerald-600">{reviewSummary.unassignedEmployees}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-[var(--shadow-card)]">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Log nhap</p>
+              <p className="mt-1 text-2xl font-extrabold text-gray-800">{editLogs.length}</p>
+              <p className="mt-1 text-[10px] font-bold text-gray-400">Lan duyet: {approvalLogs.length}</p>
             </div>
           </div>
         ) : null}
@@ -368,6 +396,9 @@ function AdminReviewContent() {
                       {weekDates.map((date) => {
                         const { registration, draftAssignment } = getCellData(employee.id, date)
                         const isEditing = editingCell?.empId === employee.id && editingCell?.date === date
+                        const isEdited = Boolean(
+                          registration && draftAssignment && registration.shift_id !== draftAssignment.shift_id
+                        )
 
                         return (
                           <td key={date} className="relative p-2 text-center">
@@ -412,9 +443,14 @@ function AdminReviewContent() {
                               )}
 
                               {draftAssignment ? (
-                                <span className="block rounded-lg px-2 py-0.5 text-[9px] font-extrabold text-white shadow-sm" style={{ backgroundColor: getShiftById(draftAssignment.shift_id)?.color }}>
-                                  Lich: {getShiftById(draftAssignment.shift_id)?.name.replace('Ca ', '') || draftAssignment.shift_id}
-                                </span>
+                                <>
+                                  <span className="block rounded-lg px-2 py-0.5 text-[9px] font-extrabold text-white shadow-sm" style={{ backgroundColor: getShiftById(draftAssignment.shift_id)?.color }}>
+                                    Lich: {getShiftById(draftAssignment.shift_id)?.name.replace('Ca ', '') || draftAssignment.shift_id}
+                                  </span>
+                                  {isEdited ? (
+                                    <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[8px] font-extrabold text-amber-700">Da sua</span>
+                                  ) : null}
+                                </>
                               ) : (
                                 <span className="block text-[9px] font-semibold text-gray-300">Chua xep</span>
                               )}
@@ -464,6 +500,46 @@ function AdminReviewContent() {
             <UserCheck size={14} /> Dot lich da o trang thai published.
           </div>
         ) : null}
+
+        {showLogDrawer ? (
+          <div className="fixed inset-0 z-40 flex justify-end bg-black/20">
+            <button className="flex-1" aria-label="Dong log drawer" onClick={() => setShowLogDrawer(false)} />
+            <div className="h-full w-full max-w-md overflow-y-auto border-l border-gray-200 bg-white p-5 shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
+                <div>
+                  <h2 className="text-sm font-extrabold text-gray-800">Lich su thao tac</h2>
+                  <p className="mt-1 text-[11px] text-gray-400">{editLogs.length} thay doi nhap. {approvalLogs.length} lan duyet.</p>
+                </div>
+                <button onClick={() => setShowLogDrawer(false)} className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-50">Dong</button>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(['all', 'approve_from_registration', 'create', 'update', 'remove'] as const).map((option) => (
+                  <button
+                    key={option}
+                    onClick={() => setLogFilter(option)}
+                    className={`rounded-full px-3 py-1 text-[10px] font-extrabold ${logFilter === option ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'}`}
+                  >
+                    {option === 'all' ? 'Tat ca' : option}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {filteredEditLogs.length > 0 ? filteredEditLogs.map((log) => (
+                  <div key={log.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="rounded-full bg-white px-2 py-1 text-[10px] font-extrabold uppercase text-gray-600">{log.action}</span>
+                      <span className="text-[10px] font-bold text-gray-400">{new Date(log.changed_at).toLocaleString('vi-VN')}</span>
+                    </div>
+                    <p className="mt-2 text-xs font-bold text-gray-800">{log.employee_id} � {log.date}</p>
+                    <p className="mt-1 text-[11px] text-gray-500">Truoc: {log.before_state?.shift_id || 'trong'} {'->'} Sau: {log.after_state?.shift_id || 'trong'}</p>
+                  </div>
+                )) : <div className="rounded-2xl border border-dashed border-gray-200 p-4 text-xs font-bold text-gray-400">Chua co log phu hop bo loc.</div>}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </AppShell>
   )
@@ -476,3 +552,6 @@ export default function AdminReviewPage() {
     </Suspense>
   )
 }
+
+
+
