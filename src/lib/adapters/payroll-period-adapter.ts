@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { PAYROLL_PERIOD_STATUS } from '@/lib/payroll/payroll-status'
 
 export const payrollPeriodAdapter = {
   async fetchPayrollPeriod(thang: number, nam: number) {
@@ -30,7 +31,7 @@ export const payrollPeriodAdapter = {
         to_chuc_id: 'a0000000-0000-0000-0000-000000000001',
         thang,
         nam,
-        trang_thai: 'da_chot',
+        trang_thai: PAYROLL_PERIOD_STATUS.CONFIRMED,
         // Optional: Assuming we need to store total gross/net, we could calculate it or pass it.
         // For this task, we will just set the necessary fields.
       }

@@ -12,6 +12,12 @@ import { AttendanceService, type PayrollAttendanceRecord } from '@/lib/services/
 import { getInitials } from '@/lib/utils'
 import { payrollAdapter, storeAdapter, employeeAdapter, MasterDataAdapter } from '@/lib/adapters'
 import { payrollPeriodAdapter } from '@/lib/adapters/payroll-period-adapter'
+import {
+  PAYROLL_PERIOD_STATUS,
+  type PayrollPeriodStatus,
+  PERIOD_STATUS_LABEL_VI,
+  PERIOD_STATUS_BADGE,
+} from '@/lib/payroll/payroll-status'
 import { PayrollPaymentModal, type PayrollPaymentBankAccount } from '@/components/payroll/PayrollPaymentModal'
 import type { PayrollPaymentMethod } from '@/lib/payroll-payment-ledger'
 import { fetchRemotePayrollPolicy, saveStoredPayrollPolicy, getStoredPayrollPolicy } from '@/lib/services/payroll-policy-service'
@@ -197,7 +203,7 @@ export default function PayrollPage() {
   const [payrollReloadKey, setPayrollReloadKey] = useState(0)
   const [policySource, setPolicySource] = useState<'system' | 'cache' | null>(null)
   const [policyInfo, setPolicyInfo] = useState<{days: number, hours: number} | null>(null)
-  const [payrollPeriodStatus, setPayrollPeriodStatus] = useState<'chua_chot' | 'da_chot'>('chua_chot')
+  const [payrollPeriodStatus, setPayrollPeriodStatus] = useState<PayrollPeriodStatus>(PAYROLL_PERIOD_STATUS.DRAFT)
   const [hideResigned, setHideResigned] = useState(false)
 
   useEffect(() => {
@@ -281,8 +287,8 @@ export default function PayrollPage() {
     payrollPeriodAdapter.fetchPayrollPeriod(thang, nam).then(period => {
       if (!isMounted) return
 
-      if (period && period.trang_thai === 'da_chot') {
-        setPayrollPeriodStatus('da_chot')
+      if (period && period.trang_thai === PAYROLL_PERIOD_STATUS.CONFIRMED) {
+        setPayrollPeriodStatus(PAYROLL_PERIOD_STATUS.CONFIRMED)
         setPolicySource('system')
         setPolicyInfo({ days: 26, hours: 8 })
         
@@ -342,7 +348,7 @@ export default function PayrollPage() {
           setIsPayrollLoading(false)
         })
       } else {
-        setPayrollPeriodStatus('chua_chot')
+        setPayrollPeriodStatus(PAYROLL_PERIOD_STATUS.DRAFT)
         fetchRemotePayrollPolicy().then(dbPolicy => {
           if (dbPolicy) {
             saveStoredPayrollPolicy(dbPolicy)
@@ -899,10 +905,10 @@ export default function PayrollPage() {
             </select>
             {period && (
               <span className="text-xs px-2.5 py-1 rounded-full font-bold" style={{
-                background: period.status === 'confirmed' ? 'var(--success-light)' : 'var(--gray-100)',
-                color: period.status === 'confirmed' ? 'var(--success)' : 'var(--text-muted)',
+                background: period.status === PAYROLL_PERIOD_STATUS.CONFIRMED ? PERIOD_STATUS_BADGE[PAYROLL_PERIOD_STATUS.CONFIRMED].bg : PERIOD_STATUS_BADGE[PAYROLL_PERIOD_STATUS.DRAFT].bg,
+                color: period.status === PAYROLL_PERIOD_STATUS.CONFIRMED ? PERIOD_STATUS_BADGE[PAYROLL_PERIOD_STATUS.CONFIRMED].color : PERIOD_STATUS_BADGE[PAYROLL_PERIOD_STATUS.DRAFT].color,
               }}>
-                {period.status === 'confirmed' ? 'Kỳ đã chốt' : 'Bản nháp'}
+                {period.status === PAYROLL_PERIOD_STATUS.CONFIRMED ? PERIOD_STATUS_LABEL_VI[PAYROLL_PERIOD_STATUS.CONFIRMED] : PERIOD_STATUS_LABEL_VI[PAYROLL_PERIOD_STATUS.DRAFT]}
               </span>
             )}
           </div>
@@ -1084,17 +1090,17 @@ export default function PayrollPage() {
                       alert(`Chốt thất bại: ${res.error}`)
                     }
                   }}
-                  disabled={payrollPeriodStatus === 'da_chot' || pendingSummary.totalShifts > 0 || anomalySummary.length > 0 || isPayrollLoading}
+                  disabled={payrollPeriodStatus === PAYROLL_PERIOD_STATUS.CONFIRMED || pendingSummary.totalShifts > 0 || anomalySummary.length > 0 || isPayrollLoading}
                   className={`btn text-xs py-1.5 px-3 border-0 gap-1 font-semibold flex items-center shadow-xs cursor-pointer ${
-                    payrollPeriodStatus === 'da_chot' ? 'bg-slate-600 text-slate-300' : 'bg-rose-600 hover:bg-rose-500 text-white'
+                    payrollPeriodStatus === PAYROLL_PERIOD_STATUS.CONFIRMED ? 'bg-slate-600 text-slate-300' : 'bg-rose-600 hover:bg-rose-500 text-white'
                   }`}
                 >
-                  <Lock size={13} /> {payrollPeriodStatus === 'da_chot' ? 'ĐÃ CHỐT' : 'Chốt kỳ lương'}
+                  <Lock size={13} /> {payrollPeriodStatus === PAYROLL_PERIOD_STATUS.CONFIRMED ? 'ĐÃ CHỐT' : 'Chốt kỳ lương'}
                 </button>
 
                 <button
                   onClick={() => setPayrollReloadKey(key => key + 1)}
-                  disabled={isPayrollLoading || payrollPeriodStatus === 'da_chot'}
+                  disabled={isPayrollLoading || payrollPeriodStatus === PAYROLL_PERIOD_STATUS.CONFIRMED}
                   className="btn bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-1.5 px-3 border-0 gap-1 font-semibold flex items-center shadow-xs cursor-pointer"
                 >
                   <RefreshCw size={13} /> {isPayrollLoading ? 'Đang tính lương...' : 'Tính lại lương'}
@@ -1175,7 +1181,7 @@ export default function PayrollPage() {
             </div>
 
             {/* Scrollable Spreadsheet Grid Table with Dynamic Columns */}
-            {anomalySummary.length > 0 && payrollPeriodStatus === 'chua_chot' && (
+            {anomalySummary.length > 0 && payrollPeriodStatus === PAYROLL_PERIOD_STATUS.DRAFT && (
               <div className="text-xs mt-2 mx-3 px-3 py-2 bg-amber-50 text-amber-800 rounded-md border border-amber-200">
                 <div className="font-bold flex items-center gap-1.5 mb-1.5">
                   <AlertTriangle size={14} className="text-amber-600" /> Có một số bất thường dữ liệu, vui lòng xử lý trước khi chốt lương:
@@ -1190,7 +1196,7 @@ export default function PayrollPage() {
                 </ul>
               </div>
             )}
-            {pendingSummary.totalShifts > 0 && payrollPeriodStatus === 'chua_chot' && (
+            {pendingSummary.totalShifts > 0 && payrollPeriodStatus === PAYROLL_PERIOD_STATUS.DRAFT && (
               <div className="text-xs mt-2 mx-3 px-3 py-2 bg-rose-50 text-rose-700 rounded-md border border-rose-200">
                 <strong>Còn {pendingSummary.totalShifts} ca chưa duyệt</strong> của {pendingSummary.employees.length} nhân viên ({pendingSummary.employees.join(', ')}) — số giờ này đang được tính là 0. Duyệt hết trước khi chốt lương.
               </div>

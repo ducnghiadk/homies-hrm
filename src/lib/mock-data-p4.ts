@@ -1,13 +1,22 @@
 
 
+import { PAYROLL_PERIOD_STATUS, PayrollPeriodStatus } from '@/lib/payroll/payroll-status'
+
 // ========== PAYROLL ==========
 
-export type PayrollStatus = 'draft' | 'confirmed' | 'paid'
+export type PayrollStatus = PayrollPeriodStatus
 
-export const mockPayrollPeriods = [
-  { id: 'pr-2026-02', period: '2026-02', status: 'draft' as PayrollStatus, total_gross: 87500000, total_net: 78750000, employee_count: 12 },
-  { id: 'pr-2026-01', period: '2026-01', status: 'paid' as PayrollStatus, total_gross: 85200000, total_net: 76680000, employee_count: 12 },
-  { id: 'pr-2025-12', period: '2025-12', status: 'paid' as PayrollStatus, total_gross: 92100000, total_net: 82890000, employee_count: 13 },
+export const mockPayrollPeriods: Array<{
+  id: string
+  period: string
+  status: PayrollPeriodStatus
+  total_gross: number
+  total_net: number
+  employee_count: number
+}> = [
+  { id: 'pr-2026-02', period: '2026-02', status: PAYROLL_PERIOD_STATUS.DRAFT, total_gross: 87500000, total_net: 78750000, employee_count: 12 },
+  { id: 'pr-2026-01', period: '2026-01', status: PAYROLL_PERIOD_STATUS.PAID, total_gross: 85200000, total_net: 76680000, employee_count: 12 },
+  { id: 'pr-2025-12', period: '2025-12', status: PAYROLL_PERIOD_STATUS.PAID, total_gross: 92100000, total_net: 82890000, employee_count: 13 },
 ]
 
 export const mockPayslips = [
