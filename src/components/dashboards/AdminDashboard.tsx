@@ -121,11 +121,11 @@ export default function AdminDashboard() {
               <div className="w-10 h-10 rounded-full bg-gray-200" />
               <div className="flex-1 space-y-2">
                 <div className="h-4 w-32 bg-gray-200 rounded" />
-                <div className="h-3 w-48 bg-gray-100 rounded" />
+                <div className="h-3 w-48 bg-primary-50 rounded" />
               </div>
               <div className="flex gap-2">
                 <div className="h-9 w-16 bg-gray-200 rounded-full" />
-                <div className="h-9 w-16 bg-gray-100 rounded-full" />
+                <div className="h-9 w-16 bg-primary-50 rounded-full" />
               </div>
             </div>
           ))}
@@ -263,7 +263,7 @@ export default function AdminDashboard() {
           {
             icon: Settings,
             label: 'Cài đặt',
-            bgColor: 'bg-gray-100',
+            bgColor: 'bg-primary-50',
             iconColor: 'text-gray-600',
             onClick: () => router.push('/settings'),
           },
@@ -376,7 +376,7 @@ export default function AdminDashboard() {
               <div
                 key={req.id}
                 className="px-4 py-3.5 flex items-center gap-3
-                  hover:bg-gray-50 active:bg-gray-100
+                  hover:bg-vanilla-50 active:bg-primary-50
                   transition-colors duration-150
                   cursor-pointer rounded-xl mx-2"
               >
@@ -420,7 +420,7 @@ export default function AdminDashboard() {
                       e.stopPropagation()
                       handleQuickReject(req.id)
                     }}
-                    className="h-9 px-3 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold
+                    className="h-9 px-3 rounded-full bg-primary-50 text-gray-600 text-xs font-semibold
                       flex items-center gap-1.5
                       hover:bg-error-50 hover:text-error-600 active:scale-95 transition-all"
                     aria-label={`Từ chối đơn của ${shortName}`}
@@ -437,7 +437,7 @@ export default function AdminDashboard() {
           {pendingLeaves.length > 3 && (
             <button
               onClick={() => router.push('/leave/approval')}
-              className="w-full py-3 text-sm text-primary-600 hover:text-primary-700 font-medium hover:bg-gray-50 rounded-lg transition-colors"
+              className="w-full py-3 text-sm text-primary-600 hover:text-primary-700 font-medium hover:bg-vanilla-50 rounded-lg transition-colors"
             >
               Xem tất cả {pendingLeaves.length} đơn →
             </button>

@@ -55,7 +55,7 @@ export default function StaffingPage() {
   }
 
   const openScheduleWizard = () => {
-    router.push('/settings/staffing?tab=schedule')
+    router.push('/staffing/workspace?tab=schedule')
   }
 
   const openOpenShiftContext = (date: string, storeLabel: string) => {

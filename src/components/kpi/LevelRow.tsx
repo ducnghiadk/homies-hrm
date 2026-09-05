@@ -1,6 +1,8 @@
 'use client'
 
+import React from 'react'
 import type { LevelConfig, KPIOptionType } from '@/lib/kpi-types'
+import { Edit3, CheckCircle2 } from 'lucide-react'
 
 interface Props {
   config: LevelConfig
@@ -8,43 +10,46 @@ interface Props {
 }
 
 const optionLabel: Record<KPIOptionType, string> = {
-  A: 'Option A', B: 'Option B', C: 'Option C',
-}
-const optionColor: Record<KPIOptionType, string> = {
-  A: '#2F6FA8', B: '#001D3D', C: '#F6C85F',
+  A: 'Option A (L0-L1)',
+  B: 'Option B (L2-L3)',
+  C: 'Option C (L4-L5)',
 }
 
 export default function LevelRow({ config, onEdit }: Props) {
   return (
-    <div className="flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-gray-50 transition-colors">
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0"
-        style={{ background: `${optionColor[config.option_type]}15`, color: optionColor[config.option_type] }}
-      >
-        {config.level}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold">{config.name}</span>
-          <span
-            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-            style={{ background: `${optionColor[config.option_type]}15`, color: optionColor[config.option_type] }}
-          >
-            {optionLabel[config.option_type]}
-          </span>
+    <div className="flex items-center justify-between gap-3 py-3 px-4 hover:bg-blue-50/20 transition-all">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-mono font-bold shrink-0 bg-blue-50 text-[#2F6FA8] border border-blue-200">
+          {config.level}
         </div>
-        <div className="text-xs text-gray-500 mt-0.5">
-          KPI ≥ {config.required_kpi_average} · {config.min_months_to_promote} tháng để thăng tiến
-          {config.promotion_requires_ceo_approval && ' · Cần CEO duyệt'}
+
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-gray-900">{config.name}</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+              {optionLabel[config.option_type]}
+            </span>
+            {config.promotion_requires_ceo_approval && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                Cần CEO phê duyệt
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-gray-500 mt-0.5 font-medium flex items-center gap-2 flex-wrap">
+            <span>Yêu cầu thăng cấp:</span>
+            <span>KPI trung bình <b className="font-mono text-gray-800">≥ {config.required_kpi_average} đ</b></span>
+            <span>•</span>
+            <span>Duy trì tối thiểu <b className="font-mono text-gray-800">{config.min_months_to_promote} tháng</b></span>
+          </div>
         </div>
       </div>
 
       <button
         onClick={() => onEdit(config)}
-        className="text-xs px-2 py-1 rounded-lg text-primary-600 hover:bg-primary-50 flex-shrink-0"
+        className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-[#2F6FA8] hover:text-white text-gray-700 font-bold text-[11px] transition flex items-center gap-1 shrink-0"
       >
-        Sửa
+        <Edit3 size={11} />
+        <span>Sửa</span>
       </button>
     </div>
   )

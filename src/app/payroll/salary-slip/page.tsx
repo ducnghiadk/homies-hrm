@@ -1,16 +1,36 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useAuthStore } from '@/store/auth-store'
 import AppShell from '@/components/layout/AppShell'
-import { calculatePayrollBatch } from '@/lib/payroll-engine'
+import { useSearchParams } from 'next/navigation'
+import { calculatePayrollBatchAsync, getPayrollPeriodBounds, normalizePayrollPeriod } from '@/lib/payroll-engine'
 import { getActivePayrollPolicy } from '@/lib/services/payroll-policy-service'
+import { hasPermission } from '@/lib/rbac'
 import { FileText, ChevronDown, ChevronUp, Download, Utensils } from 'lucide-react'
 
 const fmt = (n: number) => n.toLocaleString('vi-VN') + '₫'
-const PAYROLL_PERIOD = { start: '2026-02-01', end: '2026-02-28' }
-
 export default function SalarySlipPage() {
-  const slips = useMemo(() => calculatePayrollBatch(PAYROLL_PERIOD.start, PAYROLL_PERIOD.end).map((result) => ({
+  return (
+    <Suspense fallback={<AppShell title="Phiếu lương"><div className="p-6 text-sm text-slate-500">Đang tải phiếu lương...</div></AppShell>}>
+      <SalarySlipContent />
+    </Suspense>
+  )
+}
+
+function SalarySlipContent() {
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
+  const searchParams = useSearchParams()
+  const selectedPeriod = normalizePayrollPeriod(searchParams.get('period'))
+  const period = useMemo(() => getPayrollPeriodBounds(selectedPeriod), [selectedPeriod])
+  const [payrollResults, setPayrollResults] = useState<Awaited<ReturnType<typeof calculatePayrollBatchAsync>>>([])
+  const [isPayrollLoading, setIsPayrollLoading] = useState(true)
+  const [payrollError, setPayrollError] = useState<string | null>(null)
+  const slips = useMemo(() => payrollResults
+    .filter(result => user && (
+      hasPermission(user.role, 'payroll.view_all') || result.employee_id === user.id
+    ))
+    .map((result) => ({
     id: `slip-${result.employee_id}-${result.period}`,
     employee_id: result.employee_id,
     employee_name: result.employee_name,
@@ -38,9 +58,40 @@ export default function SalarySlipPage() {
     total_deductions: result.total_deductions + result.total_insurance + result.tax,
     net_salary: result.net_salary,
     fnb_breakdown: result.fnb_allocation_breakdown,
-  })), [])
-  const [expanded, setExpanded] = useState<string | null>(() => slips[0]?.id ?? null)
+    })), [user, payrollResults])
+  const [expanded, setExpanded] = useState<string | null>(null)
   const [activePolicy] = useState(() => getActivePayrollPolicy())
+
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated || !user) return
+    let isMounted = true
+
+    setIsPayrollLoading(true)
+    setPayrollError(null)
+    setPayrollResults([])
+
+    calculatePayrollBatchAsync(period.start, period.end)
+      .then(results => {
+        if (isMounted) setPayrollResults(results)
+      })
+      .catch(error => {
+        if (isMounted) {
+          setPayrollError(error instanceof Error ? error.message : 'Không tính được phiếu lương.')
+          setPayrollResults([])
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsPayrollLoading(false)
+      })
+
+    return () => { isMounted = false }
+  }, [hasHydrated, isAuthenticated, user, period.start, period.end])
+
+  useEffect(() => {
+    if (!expanded && slips[0]?.id) setExpanded(slips[0].id)
+  }, [expanded, slips])
+
+  if (!hasHydrated || !isAuthenticated || !user) return null
 
   return (
     <AppShell title="Phiếu lương">
@@ -54,6 +105,12 @@ export default function SalarySlipPage() {
             </div>
           </div>
         </div>
+        {isPayrollLoading && (
+          <div className="card text-sm text-slate-500">Đang tải dữ liệu lương từ chấm công thật...</div>
+        )}
+        {payrollError && (
+          <div className="card text-sm text-rose-600">Không tính được phiếu lương: {payrollError}</div>
+        )}
         {slips.map((slip, idx) => {
           const isOpen = expanded === slip.id
           return (

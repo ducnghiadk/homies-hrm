@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { AlertCircle, Calendar, CheckCheck, Copy, Link, RotateCcw, Send, UserCheck, UserX, X } from 'lucide-react'
 import { mockPositions, mockStores } from '@/lib/mock-data'
@@ -39,25 +39,25 @@ export function InvitationDetailModal({
   const sendLogs = invitation.send_logs || []
   const shareKey = invitation.public_access_token || invitation.id
   const shareUrl = `${window.location.origin}/employees/invitations/form?token=${encodeURIComponent(shareKey)}`
-  const currency = (value?: number) => `${(value || 0).toLocaleString('vi-VN')} đ`
+  const currency = (value?: number) => `${(value || 0).toLocaleString('vi-VN')} d`
   const employmentType = invitation.employee_type === 'full_time'
     ? 'Full-time'
     : invitation.employee_type === 'part_time'
       ? 'Part-time'
       : invitation.employee_type === 'seasonal'
-        ? 'Thời vụ'
+        ? 'Th?i v?'
         : invitation.employee_type === 'intern'
-          ? 'Thực tập'
-          : '—'
+          ? 'Th?c t?p'
+          : '�'
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/24 px-3 py-4 backdrop-blur-[2px] sm:px-5 sm:py-6 lg:px-8 lg:py-10">
       <div className="mx-auto flex min-h-full w-full items-start justify-center lg:items-center">
         <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-gray-200/80 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)] animate-scale-up sm:max-h-[calc(100vh-3rem)]">
-          <div className="shrink-0 flex items-center justify-between border-b border-gray-100 bg-gray-50/95 px-5 py-4 sm:px-6">
+          <div className="shrink-0 flex items-center justify-between border-b border-gray-100 bg-vanilla-50/95 px-5 py-4 sm:px-6">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Chi tiết lời mời ứng viên</h2>
-            <p className="mt-0.5 text-xs text-gray-400">ID: {invitation.id} • Quét nhanh trạng thái, độ sẵn sàng và lịch sử xử lý</p>
+            <h2 className="text-lg font-bold text-gray-900">Chi ti?t l?i m?i ?ng vi�n</h2>
+            <p className="mt-0.5 text-xs text-gray-400">ID: {invitation.id} � Qu�t nhanh tr?ng th�i, d? s?n s�ng v� l?ch s? x? l�</p>
           </div>
           <button
             onClick={onClose}
@@ -69,40 +69,40 @@ export function InvitationDetailModal({
 
           <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 animate-fade-in">
-            <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+            <div className="space-y-3 rounded-xl border border-gray-100 bg-vanilla-50/50 p-4">
               <div>
-                <span className="mb-1 block text-xs text-gray-400">Trạng thái hồ sơ</span>
+                <span className="mb-1 block text-xs text-gray-400">Tr?ng th�i h? so</span>
                 <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getInvitationStatusColor(invitation.status)}`}>
                   {getInvitationStatusLabel(invitation.status)}
                 </span>
               </div>
               <div>
-                <span className="mb-1 block text-xs text-gray-400">Ngày tạo lời mời</span>
+                <span className="mb-1 block text-xs text-gray-400">Ng�y t?o l?i m?i</span>
                 <span className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
                   <Calendar size={14} className="text-gray-400" />
                   {formatInvitationDate(invitation.invited_at)}
                 </span>
               </div>
               <div>
-                <span className="mb-1 block text-xs text-gray-400">Trạng thái gửi email</span>
+                <span className="mb-1 block text-xs text-gray-400">Tr?ng th�i g?i email</span>
                 <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getInvitationSendStatusColor(invitation.send_status)}`}>
                   {getInvitationSendStatusLabel(invitation.send_status)}
                 </span>
                 {invitation.last_send_error ? (
-                  <p className="mt-2 text-[11px] text-red-500">Lỗi gần nhất: {invitation.last_send_error}</p>
+                  <p className="mt-2 text-[11px] text-red-500">L?i g?n nh?t: {invitation.last_send_error}</p>
                 ) : null}
               </div>
             </div>
 
-            <div className="space-y-2 rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+            <div className="space-y-2 rounded-xl border border-gray-100 bg-vanilla-50/50 p-4">
               <div className="flex items-center justify-between">
-                <span className="block text-xs text-gray-400">Độ hoàn thiện hồ sơ</span>
+                <span className="block text-xs text-gray-400">�? ho�n thi?n h? so</span>
                 <span
                   className={`rounded-full border px-2 py-0.5 text-xs font-bold ${
                     ready ? 'border-green-200 bg-green-50 text-green-700' : 'border-amber-200 bg-amber-50 text-amber-700'
                   }`}
                 >
-                  {ready ? 'Đủ điều kiện duyệt' : 'Cần bổ sung'}
+                  {ready ? '�? di?u ki?n duy?t' : 'C?n b? sung'}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -117,11 +117,11 @@ export function InvitationDetailModal({
 
               {missingFieldLabels.length > 0 ? (
                 <div className="text-[11px] font-medium text-red-500">
-                  Thiếu: {missingFieldLabels.join(', ')}
+                  Thi?u: {missingFieldLabels.join(', ')}
                 </div>
               ) : (
                 <div className="flex items-center gap-1 text-[11px] font-medium text-green-600">
-                  <CheckCheck size={12} /> Hồ sơ đã đủ thông tin bắt buộc
+                  <CheckCheck size={12} /> H? so d� d? th�ng tin b?t bu?c
                 </div>
               )}
             </div>
@@ -131,7 +131,7 @@ export function InvitationDetailModal({
             <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-blue-900">
               <Link size={16} className="shrink-0 text-blue-600" />
               <div className="min-w-0 flex-1">
-                <span className="block font-bold">Link tự điền thông tin của ứng viên</span>
+                <span className="block font-bold">Link t? di?n th�ng tin c?a ?ng vi�n</span>
                 <p className="truncate font-mono text-[11px] text-blue-700">{shareUrl}</p>
               </div>
             </div>
@@ -154,63 +154,63 @@ export function InvitationDetailModal({
           </div>
 
             <div className="space-y-3">
-            <h3 className="border-b border-gray-100 pb-1 text-xs font-bold uppercase tracking-wider text-gray-900">Thông tin ứng viên khai báo</h3>
+            <h3 className="border-b border-gray-100 pb-1 text-xs font-bold uppercase tracking-wider text-gray-900">Th�ng tin ?ng vi�n khai b�o</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div><span className="block text-xs text-gray-400">Họ và tên</span><span className="text-sm font-medium text-gray-800">{invitation.full_name || '—'}</span></div>
-              <div><span className="block text-xs text-gray-400">Số điện thoại</span><span className="text-sm font-medium text-gray-800">{invitation.phone || '—'}</span></div>
-              <div><span className="block text-xs text-gray-400">Địa chỉ email</span><span className="block truncate text-sm font-medium text-gray-800">{invitation.email || '—'}</span></div>
-              <div><span className="block text-xs text-gray-400">Ngày sinh</span><span className="text-sm font-medium text-gray-800">{invitation.date_of_birth ? formatInvitationDate(invitation.date_of_birth) : '—'}</span></div>
-              <div><span className="block text-xs text-gray-400">Giới tính</span><span className="text-sm font-medium text-gray-800">{invitation.gender === 'male' ? 'Nam' : invitation.gender === 'female' ? 'Nữ' : invitation.gender === 'other' ? 'Khác' : '—'}</span></div>
-              <div><span className="block text-xs text-gray-400">Số CCCD / hộ chiếu</span><span className="text-sm font-medium text-gray-800">{invitation.cccd || '—'}</span></div>
-              <div className="sm:col-span-2"><span className="block text-xs text-gray-400">Địa chỉ thường trú</span><span className="text-sm font-medium text-gray-800">{invitation.address || '—'}</span></div>
-              <div className="sm:col-span-2"><span className="block text-xs text-gray-400">Thông tin liên hệ khẩn cấp</span><span className="text-sm font-medium text-gray-800">{invitation.emergency_contact || '—'}</span></div>
+              <div><span className="block text-xs text-gray-400">H? v� t�n</span><span className="text-sm font-medium text-gray-800">{invitation.full_name || '�'}</span></div>
+              <div><span className="block text-xs text-gray-400">S? di?n tho?i</span><span className="text-sm font-medium text-gray-800">{invitation.phone || '�'}</span></div>
+              <div><span className="block text-xs text-gray-400">�?a ch? email</span><span className="block truncate text-sm font-medium text-gray-800">{invitation.email || '�'}</span></div>
+              <div><span className="block text-xs text-gray-400">Ng�y sinh</span><span className="text-sm font-medium text-gray-800">{invitation.date_of_birth ? formatInvitationDate(invitation.date_of_birth) : '�'}</span></div>
+              <div><span className="block text-xs text-gray-400">Gi?i t�nh</span><span className="text-sm font-medium text-gray-800">{invitation.gender === 'male' ? 'Nam' : invitation.gender === 'female' ? 'N?' : invitation.gender === 'other' ? 'Kh�c' : '�'}</span></div>
+              <div><span className="block text-xs text-gray-400">S? CCCD / h? chi?u</span><span className="text-sm font-medium text-gray-800">{invitation.cccd || '�'}</span></div>
+              <div className="sm:col-span-2"><span className="block text-xs text-gray-400">�?a ch? thu?ng tr�</span><span className="text-sm font-medium text-gray-800">{invitation.address || '�'}</span></div>
+              <div className="sm:col-span-2"><span className="block text-xs text-gray-400">Th�ng tin li�n h? kh?n c?p</span><span className="text-sm font-medium text-gray-800">{invitation.emergency_contact || '�'}</span></div>
             </div>
           </div>
 
             <div className="space-y-3">
-            <h3 className="border-b border-gray-100 pb-1 text-xs font-bold uppercase tracking-wider text-gray-900">Đề xuất công việc</h3>
+            <h3 className="border-b border-gray-100 pb-1 text-xs font-bold uppercase tracking-wider text-gray-900">�? xu?t c�ng vi?c</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div><span className="block text-xs text-gray-400">Cửa hàng dự kiến</span><span className="text-sm font-medium text-gray-800">{mockStores.find((store) => store.id === invitation.store_id)?.name || invitation.store_id}</span></div>
-              <div><span className="block text-xs text-gray-400">Vị trí dự kiến</span><span className="text-sm font-medium text-gray-800">{mockPositions.find((position) => position.id === invitation.position_id)?.name || invitation.position_id}</span></div>
-              <div><span className="block text-xs text-gray-400">Vai trò phân quyền</span><span className="text-sm font-medium uppercase text-primary-600">{invitation.role}</span></div>
-              <div><span className="block text-xs text-gray-400">Ngày gia nhập</span><span className="text-sm font-medium text-gray-800">{invitation.hire_date ? formatInvitationDate(invitation.hire_date) : '—'}</span></div>
-              <div><span className="block text-xs text-gray-400">Bộ phận</span><span className="text-sm font-medium text-gray-800">{invitation.department_name || '—'}</span></div>
-              <div><span className="block text-xs text-gray-400">Loại nhân viên</span><span className="text-sm font-medium text-gray-800">{employmentType}</span></div>
-              <div><span className="block text-xs text-gray-400">Cấp bậc</span><span className="text-sm font-medium text-gray-800">{invitation.job_level || '—'}</span></div>
-              <div><span className="block text-xs text-gray-400">Lương chính thức</span><span className="text-sm font-medium text-gray-800">{currency(invitation.official_salary)}</span></div>
-              <div><span className="block text-xs text-gray-400">Lương KPI</span><span className="text-sm font-medium text-gray-800">{currency(invitation.kpi_salary)}</span></div>
-              <div><span className="block text-xs text-gray-400">Có thử việc</span><span className="text-sm font-medium text-gray-800">{invitation.is_probationary ? 'Có' : 'Không'}</span></div>
-              <div><span className="block text-xs text-gray-400">Ngày kết thúc thử việc</span><span className="text-sm font-medium text-gray-800">{invitation.probation_end_date ? formatInvitationDate(invitation.probation_end_date) : '—'}</span></div>
-              <div><span className="block text-xs text-gray-400">Kiểu lương thử việc</span><span className="text-sm font-medium text-gray-800">{invitation.probation_salary_mode === 'fixed_amount' ? 'Mức cố định' : 'Theo % lương chính thức'}</span></div>
-              <div><span className="block text-xs text-gray-400">Lương thử việc</span><span className="text-sm font-medium text-gray-800">{currency(invitation.probation_salary_value)}</span></div>
+              <div><span className="block text-xs text-gray-400">C?a h�ng d? ki?n</span><span className="text-sm font-medium text-gray-800">{mockStores.find((store) => store.id === invitation.store_id)?.name || invitation.store_id}</span></div>
+              <div><span className="block text-xs text-gray-400">V? tr� d? ki?n</span><span className="text-sm font-medium text-gray-800">{mockPositions.find((position) => position.id === invitation.position_id)?.name || invitation.position_id}</span></div>
+              <div><span className="block text-xs text-gray-400">Vai tr� ph�n quy?n</span><span className="text-sm font-medium uppercase text-primary-600">{invitation.role}</span></div>
+              <div><span className="block text-xs text-gray-400">Ng�y gia nh?p</span><span className="text-sm font-medium text-gray-800">{invitation.hire_date ? formatInvitationDate(invitation.hire_date) : '�'}</span></div>
+              <div><span className="block text-xs text-gray-400">B? ph?n</span><span className="text-sm font-medium text-gray-800">{invitation.department_name || '�'}</span></div>
+              <div><span className="block text-xs text-gray-400">Lo?i nh�n vi�n</span><span className="text-sm font-medium text-gray-800">{employmentType}</span></div>
+              <div><span className="block text-xs text-gray-400">C?p b?c</span><span className="text-sm font-medium text-gray-800">{invitation.job_level || '�'}</span></div>
+              <div><span className="block text-xs text-gray-400">Luong ch�nh th?c</span><span className="text-sm font-medium text-gray-800">{currency(invitation.official_salary)}</span></div>
+              <div><span className="block text-xs text-gray-400">Luong KPI</span><span className="text-sm font-medium text-gray-800">{currency(invitation.kpi_salary)}</span></div>
+              <div><span className="block text-xs text-gray-400">C� th? vi?c</span><span className="text-sm font-medium text-gray-800">{invitation.is_probationary ? 'C�' : 'Kh�ng'}</span></div>
+              <div><span className="block text-xs text-gray-400">Ng�y k?t th�c th? vi?c</span><span className="text-sm font-medium text-gray-800">{invitation.probation_end_date ? formatInvitationDate(invitation.probation_end_date) : '�'}</span></div>
+              <div><span className="block text-xs text-gray-400">Ki?u luong th? vi?c</span><span className="text-sm font-medium text-gray-800">{invitation.probation_salary_mode === 'fixed_amount' ? 'M?c c? d?nh' : 'Theo % luong ch�nh th?c'}</span></div>
+              <div><span className="block text-xs text-gray-400">Luong th? vi?c</span><span className="text-sm font-medium text-gray-800">{currency(invitation.probation_salary_value)}</span></div>
             </div>
           </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-400">Ghi chú tuyển dụng (HR)</span>
-              <div className="min-h-[60px] whitespace-pre-line rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
-                {invitation.hr_notes || 'Không có ghi chú tuyển dụng'}
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-400">Ghi ch� tuy?n d?ng (HR)</span>
+              <div className="min-h-[60px] whitespace-pre-line rounded-lg border border-gray-100 bg-vanilla-50 p-3 text-xs text-gray-600">
+                {invitation.hr_notes || 'Kh�ng c� ghi ch� tuy?n d?ng'}
               </div>
             </div>
             <div>
-              <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-400">Ý kiến / phản hồi từ ứng viên</span>
-              <div className="min-h-[60px] whitespace-pre-line rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
-                {invitation.candidate_notes || 'Không có phản hồi từ ứng viên'}
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-gray-400">� ki?n / ph?n h?i t? ?ng vi�n</span>
+              <div className="min-h-[60px] whitespace-pre-line rounded-lg border border-gray-100 bg-vanilla-50 p-3 text-xs text-gray-600">
+                {invitation.candidate_notes || 'Kh�ng c� ph?n h?i t? ?ng vi�n'}
               </div>
             </div>
           </div>
 
             {invitation.status === 'needs_revision' && invitation.revision_request_note ? (
               <div className="rounded-2xl border border-purple-100 bg-purple-50 p-3">
-              <span className="mb-1 block text-xs font-bold text-purple-950">Nội dung yêu cầu bổ sung đã gửi</span>
+              <span className="mb-1 block text-xs font-bold text-purple-950">N?i dung y�u c?u b? sung d� g?i</span>
               <p className="text-xs italic text-purple-800">&ldquo;{invitation.revision_request_note}&rdquo;</p>
               </div>
             ) : null}
 
             <div className="space-y-3">
-            <h3 className="border-b border-gray-100 pb-1 text-xs font-bold uppercase tracking-wider text-gray-900">Nội dung email lời mời</h3>
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+            <h3 className="border-b border-gray-100 pb-1 text-xs font-bold uppercase tracking-wider text-gray-900">N?i dung email l?i m?i</h3>
+            <div className="rounded-2xl border border-gray-200 bg-vanilla-50 p-4">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase text-gray-500">Template</span>
                 <span className="rounded-full border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700">
@@ -224,7 +224,7 @@ export function InvitationDetailModal({
           </div>
 
             <div className="space-y-3">
-            <h3 className="border-b border-gray-100 pb-1 text-xs font-bold uppercase tracking-wider text-gray-900">Lịch sử gửi mock email</h3>
+            <h3 className="border-b border-gray-100 pb-1 text-xs font-bold uppercase tracking-wider text-gray-900">L?ch s? g?i mock email</h3>
             <div className="space-y-3">
               {sendLogs.length > 0 ? (
                 sendLogs.map((log) => (
@@ -234,17 +234,17 @@ export function InvitationDetailModal({
                         {getInvitationSendStatusLabel(log.status)}
                       </span>
                       <span className="text-xs text-gray-500">{formatInvitationDate(log.attempted_at)}</span>
-                      {log.attempted_by ? <span className="text-xs text-gray-500">• Bởi: {log.attempted_by}</span> : null}
+                      {log.attempted_by ? <span className="text-xs text-gray-500">� B?i: {log.attempted_by}</span> : null}
                     </div>
-                    {log.error ? <p className="mb-2 text-xs text-red-600">Lỗi: {log.error}</p> : null}
-                    <pre className="whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-600">
+                    {log.error ? <p className="mb-2 text-xs text-red-600">L?i: {log.error}</p> : null}
+                    <pre className="whitespace-pre-wrap rounded-lg bg-vanilla-50 p-3 text-xs leading-relaxed text-gray-600">
                       {log.snapshot}
                     </pre>
                   </div>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
-                  Chưa có lần gửi email nào được ghi nhận.
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-vanilla-50 p-4 text-sm text-gray-500">
+                  Chua c� l?n g?i email n�o du?c ghi nh?n.
                 </div>
               )}
             </div>
@@ -259,7 +259,7 @@ export function InvitationDetailModal({
                 className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-600"
               >
                 <Send size={16} />
-                Gửi email
+                G?i email
               </button>
             ) : null}
             {['sent_success', 'sent_failed'].includes(invitation.send_status || '') && ['sent', 'needs_revision'].includes(invitation.status) ? (
@@ -268,7 +268,7 @@ export function InvitationDetailModal({
                 className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-600"
               >
                 <RotateCcw size={16} />
-                Gửi lại email
+                G?i l?i email
               </button>
             ) : null}
             {invitation.status === 'pending_approval' ? (
@@ -278,31 +278,31 @@ export function InvitationDetailModal({
                   className="flex items-center gap-1.5 rounded-xl bg-green-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-600"
                   disabled={!ready}
                   style={{ opacity: ready ? 1 : 0.6, cursor: ready ? 'pointer' : 'not-allowed' }}
-                  title={ready ? 'Duyệt hồ sơ' : 'Hồ sơ chưa hoàn thiện đủ 100% để duyệt'}
+                  title={ready ? 'Duy?t h? so' : 'H? so chua ho�n thi?n d? 100% d? duy?t'}
                 >
                   <UserCheck size={16} />
-                  Duyệt hồ sơ
+                  Duy?t h? so
                 </button>
                 <button
                   onClick={() => onRequestRevision(invitation.id)}
                   className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-amber-600"
                 >
                   <AlertCircle size={16} />
-                  Yêu cầu bổ sung
+                  Y�u c?u b? sung
                 </button>
                 <button
                   onClick={() => onReject(invitation.id)}
                   className="flex items-center gap-1.5 rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-600"
                 >
                   <UserX size={16} />
-                  Từ chối
+                  T? ch?i
                 </button>
               </>
             ) : null}
             </div>
             <button
               onClick={onClose}
-              className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 sm:w-auto"
+              className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-primary-50 sm:w-auto"
             >
               {INVITATIONS_COPY.backToCloseLabel}
             </button>

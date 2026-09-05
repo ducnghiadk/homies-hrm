@@ -56,7 +56,7 @@ export default function StoreViolationsPage() {
   const periods = ['2026-02', '2026-01', '2025-12']
 
   return (
-    <AppShell title="📊 Tổng hợp lỗi cửa hàng" backHref="/kpi/violations">
+    <AppShell title="Báo Cáo Tổng Hợp Lỗi Cửa Hàng" backHref="/kpi/violations">
       <div className="space-y-4">
         <Link href="/kpi/violations" className="inline-flex items-center gap-1 text-sm no-underline" style={{ color: 'var(--primary)' }}>
           <ChevronLeft size={16} /> Quay lại
@@ -74,13 +74,12 @@ export default function StoreViolationsPage() {
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-2">
           {[
-            { label: 'Tổng lỗi', value: totalViolations, icon: '⚠️', color: '#D9381E' },
-            { label: 'Điểm trừ TB', value: avgPenalty, icon: '📉', color: '#F6C85F' },
-            { label: 'NV nhiều lỗi', value: worstEmployee?.emp?.full_name?.split(' ').pop() || '—', icon: '👤', color: '#7c3aed' },
-            { label: 'Lỗi phổ biến', value: mostCommon?.code || '—', icon: '🔄', color: '#2F6FA8' },
+            { label: 'Tổng lỗi', value: totalViolations, color: '#D9381E' },
+            { label: 'Điểm trừ TB', value: avgPenalty, color: '#F6C85F' },
+            { label: 'NV nhiều lỗi', value: worstEmployee?.emp?.full_name?.split(' ').pop() || '—', color: '#7c3aed' },
+            { label: 'Lỗi phổ biến', value: mostCommon?.code || '—', color: '#2F6FA8' },
           ].map((card, i) => (
             <div key={i} className="card p-3 text-center">
-              <div className="text-xl mb-1">{card.icon}</div>
               <div className="text-lg font-black" style={{ color: card.color }}>
                 {card.value}
               </div>
@@ -91,7 +90,7 @@ export default function StoreViolationsPage() {
 
         {/* Severity chart (horizontal bars) */}
         <div className="card p-3">
-          <h4 className="text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>📊 Phân bổ theo mức độ</h4>
+          <h4 className="text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>Phân bổ theo mức độ</h4>
           <div className="space-y-2">
             {[
               { key: 'minor', label: 'Nhẹ', color: '#2F6FA8' },
@@ -121,11 +120,11 @@ export default function StoreViolationsPage() {
         {/* Employee table */}
         <div className="card overflow-hidden">
           <div className="px-3 py-2 text-xs font-bold" style={{ background: 'var(--gray-50)', color: 'var(--text-secondary)' }}>
-            👥 Nhân viên ({employeeSummaries.length})
+            Nhân viên ({employeeSummaries.length})
           </div>
           {employeeSummaries.length === 0 ? (
             <div className="text-center py-6 text-xs" style={{ color: 'var(--text-muted)' }}>
-              🎉 Không có lỗi nào
+              Không có lỗi nào
             </div>
           ) : (
             <div className="divide-y" style={{ borderColor: 'var(--gray-100)' }}>
@@ -157,10 +156,10 @@ export default function StoreViolationsPage() {
         </div>
 
         {/* Export button (UI only) */}
-        <button className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+        <button className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
           style={{ border: '2px dashed var(--gray-300)', color: 'var(--text-muted)' }}
-          onClick={() => toast.info('📥 Tính năng xuất Excel đang phát triển')}>
-          📥 Xuất báo cáo Excel
+          onClick={() => toast.info('Tính năng xuất Excel đang phát triển')}>
+          Xuất báo cáo Excel
         </button>
       </div>
     </AppShell>

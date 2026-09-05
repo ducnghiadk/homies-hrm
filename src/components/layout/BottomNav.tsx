@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, Calendar, CalendarOff, Home, MoreHorizontal, Settings, User, Users, Wallet } from 'lucide-react'
+import { Calendar, CalendarOff, Home, MoreHorizontal, Settings, User, Users, Wallet, Bell } from 'lucide-react'
 import { useAuthStore } from '@/store/auth-store'
 import { cn } from '@/lib/utils'
 
@@ -22,7 +22,7 @@ export default function BottomNav() {
   const navItems: NavItem[] = role === 'employee'
     ? [
         { href: '/', icon: Home, label: 'Trang chủ' },
-        { href: '/schedules', icon: Calendar, label: 'Lịch làm' },
+        { href: '/my-schedule', icon: Calendar, label: 'Lịch làm' },
         { href: '/leave', icon: CalendarOff, label: 'Nghỉ phép' },
         { href: '/payroll', icon: Wallet, label: 'Lương' },
         { href: '/profile', icon: User, label: 'Tôi' },
@@ -31,7 +31,7 @@ export default function BottomNav() {
       ? [
           { href: '/', icon: Home, label: 'Trang chủ' },
           { href: '/employees', icon: Users, label: 'Nhân sự' },
-          { href: '/schedules', icon: Calendar, label: 'Lịch làm' },
+          { href: '/my-schedule', icon: Calendar, label: 'Lịch làm' },
           { href: '/leave', icon: CalendarOff, label: 'Nghỉ phép' },
           { href: '/profile', icon: User, label: 'Tôi' },
         ]
@@ -39,15 +39,15 @@ export default function BottomNav() {
         ? [
             { href: '/', icon: Home, label: 'Trang chủ' },
             { href: '/employees', icon: Users, label: 'Nhân sự' },
-            { href: '/schedules', icon: Calendar, label: 'Xếp lịch' },
+            { href: '/schedule', icon: Calendar, label: 'Xếp lịch' },
             { href: '/leave', icon: CalendarOff, label: 'Nghỉ phép' },
             { href: '/more', icon: MoreHorizontal, label: 'Thêm' },
           ]
         : [
             { href: '/', icon: Home, label: 'Trang chủ' },
             { href: '/employees', icon: Users, label: 'Nhân sự' },
-            { href: '/leave', icon: CalendarOff, label: 'Nghỉ phép' },
-            { href: '/reports', icon: BarChart3, label: 'Báo cáo' },
+            { href: '/approvals', icon: Bell, label: 'Duyệt' },
+            { href: '/payroll', icon: Wallet, label: 'Lương' },
             { href: '/settings', icon: Settings, label: 'Cài đặt' },
           ]
 

@@ -32,21 +32,19 @@ import { cn } from '@/lib/utils'
 import { mockViolationRecords, mockEvaluations, mockPromotionReviews, getCurrentPeriod } from '@/lib/mock-data-kpi'
 
 const managementItems = [
-  { icon: BarChart3, label: 'Báo cáo', description: 'Xem báo cáo doanh thu, nhân sự', href: '/reports', iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
-  { icon: FileText, label: 'Hợp đồng nhân sự', description: 'Xem và ký hợp đồng trên app', href: '/employees/contracts', iconBg: 'bg-indigo-100', iconColor: 'text-indigo-600' },
-  { icon: Calculator, label: 'Định biên & Xếp ca', description: 'Tính toán nhân sự, tạo lịch tự động', href: '/settings/staffing', iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
-  { icon: CreditCard, label: 'Bảng lương', description: 'Quản lý lương, thưởng, khấu trừ', href: '/payroll', iconBg: 'bg-success-100', iconColor: 'text-success-600' },
-  { icon: MessageCircle, label: 'Chat', description: 'Nhắn tin với nhân viên', href: '/chat', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-  { icon: Store, label: 'Cửa hàng', description: 'Quản lý danh sách cửa hàng', href: '/stores', iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
+  { icon: BarChart3, label: 'Báo cáo & Phân tích', description: 'Xem báo cáo giờ công, nhân sự, chi phí', href: '/reports', iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
+  { icon: FileText, label: 'Hợp đồng lao động', description: 'Mẫu hợp đồng, ký duyệt trên app', href: '/employees/contracts', iconBg: 'bg-indigo-100', iconColor: 'text-indigo-600' },
+  { icon: Target, label: 'Thưởng BSC Cửa hàng', description: 'Bảng quyết toán & chia thưởng BSC', href: '/bsc-bonus', iconBg: 'bg-amber-100', iconColor: 'text-amber-700' },
+  { icon: CreditCard, label: 'Bảng lương', description: 'Bảng tính lương, phiếu lương, tạm ứng', href: '/payroll', iconBg: 'bg-success-100', iconColor: 'text-success-600' },
+  { icon: ClipboardCheck, label: 'Sổ vận hành ca', description: 'Việc hằng ngày, bàn giao ca, sự cố', href: '/tasks/daily', iconBg: 'bg-teal-100', iconColor: 'text-teal-700' },
+  { icon: MessageCircle, label: 'Chat & Trao đổi', description: 'Nhắn tin nội bộ với nhân viên', href: '/chat', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
 ]
 
 const settingsItems = [
   { icon: Bell, label: 'Thông báo', href: '/notifications', iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
-  { icon: Wifi, label: 'WiFi Check-in', description: 'Cài đặt WiFi chấm công', href: '/settings/wifi', iconBg: 'bg-cyan-100', iconColor: 'text-cyan-600' },
-  { icon: Settings, label: 'Cài đặt chung', description: 'Cửa hàng, quy tắc, phân quyền', href: '/settings', iconBg: 'bg-gray-100', iconColor: 'text-gray-600' },
-  { icon: Shield, label: 'Demo Phân Quyền (RBAC)', description: 'Mới • Giả lập và so sánh quyền các vai trò', href: '/rbac', iconBg: 'bg-indigo-100', iconColor: 'text-indigo-600' },
-  { icon: WifiOff, label: 'Demo Chế Độ Ngoại Tuyến', description: 'Mới • Trải nghiệm offline-first và sync dữ liệu', href: '/offline-demo', iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
-  { icon: HelpCircle, label: 'Trợ giúp', href: '/help', iconBg: 'bg-sky-100', iconColor: 'text-sky-600' },
+  { icon: Wifi, label: 'WiFi Check-in', description: 'Cài đặt WiFi chấm công chi nhánh', href: '/settings/wifi', iconBg: 'bg-cyan-100', iconColor: 'text-cyan-600' },
+  { icon: Settings, label: 'Cài đặt hệ thống', description: '5 nhóm cài đặt chuẩn SaaS', href: '/settings', iconBg: 'bg-primary-50', iconColor: 'text-gray-600' },
+  { icon: HelpCircle, label: 'Trợ giúp & Hướng dẫn', href: '/policies', iconBg: 'bg-sky-100', iconColor: 'text-sky-600' },
 ]
 
 type MenuItem = {
@@ -70,7 +68,7 @@ function MenuSection({ title, items }: { title: string; items: MenuItem[] }) {
             <Link
               key={item.href}
               href={item.href}
-              className="flex items-center gap-3 p-4 transition-colors hover:bg-gray-50 active:bg-gray-100"
+              className="flex items-center gap-3 p-4 transition-colors hover:bg-vanilla-50 active:bg-primary-50"
             >
               <div className={cn('flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl', item.iconBg)}>
                 <Icon size={20} className={item.iconColor} />
@@ -105,25 +103,24 @@ export default function MorePage() {
   const kpiEmployeeItems: MenuItem[] = [
     { icon: Target, label: 'KPI của tôi', href: '/kpi', iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
     { icon: ClipboardCheck, label: 'Tự đánh giá', href: '/kpi/evaluate', iconBg: 'bg-indigo-100', iconColor: 'text-indigo-600' },
-    { icon: AlertTriangle, label: 'Lỗi vận hành', href: '/kpi/violations', iconBg: 'bg-error-100', iconColor: 'text-error-600', badge: myViolations > 0 ? `${myViolations} mới` : undefined },
+    { icon: AlertTriangle, label: 'Sự cố & Vi phạm', href: '/kpi/violations', iconBg: 'bg-error-100', iconColor: 'text-error-600', badge: myViolations > 0 ? `${myViolations} mới` : undefined },
     { icon: Award, label: 'Bảng xếp hạng', href: '/kpi/leaderboard', iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
   ]
 
   const kpiManagerItems: MenuItem[] = [
+    { icon: Target, label: 'Thưởng BSC Cửa hàng', href: '/bsc-bonus', iconBg: 'bg-amber-100', iconColor: 'text-amber-700' },
     { icon: ClipboardCheck, label: 'Review KPI', href: '/kpi/review', iconBg: 'bg-primary-100', iconColor: 'text-primary-600', badge: pendingReviews > 0 ? `${pendingReviews} chờ` : undefined },
-    { icon: AlertTriangle, label: 'Log lỗi nhân viên', href: '/kpi/violations/log', iconBg: 'bg-error-100', iconColor: 'text-error-600' },
-    { icon: AlertTriangle, label: 'Log lỗi cuối ca', description: 'Mới', href: '/kpi/violations/batch', iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
-    { icon: BarChart3, label: 'Xét khiếu nại', href: '/kpi/violations/appeals', iconBg: 'bg-warning-100', iconColor: 'text-warning-600', badge: pendingAppeals > 0 ? `${pendingAppeals} chờ` : undefined },
+    { icon: AlertTriangle, label: 'Nhật ký ghi lỗi ca', href: '/kpi/violations/log', iconBg: 'bg-error-100', iconColor: 'text-error-600' },
+    { icon: AlertTriangle, label: 'Xét khiếu nại vi phạm', href: '/kpi/violations/appeals', iconBg: 'bg-warning-100', iconColor: 'text-warning-600', badge: pendingAppeals > 0 ? `${pendingAppeals} chờ` : undefined },
     { icon: BarChart3, label: 'Báo cáo KPI', href: '/kpi/reports', iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
-    { icon: Target, label: 'Xét thăng tiến', href: '/kpi/promotion', iconBg: 'bg-success-100', iconColor: 'text-success-600', badge: pendingPromos > 0 ? `${pendingPromos} chờ` : undefined },
-    { icon: Settings, label: 'Cài đặt KPI', href: '/kpi/settings', iconBg: 'bg-gray-100', iconColor: 'text-gray-600' },
+    { icon: Settings, label: 'Cài đặt BSC & Khung lỗi', href: '/settings/bsc', iconBg: 'bg-primary-50', iconColor: 'text-gray-600' },
   ]
 
   const scheduleManagerItems: MenuItem[] = [
-    { icon: CalendarDays, label: 'Bảng xếp lịch', description: 'Board tuần, nhu cầu, gán người, publish', href: '/schedules', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-    { icon: Settings, label: 'Setting Ca', description: 'Tên ca, khung giờ, vị trí được làm ca', href: '/settings/schedule-rules/shifts', iconBg: 'bg-violet-100', iconColor: 'text-violet-600' },
+    { icon: CalendarDays, label: 'Bảng xếp lịch tuần', description: 'Board tuần, nhu cầu, gán người, publish', href: '/schedule', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+    { icon: Settings, label: 'Khung ca làm việc', description: 'Tên ca, khung giờ, vị trí được làm ca', href: '/settings/schedule-rules/shifts', iconBg: 'bg-violet-100', iconColor: 'text-violet-600' },
     { icon: SlidersHorizontal, label: 'Quy tắc xếp ca', description: 'Cảnh báo, chặn xếp trùng, ngưỡng giờ làm', href: '/settings/schedule-rules', iconBg: 'bg-sky-100', iconColor: 'text-sky-600' },
-    { icon: ListChecks, label: 'Đăng ký ca mong muốn', description: 'Preference của nhân viên trước khi xếp', href: '/settings/schedule-rules/preferences', iconBg: 'bg-amber-100', iconColor: 'text-amber-700' },
+    { icon: Calculator, label: 'Định biên nhân sự', description: 'Số lượng nhân sự tối ưu theo giờ cao điểm', href: '/settings/staffing', iconBg: 'bg-indigo-100', iconColor: 'text-indigo-600' },
   ]
 
   return (

@@ -54,7 +54,7 @@ export default function WifiSimulator({ onWifiChange, currentWifi }: Props) {
       {/* Dropdown trigger */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-left transition-colors hover:bg-gray-100"
+        className="w-full flex items-center gap-2 bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-left transition-colors hover:bg-primary-50"
       >
         {currentWifi ? (
           <Wifi size={14} className="text-primary-500 shrink-0" />
@@ -74,7 +74,7 @@ export default function WifiSimulator({ onWifiChange, currentWifi }: Props) {
             <button
               key={opt.value}
               onClick={() => handleSelect(opt.value)}
-              className={`w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors ${
+              className={`w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 hover:bg-vanilla-50 transition-colors ${
                 (currentWifi?.ssid === opt.value || (!currentWifi && opt.value === 'none'))
                   ? 'bg-primary-50 text-primary-700 font-medium'
                   : 'text-dark-700'

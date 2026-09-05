@@ -16,7 +16,7 @@ const wifiConfigs: StoreWifiConfig[] = [
   {
     id: 'wifi-001',
     store_id: 'store-001',
-    wifi_ssid: 'BobaHouse_Q1',
+    wifi_ssid: 'Homies_HoBaPhan',
     wifi_bssid: 'AA:BB:CC:11:22:33',
     is_active: true,
     created_at: '2026-01-01T00:00:00',
@@ -24,7 +24,7 @@ const wifiConfigs: StoreWifiConfig[] = [
   {
     id: 'wifi-002',
     store_id: 'store-002',
-    wifi_ssid: 'BobaHouse_ThuDuc',
+    wifi_ssid: 'Homies_Duong429',
     wifi_bssid: 'AA:BB:CC:44:55:66',
     is_active: true,
     created_at: '2026-01-01T00:00:00',
@@ -32,7 +32,7 @@ const wifiConfigs: StoreWifiConfig[] = [
   {
     id: 'wifi-003',
     store_id: 'store-003',
-    wifi_ssid: 'BobaHouse_Q3',
+    wifi_ssid: 'Homies_LeVanSy',
     wifi_bssid: 'AA:BB:CC:77:88:99',
     is_active: true,
     created_at: '2026-01-01T00:00:00',

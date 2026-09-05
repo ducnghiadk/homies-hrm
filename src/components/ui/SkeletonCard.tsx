@@ -43,7 +43,7 @@ export function SkeletonCard({
       <div
         className={`
           w-full p-4 rounded-xl
-          bg-gray-50 border border-gray-100
+          bg-vanilla-50 border border-gray-100
           flex items-center gap-3
           ${className}
         `}

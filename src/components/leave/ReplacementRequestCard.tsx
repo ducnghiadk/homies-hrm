@@ -102,7 +102,7 @@ export function ReplacementRequestCard({ request, onStatusChange }: ReplacementR
         </div>
 
         {/* Shift details */}
-        <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+        <div className="bg-vanilla-50 rounded-xl p-3 space-y-2">
           <div className="flex items-center gap-2">
             <Clock size={14} className="text-primary-500" />
             <span className="text-sm font-bold text-gray-700">
@@ -137,12 +137,12 @@ export function ReplacementRequestCard({ request, onStatusChange }: ReplacementR
               onChange={e => setRejectReason(e.target.value)}
               placeholder="VD: Em có lịch học..."
               rows={2}
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs bg-gray-50 resize-none placeholder-gray-300 focus:ring-2 focus:ring-red-200 focus:border-error-300"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs bg-vanilla-50 resize-none placeholder-gray-300 focus:ring-2 focus:ring-red-200 focus:border-error-300"
             />
             <div className="flex gap-2">
               <button
                 onClick={() => setShowRejectForm(false)}
-                className="flex-1 py-2 rounded-xl text-xs font-medium text-gray-500 bg-gray-100"
+                className="flex-1 py-2 rounded-xl text-xs font-medium text-gray-500 bg-primary-50"
               >
                 Hủy
               </button>
@@ -162,7 +162,7 @@ export function ReplacementRequestCard({ request, onStatusChange }: ReplacementR
         <div className="px-4 pb-4 flex gap-2">
           <button
             onClick={() => setShowRejectForm(true)}
-            className="flex-1 py-3 rounded-xl text-sm font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors active:scale-[0.97]"
+            className="flex-1 py-3 rounded-xl text-sm font-medium text-gray-500 bg-primary-50 hover:bg-gray-200 transition-colors active:scale-[0.97]"
           >
             Từ chối
           </button>

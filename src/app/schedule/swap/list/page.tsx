@@ -90,7 +90,7 @@ function SwapCard({ req, isIncoming, onRespond, isManager, onManagerAction, onCa
 
       {/* Details */}
       <div className="flex items-center gap-2">
-        <div className="flex-1 p-2.5 rounded-xl bg-gray-50 text-center">
+        <div className="flex-1 p-2.5 rounded-xl bg-vanilla-50 text-center">
           <p className="text-[9px] text-gray-400">Người yêu cầu</p>
           <p className="text-xs font-bold text-dark-700">{requester?.full_name.split(' ').slice(-2).join(' ')}</p>
           {reqShift && reqSchedule && (
@@ -100,7 +100,7 @@ function SwapCard({ req, isIncoming, onRespond, isManager, onManagerAction, onCa
           )}
         </div>
         <ArrowRightLeft size={14} className="text-gray-300 shrink-0" />
-        <div className="flex-1 p-2.5 rounded-xl bg-gray-50 text-center">
+        <div className="flex-1 p-2.5 rounded-xl bg-vanilla-50 text-center">
           <p className="text-[9px] text-gray-400">{req.type === 'swap' ? 'Đổi với' : 'Người thay'}</p>
           <p className="text-xs font-bold text-dark-700">{target?.full_name.split(' ').slice(-2).join(' ')}</p>
           {req.type === 'swap' && targetShift && targetSchedule ? (
@@ -153,7 +153,7 @@ function SwapCard({ req, isIncoming, onRespond, isManager, onManagerAction, onCa
       {!isIncoming && !isManager && (req.status === 'pending' || req.status === 'accepted') && onCancel && (
         <button
           onClick={() => onCancel(req.id)}
-          className="w-full py-2 rounded-xl bg-gray-100 text-gray-600 text-xs font-bold hover:bg-gray-200 transition-colors"
+          className="w-full py-2 rounded-xl bg-primary-50 text-gray-600 text-xs font-bold hover:bg-gray-200 transition-colors"
         >
           Hủy yêu cầu
         </button>
@@ -416,7 +416,7 @@ function SwapListPageContent() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => router.back()}
-              className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+              className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center hover:bg-gray-200 transition-colors">
               <ChevronLeft size={20} className="text-gray-500" />
             </button>
             <h1 className="text-xl font-bold text-dark-700">Yêu cầu đổi ca</h1>
@@ -428,7 +428,7 @@ function SwapListPageContent() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        <div className="flex gap-1 bg-primary-50 rounded-xl p-1">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
@@ -469,13 +469,13 @@ function SwapListPageContent() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={tab === 'manager' ? 'Tìm theo người yêu cầu, người nhận, lý do...' : 'Tìm theo tên hoặc lý do...'}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
             <select
               value={tab === 'manager' ? statusFilter : 'all'}
               onChange={e => setStatusFilter(e.target.value as 'all' | ShiftSwapRequest['status'])}
               disabled={tab !== 'manager'}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="all">Tất cả trạng thái</option>
               <option value="pending">Chờ đồng nghiệp</option>
@@ -487,7 +487,7 @@ function SwapListPageContent() {
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as 'latest' | 'oldest' | 'activity')}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="activity">Sắp xếp theo hoạt động mới nhất</option>
               <option value="latest">Mới tạo gần đây</option>
@@ -536,7 +536,7 @@ function SwapListPageContent() {
 export default function SwapListPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-vanilla-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-gray-500 text-sm font-medium">Đang tải danh sách đổi ca...</p>

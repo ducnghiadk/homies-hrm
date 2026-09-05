@@ -8,7 +8,7 @@ import { MOOD_EMOJIS, mockFeedbackBox, getMoodHistory } from '@/lib/mock-data-p3
 import { Send, TrendingUp, AlertTriangle } from 'lucide-react'
 
 export default function WellnessPage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const [tab, setTab] = useState<'mood'|'feedback'>('mood')
   const [selectedMood, setSelectedMood] = useState<number|null>(null)
@@ -18,8 +18,21 @@ export default function WellnessPage() {
   const [fbContent, setFbContent] = useState('')
   const [fbSent, setFbSent] = useState(false)
 
-  useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
-  if (!user) return null
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/wellness')
+  }, [hasHydrated, isAuthenticated, router])
+
+  if (!hasHydrated) {
+    return (
+      <AppShell title="Sức khỏe & Khảo sát 🌿">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (!user || !isAuthenticated) return null
 
   const myMoods = getMoodHistory(user.id)
   const avgMood = myMoods.length > 0 ? myMoods.reduce((s,m) => s + m.mood, 0) / myMoods.length : 0

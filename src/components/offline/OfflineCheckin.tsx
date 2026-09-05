@@ -212,7 +212,7 @@ export function OfflineCheckinCard({ onSuccess, className = '' }: OfflineCheckin
 
       {/* Location details */}
       {location && distanceMeters !== null && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+        <div className="mb-4 p-3 bg-vanilla-50 rounded-lg">
           <p className="text-sm text-gray-600">
             <MapPin className="w-4 h-4 inline mr-1" />
             {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}

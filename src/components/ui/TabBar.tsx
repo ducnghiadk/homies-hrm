@@ -59,7 +59,7 @@ export function TabBar({
       <div
         className={`
           flex gap-1 p-1
-          bg-gray-100 rounded-lg
+          bg-primary-50 rounded-lg
           ${fullWidth ? 'w-full' : 'inline-flex'}
           ${className}
         `}

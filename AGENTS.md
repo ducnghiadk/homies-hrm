@@ -20,6 +20,7 @@ Kiến trúc hiện tại nghiêng về client-side pages + service layer + mock
 - `genesis/`: PRD, ADR, task và tài liệu kiến trúc theo version
 
 ## Context bắt buộc
+- Quy chuẩn thiết kế UI/UX bắt buộc: @DESIGN_RULE_HOMIES_FINAL.md
 - Bản đồ code: @docs/CODEMAP.md
 - Các lỗi đã biết: @docs/KNOWN_ISSUES.md
 - Quy tắc token: @docs/TOKEN_PLAYBOOK.md
@@ -48,10 +49,21 @@ Kiến trúc hiện tại nghiêng về client-side pages + service layer + mock
 15. Khi tôi nói "audit", "kiểm tra", hoặc "health check", chạy skill audit theo đúng quy trình.
 
 ## Lệnh dev
-- `npm run dev`: chạy dev server ở cổng `3333`
+- `npm run dev`: chạy dev server ở cổng `3535`
+- `npm run restart`: restart dev server ở cổng `3535`
 - `npm run build`: build production
 - `npm run start`: chạy bản build
 - `npm run lint`: chạy ESLint
 - `npm run ai:guard`: kiểm tra guardrail AI
 - `npm run ai:context`: in context làm việc AI
 - `npm run ai:ready`: chạy guard + context
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

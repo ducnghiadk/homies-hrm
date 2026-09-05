@@ -94,7 +94,7 @@ function StepBadge({ active, done, index, label }: { active: boolean; done: bool
 }
 
 export default function NewEmployeePage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [form, setForm] = useState<FormData>({
@@ -113,10 +113,10 @@ export default function NewEmployeePage() {
   const [createdEmployee, setCreatedEmployee] = useState<{ id: string; employee_code: string; full_name: string } | null>(null)
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login')
+    if (hasHydrated && !isAuthenticated) {
+      router.push('/login?redirect=/employees/new')
     }
-  }, [isAuthenticated, router])
+  }, [hasHydrated, isAuthenticated, router])
 
   const nextDraft = useMemo(() => EmployeeService.getNextEmployeeDraft(), [])
   const selectedStore = mockStores.find((store) => store.id === form.store_id)
@@ -239,6 +239,16 @@ export default function NewEmployeePage() {
               </button>
             </div>
           </div>
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (!hasHydrated || !user) {
+    return (
+      <AppShell title="Thêm nhân sự">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
         </div>
       </AppShell>
     )

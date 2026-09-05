@@ -79,7 +79,7 @@ export default function ChangesSummary({ originalShifts, currentShifts }: Change
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
-      <div className="p-3 bg-gray-50 border-b font-bold text-sm text-gray-700">
+      <div className="p-3 bg-vanilla-50 border-b font-bold text-sm text-gray-700">
         <FileEdit size={14} className="inline mr-1" /> Tóm tắt thay đổi ({changes.length})
       </div>
       <div className="p-3 max-h-[200px] overflow-y-auto space-y-1.5">

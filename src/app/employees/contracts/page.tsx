@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
@@ -89,7 +89,7 @@ async function readDocxAsText(file: File) {
 
 export default function EmployeeContractsPage() {
   const router = useRouter()
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const [refreshKey, setRefreshKey] = useState(0)
   const [message, setMessage] = useState<string | null>(null)
   const [templateId, setTemplateId] = useState('')
@@ -118,8 +118,8 @@ export default function EmployeeContractsPage() {
   const [fieldFilter, setFieldFilter] = useState<'all' | ContractPlaceholderStatus>('all')
 
   useEffect(() => {
-    if (!isAuthenticated) router.push('/login')
-  }, [isAuthenticated, router])
+    if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/employees/contracts')
+  }, [hasHydrated, isAuthenticated, router])
 
   const templates = ContractService.getTemplates()
   const employees = useMemo(
@@ -328,7 +328,15 @@ export default function EmployeeContractsPage() {
     setMessage('Đã quay về preview theo mẫu hợp đồng trong hệ thống.')
   }
 
-  if (!user) return null
+  if (!hasHydrated || !user) {
+    return (
+      <AppShell title="Hợp đồng nhân sự">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
 
   return (
     <AppShell title="Hợp đồng nhân sự">

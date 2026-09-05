@@ -28,7 +28,7 @@ export function ActionList({ items, maxVisible = 5, viewAllHref }: Props) {
     urgent: 'bg-error-50 border-error-200 hover:border-error-300',
     high: 'bg-warning-50 border-warning-200 hover:border-warning-300',
     medium: 'bg-primary-50 border-primary-200 hover:border-primary-300',
-    low: 'bg-gray-50 border-gray-200 hover:border-gray-300',
+    low: 'bg-vanilla-50 border-gray-200 hover:border-gray-300',
   };
 
   return (

@@ -98,7 +98,7 @@ export function MonthCalendar({
         <button
           onClick={goToPrevMonth}
           className="w-10 h-10 rounded-xl flex items-center justify-center
-            hover:bg-gray-100 active:bg-gray-200 transition-colors"
+            hover:bg-primary-50 active:bg-gray-200 transition-colors"
           aria-label="Tháng trước"
         >
           <ChevronLeft className="w-5 h-5 text-gray-600" />
@@ -119,7 +119,7 @@ export function MonthCalendar({
         <button
           onClick={goToNextMonth}
           className="w-10 h-10 rounded-xl flex items-center justify-center
-            hover:bg-gray-100 active:bg-gray-200 transition-colors"
+            hover:bg-primary-50 active:bg-gray-200 transition-colors"
           aria-label="Tháng sau"
         >
           <ChevronRight className="w-5 h-5 text-gray-600" />
@@ -158,7 +158,7 @@ export function MonthCalendar({
                 day.isCurrentMonth ? 'text-gray-900' : 'text-gray-200 pointer-events-none',
                 day.isToday && !day.isSelected && 'ring-2 ring-primary-500 ring-offset-1',
                 day.isSelected && 'bg-primary-500 text-white ring-0',
-                !disabled && !day.isSelected && day.isCurrentMonth && 'hover:bg-gray-50 active:bg-gray-100',
+                !disabled && !day.isSelected && day.isCurrentMonth && 'hover:bg-vanilla-50 active:bg-primary-50',
                 disabled && day.isCurrentMonth && 'opacity-40 cursor-not-allowed',
                 highlightColor && !day.isSelected && day.isCurrentMonth && highlightColor,
               )}

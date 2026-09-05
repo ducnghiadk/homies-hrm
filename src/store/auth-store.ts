@@ -16,7 +16,9 @@ export type AuthUser = {
   email: string
   role: UserRole
   store_id: string
+  secondary_store_ids?: string[]
   position_id: string
+  secondary_position_ids?: string[]
   avatar_url?: string
   phone: string
   employee_code: string
@@ -45,6 +47,22 @@ export type AuthUser = {
   probation_salary_mode?: ProbationSalaryMode
   probation_salary_value?: number
   auto_complete_probation?: boolean
+  current_address?: string
+  bank_name?: string
+  bank_account_no?: string
+  bank_account_holder?: string
+  cccd_issue_date?: string
+  tax_code?: string
+  base_salary?: number
+  has_insurance?: boolean
+  dependents_count?: number
+  marital_status?: string
+  ethnicity?: string
+  religion?: string
+  cccd_front_url?: string
+  cccd_back_url?: string
+  required_fields_config?: Record<string, boolean>
+  _dbSyncError?: string
 }
 
 export type LoginResult = {

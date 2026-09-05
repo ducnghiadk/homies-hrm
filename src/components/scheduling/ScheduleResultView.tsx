@@ -136,7 +136,7 @@ export default function ScheduleResultView({
                   {warnings.filter(w => w.severity === 'error').length} lỗi nghiêm trọng
                 </div>
             </div>
-            <div className={`p-2 rounded-lg ${warnings.length > 0 ? 'bg-error-50 text-error-600' : 'bg-gray-50 text-gray-400'}`}><AlertTriangle size={20} /></div>
+            <div className={`p-2 rounded-lg ${warnings.length > 0 ? 'bg-error-50 text-error-600' : 'bg-vanilla-50 text-gray-400'}`}><AlertTriangle size={20} /></div>
         </div>
     </div>
   )
@@ -170,7 +170,7 @@ export default function ScheduleResultView({
           <h3 className="font-bold text-gray-900 flex items-center gap-2">
             <History size={18} className="text-primary" /> Lịch sử bản thảo
           </h3>
-          <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-medium flex-shrink-0">
+          <span className="text-xs bg-primary-50 px-2 py-0.5 rounded-full text-gray-500 font-medium flex-shrink-0">
             {generations.length} phiên bản
           </span>
         </div>
@@ -237,7 +237,7 @@ export default function ScheduleResultView({
 
         {/* Compare Sub-panel */}
         {generations.length >= 2 && (
-          <div className="pt-3 border-t border-gray-100 space-y-3 bg-gray-50/50 p-3 rounded-xl">
+          <div className="pt-3 border-t border-gray-100 space-y-3 bg-vanilla-50/50 p-3 rounded-xl">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-gray-700">So sánh bản này với:</span>
               <select 
@@ -315,9 +315,9 @@ export default function ScheduleResultView({
     <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+                <thead className="text-xs text-gray-500 uppercase bg-vanilla-50 border-b">
                     <tr>
-                        <th className="px-4 py-3 font-medium w-40 sticky left-0 bg-gray-50 z-10">Nhân viên</th>
+                        <th className="px-4 py-3 font-medium w-40 sticky left-0 bg-vanilla-50 z-10">Nhân viên</th>
                         {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(d => (
                             <th key={d} className="px-4 py-3 font-medium text-center min-w-[100px] border-l">{d}</th>
                         ))}
@@ -325,7 +325,7 @@ export default function ScheduleResultView({
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                     {uniqueEmployees.map(emp => (
-                        <tr key={emp.id} className="hover:bg-gray-50/50">
+                        <tr key={emp.id} className="hover:bg-vanilla-50/50">
                             <td className="px-4 py-3 font-medium text-gray-900 sticky left-0 bg-white z-10 border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                                 {emp.name}
                             </td>
@@ -376,7 +376,7 @@ export default function ScheduleResultView({
                 <h2 className="text-2xl font-bold text-gray-900">Kết quả xếp ca {weekLabel}</h2>
             </div>
             <div className="flex gap-2">
-                <button onClick={onRegenerate} className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 text-gray-700 transition-colors">
+                <button onClick={onRegenerate} className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-vanilla-50 text-gray-700 transition-colors">
                     <RotateCcw size={16} /> Xếp lại
                 </button>
                 {onEdit && (
@@ -411,7 +411,7 @@ export default function ScheduleResultView({
         </div>
 
         {/* View Toggle */}
-        <div className="flex gap-1 bg-gray-100 p-1 w-fit rounded-lg mb-4">
+        <div className="flex gap-1 bg-primary-50 p-1 w-fit rounded-lg mb-4">
             <button 
                 onClick={() => setViewMode('grid')}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
@@ -463,7 +463,7 @@ function PublishModal({ weekLabel, uniqueEmployees, stats, warnings, onClose, on
                 <p className="text-sm text-gray-500 mt-1">Lịch tuần {weekLabel} sẽ được gửi cho {uniqueEmployees.length} nhân viên.</p>
             </div>
 
-            <div className="bg-gray-50 rounded-xl p-4 space-y-3 mb-6 border border-gray-100">
+            <div className="bg-vanilla-50 rounded-xl p-4 space-y-3 mb-6 border border-gray-100">
                 <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Tổng chi phí:</span>
                     <span className="font-bold text-gray-900">{(stats.totalCost / 1000000).toFixed(1)} triệu</span>
@@ -481,18 +481,18 @@ function PublishModal({ weekLabel, uniqueEmployees, stats, warnings, onClose, on
             </div>
 
             <div className="space-y-3">
-                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-vanilla-50">
                     <input type="checkbox" defaultChecked className="w-4 h-4 text-primary rounded" />
                     <span className="text-sm font-medium">Gửi thông báo Push App</span>
                 </label>
-                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-vanilla-50">
                     <input type="checkbox" className="w-4 h-4 text-primary rounded" />
                     <span className="text-sm font-medium">Gửi Email tổng hợp</span>
                 </label>
             </div>
 
             <div className="flex gap-3 mt-8">
-                <button onClick={onClose} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">
+                <button onClick={onClose} className="flex-1 px-4 py-2.5 bg-primary-50 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">
                     Hủy
                 </button>
                 <button onClick={() => onPublish?.(result)} className="flex-1 px-4 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/30">

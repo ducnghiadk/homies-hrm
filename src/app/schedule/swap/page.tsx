@@ -127,7 +127,7 @@ export default function ShiftSwapPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button onClick={() => step > 0 ? setStep(s => s - 1) : router.back()}
-              className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+              className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center hover:bg-gray-200 transition-colors">
               <ChevronLeft size={20} className="text-gray-500" />
             </button>
             <div>
@@ -139,7 +139,7 @@ export default function ShiftSwapPage() {
           </div>
           <button
             onClick={() => router.push('/schedule/swap/list')}
-            className="px-3 py-2 rounded-xl bg-gray-100 text-dark-700 text-xs font-bold flex items-center gap-2 hover:bg-gray-200 transition-colors"
+            className="px-3 py-2 rounded-xl bg-primary-50 text-dark-700 text-xs font-bold flex items-center gap-2 hover:bg-gray-200 transition-colors"
           >
             <Inbox size={14} />
             Inbox
@@ -420,7 +420,7 @@ export default function ShiftSwapPage() {
         <div className="flex gap-2 pt-2">
           {step > 0 && (
             <button onClick={() => setStep(s => s - 1)}
-              className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-600 text-sm font-medium active:scale-[0.97] transition-transform">
+              className="flex-1 py-3 rounded-xl bg-primary-50 text-gray-600 text-sm font-medium active:scale-[0.97] transition-transform">
               Quay lại
             </button>
           )}

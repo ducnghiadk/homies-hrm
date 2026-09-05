@@ -122,7 +122,7 @@ function ErrorFallback({
   const [showStack, setShowStack] = React.useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-vanilla-50 flex items-center justify-center p-4">
       <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-6">
         {/* Icon */}
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-error-100 flex items-center justify-center">
@@ -139,7 +139,7 @@ function ErrorFallback({
 
         {/* Error message */}
         {error && (
-          <div className="bg-gray-100 rounded-xl p-4 mb-4">
+          <div className="bg-primary-50 rounded-xl p-4 mb-4">
             <p className="text-sm text-gray-700 font-medium">
               {error.message || 'Unknown error'}
             </p>

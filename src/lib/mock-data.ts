@@ -31,8 +31,10 @@ export type Position = {
 export type Employee = {
   id: string
   org_id: string
-  store_id: string
-  position_id: string
+  store_id: string                    // Chi nhánh làm việc chính
+  secondary_store_ids?: string[]      // Chi nhánh phụ / Hỗ trợ tăng ca
+  position_id: string                 // Vị trí chuyên môn chính
+  secondary_position_ids?: string[]   // Vị trí kiêm nhiệm
   employee_code: string
   full_name: string
   phone: string
@@ -65,6 +67,7 @@ export type Schedule = {
   store_id: string
   employee_id: string
   shift_id: string
+  assigned_position_id?: string
   date: string
   notes?: string
   status?: 'draft' | 'published'
@@ -134,195 +137,68 @@ export const mockOrg: Organization = {
 }
 
 // ============================================
-// Stores (3 cửa hàng TP.HCM)
+// Stores (3 cửa hàng TP.HCM theo đúng danh mục Setting)
 // ============================================
 export const mockStores: Store[] = [
   {
     id: 'store-001',
     org_id: 'org-001',
-    name: 'Homies Milk Tea - Nguyễn Huệ',
-    address: '123 Nguyễn Huệ, Q.1, TP.HCM',
-    latitude: 10.7736,
-    longitude: 106.7024,
+    name: 'Homies Milk Tea - Hồ Bá Phấn',
+    address: '49 Hồ Bá Phấn, Phước Long A, TP. Thủ Đức, TP.HCM',
+    latitude: 10.822435,
+    longitude: 106.762649,
     checkin_radius_meters: 100,
-    phone: '028 1234 5670',
+    phone: '028 3821 1111',
     is_active: true,
   },
   {
     id: 'store-002',
     org_id: 'org-001',
-    name: 'Homies Milk Tea - Phạm Văn Đồng',
-    address: '456 Phạm Văn Đồng, Thủ Đức, TP.HCM',
-    latitude: 10.8381,
-    longitude: 106.6810,
+    name: 'Homies Milk Tea - Đường 429',
+    address: '429 Đường 429, Tăng Nhơn Phú A, TP. Thủ Đức, TP.HCM',
+    latitude: 10.7845,
+    longitude: 106.6679,
     checkin_radius_meters: 100,
-    phone: '028 1234 5671',
+    phone: '028 3822 2222',
     is_active: true,
   },
   {
     id: 'store-003',
     org_id: 'org-001',
     name: 'Homies Milk Tea - Lê Văn Sỹ',
-    address: '789 Lê Văn Sỹ, Q.3, TP.HCM',
-    latitude: 10.7845,
-    longitude: 106.6679,
-    checkin_radius_meters: 100,
-    phone: '028 1234 5672',
-    is_active: true,
+    address: 'Lê Văn Sỹ, Phường Phước Long A, TP. Thủ Đức, TP. Hồ Chí Minh',
+    latitude: 10.7340,
+    longitude: 106.7220,
+    checkin_radius_meters: 120,
+    phone: '028 3823 3333',
+    is_active: false,
   },
 ]
 
+export function getStoresList(includeInactive = false): Store[] {
+  if (includeInactive) return mockStores
+  return mockStores.filter(s => s.is_active !== false)
+}
+
 // ============================================
-// Positions (5 vị trí)
+// Positions (Danh mục Chức vụ chuẩn)
 // ============================================
 export const mockPositions: Position[] = [
   { id: 'pos-001', org_id: 'org-001', name: 'Pha chế', level: 1, base_salary: 5500000 },
   { id: 'pos-002', org_id: 'org-001', name: 'Thu ngân', level: 1, base_salary: 5000000 },
   { id: 'pos-003', org_id: 'org-001', name: 'Phục vụ', level: 1, base_salary: 4500000 },
-  { id: 'pos-004', org_id: 'org-001', name: 'Phó quản lý', level: 3, base_salary: 8000000 },
-  { id: 'pos-005', org_id: 'org-001', name: 'Quản lý', level: 4, base_salary: 12000000 },
+  { id: 'pos-004', org_id: 'org-001', name: 'Trưởng ca', level: 2, base_salary: 7000000 },
+  { id: 'pos-005', org_id: 'org-001', name: 'Quản lý', level: 3, base_salary: 12000000 },
+  { id: 'pos-006', org_id: 'org-001', name: 'Quản lý điểm bán hàng', level: 3, base_salary: 12000000 },
+  { id: 'pos-007', org_id: 'org-001', name: 'Nhân viên', level: 1, base_salary: 5000000 },
+  { id: 'pos-008', org_id: 'org-001', name: 'Chủ thương hiệu', level: 5, base_salary: 25000000 },
+  { id: 'pos-009', org_id: 'org-001', name: 'Quản lý nhân sự', level: 4, base_salary: 15000000 },
+  { id: 'pos-010', org_id: 'org-001', name: 'Quản lý vùng', level: 4, base_salary: 18000000 },
+  { id: 'pos-011', org_id: 'org-001', name: 'Quản lý bộ phận', level: 3, base_salary: 12000000 },
 ]
 
 // ============================================
-// Employees (15 people)
-// ============================================
-export const mockEmployees: Employee[] = [
-  // CEO
-  {
-    id: 'emp-001', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-005',
-    employee_code: 'BH-001', full_name: 'Nguyễn Minh Tuấn', phone: '0901234567',
-    email: 'tuan@bobahouse.vn', date_of_birth: '1990-05-15', gender: 'male',
-    address: '100 Nguyễn Du, Q.1, TP.HCM', role: 'ceo', status: 'active',
-    hire_date: '2023-01-01', total_points: 5200, gamification_level: 'platinum',
-    kpi_level: 'L5',
-  },
-  // Managers (3)
-  {
-    id: 'emp-002', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-005',
-    employee_code: 'BH-002', full_name: 'Trần Thị Lan', phone: '0912345678',
-    email: 'lan@bobahouse.vn', date_of_birth: '1995-08-20', gender: 'female',
-    address: '200 Trần Hưng Đạo, Q.1, TP.HCM', role: 'store_manager', status: 'active',
-    hire_date: '2023-03-15', total_points: 3800, gamification_level: 'gold',
-    kpi_level: 'L4',
-  },
-  {
-    id: 'emp-003', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-005',
-    employee_code: 'BH-003', full_name: 'Lê Hoàng Nam', phone: '0923456789',
-    email: 'nam@bobahouse.vn', date_of_birth: '1993-11-10', gender: 'male',
-    address: '300 Phạm Văn Đồng, Thủ Đức, TP.HCM', role: 'store_manager', status: 'active',
-    hire_date: '2023-06-01', total_points: 2900, gamification_level: 'gold',
-    kpi_level: 'L4',
-  },
-  {
-    id: 'emp-004', org_id: 'org-001', store_id: 'store-003', position_id: 'pos-004',
-    employee_code: 'BH-004', full_name: 'Phạm Thị Hương', phone: '0934567890',
-    email: 'huong@bobahouse.vn', date_of_birth: '1996-03-25', gender: 'female',
-    address: '400 Lê Văn Sỹ, Q.3, TP.HCM', role: 'shift_leader', status: 'active',
-    hire_date: '2024-01-10', total_points: 2100, gamification_level: 'silver',
-    kpi_level: 'L3',
-  },
-  // Employees (11)
-  {
-    id: 'emp-005', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-001',
-    employee_code: 'BH-005', full_name: 'Võ Thanh Bình', phone: '0945678901',
-    email: 'binh@bobahouse.vn', date_of_birth: '2001-07-12', gender: 'male',
-    address: '50 Bùi Viện, Q.1, TP.HCM', role: 'employee', status: 'active',
-    hire_date: '2024-06-01', total_points: 1500, gamification_level: 'silver',
-    kpi_level: 'L1',
-  },
-  {
-    id: 'emp-006', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-002',
-    employee_code: 'BH-006', full_name: 'Nguyễn Thị Mai', phone: '0956789012',
-    email: 'mai@bobahouse.vn', date_of_birth: '2002-09-30', gender: 'female',
-    address: '60 Đề Thám, Q.1, TP.HCM', role: 'employee', status: 'active',
-    hire_date: '2024-07-15', total_points: 980, gamification_level: 'bronze',
-    kpi_level: 'L0',
-  },
-  {
-    id: 'emp-007', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-003',
-    employee_code: 'BH-007', full_name: 'Đặng Minh Khoa', phone: '0967890123',
-    email: 'khoa@bobahouse.vn', date_of_birth: '2003-01-05', gender: 'male',
-    address: '70 Phạm Ngũ Lão, Q.1, TP.HCM', role: 'employee', status: 'probation',
-    hire_date: '2025-12-01', total_points: 320, gamification_level: 'bronze',
-    kpi_level: 'L0',
-  },
-  {
-    id: 'emp-008', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-001',
-    employee_code: 'BH-008', full_name: 'Huỳnh Thị Ngọc', phone: '0978901234',
-    email: 'ngoc@bobahouse.vn', date_of_birth: '2000-04-18', gender: 'female',
-    address: '80 Kha Vạn Cân, Thủ Đức, TP.HCM', role: 'employee', status: 'active',
-    hire_date: '2024-04-01', total_points: 2200, gamification_level: 'silver',
-    kpi_level: 'L2',
-  },
-  {
-    id: 'emp-009', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-001',
-    employee_code: 'BH-009', full_name: 'Trần Văn Đức', phone: '0989012345',
-    email: 'duc@bobahouse.vn', date_of_birth: '2001-12-22', gender: 'male',
-    address: '90 Võ Văn Ngân, Thủ Đức, TP.HCM', role: 'employee', status: 'active',
-    hire_date: '2024-08-01', total_points: 870, gamification_level: 'bronze',
-    kpi_level: 'L2',
-  },
-  {
-    id: 'emp-010', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-002',
-    employee_code: 'BH-010', full_name: 'Lý Thị Thanh', phone: '0990123456',
-    email: 'thanh@bobahouse.vn', date_of_birth: '2002-06-08', gender: 'female',
-    address: '100 Lê Văn Việt, Q.9, TP.HCM', role: 'employee', status: 'active',
-    hire_date: '2024-09-15', total_points: 650, gamification_level: 'bronze',
-    kpi_level: 'L1',
-  },
-  {
-    id: 'emp-011', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-003',
-    employee_code: 'BH-011', full_name: 'Ngô Quang Hải', phone: '0901122334',
-    email: 'hai@bobahouse.vn', date_of_birth: '2003-03-14', gender: 'male',
-    address: '110 Tăng Nhơn Phú, Q.9, TP.HCM', role: 'employee', status: 'active',
-    hire_date: '2025-01-10', total_points: 410, gamification_level: 'bronze',
-    kpi_level: 'L1',
-  },
-  {
-    id: 'emp-012', org_id: 'org-001', store_id: 'store-003', position_id: 'pos-001',
-    employee_code: 'BH-012', full_name: 'Mai Thị Hồng', phone: '0912233445',
-    email: 'hong@bobahouse.vn', date_of_birth: '2001-10-02', gender: 'female',
-    address: '120 Cách Mạng Tháng 8, Q.3, TP.HCM', role: 'employee', status: 'active',
-    hire_date: '2024-05-20', total_points: 1800, gamification_level: 'silver',
-    kpi_level: 'L1',
-  },
-  {
-    id: 'emp-013', org_id: 'org-001', store_id: 'store-003', position_id: 'pos-002',
-    employee_code: 'BH-013', full_name: 'Bùi Văn Phong', phone: '0923344556',
-    email: 'phong@bobahouse.vn', date_of_birth: '2002-02-28', gender: 'male',
-    address: '130 Lê Văn Sỹ, Q.3, TP.HCM', role: 'employee', status: 'active',
-    hire_date: '2024-10-01', total_points: 520, gamification_level: 'bronze',
-    kpi_level: 'L1',
-  },
-  {
-    id: 'emp-014', org_id: 'org-001', store_id: 'store-003', position_id: 'pos-003',
-    employee_code: 'BH-014', full_name: 'Dương Thị Linh', phone: '0934455667',
-    email: 'linh@bobahouse.vn', date_of_birth: '2003-08-19', gender: 'female',
-    address: '140 Trường Sa, Q.3, TP.HCM', role: 'employee', status: 'active',
-    hire_date: '2025-02-01', total_points: 180, gamification_level: 'bronze',
-    kpi_level: 'L1',
-  },
-  {
-    id: 'emp-015', org_id: 'org-001', store_id: 'store-003', position_id: 'pos-001',
-    employee_code: 'BH-015', full_name: 'Phan Quốc Anh', phone: '0945566778',
-    email: 'anh@bobahouse.vn', date_of_birth: '2000-11-25', gender: 'male',
-    address: '150 Hoàng Sa, Q.3, TP.HCM', role: 'employee', status: 'active',
-    hire_date: '2024-03-10', total_points: 2600, gamification_level: 'gold',
-    kpi_level: 'L1',
-  },
-  // HR Admin
-  {
-    id: 'emp-016', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-005',
-    employee_code: 'BH-016', full_name: 'Hoàng Thị Yến', phone: '0956677889',
-    email: 'yen@bobahouse.vn', date_of_birth: '1992-04-12', gender: 'female',
-    address: '160 Hai Bà Trưng, Q.1, TP.HCM', role: 'hr_admin', status: 'active',
-    hire_date: '2023-02-01', total_points: 4100, gamification_level: 'platinum',
-    kpi_level: 'L4',
-  },
-]
-
-// ============================================
-// Shifts (3 ca)
+// Shifts (Ca làm việc chuẩn)
 // ============================================
 export const mockShifts: Shift[] = [
   { id: 'shift-001', org_id: 'org-001', name: 'Ca Sáng', start_time: '08:00', end_time: '14:00', color: '#2F6FA8' },
@@ -330,308 +206,167 @@ export const mockShifts: Shift[] = [
   { id: 'shift-003', org_id: 'org-001', name: 'Ca Tối', start_time: '18:00', end_time: '23:00', color: '#001D3D' },
 ]
 
-// ============================================
-// Helper: Generate dates for current week
-// ============================================
-function getWeekDates(weekOffset = 0): string[] {
-  const now = new Date()
-  const monday = new Date(now)
-  monday.setDate(now.getDate() - now.getDay() + 1 + weekOffset * 7)
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday)
-    d.setDate(monday.getDate() + i)
-    return d.toISOString().split('T')[0]
-  })
+export function getShiftById(id?: string) {
+  if (!id) return undefined
+  return mockShifts.find(s => s.id === id)
 }
 
 // ============================================
-// Schedules (2 weeks)
-// ============================================
-const thisWeek = getWeekDates(0)
-const lastWeek = getWeekDates(-1)
-
-export const mockSchedules: Schedule[] = [
-  // Store 1 - This week (simplified: each employee works 5 days)
-  ...thisWeek.slice(0, 5).flatMap(date => [
-    { id: `sch-${date}-001`, org_id: 'org-001', store_id: 'store-001', employee_id: 'emp-005', shift_id: 'shift-001', date },
-    { id: `sch-${date}-002`, org_id: 'org-001', store_id: 'store-001', employee_id: 'emp-006', shift_id: 'shift-001', date },
-    { id: `sch-${date}-003`, org_id: 'org-001', store_id: 'store-001', employee_id: 'emp-007', shift_id: 'shift-002', date },
-  ]),
-  // Store 2 - This week
-  ...thisWeek.slice(0, 5).flatMap(date => [
-    { id: `sch-${date}-004`, org_id: 'org-001', store_id: 'store-002', employee_id: 'emp-008', shift_id: 'shift-001', date },
-    { id: `sch-${date}-005`, org_id: 'org-001', store_id: 'store-002', employee_id: 'emp-009', shift_id: 'shift-002', date },
-    { id: `sch-${date}-006`, org_id: 'org-001', store_id: 'store-002', employee_id: 'emp-010', shift_id: 'shift-001', date },
-    { id: `sch-${date}-007`, org_id: 'org-001', store_id: 'store-002', employee_id: 'emp-011', shift_id: 'shift-002', date },
-  ]),
-  // Store 3 - This week
-  ...thisWeek.slice(0, 5).flatMap(date => [
-    { id: `sch-${date}-008`, org_id: 'org-001', store_id: 'store-003', employee_id: 'emp-012', shift_id: 'shift-001', date },
-    { id: `sch-${date}-009`, org_id: 'org-001', store_id: 'store-003', employee_id: 'emp-013', shift_id: 'shift-002', date },
-    { id: `sch-${date}-010`, org_id: 'org-001', store_id: 'store-003', employee_id: 'emp-014', shift_id: 'shift-003', date },
-    { id: `sch-${date}-011`, org_id: 'org-001', store_id: 'store-003', employee_id: 'emp-015', shift_id: 'shift-001', date },
-  ]),
-]
-
-// ============================================
-// Today's Attendances
-// ============================================
-const today = new Date().toISOString().split('T')[0]
-const todayBase = new Date().toISOString().split('T')[0]
-
-export const mockAttendances: Attendance[] = [
-  // Today - Store 1
-  {
-    id: 'att-001', org_id: 'org-001', employee_id: 'emp-005', store_id: 'store-001', shift_id: 'shift-001',
-    date: today, check_in_time: `${todayBase}T07:55:00+07:00`, check_out_time: `${todayBase}T14:05:00+07:00`,
-    check_in_lat: 10.7738, check_in_lng: 106.7022, check_in_distance_meters: 25,
-    status: 'on_time', late_minutes: 0, total_hours: 6.17, overtime_hours: 0.17,
-  },
-  {
-    id: 'att-002', org_id: 'org-001', employee_id: 'emp-006', store_id: 'store-001', shift_id: 'shift-001',
-    date: today, check_in_time: `${todayBase}T08:12:00+07:00`,
-    check_in_lat: 10.7735, check_in_lng: 106.7025, check_in_distance_meters: 15,
-    status: 'late', late_minutes: 7, total_hours: 0, overtime_hours: 0,
-  },
-  {
-    id: 'att-003', org_id: 'org-001', employee_id: 'emp-007', store_id: 'store-001', shift_id: 'shift-002',
-    date: today, status: 'absent', late_minutes: 0, total_hours: 0, overtime_hours: 0,
-  },
-  // Today - Store 2
-  {
-    id: 'att-004', org_id: 'org-001', employee_id: 'emp-008', store_id: 'store-002', shift_id: 'shift-001',
-    date: today, check_in_time: `${todayBase}T07:50:00+07:00`, check_out_time: `${todayBase}T14:00:00+07:00`,
-    check_in_lat: 10.8383, check_in_lng: 106.6808, check_in_distance_meters: 30,
-    status: 'on_time', late_minutes: 0, total_hours: 6.17, overtime_hours: 0.17,
-  },
-  {
-    id: 'att-005', org_id: 'org-001', employee_id: 'emp-009', store_id: 'store-002', shift_id: 'shift-002',
-    date: today, check_in_time: `${todayBase}T14:03:00+07:00`,
-    check_in_lat: 10.8380, check_in_lng: 106.6812, check_in_distance_meters: 20,
-    status: 'on_time', late_minutes: 0, total_hours: 0, overtime_hours: 0,
-  },
-  // Historical - yesterday
-  ...(() => {
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    const yd = yesterday.toISOString().split('T')[0]
-    return [
-      {
-        id: 'att-h01', org_id: 'org-001', employee_id: 'emp-005', store_id: 'store-001', shift_id: 'shift-001',
-        date: yd, check_in_time: `${yd}T07:58:00+07:00`, check_out_time: `${yd}T14:02:00+07:00`,
-        status: 'on_time' as const, late_minutes: 0, total_hours: 6.07, overtime_hours: 0.07,
-      },
-      {
-        id: 'att-h02', org_id: 'org-001', employee_id: 'emp-006', store_id: 'store-001', shift_id: 'shift-001',
-        date: yd, check_in_time: `${yd}T07:45:00+07:00`, check_out_time: `${yd}T14:00:00+07:00`,
-        status: 'on_time' as const, late_minutes: 0, total_hours: 6.25, overtime_hours: 0.25,
-      },
-    ]
-  })(),
-  // ── Seed: leave attendance records ──
-  {
-    id: 'att-leave-001', org_id: 'org-001', employee_id: 'emp-005', store_id: 'store-001',
-    date: '2026-02-12', status: 'leave' as const,
-    leave_request_id: 'lr-001', leave_type: 'annual',
-    late_minutes: 0, total_hours: 8, overtime_hours: 0,
-  },
-  {
-    id: 'att-leave-002', org_id: 'org-001', employee_id: 'emp-009', store_id: 'store-002',
-    date: '2026-02-17', status: 'leave' as const,
-    leave_request_id: 'lr-004', leave_type: 'sick',
-    late_minutes: 0, total_hours: 8, overtime_hours: 0,
-  },
-  {
-    id: 'att-leave-003', org_id: 'org-001', employee_id: 'emp-012', store_id: 'store-003',
-    date: '2026-02-14', status: 'leave' as const,
-    leave_request_id: 'lr-007', leave_type: 'personal',
-    late_minutes: 0, total_hours: 8, overtime_hours: 0,
-  },
-
-  // ══════════════════════════════════════════════
-  // Seed: Feb 2026 attendance for payroll engine
-  // Workdays: 2,3,4,5,6 | 9,10,11,12,13 | 16,17,18,19,20 | 23,24,25,26,27
-  // ══════════════════════════════════════════════
-  ...(() => {
-    const O = 'org-001'
-    type S = 'on_time' | 'late' | 'early' | 'absent' | 'leave'
-    const a = (
-      id: string, emp: string, store: string, date: string,
-      st: S, late: number, hrs: number, ot: number,
-      leaveReq?: string, leaveType?: string,
-    ): Attendance => ({
-      id, org_id: O, employee_id: emp, store_id: store, date,
-      status: st, late_minutes: late, total_hours: hrs, overtime_hours: ot,
-      ...(st === 'on_time' || st === 'late' || st === 'early' ? {
-        check_in_time: st === 'late' ? '08:' + (15 + late).toString().padStart(2, '0') : '07:55',
-        check_out_time: ot > 0 ? `${17 + Math.floor(ot)}:00` : '17:00',
-      } : {}),
-      ...(leaveReq ? { leave_request_id: leaveReq, leave_type: leaveType } : {}),
-    })
-
-    const days = ['02','03','04','05','06','09','10','11','13','16','17','18','19','20','23','24','25','26','27']
-    let n = 200
-
-    // emp-005: Pha chế, store-001 — 20 work, 2 leave(annual), 3 late, 10hrs OT
-    const e5 = days.map(d => {
-      const dt = `2026-02-${d}`
-      if (d === '12' || d === '13') return null // leave already seeded for 12; skip 13 too
-      if (d === '11') return a(`att-p-${n++}`, 'emp-005', 'store-001', dt, 'leave', 0, 8, 0, 'lr-010', 'annual')
-      if (d === '04' || d === '17' || d === '24') return a(`att-p-${n++}`, 'emp-005', 'store-001', dt, 'late', 20, 7.7, 0)
-      if (d === '06' || d === '20') return a(`att-p-${n++}`, 'emp-005', 'store-001', dt, 'on_time', 0, 10, 2)
-      return a(`att-p-${n++}`, 'emp-005', 'store-001', dt, 'on_time', 0, 8, 0)
-    }).filter(Boolean) as Attendance[]
-
-    // emp-006: Pha chế, store-001 — 22 work, 0 leave, 1 late, 8hrs OT
-    const e6 = days.map(d => {
-      const dt = `2026-02-${d}`
-      if (d === '10') return a(`att-p-${n++}`, 'emp-006', 'store-001', dt, 'late', 15, 7.75, 0)
-      if (d === '05' || d === '19' || d === '26') return a(`att-p-${n++}`, 'emp-006', 'store-001', dt, 'on_time', 0, 10, 2)
-      if (d === '27') return a(`att-p-${n++}`, 'emp-006', 'store-001', dt, 'on_time', 0, 10, 2)
-      return a(`att-p-${n++}`, 'emp-006', 'store-001', dt, 'on_time', 0, 8, 0)
-    }).filter(Boolean) as Attendance[]
-
-    // emp-007: Phục vụ, store-001 — 18 work, 1 absent, 4 late, 0 OT
-    const e7 = days.map(d => {
-      const dt = `2026-02-${d}`
-      if (d === '16') return a(`att-p-${n++}`, 'emp-007', 'store-001', dt, 'absent', 0, 0, 0)
-      if (['03','11','18','25'].includes(d)) return a(`att-p-${n++}`, 'emp-007', 'store-001', dt, 'late', 25, 7.6, 0)
-      return a(`att-p-${n++}`, 'emp-007', 'store-001', dt, 'on_time', 0, 8, 0)
-    }).filter(Boolean) as Attendance[]
-
-    // emp-008: Pha chế, store-002 — 21 work, 1 leave(sick), 1 late, 6hrs OT
-    const e8 = days.map(d => {
-      const dt = `2026-02-${d}`
-      if (d === '19') return a(`att-p-${n++}`, 'emp-008', 'store-002', dt, 'leave', 0, 8, 0, 'lr-011', 'sick')
-      if (d === '09') return a(`att-p-${n++}`, 'emp-008', 'store-002', dt, 'late', 10, 7.8, 0)
-      if (d === '06' || d === '20' || d === '27') return a(`att-p-${n++}`, 'emp-008', 'store-002', dt, 'on_time', 0, 10, 2)
-      return a(`att-p-${n++}`, 'emp-008', 'store-002', dt, 'on_time', 0, 8, 0)
-    }).filter(Boolean) as Attendance[]
-
-    // emp-009: Pha chế, store-002 — 19 work, 2 leave(sick), 2 late, 4hrs OT
-    const e9 = days.map(d => {
-      const dt = `2026-02-${d}`
-      if (d === '17') return null // already seeded leave for 17
-      if (d === '18') return a(`att-p-${n++}`, 'emp-009', 'store-002', dt, 'leave', 0, 8, 0, 'lr-004', 'sick')
-      if (d === '05' || d === '23') return a(`att-p-${n++}`, 'emp-009', 'store-002', dt, 'late', 30, 7.5, 0)
-      if (d === '13' || d === '27') return a(`att-p-${n++}`, 'emp-009', 'store-002', dt, 'on_time', 0, 10, 2)
-      return a(`att-p-${n++}`, 'emp-009', 'store-002', dt, 'on_time', 0, 8, 0)
-    }).filter(Boolean) as Attendance[]
-
-    // emp-010: Thu ngân, store-002 — 22 work, 0 late, 2hrs OT
-    const e10 = days.map(d => {
-      const dt = `2026-02-${d}`
-      if (d === '20') return a(`att-p-${n++}`, 'emp-010', 'store-002', dt, 'on_time', 0, 10, 2)
-      return a(`att-p-${n++}`, 'emp-010', 'store-002', dt, 'on_time', 0, 8, 0)
-    }).filter(Boolean) as Attendance[]
-
-    // emp-011: Phục vụ, store-002 — 20 work, 1 absent, 2 late, 0 OT
-    const e11 = days.map(d => {
-      const dt = `2026-02-${d}`
-      if (d === '11') return a(`att-p-${n++}`, 'emp-011', 'store-002', dt, 'absent', 0, 0, 0)
-      if (d === '04' || d === '24') return a(`att-p-${n++}`, 'emp-011', 'store-002', dt, 'late', 20, 7.7, 0)
-      return a(`att-p-${n++}`, 'emp-011', 'store-002', dt, 'on_time', 0, 8, 0)
-    }).filter(Boolean) as Attendance[]
-
-    // emp-012: Pha chế, store-003 — 19 work, 2 leave (1 personal already seeded), 1 late, 6hrs OT
-    const e12 = days.map(d => {
-      const dt = `2026-02-${d}`
-      if (d === '13') return null // adjacent to 14 leave
-      if (d === '09') return a(`att-p-${n++}`, 'emp-012', 'store-003', dt, 'leave', 0, 8, 0, 'lr-012', 'annual')
-      if (d === '17') return a(`att-p-${n++}`, 'emp-012', 'store-003', dt, 'late', 15, 7.75, 0)
-      if (d === '06' || d === '20' || d === '27') return a(`att-p-${n++}`, 'emp-012', 'store-003', dt, 'on_time', 0, 10, 2)
-      return a(`att-p-${n++}`, 'emp-012', 'store-003', dt, 'on_time', 0, 8, 0)
-    }).filter(Boolean) as Attendance[]
-
-    // emp-013: Thu ngân, store-003 — 22 work, 0 leave, 0 late, 4hrs OT
-    const e13 = days.map(d => {
-      const dt = `2026-02-${d}`
-      if (d === '13' || d === '27') return a(`att-p-${n++}`, 'emp-013', 'store-003', dt, 'on_time', 0, 10, 2)
-      return a(`att-p-${n++}`, 'emp-013', 'store-003', dt, 'on_time', 0, 8, 0)
-    }).filter(Boolean) as Attendance[]
-
-    // emp-014: Phục vụ, store-003 — 20 work, 1 leave(wedding), 2 late, 0 OT
-    const e14 = days.map(d => {
-      const dt = `2026-02-${d}`
-      if (d === '23') return a(`att-p-${n++}`, 'emp-014', 'store-003', dt, 'leave', 0, 8, 0, 'lr-013', 'wedding')
-      if (d === '06' || d === '18') return a(`att-p-${n++}`, 'emp-014', 'store-003', dt, 'late', 20, 7.7, 0)
-      return a(`att-p-${n++}`, 'emp-014', 'store-003', dt, 'on_time', 0, 8, 0)
-    }).filter(Boolean) as Attendance[]
-
-    return [...e5, ...e6, ...e7, ...e8, ...e9, ...e10, ...e11, ...e12, ...e13, ...e14]
-  })(),
-]
-
-// ============================================
-// Shift Requests
-// ============================================
-export const mockRequests: ShiftRequest[] = [
-  {
-    id: 'req-001', org_id: 'org-001', employee_id: 'emp-006',
-    type: 'time_off', status: 'pending',
-    start_date: thisWeek[4], end_date: thisWeek[4],
-    reason: 'Em có việc gia đình cần giải quyết ạ',
-    created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-  },
-  {
-    id: 'req-002', org_id: 'org-001', employee_id: 'emp-009',
-    type: 'swap', status: 'pending',
-    from_schedule_id: `sch-${thisWeek[3]}-005`,
-    to_employee_id: 'emp-008',
-    reason: 'Em muốn đổi ca với bạn Ngọc vì bị trùng lịch học',
-    created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
-  },
-  {
-    id: 'req-003', org_id: 'org-001', employee_id: 'emp-012',
-    type: 'time_off', status: 'approved',
-    start_date: lastWeek[2], end_date: lastWeek[2],
-    reason: 'Đi khám bệnh',
-    reviewed_by: 'emp-004', reviewed_at: new Date(Date.now() - 72 * 3600000).toISOString(),
-    review_notes: 'Ok em',
-    created_at: new Date(Date.now() - 96 * 3600000).toISOString(),
-  },
-]
-
-// ============================================
-// Notifications
+// Notifications & Requests
 // ============================================
 export const mockNotifications: Notification[] = [
   {
-    id: 'notif-001', employee_id: 'emp-002',
+    id: 'notif-001',
+    employee_id: 'emp-002',
     title: 'Yêu cầu nghỉ phép mới',
-    body: 'Nguyễn Thị Mai xin nghỉ phép ngày ' + thisWeek[4],
-    type: 'request', is_read: false,
+    body: 'Có yêu cầu nghỉ phép mới cần xem xét',
+    type: 'request',
+    is_read: false,
     created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
   },
+]
+
+export const mockRequests: ShiftRequest[] = []
+
+// ============================================
+// Employees (Nhân sự chính thức Homies)
+// ============================================
+export const mockEmployees: Employee[] = [
+  // CEO & Ban Giám Đốc
   {
-    id: 'notif-002', employee_id: 'emp-002',
-    title: 'Nhân viên đi trễ',
-    body: 'Nguyễn Thị Mai check-in trễ 7 phút',
-    type: 'checkin', is_read: false,
-    created_at: new Date(Date.now() - 4 * 3600000).toISOString(),
+    id: 'emp-001', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-005',
+    employee_code: 'BH-001', full_name: 'Nguyễn Đức Nghĩa', phone: '0901234567',
+    email: 'tuan@bobahouse.vn', date_of_birth: '1990-05-15', gender: 'male',
+    address: '100 Nguyễn Du, Q.1, TP.HCM', role: 'ceo', status: 'active',
+    hire_date: '2023-01-01', total_points: 5200, gamification_level: 'platinum',
+    kpi_level: 'L5',
+  },
+  // Nhân sự Homies Milk Tea - Đường 429 & Hồ Bá Phấn (Chuẩn mã thực tế)
+  {
+    id: 'e04b5c70-97e2-4061-8bef-0fae5563a066', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-001',
+    employee_code: 'BH-0913', full_name: 'Huỳnh Lê Kiều Linh', phone: '0779554540',
+    email: 'huynhlekieulinh6@gmail.com', date_of_birth: '1998-07-12', gender: 'female',
+    address: '429 Phước Long A, TP. Thủ Đức, TP.HCM', role: 'employee', status: 'active',
+    hire_date: '2024-03-01', total_points: 1500, gamification_level: 'silver',
+    kpi_level: 'L2',
   },
   {
-    id: 'notif-003', employee_id: 'emp-005',
-    title: '🎉 Check-in thành công!',
-    body: 'Bạn đã check-in đúng giờ. +10 điểm!',
-    type: 'checkin', is_read: true,
-    created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
+    id: 'f747f06f-9e95-406e-a5b5-0f6571dbfaa4', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-001',
+    employee_code: 'NV0028', full_name: 'Phạm Nguyễn Đông Duy', phone: '0943749525',
+    email: 'phamnguyendongduy2020@gmail.com', date_of_birth: '2005-12-21', gender: 'male',
+    address: '160 Cầu Xây, Phường Tăng Nhơn Phú, TP. Thủ Đức, TP.HCM', role: 'employee', status: 'active',
+    hire_date: '2026-04-25', total_points: 1800, gamification_level: 'silver',
+    kpi_level: 'L2',
+  },
+  {
+    id: '2f3acef5-118f-490b-8530-d86aa164b90a', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-001',
+    employee_code: 'NV0020', full_name: 'Lê Minh Lộc', phone: '0945576422',
+    email: 'lloclm0203@gmail.com', date_of_birth: '2007-01-02', gender: 'male',
+    address: 'Hẻm 441, Đường Lê Văn Việt, Phường Tăng Nhơn Phú, TP.HCM', role: 'employee', status: 'active',
+    hire_date: '2025-11-30', total_points: 1650, gamification_level: 'silver',
+    kpi_level: 'L2',
+  },
+  {
+    id: 'd8b8ecd5-1e74-415b-a739-2fa6bbd81284', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-002',
+    employee_code: 'NV0017', full_name: 'Nguyễn Thanh Thiện', phone: '0775943568',
+    email: 'nguyenthanhthien2804@gmail.com', date_of_birth: '1999-11-20', gender: 'male',
+    address: '7/52 đường 385, Phường Tăng Nhơn Phú, TP. Thủ Đức, TP.HCM', role: 'employee', status: 'active',
+    hire_date: '2025-10-21', total_points: 1700, gamification_level: 'silver',
+    kpi_level: 'L2',
+  },
+  {
+    id: '10a4897f-9936-41a7-804f-8a4556eaaf0c', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-005',
+    employee_code: 'NV0016', full_name: 'Nguyễn Thị Kiều Ý', phone: '0378410208',
+    email: 'kieuy4052007@gmail.com', date_of_birth: '1997-08-14', gender: 'female',
+    address: '429 Đường 429, Tăng Nhơn Phú A, TP. Thủ Đức, TP.HCM', role: 'store_manager', status: 'active',
+    hire_date: '2025-10-05', total_points: 2500, gamification_level: 'gold',
+    kpi_level: 'L3',
+  },
+  {
+    id: '9392ab72-eacc-4211-a0b3-a183c0db75d5', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-005',
+    employee_code: 'NV0027', full_name: 'Trần Công Huy', phone: '0332151527',
+    email: 'jinn.wooo.02@gmail.com', date_of_birth: '1999-02-21', gender: 'male',
+    address: '21/2A đường 388, Phường Phước Long, TP. Thủ Đức, TP.HCM', role: 'store_manager', status: 'active',
+    hire_date: '2026-04-05', total_points: 2200, gamification_level: 'gold',
+    kpi_level: 'L3',
   },
 ]
 
 // ============================================
-// Helpers
+// Schedules & Attendances mutable storage
 // ============================================
-export function getEmployeeById(id: string) {
-  return mockEmployees.find(e => e.id === id)
+export const mockSchedules: Schedule[] = []
+export const mockAttendances: Attendance[] = []
+
+export const STORE_UUID_MAP: Record<string, string> = {
+  'c0111111-1111-1111-1111-111111111111': 'store-001',
+  'c0222222-2222-2222-2222-222222222222': 'store-002',
+  'c0333333-3333-3333-3333-333333333333': 'store-003',
 }
 
-export function getStoreById(id: string) {
-  return mockStores.find(s => s.id === id)
+export const REVERSE_STORE_UUID_MAP: Record<string, string> = {
+  'store-001': 'c0111111-1111-1111-1111-111111111111',
+  'store-002': 'c0222222-2222-2222-2222-222222222222',
+  'store-003': 'c0333333-3333-3333-3333-333333333333',
 }
 
-export function getPositionById(id: string) {
-  return mockPositions.find(p => p.id === id)
+export function isStoreMatch(a?: string, b?: string): boolean {
+  if (!a || !b) return false
+  if (a === b) return true
+  const normA = STORE_UUID_MAP[a] || REVERSE_STORE_UUID_MAP[a] || a
+  const normB = STORE_UUID_MAP[b] || REVERSE_STORE_UUID_MAP[b] || b
+  if (normA === normB) return true
+
+  const storeA = getStoreById(a)
+  const storeB = getStoreById(b)
+  if (storeA && storeB && (storeA.id === storeB.id || storeA.name === storeB.name)) return true
+  return false
+}
+
+const POSITION_UUID_MAP: Record<string, string> = {
+  'b0000000-0000-0000-0000-000000000001': 'pos-001',
+  'b0000000-0000-0000-0000-000000000002': 'pos-002',
+  'b0000000-0000-0000-0000-000000000003': 'pos-003',
+  'b0000000-0000-0000-0000-000000000004': 'pos-004',
+  'b0000000-0000-0000-0000-000000000005': 'pos-005',
+  'b0000000-0000-0000-0000-000000000006': 'pos-006',
+  'b0000000-0000-0000-0000-000000000007': 'pos-007',
+  'b0000000-0000-0000-0000-000000000008': 'pos-008',
+  'b0000000-0000-0000-0000-000000000009': 'pos-009',
+  'b0000000-0000-0000-0000-000000000010': 'pos-010',
+  'b0000000-0000-0000-0000-000000000011': 'pos-011',
+}
+
+export function getEmployeeById(id?: string) {
+  if (!id) return undefined
+  const direct = mockEmployees.find(e => e.id === id || e.employee_code === id || (e.email && e.email.toLowerCase() === id.toLowerCase()))
+  if (direct) return direct
+
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('hrm_employees_db')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          const matched = parsed.find((e: Partial<Employee>) => e.id === id || e.employee_code === id || (e.email && e.email.toLowerCase() === id.toLowerCase()))
+          if (matched) return matched as Employee
+        }
+      }
+    } catch {}
+  }
+  return undefined
+}
+
+export function getStoreById(id?: string) {
+  if (!id) return undefined
+  const resolvedId = STORE_UUID_MAP[id] || id
+  return mockStores.find(s => s.id === resolvedId || s.id === id)
+}
+
+export function getPositionById(id?: string) {
+  if (!id) return undefined
+  const resolvedId = POSITION_UUID_MAP[id] || id
+  return mockPositions.find(p => p.id === resolvedId || p.id === id)
 }
 
 let schedulesInitialized = false
@@ -644,7 +379,21 @@ export function initSchedules() {
       try {
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed)) {
-          mockSchedules.splice(0, mockSchedules.length, ...parsed)
+          const seenIds = new Set<string>()
+          const deduplicated: Schedule[] = []
+
+          parsed.forEach((s: Schedule, idx: number) => {
+            if (!s) return
+            let id = s.id
+            if (!id || seenIds.has(id)) {
+              id = `sch-unique-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`
+              s.id = id
+            }
+            seenIds.add(id)
+            deduplicated.push(s)
+          })
+
+          mockSchedules.splice(0, mockSchedules.length, ...deduplicated)
         }
       } catch (e) {
         console.error('Failed to parse saved schedules', e)
@@ -660,6 +409,20 @@ export function saveSchedulesToStorage() {
   }
 }
 
+export function getSchedulesByStoreWeek(storeId: string, weekDates: string[]): Schedule[] {
+  initSchedules()
+  return mockSchedules.filter(s => isStoreMatch(s.store_id, storeId) && weekDates.includes(s.date))
+}
+
+export function getScheduleByEmployeeDate(employeeId: string, date: string, storeId?: string): Schedule | undefined {
+  initSchedules()
+  return mockSchedules.find(schedule =>
+    schedule.employee_id === employeeId &&
+    schedule.date === date &&
+    (!storeId || isStoreMatch(schedule.store_id, storeId))
+  )
+}
+
 export function publishSmartSchedule(result: {
   weekStart: string
   storeId?: string
@@ -668,7 +431,6 @@ export function publishSmartSchedule(result: {
   initSchedules()
   const storeId = result.storeId || 'store-001'
 
-  // Calculate the 7 week dates
   const weekDates: string[] = []
   const monday = new Date(result.weekStart)
   for (let i = 0; i < 7; i++) {
@@ -698,12 +460,8 @@ export function publishSmartSchedule(result: {
   replaceSchedulesForStoreWeek(storeId, weekDates, nextSchedules)
 }
 
-export function getShiftById(id: string) {
-  return mockShifts.find(s => s.id === id)
-}
-
 export function getEmployeesByStore(storeId: string) {
-  return mockEmployees.filter(e => e.store_id === storeId)
+  return mockEmployees.filter(e => isStoreMatch(e.store_id, storeId))
 }
 
 export function getSchedulesByEmployee(employeeId: string, weekDates: string[]) {
@@ -723,26 +481,7 @@ export function getTodayAttendance(employeeId: string) {
 
 export function getStoreAttendanceToday(storeId: string) {
   const today = new Date().toISOString().split('T')[0]
-  return mockAttendances.filter(a => a.store_id === storeId && a.date === today)
-}
-
-// ============================================
-// Schedule CRUD (mutable — for manager assignment)
-// ============================================
-let scheduleCounter = 500
-
-export function getSchedulesByStoreWeek(storeId: string, weekDates: string[]): Schedule[] {
-  initSchedules()
-  return mockSchedules.filter(s => s.store_id === storeId && weekDates.includes(s.date))
-}
-
-export function getScheduleByEmployeeDate(employeeId: string, date: string, storeId?: string): Schedule | undefined {
-  initSchedules()
-  return mockSchedules.find(schedule =>
-    schedule.employee_id === employeeId &&
-    schedule.date === date &&
-    (!storeId || schedule.store_id === storeId)
-  )
+  return mockAttendances.filter(a => isStoreMatch(a.store_id, storeId) && a.date === today)
 }
 
 export function addSchedule(
@@ -751,31 +490,60 @@ export function addSchedule(
   shiftId: string,
   date: string,
   notes?: string,
-  status: 'draft' | 'published' = 'published'
+  status: 'draft' | 'published' = 'published',
+  assignedPositionId?: string,
+  replaceScheduleId?: string
 ): Schedule {
   initSchedules()
-  // Remove existing schedule for this employee+date if any
-  const existingIdx = mockSchedules.findIndex(s => s.employee_id === employeeId && s.date === date)
-  if (existingIdx !== -1) mockSchedules.splice(existingIdx, 1)
+  
+  if (replaceScheduleId) {
+    const rIdx = mockSchedules.findIndex(s => s.id === replaceScheduleId)
+    if (rIdx !== -1) mockSchedules.splice(rIdx, 1)
+  } else {
+    // Với ca linh hoạt/phát sinh: thay thế ca nếu cùng loại hoặc trùng khung giờ
+    const isFlex = shiftId === 'shift-004' || shiftId.startsWith('shift-flex') || (notes && (notes.toLowerCase().includes('linh hoạt') || notes.toLowerCase().includes('phát sinh') || /\[\d{1,2}:\d{2}/.test(notes)))
+    const existingIdx = mockSchedules.findIndex(s => {
+      if (s.employee_id !== employeeId || s.date !== date) return false
+      if (s.shift_id === shiftId) return true
+      if (notes && s.notes === notes) return true
+
+      const sIsFlex = s.shift_id === 'shift-004' || s.shift_id.startsWith('shift-flex') || (s.notes && (s.notes.toLowerCase().includes('linh hoạt') || s.notes.toLowerCase().includes('phát sinh') || /\[\d{1,2}:\d{2}/.test(s.notes)))
+      if (isFlex && sIsFlex) {
+        const newTimeMatch = notes?.match(/\[(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\]/) || notes?.match(/\((\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\)/)
+        const oldTimeMatch = s.notes?.match(/\[(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\]/) || s.notes?.match(/\((\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\)/)
+        if (newTimeMatch && oldTimeMatch && newTimeMatch[1] === oldTimeMatch[1] && newTimeMatch[2] === oldTimeMatch[2]) {
+          return true
+        }
+      }
+      return false
+    })
+    if (existingIdx !== -1) mockSchedules.splice(existingIdx, 1)
+  }
 
   const record: Schedule = {
-    id: `sch-mgr-${scheduleCounter++}`,
+    id: `sch-mgr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     org_id: 'org-001',
     store_id: storeId,
     employee_id: employeeId,
     shift_id: shiftId,
+    assigned_position_id: assignedPositionId,
     date,
     notes,
     status,
+    updated_at: new Date().toISOString(),
   }
   mockSchedules.push(record)
   saveSchedulesToStorage()
   return record
 }
 
-export function removeSchedule(employeeId: string, date: string): boolean {
+export function removeSchedule(employeeId: string, date: string, scheduleId?: string): boolean {
   initSchedules()
-  const idx = mockSchedules.findIndex(s => s.employee_id === employeeId && s.date === date)
+  const idx = mockSchedules.findIndex(s =>
+    scheduleId
+      ? s.id === scheduleId
+      : (s.employee_id === employeeId && s.date === date)
+  )
   if (idx === -1) return false
   mockSchedules.splice(idx, 1)
   saveSchedulesToStorage()
@@ -786,7 +554,7 @@ export function replaceSchedulesForStoreWeek(storeId: string, weekDates: string[
   initSchedules()
   for (let i = mockSchedules.length - 1; i >= 0; i--) {
     const schedule = mockSchedules[i]
-    if (schedule.store_id === storeId && weekDates.includes(schedule.date)) {
+    if (isStoreMatch(schedule.store_id, storeId) && weekDates.includes(schedule.date)) {
       mockSchedules.splice(i, 1)
     }
   }
@@ -800,7 +568,7 @@ export function replaceSchedulesForStoreWeek(storeId: string, weekDates: string[
 
 export function copyWeekSchedules(storeId: string, fromWeek: string[], toWeek: string[]): number {
   initSchedules()
-  const sourceSchedules = mockSchedules.filter(s => s.store_id === storeId && fromWeek.includes(s.date))
+  const sourceSchedules = mockSchedules.filter(s => isStoreMatch(s.store_id, storeId) && fromWeek.includes(s.date))
   let count = 0
   sourceSchedules.forEach(s => {
     const dayIdx = fromWeek.indexOf(s.date)
@@ -816,4 +584,3 @@ export function copyWeekSchedules(storeId: string, fromWeek: string[], toWeek: s
   saveSchedulesToStorage()
   return count
 }
-

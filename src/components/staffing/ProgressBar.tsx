@@ -80,7 +80,7 @@ export default function ProgressBar({
       <div className="h-2" />
 
       {/* Progress bar */}
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-2 bg-primary-50 rounded-full overflow-hidden">
         <div
           className="h-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-700 ease-out rounded-full"
           style={{ width: `${percent}%` }}

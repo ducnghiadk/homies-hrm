@@ -16,6 +16,7 @@ import {
   type OpenShiftClaim,
 } from '@/lib/mock-data-open-shifts'
 import { getEmployeeById, mockStores } from '@/lib/mock-data'
+import { storeAdapter } from '@/lib/adapters'
 import { notifyOpenShiftClaimResult } from '@/lib/notifications/open-shift-notifications'
 import { ScheduleEmailService } from '@/lib/services/schedule-email-service'
 import { format } from 'date-fns'
@@ -82,7 +83,7 @@ function ClaimReviewCard({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <div className="rounded-xl bg-gray-50 px-3 py-2">
+        <div className="rounded-xl bg-vanilla-50 px-3 py-2">
           <p className="text-[10px] text-gray-400 flex items-center gap-1">
             <Clock size={10} /> Ca làm
           </p>
@@ -90,13 +91,13 @@ function ClaimReviewCard({
             {shiftInfo?.name || 'Ca'} • {shiftInfo?.start_time} - {shiftInfo?.end_time}
           </p>
         </div>
-        <div className="rounded-xl bg-gray-50 px-3 py-2">
+        <div className="rounded-xl bg-vanilla-50 px-3 py-2">
           <p className="text-[10px] text-gray-400 flex items-center gap-1">
             <MapPin size={10} /> Cửa hàng
           </p>
           <p className="text-xs font-bold text-dark-700">{store?.name || shift.store_id}</p>
         </div>
-        <div className="rounded-xl bg-gray-50 px-3 py-2">
+        <div className="rounded-xl bg-vanilla-50 px-3 py-2">
           <p className="text-[10px] text-gray-400 flex items-center gap-1">
             <Briefcase size={10} /> Vị trí
           </p>
@@ -229,6 +230,12 @@ function OpenShiftClaimsPageContent() {
   const [dateTo, setDateTo] = useState(() => searchParams.get('dateTo') || '')
   const [sortBy, setSortBy] = useState<'oldest' | 'newest'>('oldest')
 
+  const [storeList, setStoreList] = useState(mockStores)
+
+  useEffect(() => {
+    storeAdapter.getStores().then(res => setStoreList(res))
+  }, [])
+
   useEffect(() => {
     if (!isAuthenticated) router.push('/login')
   }, [isAuthenticated, router])
@@ -237,8 +244,8 @@ function OpenShiftClaimsPageContent() {
   const highlightedClaimId = searchParams.get('claimId')
   const isManager = user?.role === 'store_manager' || user?.role === 'hr_admin' || user?.role === 'ceo'
   const storeOptions = user?.role === 'store_manager'
-    ? mockStores.filter(store => store.id === user.store_id)
-    : mockStores
+    ? storeList.filter(store => store.id === user.store_id)
+    : storeList
   const pendingClaims = useMemo(() => {
     return activeStoreId ? getPendingClaimsForStore(activeStoreId) : []
   }, [activeStoreId])
@@ -367,7 +374,7 @@ function OpenShiftClaimsPageContent() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center hover:bg-gray-200 transition-colors"
           >
             <ChevronLeft size={20} className="text-gray-500" />
           </button>
@@ -406,7 +413,7 @@ function OpenShiftClaimsPageContent() {
               value={activeStoreId}
               onChange={e => setSelectedStoreId(e.target.value)}
               disabled={storeOptions.length <= 1}
-              className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-dark-700 focus:outline-none"
+              className="bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-dark-700 focus:outline-none"
             >
               {storeOptions.map(store => (
                 <option key={store.id} value={store.id}>
@@ -423,12 +430,12 @@ function OpenShiftClaimsPageContent() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Tìm theo nhân viên, ca, cửa hàng..."
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
             <select
               value={positionFilter}
               onChange={e => setPositionFilter(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="all">Tất cả vị trí</option>
               {availablePositions.map(position => (
@@ -441,18 +448,18 @@ function OpenShiftClaimsPageContent() {
               type="date"
               value={dateFrom}
               onChange={e => setDateFrom(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
             <input
               type="date"
               value={dateTo}
               onChange={e => setDateTo(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as 'oldest' | 'newest')}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="oldest">Cũ nhất trước</option>
               <option value="newest">Mới nhất trước</option>
@@ -465,7 +472,7 @@ function OpenShiftClaimsPageContent() {
 
         {filteredClaims.length === 0 ? (
           <div className="text-center py-16 space-y-3">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto">
               <CheckCircle2 size={28} className="text-gray-300" />
             </div>
             <p className="text-sm text-gray-400 font-medium">
@@ -505,7 +512,7 @@ function OpenShiftClaimsPageContent() {
 export default function OpenShiftClaimsPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-vanilla-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-gray-500 text-sm font-medium">Đang tải dữ liệu duyệt nhận ca...</p>

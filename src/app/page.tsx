@@ -2,7 +2,7 @@
 
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import AppShell from '@/components/layout/AppShell'
 import { EmployeeDashboardPremium } from '@/components/dashboard/EmployeeDashboardPremium'
@@ -10,32 +10,28 @@ import { ManagerDashboardPremium } from '@/components/dashboard/ManagerDashboard
 import { AdminDashboardPremium } from '@/components/dashboard/AdminDashboardPremium'
 
 export default function HomePage() {
-  const { user, isAuthenticated, hasHydrated } = useAuthStore()
+  const { user, isLoading, hasHydrated } = useAuthStore()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (hasHydrated && (!isAuthenticated || !user)) {
-      router.replace('/login')
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (mounted && hasHydrated && !isLoading) {
+      if (!user) {
+        router.replace('/login')
+      }
     }
-  }, [hasHydrated, isAuthenticated, user, router])
+  }, [mounted, hasHydrated, isLoading, user, router])
 
-  if (!hasHydrated) {
+  if (!mounted || !hasHydrated || isLoading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
+      <div className="flex min-h-screen items-center justify-center bg-vanilla-50 px-6">
         <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-5 py-4 text-sm font-medium text-gray-600 shadow-sm">
           <Loader2 size={18} className="animate-spin text-primary-500" />
-          Dang tai phien dang nhap...
-        </div>
-      </div>
-    )
-  }
-
-  if (!user || !isAuthenticated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
-        <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-5 py-4 text-sm font-medium text-gray-600 shadow-sm">
-          <Loader2 size={18} className="animate-spin text-primary-500" />
-          Dang chuyen den trang dang nhap...
+          Đang chuẩn bị bảng điều khiển...
         </div>
       </div>
     )
@@ -54,7 +50,12 @@ export default function HomePage() {
       case 'area_manager':
         return (
           <ManagerDashboardPremium
-            user={{ id: user.id, name: user.full_name, storeId: user.store_id, storeName: 'Chi nhánh Quận 1' }}
+            user={{
+              id: user.id,
+              name: user.full_name,
+              storeId: user.store_id,
+              storeName: user.store_id === 'store-001' ? 'Homies - Hồ Bá Phấn' : 'Homies - Đường 429',
+            }}
           />
         )
       case 'ceo':

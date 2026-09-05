@@ -37,15 +37,16 @@ export function checkoutToday(
   employeeId: string,
   lat: number,
   lng: number,
+  shiftId?: string,
 ): Attendance | null {
-  return AttendanceService.checkoutToday(employeeId, lat, lng)
+  return AttendanceService.checkoutToday(employeeId, lat, lng, shiftId)
 }
 
 /**
  * Get today's check-in record for an employee.
  */
-export function getTodayCheckin(employeeId: string): Attendance | undefined {
-  return AttendanceService.getTodayCheckin(employeeId)
+export function getTodayCheckin(employeeId: string, shiftId?: string): Attendance | undefined {
+  return AttendanceService.getTodayCheckin(employeeId, shiftId)
 }
 
 /**
@@ -53,6 +54,6 @@ export function getTodayCheckin(employeeId: string): Attendance | undefined {
  */
 export type LiveCheckinStatus = 'not_checked_in' | 'checked_in' | 'checked_out'
 
-export function getLiveCheckinStatus(employeeId: string): LiveCheckinStatus {
-  return AttendanceService.getLiveCheckinStatus(employeeId)
+export function getLiveCheckinStatus(employeeId: string, shiftId?: string): LiveCheckinStatus {
+  return AttendanceService.getLiveCheckinStatus(employeeId, shiftId)
 }

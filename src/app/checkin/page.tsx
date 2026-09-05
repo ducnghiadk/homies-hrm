@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/store/auth-store'
 import AppShell from '@/components/layout/AppShell'
-import { getStoreById, getShiftById, type Attendance } from '@/lib/mock-data'
+import { getShiftById, type Attendance } from '@/lib/mock-data'
 import { saveOfflineCheckin, syncPendingCheckins, getPendingCount } from '@/lib/offline-checkin'
-import { matchStoreWifi } from '@/lib/mock-data-wifi'
 import { isEmployeeOnLeave } from '@/lib/leave-attendance-sync'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { calculateDistance, formatTime } from '@/lib/utils'
+import { storeAdapter, type StoreWithWifi } from '@/lib/adapters/store-adapter'
 import confetti from 'canvas-confetti'
 import {
   ArrowLeft, Clock, Navigation, AlertTriangle,
@@ -25,13 +25,38 @@ import { AttendanceService } from '@/lib/services/attendance-service'
 const CheckinMap = dynamic(() => import('@/components/checkin/CheckinMap'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+    <div className="w-full h-full bg-primary-50 flex items-center justify-center">
       <Loader2 size={32} className="animate-spin text-gray-400" />
     </div>
   ),
 })
 
 type PageStatus = 'locating' | 'gps_error' | 'in_range' | 'out_range' | 'checked_in' | 'checked_out'
+type ToastTone = 'default' | 'success' | 'warning' | 'error'
+type CheckinMethod = 'gps' | 'thu_cong'
+
+const TOAST_TONE_CLASS: Record<ToastTone, string> = {
+  default: 'bg-dark-700 text-white',
+  success: 'bg-success-600 text-white',
+  warning: 'bg-warning-100 text-warning-900 border border-warning-300',
+  error: 'bg-error-600 text-white',
+}
+
+function toMinutes(value?: string): number | null {
+  if (!value) return null
+  const [hours, minutes] = value.split(':').map(Number)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null
+  return hours * 60 + minutes
+}
+
+function isScheduleActive(schedule: { shift_id: string }, nowMinutes: number): boolean {
+  const shift = getShiftById(schedule.shift_id)
+  const start = toMinutes(shift?.start_time)
+  const end = toMinutes(shift?.end_time)
+  if (start === null || end === null) return false
+  if (end <= start) return nowMinutes >= start || nowMinutes < end
+  return nowMinutes >= start && nowMinutes < end
+}
 
 export default function CheckInPage() {
   return (
@@ -47,18 +72,31 @@ function CheckInPageContent() {
   const isOnline = useNetworkStatus()
 
   const currentUser = user!
-  const store = getStoreById(currentUser.store_id)
+  const [store, setStore] = useState<StoreWithWifi | null>(null)
+  const [storeLoadMessage, setStoreLoadMessage] = useState('Đang tải thông tin cửa hàng...')
+  const todayStr = new Date().toISOString().split('T')[0]
+  const publishedTodaySchedules = ScheduleService.getSchedulesForUser(currentUser, currentUser.id)
+    .filter(s => s.status === 'published' && ScheduleService.isWeekPublished(s.store_id, ScheduleService.getWeekStartDate(s.date)))
+    .filter(s => s.date === todayStr)
+  const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes()
+  const todaySchedule = publishedTodaySchedules.find(schedule => isScheduleActive(schedule, currentMinutes))
+    || publishedTodaySchedules.find(schedule => {
+      const start = toMinutes(getShiftById(schedule.shift_id)?.start_time)
+      return start !== null && start > currentMinutes
+    })
+    || publishedTodaySchedules[0]
+  const shift = todaySchedule ? getShiftById(todaySchedule.shift_id) : null
 
   const [checkinRecord, setCheckinRecord] = useState<Attendance | null>(() => {
     if (typeof window === 'undefined') return null
     AttendanceService.syncLiveCheckinsToMock()
-    return AttendanceService.getTodayCheckin(currentUser.id) || null
+    return AttendanceService.getTodayCheckin(currentUser.id, todaySchedule?.shift_id) || null
   })
 
   const [status, setStatus] = useState<PageStatus>(() => {
     if (typeof window === 'undefined') return 'locating'
     AttendanceService.syncLiveCheckinsToMock()
-    const existing = AttendanceService.getTodayCheckin(currentUser.id)
+    const existing = AttendanceService.getTodayCheckin(currentUser.id, todaySchedule?.shift_id)
     if (existing) {
       return existing.check_out_time ? 'checked_out' : 'checked_in'
     }
@@ -68,6 +106,7 @@ function CheckInPageContent() {
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null)
   const [distance, setDistance] = useState<number | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [toastTone, setToastTone] = useState<ToastTone>('default')
 
   const [pendingCount, setPendingCount] = useState<number>(() => {
     if (typeof window === 'undefined') return 0
@@ -76,36 +115,77 @@ function CheckInPageContent() {
   const [isOfflineCheckin, setIsOfflineCheckin] = useState(false)
 
   const [simulatedWifi, setSimulatedWifi] = useState<{ ssid: string; bssid?: string } | null>(null)
-  const [checkinMethod, setCheckinMethod] = useState<'gps' | 'wifi' | null>(null)
+  const [checkinMethod, setCheckinMethod] = useState<CheckinMethod | null>(null)
   const watchIdRef = useRef<number | null>(null)
+  const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevOnlineRef = useRef(true)
-
-  const todayStr = new Date().toISOString().split('T')[0]
-  const todaySchedule = ScheduleService.getSchedulesForUser(currentUser, currentUser.id)
-    .filter(s => s.status === 'published' && ScheduleService.isWeekPublished(s.store_id, ScheduleService.getWeekStartDate(s.date)))
-    .find(s => s.date === todayStr)
-  const shift = todaySchedule ? getShiftById(todaySchedule.shift_id) : null
 
   const noSchedule = !todaySchedule
 
-  // ─── WiFi verification ───
-  const wifiMatch = store && simulatedWifi
-    ? matchStoreWifi(store.id, simulatedWifi.ssid, simulatedWifi.bssid)
-    : null
-  const wifiVerified = !!wifiMatch
-  const gpsInRange = distance !== null && store ? distance <= store.checkin_radius_meters : false
-  const canCheckin = wifiVerified || gpsInRange
+  useEffect(() => {
+    let active = true
+    const storeId = currentUser.store_id
+    if (!storeId) {
+      setStore(null)
+      setStoreLoadMessage('Nhân viên chưa có cua_hang_id nên chưa xác định được cửa hàng.')
+      setStatus('gps_error')
+      return
+    }
+
+    setStoreLoadMessage('Đang tải thông tin cửa hàng...')
+    storeAdapter.getStoreById(storeId)
+      .then(result => {
+        if (!active) return
+        if (!result) {
+          setStore(null)
+          setStoreLoadMessage(`Không tìm thấy cửa hàng với cua_hang_id: ${storeId}`)
+          setStatus('gps_error')
+          return
+        }
+        setStore(result)
+        setStoreLoadMessage('')
+      })
+      .catch(error => {
+        if (!active) return
+        setStore(null)
+        setStoreLoadMessage(`Lỗi query cửa hàng: ${error instanceof Error ? error.message : 'Không rõ lý do'}`)
+        setStatus('gps_error')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [currentUser.store_id])
+
+  // ─── WiFi declaration (for reference only, not location proof) ───
+  const declaredWifiMatches = !!(store?.wifi_ssid && simulatedWifi?.ssid === store.wifi_ssid)
+  const gpsInRange = userPos !== null && distance !== null && store ? distance <= store.checkin_radius_meters : false
+  const canCheckin = !!store
 
   // GPS location tracking
   const startGPS = useCallback(() => {
+    if (!store) return
+    if (gpsTimeoutRef.current !== null) {
+      clearTimeout(gpsTimeoutRef.current)
+      gpsTimeoutRef.current = null
+    }
+
     if (!navigator.geolocation) {
       setStatus('gps_error')
       return
     }
 
     setStatus('locating')
+    gpsTimeoutRef.current = setTimeout(() => {
+      setStatus(prev => prev === 'locating' ? 'gps_error' : prev)
+      gpsTimeoutRef.current = null
+    }, 10000)
 
     const onSuccess = (pos: GeolocationPosition) => {
+      if (gpsTimeoutRef.current !== null) {
+        clearTimeout(gpsTimeoutRef.current)
+        gpsTimeoutRef.current = null
+      }
       const { latitude, longitude } = pos.coords
       setUserPos({ lat: latitude, lng: longitude })
 
@@ -115,7 +195,7 @@ function CheckInPageContent() {
         setDistance(distRounded)
 
         // Only update range status if not already checked in/out
-        const existing = AttendanceService.getTodayCheckin(currentUser.id)
+        const existing = AttendanceService.getTodayCheckin(currentUser.id, todaySchedule?.shift_id)
         if (!existing) {
           setStatus(distRounded <= store.checkin_radius_meters ? 'in_range' : 'out_range')
         }
@@ -123,6 +203,10 @@ function CheckInPageContent() {
     }
 
     const onError = () => {
+      if (gpsTimeoutRef.current !== null) {
+        clearTimeout(gpsTimeoutRef.current)
+        gpsTimeoutRef.current = null
+      }
       setStatus('gps_error')
     }
 
@@ -139,13 +223,13 @@ function CheckInPageContent() {
       timeout: 10000,
       maximumAge: 5000,
     })
-  }, [store, currentUser.id, setStatus, setUserPos, setDistance])
+  }, [store, currentUser.id, todaySchedule?.shift_id, setStatus, setUserPos, setDistance])
 
   useEffect(() => {
     // Don't start GPS if already checked in/out
-    const existing = AttendanceService.getTodayCheckin(currentUser.id)
+    const existing = AttendanceService.getTodayCheckin(currentUser.id, todaySchedule?.shift_id)
     let active = true
-    if (!existing) {
+    if (!existing && store) {
       setTimeout(() => {
         if (active) startGPS()
       }, 0)
@@ -155,44 +239,73 @@ function CheckInPageContent() {
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current)
       }
+      if (gpsTimeoutRef.current !== null) {
+        clearTimeout(gpsTimeoutRef.current)
+        gpsTimeoutRef.current = null
+      }
     }
-  }, [startGPS, currentUser.id])
+  }, [startGPS, currentUser.id, todaySchedule?.shift_id, store])
 
   // ─── Auto-sync when back online ───
   useEffect(() => {
     if (isOnline && !prevOnlineRef.current) {
       // Just came back online — sync pending
-      const result = syncPendingCheckins()
-      if (result.synced > 0) {
-        setTimeout(() => {
-          setToast(`☁️ Đã đồng bộ ${result.synced} chấm công`)
-          setPendingCount(getPendingCount(currentUser.id))
-          const existing = AttendanceService.getTodayCheckin(currentUser.id)
-          if (existing) {
-            setCheckinRecord(existing)
-            setStatus(existing.check_out_time ? 'checked_out' : 'checked_in')
-          }
-          setTimeout(() => setToast(null), 3000)
-        }, 0)
-      }
-      if (result.needsReview > 0) {
-        setTimeout(() => {
-          setToast(`⚠️ ${result.needsReview} chấm công cần HR review (chênh lệch thời gian)`)
-          setTimeout(() => setToast(null), 4000)
-        }, result.synced > 0 ? 3500 : 0)
-      }
+      void syncPendingCheckins().then(result => {
+        if (result.synced > 0) {
+          setTimeout(() => {
+            setToastTone('success')
+            setToast(`Đã đồng bộ ${result.synced} chấm công`)
+            setPendingCount(getPendingCount(currentUser.id))
+            const existing = AttendanceService.getTodayCheckin(currentUser.id, todaySchedule?.shift_id)
+            if (existing) {
+              setCheckinRecord(existing)
+              setStatus(existing.check_out_time ? 'checked_out' : 'checked_in')
+            }
+            setTimeout(() => setToast(null), 3000)
+          }, 0)
+        }
+        if (result.needsReview > 0) {
+          setTimeout(() => {
+            setToastTone('warning')
+            setToast(`${result.needsReview} chấm công cần HR review (chênh lệch thời gian)`)
+            setTimeout(() => setToast(null), 4000)
+          }, result.synced > 0 ? 3500 : 0)
+        }
+      })
     }
     prevOnlineRef.current = isOnline
-  }, [isOnline, currentUser.id])
+  }, [isOnline, currentUser.id, todaySchedule?.shift_id])
 
   // ─── Check-in handler ───
-  const handleCheckin = () => {
-    if (!store) return
+  const getAttendanceDecision = () => {
+    if (gpsInRange && distance !== null) {
+      return {
+        method: 'gps' as const,
+        distanceMeters: distance,
+        ghiChuViTri: undefined,
+      }
+    }
 
-    // Must have WiFi match OR GPS in range
-    if (!wifiVerified && !gpsInRange) {
-      setToast('Bạn cần ở trong cửa hàng hoặc kết nối WiFi cửa hàng')
-      setTimeout(() => setToast(null), 3000)
+    const roundedDistance = distance === null ? null : Math.round(distance)
+    return {
+      method: 'thu_cong' as const,
+      distanceMeters: roundedDistance ?? (store ? store.checkin_radius_meters + 1 : 0),
+      ghiChuViTri: roundedDistance === null ? 'Không có GPS' : `Ngoài vùng: cách ${roundedDistance}m`,
+    }
+  }
+
+  const confirmManualAttendance = (actionLabel: string) => {
+    const locationDetail = distance === null
+      ? 'Không có GPS.'
+      : `Khoảng cách thực tế: ${Math.round(distance)}m.`
+    return window.confirm(`${actionLabel} chưa được xác minh bằng GPS.\n${locationDetail}\nCa này sẽ cần quản lý duyệt`)
+  }
+
+  const handleCheckin = async () => {
+    if (!store) {
+      setToastTone('error')
+      setToast(storeLoadMessage || 'Chưa có thông tin cửa hàng để check-in.')
+      setTimeout(() => setToast(null), 4000)
       return
     }
 
@@ -204,25 +317,36 @@ function CheckInPageContent() {
       return
     }
 
-    const method: 'wifi' | 'gps' = wifiVerified ? 'wifi' : 'gps'
-    setCheckinMethod(method)
+    const decision = getAttendanceDecision()
+    if (decision.method === 'thu_cong' && !confirmManualAttendance('Check-in')) {
+      return
+    }
+    setCheckinMethod(decision.method)
 
     const timeStr = formatTime(new Date())
 
     if (isOnline) {
       // ── Online: write directly ──
-      const record = AttendanceService.checkinToday(
+      const result = await AttendanceService.checkinToday(
         currentUser.id,
         currentUser.store_id,
-        userPos?.lat ?? store.latitude,
-        userPos?.lng ?? store.longitude,
-        method === 'wifi' ? 0 : (distance ?? 0),
+        userPos?.lat,
+        userPos?.lng,
+        decision.distanceMeters,
         shift?.id,
         shift?.start_time,
+        { waitForDb: true, phuongThucCheckIn: decision.method, ghiChuViTri: decision.ghiChuViTri },
       )
+      if (result.trangThai === 'that_bai' || !result.record) {
+        setToastTone('error')
+        setToast(`Check-in THẤT BẠI, chưa được ghi nhận.${result.loi ? ` ${result.loi}` : ''}`)
+        setTimeout(() => setToast(null), 4000)
+        return
+      }
+      const record = result.record
       setCheckinRecord(record)
       setStatus('checked_in')
-      setIsOfflineCheckin(false)
+      setIsOfflineCheckin(result.trangThai === 'chi_luu_may')
 
       confetti({
         particleCount: 120,
@@ -231,7 +355,12 @@ function CheckInPageContent() {
         colors: ['#3971B8', '#C8D69B', '#F6E6A5', '#1E9E57'],
       })
 
-      setToast(`✅ Check-in thành công lúc ${timeStr}${method === 'wifi' ? ' (WiFi)' : ''}`)
+      setToastTone(result.trangThai === 'da_luu_db' ? 'success' : 'warning')
+      setToast(
+        result.trangThai === 'da_luu_db'
+          ? `Đã check-in lúc ${timeStr}${decision.method === 'thu_cong' ? ' (Chờ quản lý duyệt)' : ''}`
+          : 'Đã lưu tạm trên máy, CHƯA vào hệ thống. Sẽ tự gửi lại khi có mạng.'
+      )
       setTimeout(() => {
         setToast(null)
         router.push('/')
@@ -241,9 +370,9 @@ function CheckInPageContent() {
       saveOfflineCheckin(
         currentUser.id,
         currentUser.store_id,
-        userPos?.lat ?? store.latitude,
-        userPos?.lng ?? store.longitude,
-        method === 'wifi' ? 0 : (distance ?? 0),
+        userPos?.lat ?? 0,
+        userPos?.lng ?? 0,
+        decision.distanceMeters,
         shift?.id,
         shift?.start_time,
       )
@@ -258,7 +387,8 @@ function CheckInPageContent() {
         colors: ['#F6C85F', '#d97706', '#fbbf24'],
       })
 
-      setToast(`☁️ Check-in thành công lúc ${timeStr} (Chờ đồng bộ)`)
+      setToastTone('warning')
+      setToast('Đã lưu tạm trên máy, CHƯA vào hệ thống. Sẽ tự gửi lại khi có mạng.')
       setTimeout(() => {
         setToast(null)
         router.push('/')
@@ -267,18 +397,40 @@ function CheckInPageContent() {
   }
 
   // ─── Check-out handler ───
-  const handleCheckout = () => {
-    if (!userPos) return
+  const handleCheckout = async () => {
+    if (!store) return
 
-    const record = AttendanceService.checkoutToday(currentUser.id, userPos.lat, userPos.lng)
-    if (!record) return
+    const decision = getAttendanceDecision()
+    if (decision.method === 'thu_cong' && !confirmManualAttendance('Check-out')) {
+      return
+    }
+
+    const result = await AttendanceService.checkoutToday(
+      currentUser.id,
+      userPos?.lat,
+      userPos?.lng,
+      shift?.id,
+      { waitForDb: true, phuongThucCheckIn: decision.method, ghiChuViTri: decision.ghiChuViTri },
+    )
+    if (result.trangThai === 'that_bai' || !result.record) {
+      setToastTone('error')
+      setToast(`Check-out THẤT BẠI, chưa được ghi nhận.${result.loi ? ` ${result.loi}` : ''}`)
+      setTimeout(() => setToast(null), 4000)
+      return
+    }
+    const record = result.record
 
     setCheckinRecord(record)
     setStatus('checked_out')
 
     const totalH = Math.floor(record.total_hours)
     const totalM = Math.round((record.total_hours - totalH) * 60)
-    setToast(`🏁 Kết thúc ca — Tổng ${totalH} giờ ${totalM} phút`)
+    setToastTone(result.trangThai === 'da_luu_db' ? 'success' : 'warning')
+    setToast(
+      result.trangThai === 'da_luu_db'
+        ? `Đã kết thúc ca — Tổng ${totalH} giờ ${totalM} phút`
+        : 'Đã lưu tạm trên máy, CHƯA vào hệ thống. Sẽ tự gửi lại khi có mạng.'
+    )
     setTimeout(() => {
       setToast(null)
       router.push('/')
@@ -299,8 +451,8 @@ function CheckInPageContent() {
             />
           )}
           {!store && (
-            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-              <p className="text-gray-400">Không có thông tin cửa hàng</p>
+            <div className="w-full h-full bg-primary-50 flex items-center justify-center">
+              <p className="text-gray-400">{storeLoadMessage}</p>
             </div>
           )}
         </div>
@@ -340,7 +492,7 @@ function CheckInPageContent() {
         <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5" />
 
         {/* ─── Shift info card ─── */}
-        <div className="bg-gray-50 rounded-2xl p-4 mb-5">
+        <div className="bg-vanilla-50 rounded-2xl p-4 mb-5">
           {shift ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${shift.color}20` }}>
@@ -371,34 +523,30 @@ function CheckInPageContent() {
             <WifiSimulator onWifiChange={setSimulatedWifi} currentWifi={simulatedWifi} />
 
             {/* Verification method display */}
-            <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+            <div className="bg-vanilla-50 rounded-xl p-3 space-y-2">
               <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Phương thức xác nhận</p>
 
               {/* WiFi status */}
               <div className="flex items-center gap-2">
-                {wifiVerified ? (
+                {declaredWifiMatches ? (
                   <>
                     <Wifi size={14} className="text-success-500" />
-                    <span className="text-xs text-success-700 font-medium">WiFi: {simulatedWifi?.ssid} ✓</span>
+                    <span className="text-xs text-success-700 font-medium">WiFi tự khai báo: {simulatedWifi?.ssid} (khớp cấu hình)</span>
                   </>
                 ) : (
                   <>
                     <WifiOff size={14} className="text-gray-400" />
                     <span className="text-xs text-gray-400">
-                      {simulatedWifi ? `WiFi: ${simulatedWifi.ssid} (không phải cửa hàng)` : 'WiFi: Không kết nối WiFi cửa hàng'}
+                      {simulatedWifi ? `WiFi tự khai báo: ${simulatedWifi.ssid}` : 'WiFi tự khai báo: Chưa chọn'}
                     </span>
                   </>
                 )}
               </div>
+              <p className="text-xs text-warning-700">Tự khai báo, không dùng để xác minh vị trí</p>
 
               {/* GPS status */}
               <div className="flex items-center gap-2">
-                {wifiVerified ? (
-                  <>
-                    <Navigation size={14} className="text-gray-300" />
-                    <span className="text-xs text-gray-300">GPS: Không cần</span>
-                  </>
-                ) : gpsInRange ? (
+                {gpsInRange ? (
                   <>
                     <Navigation size={14} className="text-success-500" />
                     <span className="text-xs text-success-700 font-medium">GPS: Trong phạm vi ({distance}m) ✓</span>
@@ -411,7 +559,7 @@ function CheckInPageContent() {
                 ) : (
                   <>
                     <Navigation size={14} className="text-gray-300" />
-                    <span className="text-xs text-gray-400">GPS: Đang xác định...</span>
+                    <span className="text-xs text-gray-400">{status === 'gps_error' ? 'GPS: Không lấy được' : 'GPS: Đang xác định...'}</span>
                   </>
                 )}
               </div>
@@ -441,7 +589,7 @@ function CheckInPageContent() {
           {status === 'in_range' && (
             <div className="inline-flex items-center gap-2 bg-success-50 text-success-700 px-4 py-2 rounded-full text-sm font-semibold">
               <CheckCircle2 size={16} />
-              {wifiVerified ? 'Xác nhận qua WiFi cửa hàng' : `Bạn đang trong cửa hàng (${distance}m)`}
+              Bạn đang trong cửa hàng ({distance}m)
             </div>
           )}
 
@@ -471,7 +619,7 @@ function CheckInPageContent() {
                 <>
                   <div className="inline-flex items-center gap-2 text-primary-600 font-semibold text-sm">
                     <CheckCircle2 size={16} />
-                    Đã check-in lúc {checkinRecord && formatTime(checkinRecord.check_in_time!)}{checkinMethod === 'wifi' && ' (WiFi)'}
+                    Đã check-in lúc {checkinRecord && formatTime(checkinRecord.check_in_time!)}{checkinMethod === 'thu_cong' && ' (Chờ quản lý duyệt)'}
                   </div>
                   {checkinRecord?.status === 'late' && (
                     <p className="text-xs text-warning-600">⚠️ Trễ {checkinRecord.late_minutes} phút</p>
@@ -512,31 +660,40 @@ function CheckInPageContent() {
               onClick={handleCheckin}
               disabled={!canCheckin}
               className={`w-full py-4 rounded-2xl text-lg font-bold flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-lg ${
-                canCheckin
+                canCheckin && gpsInRange
                   ? 'bg-gradient-to-r from-[#3971B8] to-[#2A5A8F] text-white'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                  : canCheckin
+                    ? 'bg-warning-500 text-white'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
               }`}
             >
               <LogIn size={24} />
-              CHECK-IN {wifiVerified && !gpsInRange && '(WiFi)'}
+              {gpsInRange ? 'CHECK-IN' : 'CHECK-IN (ngoài vùng - chờ duyệt)'}
             </button>
           )}
 
-          {/* Locating / GPS Error — nothing actionable yet */}
+          {/* Locating / GPS Error */}
           {status === 'locating' && (
-            <button disabled className="w-full py-4 rounded-2xl bg-gray-200 text-gray-400 text-lg font-bold flex items-center justify-center gap-3 cursor-not-allowed">
-              <Loader2 size={24} className="animate-spin" />
-              Đang chờ GPS...
+            <button
+              onClick={handleCheckin}
+              disabled={!canCheckin}
+              className={`w-full py-4 rounded-2xl text-lg font-bold flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform ${
+                canCheckin ? 'bg-warning-500 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+              }`}
+            >
+              <LogIn size={24} />
+              CHECK-IN (không có GPS - chờ duyệt)
             </button>
           )}
 
           {status === 'gps_error' && (
             <button
-              onClick={startGPS}
-              className="w-full py-4 rounded-2xl bg-primary-600 text-white text-lg font-bold flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform"
+              onClick={handleCheckin}
+              disabled={!canCheckin}
+              className="w-full py-4 rounded-2xl bg-warning-500 text-white text-lg font-bold flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform"
             >
-              <Navigation size={24} />
-              Thử lại
+              <LogIn size={24} />
+              CHECK-IN (không có GPS - chờ duyệt)
             </button>
           )}
 
@@ -556,7 +713,7 @@ function CheckInPageContent() {
           {status === 'checked_out' && (
             <button
               onClick={() => router.push('/')}
-              className="w-full py-4 rounded-2xl bg-gray-100 text-gray-500 text-lg font-bold flex items-center justify-center gap-3"
+              className="w-full py-4 rounded-2xl bg-primary-50 text-gray-500 text-lg font-bold flex items-center justify-center gap-3"
             >
               <CheckCircle2 size={24} />
               Về trang chủ
@@ -574,10 +731,14 @@ function CheckInPageContent() {
             {isOnline && (
               <button
                 onClick={() => {
-                  const r = syncPendingCheckins()
-                  if (r.synced > 0) setToast(`☁️ Đã đồng bộ ${r.synced} chấm công`)
-                  setPendingCount(getPendingCount(currentUser.id))
-                  setTimeout(() => setToast(null), 3000)
+                  void syncPendingCheckins().then(r => {
+                    if (r.synced > 0) {
+                      setToastTone('success')
+                      setToast(`Đã đồng bộ ${r.synced} chấm công`)
+                    }
+                    setPendingCount(getPendingCount(currentUser.id))
+                    setTimeout(() => setToast(null), 3000)
+                  })
                 }}
                 className="text-xs font-medium text-warning-600 underline whitespace-nowrap"
               >
@@ -601,7 +762,7 @@ function CheckInPageContent() {
 
       {/* ─── Toast notification ─── */}
       {toast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-dark-700 text-white px-6 py-3 rounded-2xl shadow-2xl text-sm font-medium animate-fade-in max-w-[90vw] text-center">
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 ${TOAST_TONE_CLASS[toastTone]} px-6 py-3 rounded-2xl shadow-2xl text-sm font-medium animate-fade-in max-w-[90vw] text-center`}>
           {toast}
         </div>
       )}

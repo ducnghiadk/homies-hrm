@@ -15,6 +15,7 @@ import {
   RegistrationWeek
 } from '@/lib/mock-data-registration-weeks'
 import { ShiftTemplateService, type ShiftTemplate } from '@/lib/services/shift-template-service'
+import { shiftRegistrationAdapter } from '@/lib/adapters'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import {
@@ -284,33 +285,51 @@ function ShiftPreferencesPageContent() {
     )))
   }
 
-  const handleSave = (submitStatus: 'draft' | 'submitted') => {
+  const handleSave = async (submitStatus: 'draft' | 'submitted') => {
     if (isLocked) {
-      showToast('Dot dang ky ca dang khoa, khong the gui!')
+      showToast('Đợt đăng ký ca đang khóa, không thể gửi!')
       return
     }
 
-    savePreferences(
-      user.id,
-      weekStart,
-      days.map(day => {
-        const legacy = buildLegacyPreferenceFlags(day.shiftPreferences)
-        return {
-          date: day.date,
-          morning: legacy.morning,
-          afternoon: legacy.afternoon,
-          evening: legacy.evening,
-          notAvailable: day.notAvailable,
-          shiftPreferences: buildAvailabilityMap(day.shiftPreferences),
-          shiftPreferenceLevels: buildPreferenceLevels(day.shiftPreferences),
-          reason: day.reason || undefined,
-        }
-      }),
-      note,
-      submitStatus,
-    )
+    const payload = days.map(day => {
+      const legacy = buildLegacyPreferenceFlags(day.shiftPreferences)
+      return {
+        date: day.date,
+        morning: legacy.morning,
+        afternoon: legacy.afternoon,
+        evening: legacy.evening,
+        notAvailable: day.notAvailable,
+        shiftPreferences: buildAvailabilityMap(day.shiftPreferences),
+        shiftPreferenceLevels: buildPreferenceLevels(day.shiftPreferences),
+        reason: day.reason || undefined,
+      }
+    })
+
+    savePreferences(user.id, weekStart, payload, note, submitStatus)
+
+    if (submitStatus === 'submitted') {
+      const prefItems = payload.map((p, idx) => ({
+        id: `pref-${user.id}-${p.date}-${idx}`,
+        user_id: user.id,
+        week_start_date: weekStart,
+        date: p.date,
+        morning_available: p.morning,
+        afternoon_available: p.afternoon,
+        evening_available: p.evening,
+        not_available: p.notAvailable,
+        shift_preferences: p.shiftPreferences,
+        shift_preference_levels: p.shiftPreferenceLevels,
+        reason: p.reason,
+        note,
+        status: 'submitted' as const,
+        submitted_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      }))
+      await shiftRegistrationAdapter.submitPreferences(user.id, weekStart, prefItems, user)
+    }
+
     setStatus(submitStatus)
-    showToast(submitStatus === 'submitted' ? 'Da gui dang ky thanh cong!' : 'Da luu nhap nguyen vong')
+    showToast(submitStatus === 'submitted' ? 'Đã gửi đăng ký ca thành công lên CSDL!' : 'Đã lưu nháp nguyện vọng')
   }
 
   const showToast = (msg: string) => {
@@ -328,7 +347,7 @@ function ShiftPreferencesPageContent() {
     <AppShell showNav>
       <div className="space-y-5 animate-fade-in font-['Inter'] pb-24">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 transition-colors hover:bg-gray-200">
+          <button onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 transition-colors hover:bg-gray-200">
             <ChevronLeft size={20} className="text-gray-500" />
           </button>
           <div>
@@ -338,12 +357,12 @@ function ShiftPreferencesPageContent() {
         </div>
 
         {!regWeek ? (
-          <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs font-semibold text-gray-600">
+          <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-vanilla-50 p-4 text-xs font-semibold text-gray-600">
             <Lock size={16} className="text-gray-400" />
             <span>Admin chua mo cong dang ky ca cho tuan ke tiep.</span>
           </div>
         ) : regWeek.status === 'closed' ? (
-          <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs font-semibold text-gray-500">
+          <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-vanilla-50 p-4 text-xs font-semibold text-gray-500">
             <Lock size={16} />
             <span>Dot dang ky ca cho tuan nay dang o trang thai nhap (dong).</span>
           </div>
@@ -441,7 +460,7 @@ function ShiftPreferencesPageContent() {
                         onClick={() => updateShiftPreference(idx, template.id)}
                         disabled={isLocked || status === 'submitted'}
                         className={`relative rounded-xl p-3 text-left transition-all ${
-                          level === 'unavailable' ? 'bg-gray-50 opacity-75' : badge.cardClass
+                          level === 'unavailable' ? 'bg-vanilla-50 opacity-75' : badge.cardClass
                         } ${(isLocked || status === 'submitted') ? 'cursor-not-allowed' : ''}`}
                         style={level !== 'unavailable' ? badge.style : undefined}
                       >
@@ -481,7 +500,7 @@ function ShiftPreferencesPageContent() {
                   className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl p-2.5 text-xs font-bold transition-all ${
                     day.notAvailable
                       ? 'border border-error-200 bg-error-100 text-error-650'
-                      : 'bg-gray-50 text-gray-400 hover:text-gray-500'
+                      : 'bg-vanilla-50 text-gray-400 hover:text-gray-500'
                   } ${(isLocked || status === 'submitted') ? 'cursor-not-allowed' : ''}`}
                 >
                   <XIcon size={14} />
@@ -507,7 +526,7 @@ function ShiftPreferencesPageContent() {
           <div className="mb-3 flex flex-wrap gap-2 text-[11px] font-semibold">
             <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-white">Uu tien</span>
             <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">Co the lam</span>
-            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600">Khong phu hop</span>
+            <span className="rounded-full bg-primary-50 px-2.5 py-1 text-gray-600">Khong phu hop</span>
           </div>
           <p className="mb-2 text-xs font-bold text-gray-550">Ghi chu gui quan ly</p>
           <textarea
@@ -516,12 +535,12 @@ function ShiftPreferencesPageContent() {
             disabled={isLocked || status === 'submitted'}
             placeholder="Vi du: Em muon dang ky lam nhieu ca mo cua, hoac tranh khung gio toi thu 4..."
             rows={3}
-            className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold placeholder:text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            className="w-full resize-none rounded-xl border border-gray-200 bg-vanilla-50 px-3 py-2.5 text-xs font-semibold placeholder:text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
         </div>
 
         {isLocked ? (
-          <div className="flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-gray-100 p-4 text-xs font-bold text-gray-400">
+          <div className="flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-primary-50 p-4 text-xs font-bold text-gray-400">
             <Lock size={16} />
             <span>Form dang ky da khoa (het han hoac chua mo).</span>
           </div>
@@ -529,7 +548,7 @@ function ShiftPreferencesPageContent() {
           <div className="flex gap-2">
             <button
               onClick={() => handleSave('draft')}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-100 py-3 text-sm font-bold text-gray-600 transition-all hover:bg-gray-200 active:scale-[0.97]"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-50 py-3 text-sm font-bold text-gray-600 transition-all hover:bg-gray-200 active:scale-[0.97]"
             >
               <Save size={16} /> Luu nhap
             </button>
@@ -563,7 +582,7 @@ function ShiftPreferencesPageContent() {
 export default function ShiftPreferencesPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-vanilla-50">
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
           <p className="text-sm font-medium text-gray-500">Dang tai cau hinh dang ky ca...</p>

@@ -1,4 +1,4 @@
-export type SettingCategoryId = 'organization' | 'hr' | 'finance' | 'system';
+export type SettingCategoryId = 'organization' | 'hr_master' | 'payroll' | 'scheduling' | 'system';
 
 export type SetupStatus = 'not_started' | 'in_progress' | 'completed';
 

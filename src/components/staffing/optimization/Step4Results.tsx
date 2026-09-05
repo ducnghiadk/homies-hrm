@@ -40,7 +40,7 @@ export default function Step4Results({ state, plans, onSelectPlan, onBack }: Ste
              <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
                 <BarChart3 size={14} className="text-primary-600" />
                 Nhu cầu nhân sự theo giờ
-                <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Dự báo</span>
+                <span className="text-xs font-normal text-gray-500 bg-primary-50 px-2 py-0.5 rounded-full">Dự báo</span>
              </h3>
              <div className="flex gap-4 text-xs text-gray-500">
                  <div className="flex items-center gap-1"><div className="w-3 h-3 bg-primary-500 rounded-sm" /> Cần thiết</div>

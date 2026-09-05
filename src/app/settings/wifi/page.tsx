@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import { useAuthStore } from '@/store/auth-store'
 import { getStoreById, mockStores } from '@/lib/mock-data'
+import { storeAdapter } from '@/lib/adapters'
 import {
   getStoreWifiConfigs,
   addWifiConfig,
@@ -20,9 +21,15 @@ export default function WifiConfigPage() {
   const { user } = useAuthStore()
   const router = useRouter()
 
+  const [storeList, setStoreList] = useState(mockStores)
+
+  useEffect(() => {
+    storeAdapter.getStores().then(res => setStoreList(res))
+  }, [])
+
   // Store managers see their store; admins see all
   const isAdmin = user?.role === 'hr_admin' || user?.role === 'ceo'
-  const stores = isAdmin ? mockStores.filter(s => s.is_active) : user ? [getStoreById(user.store_id)].filter(Boolean) : []
+  const stores = isAdmin ? storeList.filter(s => s.is_active) : user ? storeList.filter(s => s.id === user.store_id) : []
 
   const [selectedStoreId, setSelectedStoreId] = useState(stores[0]?.id ?? '')
   const [configs, setConfigs] = useState<StoreWifiConfig[]>(
@@ -74,7 +81,7 @@ export default function WifiConfigPage() {
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => router.back()}
-          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-dark-700 hover:bg-gray-200 transition-colors"
+          className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center text-dark-700 hover:bg-gray-200 transition-colors"
         >
           <ArrowLeft size={20} />
         </button>
@@ -131,7 +138,7 @@ export default function WifiConfigPage() {
             }`}
           >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              cfg.is_active ? 'bg-success-50' : 'bg-gray-100'
+              cfg.is_active ? 'bg-success-50' : 'bg-primary-50'
             }`}>
               <Wifi size={20} className={cfg.is_active ? 'text-success-500' : 'text-gray-400'} />
             </div>
@@ -149,7 +156,7 @@ export default function WifiConfigPage() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => handleToggle(cfg.id)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-lg hover:bg-primary-50 transition-colors"
                 title={cfg.is_active ? 'Tắt' : 'Bật'}
               >
                 {cfg.is_active ? (
@@ -181,8 +188,8 @@ export default function WifiConfigPage() {
               type="text"
               value={newSsid}
               onChange={e => setNewSsid(e.target.value)}
-              placeholder="VD: BobaHouse_Q1"
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300"
+              placeholder="VD: Homies_HoBaPhan"
+              className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300"
               autoFocus
             />
           </div>
@@ -194,7 +201,7 @@ export default function WifiConfigPage() {
               value={newBssid}
               onChange={e => setNewBssid(e.target.value)}
               placeholder="VD: AA:BB:CC:11:22:33"
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 font-mono"
+              className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-300 font-mono"
             />
             <p className="text-xs text-gray-300 mt-1">Địa chỉ MAC của router, giúp tránh giả mạo tên WiFi</p>
           </div>
@@ -202,7 +209,7 @@ export default function WifiConfigPage() {
           <div className="flex gap-2">
             <button
               onClick={() => { setShowAddForm(false); setNewSsid(''); setNewBssid('') }}
-              className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-500 text-sm font-medium"
+              className="flex-1 py-2.5 rounded-xl bg-primary-50 text-gray-500 text-sm font-medium"
             >
               Hủy
             </button>

@@ -109,7 +109,7 @@ export default function PreferenceAnalysisPanel({ stats, matches }: Props) {
                         <span className="font-medium text-gray-700">{item.label}</span>
                         <span className="text-gray-500">{item.count} ca</span>
                       </div>
-                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-2 bg-primary-50 rounded-full overflow-hidden">
                         <div 
                           className="h-full rounded-full"
                           style={{ 

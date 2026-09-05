@@ -162,46 +162,7 @@ export function saveClaims(list: OpenShiftClaim[]): void {
 export function getInitialOpenShifts(): OpenShift[] {
   const persisted = getPersistedOpenShifts()
   if (persisted.length > 0) return persisted
-
-  const today = new Date()
-  const dates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today)
-    d.setDate(today.getDate() + i + 1)
-    return d.toISOString().split('T')[0]
-  })
-
-  const seeds: Omit<OpenShift, 'id' | 'created_at'>[] = [
-    { store_id: 'store-001', shift_id: 'shift-001', date: dates[0], position_id: 'pos-001', slots_needed: 2, slots_filled: 0, note: 'Thiếu người ca sáng', auto_approve: false, status: 'open', created_by: 'emp-003' },
-    { store_id: 'store-001', shift_id: 'shift-002', date: dates[1], position_id: 'pos-002', slots_needed: 1, slots_filled: 0, note: '', auto_approve: true, status: 'open', created_by: 'emp-003' },
-    { store_id: 'store-001', shift_id: 'shift-003', date: dates[2], position_id: 'pos-001', slots_needed: 1, slots_filled: 0, note: 'Cần gấp', auto_approve: false, status: 'open', created_by: 'emp-003' },
-    { store_id: 'store-001', shift_id: 'shift-001', date: dates[4], position_id: 'pos-003', slots_needed: 3, slots_filled: 1, note: 'Ngày đông khách', auto_approve: true, status: 'open', created_by: 'emp-003' },
-  ]
-
-  let counter = 100
-  const seeded = seeds.map(s => {
-    const creator = mockEmployees.find(e => e.id === s.created_by)
-    const creatorName = creator ? creator.full_name : 'Quản lý'
-    const id = `os-${counter++}`
-    const createdAt = new Date(Date.now() - Math.random() * 86400000).toISOString()
-    
-    return {
-      ...s,
-      id,
-      created_at: createdAt,
-      events: [
-        {
-          event: 'created' as const,
-          timestamp: createdAt,
-          by_id: s.created_by,
-          by_name: creatorName,
-          note: `Đã mở ca trống: Ca ${mockShifts.find(x => x.id === s.shift_id)?.name || s.shift_id} - ${s.note || 'Không có ghi chú'}`
-        }
-      ]
-    }
-  })
-  
-  saveOpenShifts(seeded)
-  return seeded
+  return []
 }
 
 export function getInitialClaims(): OpenShiftClaim[] {

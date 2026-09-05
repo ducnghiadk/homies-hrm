@@ -11,7 +11,7 @@ export default function TimeRangeSlider({ value, onChange, label, color = 'bg-pr
   return (
     <div className="flex items-center gap-3 py-2">
       <div className="w-20 text-xs font-medium text-gray-600">{label}</div>
-      <div className="flex-1 relative h-6 bg-gray-100 rounded-lg overflow-hidden cursor-pointer group">
+      <div className="flex-1 relative h-6 bg-primary-50 rounded-lg overflow-hidden cursor-pointer group">
         {/* Background track */}
         <input 
             type="range" 

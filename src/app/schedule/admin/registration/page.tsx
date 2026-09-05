@@ -19,6 +19,7 @@ import {
   formatDateString,
   getMondayOfDate
 } from '@/lib/mock-data-registration-weeks'
+import { shiftRegistrationAdapter } from '@/lib/adapters'
 import { mockShifts } from '@/lib/mock-data'
 import { toast } from 'sonner'
 
@@ -150,7 +151,7 @@ export default function AdminRegistrationPage() {
   }
 
   // Form submit handler
-  const handleSave = (status: RegistrationWeek['status']) => {
+  const handleSave = async (status: RegistrationWeek['status']) => {
     if (!targetMonday) {
       toast.error('Vui lòng chọn tuần xếp lịch')
       return
@@ -167,6 +168,19 @@ export default function AdminRegistrationPage() {
         registration_deadline: `${deadlineDate}T${deadlineTime}`,
         created_by: user.id
       })
+
+      await shiftRegistrationAdapter.openRegistrationWeek(
+        targetMonday,
+        `${deadlineDate}T${deadlineTime}`,
+        storeId,
+        user.id,
+        {
+          id: savedWeek.id,
+          status,
+          registrationOpenDate: openDate,
+          publishedAt: savedWeek.published_at,
+        }
+      )
 
       // Convert quota matrix back to array
       const quotaArray: Omit<ShiftQuota, 'id'>[] = []
@@ -189,9 +203,10 @@ export default function AdminRegistrationPage() {
         }
       })
 
-      saveShiftQuotas(savedWeek.id, quotaArray)
+      const savedQuotas = saveShiftQuotas(savedWeek.id, quotaArray)
+      await shiftRegistrationAdapter.saveShiftQuotas(savedQuotas)
       toast.success(
-        status === 'open' ? 'Đã mở cổng đăng ký ca thành công' : 'Đã lưu nháp cấu hình thành công',
+        status === 'open' ? 'Đã mở cổng đăng ký ca thành công lên CSDL' : 'Đã lưu nháp cấu hình thành công',
         {
           description:
             status === 'open'
@@ -212,10 +227,22 @@ export default function AdminRegistrationPage() {
     }
   }
 
+  const handleStatusChange = async (week: RegistrationWeek, status: RegistrationWeek['status']) => {
+    try {
+      const syncedWeek = await shiftRegistrationAdapter.updateRegistrationWeekStatus(week.id, status)
+      if (!syncedWeek) throw new Error('Không tìm thấy kỳ đăng ký trong kho đồng bộ.')
+      updateRegistrationStatus(week.id, status)
+      setRefreshKey(key => key + 1)
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Không thể cập nhật trạng thái kỳ đăng ký.'
+      toast.error('Cập nhật trạng thái thất bại', { description: errorMessage })
+    }
+  }
+
   const getStatusBadge = (status: RegistrationWeek['status']) => {
     switch (status) {
       case 'closed':
-        return <span className="bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full text-xs font-bold border border-gray-200">Nháp (Đóng)</span>
+        return <span className="bg-primary-50 text-gray-600 px-2.5 py-1 rounded-full text-xs font-bold border border-gray-200">Nháp (Đóng)</span>
       case 'open':
         return <span className="bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full text-xs font-bold border border-emerald-100 animate-pulse">Đang đăng ký</span>
       case 'reviewing':
@@ -246,7 +273,7 @@ export default function AdminRegistrationPage() {
         </div>
 
         {/* ─── Segment Navigation Bar ─── */}
-        <div className="flex bg-gray-100 p-1 rounded-2xl gap-1 w-full border border-gray-200/50">
+        <div className="flex bg-primary-50 p-1 rounded-2xl gap-1 w-full border border-gray-200/50">
           <button
             onClick={() => router.push('/schedule/manage')}
             className="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all text-gray-500 hover:text-gray-700"
@@ -307,10 +334,7 @@ export default function AdminRegistrationPage() {
                   <div className="flex flex-wrap gap-2 w-full md:w-auto">
                     {week.status === 'closed' && (
                       <button
-                        onClick={() => {
-                          updateRegistrationStatus(week.id, 'open')
-                          setRefreshKey(key => key + 1)
-                        }}
+                        onClick={() => void handleStatusChange(week, 'open')}
                         className="bg-emerald-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl hover:bg-emerald-700 transition-colors flex-1 md:flex-none"
                       >
                         Mở cổng ĐK
@@ -318,10 +342,7 @@ export default function AdminRegistrationPage() {
                     )}
                     {week.status === 'open' && (
                       <button
-                        onClick={() => {
-                          updateRegistrationStatus(week.id, 'reviewing')
-                          setRefreshKey(key => key + 1)
-                        }}
+                        onClick={() => void handleStatusChange(week, 'reviewing')}
                         className="bg-warning-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl hover:bg-warning-700 transition-colors flex-1 md:flex-none"
                       >
                         Đóng cổng & Review
@@ -337,7 +358,7 @@ export default function AdminRegistrationPage() {
                     )}
                     <button
                       onClick={() => startEdit(week)}
-                      className="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors flex items-center justify-center gap-1.5 flex-1 md:flex-none"
+                      className="bg-vanilla-50 hover:bg-primary-50 border border-gray-200 text-gray-700 text-xs font-bold px-3.5 py-2 rounded-xl transition-colors flex items-center justify-center gap-1.5 flex-1 md:flex-none"
                     >
                       <Edit2 size={13} /> Chỉnh sửa
                     </button>
@@ -416,7 +437,7 @@ export default function AdminRegistrationPage() {
               <div className="overflow-x-auto border border-gray-100 rounded-2xl">
                 <table className="w-full text-left border-collapse min-w-[700px]">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
+                    <tr className="bg-vanilla-50 border-b border-gray-100">
                       <th className="p-3 text-[10px] font-extrabold text-gray-500 tracking-wider">CA LÀM</th>
                       {DAY_LABELS.map((day, idx) => (
                         <th key={idx} className="p-3 text-[10px] font-extrabold text-gray-500 tracking-wider text-center">{day}</th>
@@ -425,7 +446,7 @@ export default function AdminRegistrationPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {mockShifts.map(shift => (
-                      <tr key={shift.id} className="hover:bg-gray-50/50">
+                      <tr key={shift.id} className="hover:bg-vanilla-50/50">
                         <td className="p-3 font-bold text-xs text-gray-700 min-w-[120px]">
                           <span className="inline-block w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: shift.color }} />
                           {shift.name}
@@ -435,7 +456,7 @@ export default function AdminRegistrationPage() {
                           const q = quotas[key] || { min: 1, max: 2 }
                           return (
                             <td key={dayIdx} className="p-2">
-                              <div className="flex flex-col items-center gap-1.5 bg-gray-50/50 p-2 rounded-xl border border-gray-100">
+                              <div className="flex flex-col items-center gap-1.5 bg-vanilla-50/50 p-2 rounded-xl border border-gray-100">
                                 {/* Min staff */}
                                 <div className="flex items-center justify-between w-full text-[10px] text-gray-400 gap-1">
                                   <span>Min</span>
@@ -443,13 +464,13 @@ export default function AdminRegistrationPage() {
                                     <button 
                                       type="button"
                                       onClick={() => handleQuotaChange(shift.id, dayIdx, 'min', q.min - 1)}
-                                      className="w-4 h-4 flex items-center justify-center font-bold text-gray-500 hover:bg-gray-100 rounded"
+                                      className="w-4 h-4 flex items-center justify-center font-bold text-gray-500 hover:bg-primary-50 rounded"
                                     >-</button>
                                     <span className="font-extrabold text-gray-800 w-3 text-center">{q.min}</span>
                                     <button 
                                       type="button"
                                       onClick={() => handleQuotaChange(shift.id, dayIdx, 'min', q.min + 1)}
-                                      className="w-4 h-4 flex items-center justify-center font-bold text-gray-500 hover:bg-gray-100 rounded"
+                                      className="w-4 h-4 flex items-center justify-center font-bold text-gray-500 hover:bg-primary-50 rounded"
                                     >+</button>
                                   </div>
                                 </div>
@@ -461,13 +482,13 @@ export default function AdminRegistrationPage() {
                                     <button 
                                       type="button"
                                       onClick={() => handleQuotaChange(shift.id, dayIdx, 'max', q.max - 1)}
-                                      className="w-4 h-4 flex items-center justify-center font-bold text-gray-500 hover:bg-gray-100 rounded"
+                                      className="w-4 h-4 flex items-center justify-center font-bold text-gray-500 hover:bg-primary-50 rounded"
                                     >-</button>
                                     <span className="font-extrabold text-gray-800 w-3 text-center">{q.max}</span>
                                     <button 
                                       type="button"
                                       onClick={() => handleQuotaChange(shift.id, dayIdx, 'max', q.max + 1)}
-                                      className="w-4 h-4 flex items-center justify-center font-bold text-gray-500 hover:bg-gray-100 rounded"
+                                      className="w-4 h-4 flex items-center justify-center font-bold text-gray-500 hover:bg-primary-50 rounded"
                                     >+</button>
                                   </div>
                                 </div>
@@ -487,7 +508,7 @@ export default function AdminRegistrationPage() {
               <button
                 type="button"
                 onClick={() => handleSave('closed')}
-                className="bg-gray-100 hover:bg-gray-250 border border-gray-200 text-gray-700 text-xs font-bold px-4 py-3 rounded-xl transition-all flex items-center gap-1.5 hover:scale-[1.01]"
+                className="bg-primary-50 hover:bg-gray-250 border border-gray-200 text-gray-700 text-xs font-bold px-4 py-3 rounded-xl transition-all flex items-center gap-1.5 hover:scale-[1.01]"
               >
                 <Save size={16} /> Lưu bản nháp
               </button>

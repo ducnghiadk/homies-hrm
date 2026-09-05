@@ -8,19 +8,49 @@ import type { NextRequest } from 'next/server'
 type RoutePermission = {
   paths: string[]
   requiredRoles?: string[]
+  exact?: boolean
   requiredPermission?: string
 }
 
 const ROLE_HIERARCHY: Record<string, number> = {
   employee: 1,
+  nhan_vien: 1,
   shift_leader: 2,
+  truong_ca: 2,
   store_manager: 3,
+  quan_ly_cua_hang: 3,
   area_manager: 4,
+  quan_ly_khu_vuc: 4,
   hr_admin: 5,
+  quan_tri_hr: 5,
   ceo: 6,
+  ban_giam_doc: 6,
 }
 
 const ROUTE_PERMISSIONS: RoutePermission[] = [
+  // Employee-safe personal pages. The page still scopes the returned records.
+  {
+    paths: ['/payroll/salary-slip'],
+    requiredRoles: ['employee', 'shift_leader', 'store_manager', 'area_manager', 'hr_admin', 'ceo'],
+  },
+
+  // Management roots must not inherit employee-level navigation access.
+  {
+    paths: ['/attendance'],
+    exact: true,
+    requiredRoles: ['shift_leader', 'store_manager', 'area_manager', 'hr_admin', 'ceo'],
+  },
+  {
+    paths: ['/schedule'],
+    exact: true,
+    requiredRoles: ['store_manager', 'area_manager', 'hr_admin', 'ceo'],
+  },
+  {
+    paths: ['/payroll'],
+    exact: true,
+    requiredRoles: ['hr_admin', 'ceo'],
+  },
+
   // Admin routes - CEO only
   {
     paths: ['/settings/system', '/admin'],
@@ -46,6 +76,8 @@ const ROUTE_PERMISSIONS: RoutePermission[] = [
       '/settings/labor-cost',
       '/settings/payroll',
       '/settings/master-data',
+      '/settings/organization',
+      '/settings/branches',
     ],
     requiredRoles: ['hr_admin', 'ceo'],
   },
@@ -86,7 +118,7 @@ const ROUTE_PERMISSIONS: RoutePermission[] = [
       '/attendance/overtime',
       '/kpi/leaderboard',
     ],
-    requiredRoles: ['shift_leader', 'store_manager', 'area_manager', 'hr_admin', 'ceo'],
+    requiredRoles: ['employee', 'shift_leader', 'store_manager', 'area_manager', 'hr_admin', 'ceo'],
   },
 ]
 
@@ -94,18 +126,20 @@ const ROUTE_PERMISSIONS: RoutePermission[] = [
 // HELPER FUNCTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function matchesPath(pathname: string, patterns: string[]): boolean {
+function matchesRoute(pathname: string, route: string): boolean {
+  if (route === '/') return pathname === '/'
+  return pathname === route || pathname.startsWith(route + '/')
+}
+
+function matchesPath(pathname: string, patterns: string[], exact = false): boolean {
   return patterns.some(pattern => {
-    // Exact match
-    if (pathname === pattern) return true
-    // Prefix match (for nested routes)
-    if (pathname.startsWith(pattern + '/')) return true
-    return false
+    if (exact) return pathname === pattern
+    return matchesRoute(pathname, pattern)
   })
 }
 
 function getRoutePermission(pathname: string): RoutePermission | undefined {
-  return ROUTE_PERMISSIONS.find(rp => matchesPath(pathname, rp.paths))
+  return ROUTE_PERMISSIONS.find(rp => matchesPath(pathname, rp.paths, rp.exact))
 }
 
 function hasRequiredRole(userRole: string | undefined, requiredRoles: string[] | undefined): boolean {
@@ -135,7 +169,7 @@ export function proxy(request: NextRequest) {
   const redirectPath = `${pathname}${request.nextUrl.search}`
 
   // Allow public routes
-  if (publicRoutes.some(route => pathname.startsWith(route))) {
+  if (publicRoutes.some(route => matchesRoute(pathname, route))) {
     return NextResponse.next()
   }
 
@@ -151,7 +185,7 @@ export function proxy(request: NextRequest) {
   }
 
   const routePermission = getRoutePermission(pathname)
-  const isProtectedRoute = routePermission && !skipPermissionRoutes.some(r => pathname.startsWith(r))
+  const isProtectedRoute = routePermission && !skipPermissionRoutes.some(route => matchesRoute(pathname, route))
 
   if (isProtectedRoute && (authCookie !== '1' || !roleCookie || roleCookie.trim() === '')) {
     const loginUrl = new URL('/login', request.url)

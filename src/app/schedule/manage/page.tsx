@@ -8,6 +8,7 @@ import {
   mockStores,
   getPositionById,
 } from '@/lib/mock-data'
+import { storeAdapter, employeeAdapter } from '@/lib/adapters'
 import { EmployeeService } from '@/lib/services/employee-service'
 import { ScheduleService } from '@/lib/services/schedule-service'
 import { ShiftTemplateService } from '@/lib/services/shift-template-service'
@@ -58,7 +59,7 @@ const weekStatusStyles: Record<string, { label: string; badge: string; note: str
   },
   closed: {
     label: 'Đã đóng đăng ký',
-    badge: 'bg-gray-100 text-gray-700 border-gray-200',
+    badge: 'bg-primary-50 text-gray-700 border-gray-200',
     note: 'Đã khóa đăng ký và đang chờ manager xếp lịch.',
   },
   draft: {
@@ -68,7 +69,7 @@ const weekStatusStyles: Record<string, { label: string; badge: string; note: str
   },
   empty: {
     label: 'Chưa cấu hình',
-    badge: 'bg-gray-100 text-gray-600 border-gray-200',
+    badge: 'bg-primary-50 text-gray-600 border-gray-200',
     note: 'Tuần này chưa có registration week hoặc chưa tạo lịch.',
   },
 }
@@ -107,6 +108,17 @@ function ScheduleManagePageContent() {
     const requestedStoreId = searchParams.get('storeId')
     return requestedStoreId || 'store-001'
   })
+  const [stores, setStores] = useState(mockStores)
+
+  useEffect(() => {
+    storeAdapter.getStores().then(res => setStores(res))
+    employeeAdapter.getAllEmployees().then(res => {
+      if (res && res.length) {
+        EmployeeService.syncEmployeesFromAdapter(res)
+        setRefreshTrigger(k => k + 1)
+      }
+    })
+  }, [])
 
   useEffect(() => {
     if (!isAuthenticated) router.push('/login')
@@ -133,10 +145,10 @@ function ScheduleManagePageContent() {
   const availableStores = useMemo(() => {
     if (!user) return []
     if (user.role === 'ceo' || user.role === 'hr_admin') {
-      return mockStores.filter(store => store.is_active)
+      return stores.filter(store => store.is_active)
     }
-    return mockStores.filter(store => store.id === user.store_id)
-  }, [user])
+    return stores.filter(store => store.id === user.store_id)
+  }, [user, stores])
 
   const activeStoreId = useMemo(() => {
     if (!user) return selectedStoreId
@@ -356,7 +368,7 @@ function ScheduleManagePageContent() {
           <p className="mt-0.5 text-xs text-gray-400">Bảng phân ca hàng tuần cho nhân viên</p>
         </div>
 
-        <div className="flex w-full gap-1 rounded-2xl border border-gray-200/50 bg-gray-100 p-1">
+        <div className="flex w-full gap-1 rounded-2xl border border-gray-200/50 bg-primary-50 p-1">
           <button
             onClick={() => router.push('/schedule/manage')}
             className="flex-1 rounded-xl bg-white px-3 py-2 text-xs font-bold text-gray-800 shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all"
@@ -381,7 +393,7 @@ function ScheduleManagePageContent() {
           <div className="flex items-center justify-between">
             <button
               onClick={() => setWeekOffset(offset => offset - 1)}
-              className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-gray-100"
+              className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-primary-50"
             >
               <ChevronLeft size={20} className="text-gray-500" />
             </button>
@@ -398,14 +410,14 @@ function ScheduleManagePageContent() {
             </div>
             <button
               onClick={() => setWeekOffset(offset => offset + 1)}
-              className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-gray-100"
+              className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-primary-50"
             >
               <ChevronRight size={20} className="text-gray-500" />
             </button>
           </div>
 
           <div className="mt-3 grid gap-3 md:grid-cols-[1.3fr_1fr]">
-            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+            <div className="rounded-2xl border border-gray-100 bg-vanilla-50 p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${weekStatus.badge}`}>
                   {weekStatus.label}
@@ -445,7 +457,7 @@ function ScheduleManagePageContent() {
                 )}
 
                 <div className="grid gap-2 md:grid-cols-2">
-                  <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                  <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-vanilla-50 px-3 py-2 text-xs text-gray-500">
                     <Search size={14} />
                     <input
                       value={search}
@@ -458,7 +470,7 @@ function ScheduleManagePageContent() {
                   <select
                     value={positionFilter}
                     onChange={event => setPositionFilter(event.target.value)}
-                    className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700"
+                    className="rounded-xl border border-gray-200 bg-vanilla-50 px-3 py-2 text-xs font-medium text-gray-700"
                   >
                     <option value="all">Tất cả vị trí</option>
                     {positionOptions.map(position => (
@@ -481,7 +493,7 @@ function ScheduleManagePageContent() {
                       className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${
                         coverageFilter === option.key
                           ? 'bg-primary text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          : 'bg-primary-50 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
                       {option.label}
@@ -491,7 +503,7 @@ function ScheduleManagePageContent() {
 
                 <button
                   onClick={handleSaveDraft}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-50"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-vanilla-50"
                 >
                   <Save size={14} /> Lưu nháp
                 </button>
@@ -501,7 +513,7 @@ function ScheduleManagePageContent() {
                   disabled={isPublished}
                   className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
                     isPublished
-                      ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'
+                      ? 'cursor-not-allowed border-gray-200 bg-primary-50 text-gray-400'
                       : 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100'
                   }`}
                 >
@@ -513,7 +525,7 @@ function ScheduleManagePageContent() {
                   disabled={blockingWarnings.length > 0}
                   className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition-all shadow-sm ${
                     blockingWarnings.length > 0
-                      ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 shadow-none'
+                      ? 'cursor-not-allowed border-gray-200 bg-primary-50 text-gray-400 shadow-none'
                       : isPublished
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                         : 'border-transparent bg-emerald-600 text-white hover:bg-emerald-700'
@@ -524,13 +536,13 @@ function ScheduleManagePageContent() {
 
                 <button
                   onClick={() => router.push(`/schedule/history?storeId=${activeStoreId}&weekStart=${weekStrs[0]}`)}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-100"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-vanilla-50 px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-primary-50"
                 >
                   <History size={14} /> Lịch sử thay đổi
                 </button>
                 <button
                   onClick={() => router.push('/schedule/templates')}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-100"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-vanilla-50 px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-primary-50"
                 >
                   Templates ca
                 </button>
@@ -541,15 +553,15 @@ function ScheduleManagePageContent() {
 
         {publishSummary && (
           <div className="grid gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:grid-cols-5">
-            <div className="rounded-xl bg-gray-50 p-3">
+            <div className="rounded-xl bg-vanilla-50 p-3">
               <p className="text-[11px] text-gray-400">Tổng ca</p>
               <p className="mt-1 text-lg font-bold text-gray-800">{publishSummary.totalAssignments}</p>
             </div>
-            <div className="rounded-xl bg-gray-50 p-3">
+            <div className="rounded-xl bg-vanilla-50 p-3">
               <p className="text-[11px] text-gray-400">Nhân sự đã có lịch</p>
               <p className="mt-1 text-lg font-bold text-gray-800">{publishSummary.assignedEmployees}</p>
             </div>
-            <div className="rounded-xl bg-gray-50 p-3">
+            <div className="rounded-xl bg-vanilla-50 p-3">
               <p className="text-[11px] text-gray-400">Nhân sự còn trống</p>
               <p className="mt-1 text-lg font-bold text-gray-800">{publishSummary.unassignedEmployees}</p>
             </div>
@@ -702,7 +714,7 @@ function ScheduleManagePageContent() {
                             setChangeReason('')
                             setShowAddModal(true)
                           }}
-                          className="w-full rounded-md py-1 text-[10px] text-gray-400 transition-opacity hover:bg-gray-100"
+                          className="w-full rounded-md py-1 text-[10px] text-gray-400 transition-opacity hover:bg-primary-50"
                           style={{ opacity: cellScheds.length === 0 ? 1 : 0.5 }}
                         >
                           <Plus size={10} className="mx-auto" />
@@ -796,7 +808,7 @@ function ScheduleManagePageContent() {
 export default function ScheduleManagePage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-vanilla-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-gray-500 text-sm font-medium">Đang tải dữ liệu xếp lịch...</p>

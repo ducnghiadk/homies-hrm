@@ -117,14 +117,8 @@ export const mockStaffHours: StaffHourData = {
 
 export const mockAttendanceReport: AttendanceReportData = {
   period: '01/2026', store: 'Tất cả',
-  summary: { total_days: 26, on_time_rate: 87.5, late_rate: 8.3, absent_rate: 4.2 },
-  by_employee: [
-    { name: 'Trần Thị Mai', on_time: 26, late: 0, absent: 0, total: 26 },
-    { name: 'Vũ Hoàng Đức', on_time: 24, late: 1, absent: 1, total: 26 },
-    { name: 'Đặng Minh Khoa', on_time: 20, late: 4, absent: 2, total: 26 },
-    { name: 'Ngô Thị Hồng', on_time: 23, late: 2, absent: 1, total: 26 },
-    { name: 'Bùi Văn Tùng', on_time: 22, late: 3, absent: 1, total: 26 },
-  ],
+  summary: { total_days: 0, on_time_rate: 100, late_rate: 0, absent_rate: 0 },
+  by_employee: [],
 }
 
 export const mockSalaryStructure: SalaryStructureData = {

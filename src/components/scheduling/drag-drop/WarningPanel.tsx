@@ -26,7 +26,7 @@ export default function WarningPanel({ validation, onApplyFix }: WarningPanelPro
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      <div className="p-3 bg-gray-50 border-b font-bold text-sm text-gray-700 flex items-center gap-2">
+      <div className="p-3 bg-vanilla-50 border-b font-bold text-sm text-gray-700 flex items-center gap-2">
         <AlertTriangle size={16} className="text-warning-600" /> Kiểm tra & Cảnh báo
       </div>
 
@@ -113,14 +113,14 @@ export default function WarningPanel({ validation, onApplyFix }: WarningPanelPro
             <h4 className="font-bold text-gray-900 flex items-center gap-2">
               <Sparkles size={16} className="text-primary" /> Xem trước thay đổi
             </h4>
-            <div className="mt-3 bg-gray-50 rounded-lg p-3 text-xs text-gray-700 space-y-1">
+            <div className="mt-3 bg-vanilla-50 rounded-lg p-3 text-xs text-gray-700 space-y-1">
               <div className="font-medium text-gray-900">{previewFix.item.message}</div>
               <div className="text-primary">→ {previewFix.item.suggestion}</div>
             </div>
             <div className="flex gap-2 mt-4">
               <button
                 onClick={() => setPreviewFix(null)}
-                className="flex-1 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+                className="flex-1 px-3 py-2 text-sm font-medium text-gray-600 bg-primary-50 rounded-lg hover:bg-gray-200"
               >
                 Hủy
               </button>

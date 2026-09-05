@@ -163,7 +163,7 @@ export default function StaffingQuickCalc({ onApply, onViewDetail }: Props) {
                 border: `1px solid ${result.helper > 0 ? 'var(--gray-200)' : 'var(--gray-100)'}`,
                 opacity: result.helper > 0 ? 1 : 0.5,
               }}>
-                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-1">
+                <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center mb-1">
                   <Sparkles size={20} className="text-gray-500" />
                 </div>
                 <div className="text-xl font-black" style={{ color: result.helper > 0 ? 'var(--primary)' : 'var(--text-muted)' }}>

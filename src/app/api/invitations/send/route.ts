@@ -4,6 +4,18 @@ import type { EmploymentType } from '@/lib/mock-data-employee-ext'
 
 export async function POST(request: Request) {
   try {
+    // Basic Auth Check: ensure caller specifies valid internal request header or authentication context
+    const authHeader = request.headers.get('authorization')
+    const secretKey = process.env.INTERNAL_API_SECRET
+
+    if (secretKey && authHeader !== `Bearer ${secretKey}`) {
+      // If secret key is configured, strictly validate
+      return NextResponse.json(
+        { ok: false, error: 'Truy cập không hợp lệ. Yêu cầu quyền xác thực.' },
+        { status: 401 },
+      )
+    }
+
     const body = await request.json() as {
       invitation?: {
         id: string

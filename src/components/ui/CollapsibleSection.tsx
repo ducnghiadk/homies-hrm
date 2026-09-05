@@ -81,8 +81,8 @@ export default function CollapsibleSection({
         className={`
           w-full flex items-center gap-3 px-4 py-3 text-left
           transition-colors duration-150
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'}
-          ${isOpen ? 'bg-gray-50' : 'bg-white'}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-vanilla-50 cursor-pointer'}
+          ${isOpen ? 'bg-vanilla-50' : 'bg-white'}
           ${headerClassName}
         `}
       >
@@ -110,7 +110,7 @@ export default function CollapsibleSection({
 
         {/* Badge */}
         {badge !== undefined && badge !== null && (
-          <span className="shrink-0 bg-gray-100 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">
+          <span className="shrink-0 bg-primary-50 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">
             {badge}
           </span>
         )}

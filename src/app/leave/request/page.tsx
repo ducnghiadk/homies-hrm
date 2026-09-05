@@ -14,6 +14,7 @@ import {
   getLeaveStats, LEAVE_TYPE_MAP,
 } from '@/lib/mock-data-leave'
 import type { LeaveRequest, LeaveType } from '@/lib/mock-data-leave'
+import { leaveAdapter } from '@/lib/adapters'
 import {
   addPendingQuota, approveQuotaDeduct, rejectQuotaRestore, cancelQuotaRestore,
 } from '@/lib/quota-service'
@@ -25,13 +26,11 @@ import {
   ClipboardList, CheckCircle2, Clock, XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { checkLeaveImpactOnStaffing, type LeaveStaffingImpact } from '@/lib/understaffing-alert'
 
 // ─── TYPES ───
 type TabKey = 'my' | 'approval' | 'calendar'
-
-
 
 // ─── INNER ───
 function LeavePageInner() {
@@ -44,19 +43,30 @@ function LeavePageInner() {
   const [showForm, setShowForm] = useState(false)
   const [formInitialType, setFormInitialType] = useState<LeaveType | undefined>()
   const [requests, setRequests] = useState<LeaveRequest[]>(mockLeaveRequests)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const { user } = useAuthStore()
-  const currentEmployeeId = user?.id || 'emp-005'
+  const currentEmployeeId = user?.id || 'emp-001'
   const currentQuota = mockLeaveQuotas.find(q => q.employee_id === currentEmployeeId) || mockLeaveQuotas[0]
+
+  useEffect(() => {
+    let isMounted = true
+    leaveAdapter.getAllLeaveRequests(user || undefined).then(list => {
+      if (isMounted && list.length > 0) {
+        setRequests(list)
+      }
+    })
+    return () => {
+      isMounted = false
+    }
+  }, [user, refreshKey])
 
   const stats = useMemo(() => getLeaveStats(requests), [requests])
 
   const myRequests = useMemo(
-    () => requests.filter(r => r.employee_id === currentEmployeeId),
-    [requests, currentEmployeeId]
+    () => requests.filter(r => r.employee_id === currentEmployeeId || (user?.email && r.employee_id === user.email)),
+    [requests, currentEmployeeId, user]
   )
-
-
 
   // ─── HANDLERS ───
   const handleTabChange = useCallback((tab: string) => {
@@ -94,7 +104,7 @@ function LeavePageInner() {
       employee_position: user?.role === 'store_manager' ? 'Quản lý cửa hàng' : 'Nhân viên',
       store_id: user?.store_id || 'store-001',
       leave_type: draft.leave_type || 'annual',
-      leave_type_label: LEAVE_TYPE_MAP[draft.leave_type || 'annual'].name,
+      leave_type_label: LEAVE_TYPE_MAP[draft.leave_type || 'annual']?.name || 'Phép năm',
       status: 'pending',
       start_date: draft.start_date || '',
       end_date: draft.end_date || '',
@@ -111,7 +121,7 @@ function LeavePageInner() {
     setSubmitDialog(true)
   }, [requests.length, currentEmployeeId, user])
 
-  const confirmSubmit = useCallback(() => {
+  const confirmSubmit = useCallback(async () => {
     if (!pendingSubmit) return
 
     // Auto-deduct: tăng pending quota
@@ -126,14 +136,16 @@ function LeavePageInner() {
       return
     }
 
-    setRequests(prev => [pendingSubmit, ...prev])
+    const saved = await leaveAdapter.createLeaveRequest(pendingSubmit, user || undefined)
+    setRequests(prev => [saved, ...prev.filter(r => r.id !== saved.id)])
     setShowForm(false)
     setSubmitDialog(false)
-    toast.success('📤 Đã gửi đơn xin nghỉ!', {
+    toast.success('📤 Đã gửi đơn xin nghỉ lên CSDL!', {
       description: `${pendingSubmit.leave_type_label} • ${pendingSubmit.days} ngày (còn ${quotaResult.quota?.remaining ?? '?'} ngày)`,
     })
     setPendingSubmit(null)
-  }, [pendingSubmit])
+    setRefreshKey(v => v + 1)
+  }, [pendingSubmit, user])
 
   const handleApprove = useCallback((id: string) => {
     const req = requests.find(r => r.id === id)
@@ -162,7 +174,6 @@ function LeavePageInner() {
   const confirmApprove = useCallback(async () => {
     if (!approveDialog.id) return
     setIsProcessing(true)
-    await new Promise(r => setTimeout(r, 800))
 
     const req = requests.find(r => r.id === approveDialog.id)
 
@@ -176,22 +187,24 @@ function LeavePageInner() {
       )
     }
 
+    await leaveAdapter.updateLeaveRequestStatus(approveDialog.id, 'approved', user || undefined)
+
     setRequests(prev => prev.map(r =>
       r.id === approveDialog.id ? {
         ...r, status: 'approved' as const,
-        approver_id: 'emp-002', approver_name: 'Nguyễn Quản Lý',
+        approver_id: user?.id || 'emp-001', approver_name: user?.full_name || 'Quản lý',
         approved_at: new Date().toISOString(),
       } : r
     ))
-    toast.success('✅ Đã duyệt đơn nghỉ', { description: `Đơn của ${approveDialog.name} đã được duyệt. Quota đã cập nhật.` })
+    toast.success('✅ Đã duyệt đơn nghỉ trên CSDL', { description: `Đơn của ${approveDialog.name} đã được duyệt thành công.` })
     setApproveDialog({ isOpen: false, id: null, name: '' })
     setIsProcessing(false)
-  }, [approveDialog, requests])
+    setRefreshKey(v => v + 1)
+  }, [approveDialog, requests, user])
 
   const confirmReject = useCallback(async (data?: { reason?: string }) => {
     if (!rejectDialog.id) return
     setIsProcessing(true)
-    await new Promise(r => setTimeout(r, 800))
 
     const req = requests.find(r => r.id === rejectDialog.id)
 
@@ -202,10 +215,12 @@ function LeavePageInner() {
       removeLeaveAttendanceRecords(req.id)
     }
 
+    await leaveAdapter.updateLeaveRequestStatus(rejectDialog.id, 'rejected', user || undefined, data?.reason)
+
     setRequests(prev => prev.map(r =>
       r.id === rejectDialog.id ? {
         ...r, status: 'rejected' as const,
-        approver_id: 'emp-002', approver_name: 'Nguyễn Quản Lý',
+        approver_id: user?.id || 'emp-001', approver_name: user?.full_name || 'Quản lý',
         rejected_at: new Date().toISOString(),
         approver_comment: data?.reason || 'Không đủ điều kiện',
       } : r
@@ -215,12 +230,12 @@ function LeavePageInner() {
     })
     setRejectDialog({ isOpen: false, id: null, name: '' })
     setIsProcessing(false)
-  }, [rejectDialog, requests])
+    setRefreshKey(v => v + 1)
+  }, [rejectDialog, requests, user])
 
   const confirmCancel = useCallback(async () => {
     if (!cancelDialog.id) return
     setIsProcessing(true)
-    await new Promise(r => setTimeout(r, 800))
 
     const req = requests.find(r => r.id === cancelDialog.id)
 
@@ -233,13 +248,16 @@ function LeavePageInner() {
       }
     }
 
+    await leaveAdapter.updateLeaveRequestStatus(cancelDialog.id, 'cancelled', user || undefined)
+
     setRequests(prev => prev.map(r =>
       r.id === cancelDialog.id ? { ...r, status: 'cancelled' as const, updated_at: new Date().toISOString() } : r
     ))
     toast('🚫 Đã hủy đơn nghỉ. Quota đã hoàn lại.')
     setCancelDialog({ isOpen: false, id: null })
     setIsProcessing(false)
-  }, [cancelDialog, requests])
+    setRefreshKey(v => v + 1)
+  }, [cancelDialog, requests, user])
 
 
 
@@ -458,11 +476,11 @@ export default function LeaveRequestPage() {
     <Suspense fallback={
       <AppShell title="Nghỉ phép">
         <div className="space-y-4 animate-pulse">
-          <div className="h-8 bg-gray-100 rounded-xl w-48" />
-          <div className="h-32 bg-gray-100 rounded-2xl" />
-          <div className="h-10 bg-gray-100 rounded-xl" />
+          <div className="h-8 bg-primary-50 rounded-xl w-48" />
+          <div className="h-32 bg-primary-50 rounded-2xl" />
+          <div className="h-10 bg-primary-50 rounded-xl" />
           <div className="space-y-3">
-            {[1, 2, 3].map(i => <div key={i} className="h-40 bg-gray-100 rounded-2xl" />)}
+            {[1, 2, 3].map(i => <div key={i} className="h-40 bg-primary-50 rounded-2xl" />)}
           </div>
         </div>
       </AppShell>

@@ -94,7 +94,7 @@ export default function OfflineDemoPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
               activeTab === tab.id
                 ? 'bg-primary text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-primary-50 text-gray-700 hover:bg-gray-200'
             }`}
           >
             <tab.icon size={16} />
@@ -138,7 +138,7 @@ export default function OfflineDemoPage() {
           <Card className="p-4">
             <h3 className="font-bold text-lg mb-4">📊 Thống kê</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-50 rounded-lg p-4 text-center">
+              <div className="bg-vanilla-50 rounded-lg p-4 text-center">
                 <p className="text-3xl font-bold text-primary">{stats.total}</p>
                 <p className="text-sm text-gray-600">Tổng tác vụ</p>
               </div>
@@ -166,7 +166,7 @@ export default function OfflineDemoPage() {
           )}
 
           {/* Last sync */}
-          <Card className="p-4 bg-gray-50">
+          <Card className="p-4 bg-vanilla-50">
             <div className="flex items-center gap-2">
               <Clock className="w-5 h-5 text-gray-400" />
               <span className="text-sm text-gray-600">

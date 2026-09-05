@@ -100,7 +100,7 @@ export default function PreferenceOverviewPage() {
     switch (status) {
       case 'submitted': return { bg: 'bg-success-50', text: 'text-success-600', border: 'border-success-200' }
       case 'draft': return { bg: 'bg-warning-50', text: 'text-warning-600', border: 'border-warning-200' }
-      default: return { bg: 'bg-gray-50', text: 'text-gray-400', border: 'border-gray-200' }
+      default: return { bg: 'bg-vanilla-50', text: 'text-gray-400', border: 'border-gray-200' }
     }
   }
 
@@ -118,7 +118,7 @@ export default function PreferenceOverviewPage() {
         {/* Header */}
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()}
-            className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+            className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center hover:bg-gray-200 transition-colors">
             <ChevronLeft size={20} className="text-gray-500" />
           </button>
           <div className="flex-1">
@@ -129,13 +129,13 @@ export default function PreferenceOverviewPage() {
           </div>
           <button 
             onClick={() => setWeekOffset(w => w - 1)}
-            className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200"
+            className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center hover:bg-gray-200"
           >
             ←
           </button>
           <button 
             onClick={() => setWeekOffset(w => w + 1)}
-            className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200"
+            className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center hover:bg-gray-200"
           >
             →
           </button>
@@ -145,7 +145,7 @@ export default function PreferenceOverviewPage() {
         <div className="bg-white rounded-2xl border border-gray-100 p-3 flex items-center justify-center gap-2">
           <button 
             onClick={() => setWeekOffset(w => w - 1)}
-            className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium"
+            className="px-3 py-1.5 rounded-lg bg-primary-50 hover:bg-gray-200 text-sm font-medium"
           >
             ← Tuần trước
           </button>
@@ -156,7 +156,7 @@ export default function PreferenceOverviewPage() {
           </div>
           <button 
             onClick={() => setWeekOffset(w => w + 1)}
-            className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium"
+            className="px-3 py-1.5 rounded-lg bg-primary-50 hover:bg-gray-200 text-sm font-medium"
           >
             Tuần sau →
           </button>
@@ -176,14 +176,14 @@ export default function PreferenceOverviewPage() {
             <p className="text-2xl font-black text-warning-600">{stats.draft}</p>
             <p className="text-xs text-warning-500">Nháp</p>
           </div>
-          <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 text-center">
+          <div className="bg-vanilla-50 rounded-2xl border border-gray-200 p-4 text-center">
             <p className="text-2xl font-black text-gray-400">{stats.notStarted}</p>
             <p className="text-xs text-gray-400">Chưa đăng ký</p>
           </div>
         </div>
 
         {/* Filter */}
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        <div className="flex gap-1 bg-primary-50 rounded-xl p-1">
           {([
             { key: 'all' as const, label: 'Tất cả', count: stats.total },
             { key: 'submitted' as const, label: 'Đã gửi', count: stats.submitted },
@@ -201,7 +201,7 @@ export default function PreferenceOverviewPage() {
             >
               {f.label}
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                filter === f.key ? 'bg-gray-100' : 'bg-gray-200'
+                filter === f.key ? 'bg-primary-50' : 'bg-gray-200'
               }`}>
                 {f.count}
               </span>
@@ -271,7 +271,7 @@ export default function PreferenceOverviewPage() {
                             ? 'bg-error-100 text-error-600' 
                             : dayStatus === 'available'
                               ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-gray-50 text-gray-400'
+                              : 'bg-vanilla-50 text-gray-400'
                         }`}
                         title={format(date, 'EEE dd/MM', { locale: vi })}
                       >
@@ -309,7 +309,7 @@ export default function PreferenceOverviewPage() {
         {/* Empty State */}
         {filteredEmployees.length === 0 && (
           <div className="text-center py-12">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+            <div className="w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto mb-3">
               <Filter size={24} className="text-gray-300" />
             </div>
             <p className="text-sm text-gray-400">Không có nhân viên phù hợp</p>

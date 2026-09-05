@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import { Avatar } from '@/components/ui/Avatar'
-import { getPositionById, getStoreById, mockStores } from '@/lib/mock-data'
-import { EmployeeService } from '@/lib/services/employee-service'
-import { useAuthStore } from '@/store/auth-store'
+import { getPositionById, getStoreById, mockStores, isStoreMatch } from '@/lib/mock-data'
+import { storeAdapter, employeeAdapter } from '@/lib/adapters'
+import { EmployeeService, getDepartmentName, getDefaultSecondaryPositions } from '@/lib/services/employee-service'
+import { useAuthStore, type AuthUser } from '@/store/auth-store'
+import EmployeeImportModal from '@/components/employee/EmployeeImportModal'
 
 type InlineIconProps = {
   size?: number
@@ -96,6 +98,22 @@ const SearchIcon = ({ size, className }: InlineIconProps) => (
   </InlineIcon>
 )
 
+const LayoutGridIcon = ({ size, className }: InlineIconProps) => (
+  <InlineIcon size={size} className={className}>
+    <rect width="7" height="7" x="3" y="3" rx="1" />
+    <rect width="7" height="7" x="14" y="3" rx="1" />
+    <rect width="7" height="7" x="14" y="14" rx="1" />
+    <rect width="7" height="7" x="3" y="14" rx="1" />
+  </InlineIcon>
+)
+
+const TablePropertiesIcon = ({ size, className }: InlineIconProps) => (
+  <InlineIcon size={size} className={className}>
+    <path d="M15 3v18M9 3v18M4 9h16M4 15h16" />
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+  </InlineIcon>
+)
+
 const MoreHorizontalIcon = ({ size, className }: InlineIconProps) => (
   <InlineIcon size={size} className={className}>
     <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
@@ -116,6 +134,20 @@ const PencilIcon = ({ size, className }: InlineIconProps) => (
   <InlineIcon size={size} className={className}>
     <path d="M12 20h9" />
     <path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z" />
+  </InlineIcon>
+)
+
+const SlidersIcon = ({ size, className }: InlineIconProps) => (
+  <InlineIcon size={size} className={className}>
+    <line x1="4" y1="21" x2="4" y2="14" />
+    <line x1="4" y1="10" x2="4" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12" y2="3" />
+    <line x1="20" y1="21" x2="20" y2="16" />
+    <line x1="20" y1="12" x2="20" y2="3" />
+    <line x1="1" y1="14" x2="7" y2="14" />
+    <line x1="9" y1="8" x2="15" y2="8" />
+    <line x1="17" y1="16" x2="23" y2="16" />
   </InlineIcon>
 )
 
@@ -150,18 +182,18 @@ const getWorkStatusMeta = (status: string) => {
     case 'inactive':
       return { label: 'Sắp nhận việc', className: 'bg-primary-50 text-primary-700' }
     case 'resigned':
-      return { label: 'Đã nghỉ', className: 'bg-gray-100 text-gray-600' }
+      return { label: 'Đã nghỉ', className: 'bg-primary-50 text-gray-600' }
     default:
-      return { label: status, className: 'bg-gray-100 text-gray-600' }
+      return { label: status, className: 'bg-primary-50 text-gray-600' }
   }
 }
 
 const getAccountStatusMeta = (status?: string) => {
   switch (status) {
     case 'dang_hoat_dong':
-      return { label: 'Tài khoản hoạt động', className: 'bg-success-50 text-success-700' }
+      return { label: 'Hoạt động', className: 'bg-success-50 text-success-700' }
     case 'bi_khoa':
-      return { label: 'Tài khoản khóa', className: 'bg-error-50 text-error-700' }
+      return { label: 'Bị khóa', className: 'bg-error-50 text-error-700' }
     default:
       return { label: 'Chưa kích hoạt', className: 'bg-warning-50 text-warning-700' }
   }
@@ -182,10 +214,8 @@ const getRoleLabel = (role: string) => {
   }
 }
 
-const getDepartmentLabel = (positionName?: string) => {
-  if (!positionName) return 'Vận hành cửa hàng'
-  if (positionName.toLowerCase().includes('quản lý')) return 'Quản lý cửa hàng'
-  return 'Vận hành cửa hàng'
+const getDepartmentLabel = (positionId?: string, role?: AuthUser['role']) => {
+  return getDepartmentName(positionId, role)
 }
 
 const getStoreLabel = (storeId?: string) => {
@@ -193,7 +223,45 @@ const getStoreLabel = (storeId?: string) => {
   return storeName ? storeName.replace('Homies Milk Tea - ', '') : 'Chưa phân bổ'
 }
 
-const employeeTableGridTemplate = '44px 36px 76px minmax(204px,1.35fr) 100px 92px minmax(124px,0.9fr) 84px minmax(120px,0.9fr) 104px 152px'
+export type ColumnKey =
+  | 'code'
+  | 'name'
+  | 'phone'
+  | 'email'
+  | 'store'
+  | 'position'
+  | 'department'
+  | 'hire_date'
+  | 'role'
+  | 'status'
+  | 'account_status'
+  | 'dob'
+  | 'cccd'
+  | 'address'
+
+export interface ColumnConfig {
+  id: ColumnKey
+  label: string
+  width: string
+  visible: boolean
+}
+
+const DEFAULT_COLUMNS: ColumnConfig[] = [
+  { id: 'code', label: 'Mã NV', width: '80px', visible: true },
+  { id: 'name', label: 'Họ và tên', width: 'minmax(180px, 1.2fr)', visible: true },
+  { id: 'phone', label: 'Số điện thoại', width: '125px', visible: true },
+  { id: 'email', label: 'Email nhân sự', width: 'minmax(180px, 1.2fr)', visible: true },
+  { id: 'store', label: 'Chi nhánh', width: 'minmax(130px, 1fr)', visible: true },
+  { id: 'position', label: 'Chức danh', width: 'minmax(130px, 1fr)', visible: true },
+  { id: 'department', label: 'Bộ phận', width: 'minmax(130px, 1fr)', visible: false },
+  { id: 'hire_date', label: 'Ngày vào làm', width: '105px', visible: true },
+  { id: 'role', label: 'Vai trò', width: '115px', visible: true },
+  { id: 'status', label: 'Trạng thái làm việc', width: '125px', visible: true },
+  { id: 'account_status', label: 'Trạng thái tài khoản', width: '125px', visible: false },
+  { id: 'dob', label: 'Ngày sinh', width: '105px', visible: false },
+  { id: 'cccd', label: 'Số CCCD', width: '125px', visible: false },
+  { id: 'address', label: 'Địa chỉ', width: 'minmax(180px, 1.2fr)', visible: false },
+]
 
 export default function EmployeesPage() {
   const { user, isAuthenticated, hasHydrated } = useAuthStore()
@@ -205,15 +273,111 @@ export default function EmployeesPage() {
   const [selectedAccountStatus, setSelectedAccountStatus] = useState('')
   const [rawSelectedEmployeeIds, setRawSelectedEmployeeIds] = useState<string[]>([])
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null)
+  const [stores, setStores] = useState(mockStores)
   const actionMenuRef = useRef<HTMLDivElement | null>(null)
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<AuthUser | null>(null)
+  const [customNewPassword, setCustomNewPassword] = useState('')
+  const [resetResult, setResetResult] = useState<{ password?: string; message?: string } | null>(null)
+  const [copiedPassword, setCopiedPassword] = useState(false)
+  const [isAddDropdownOpen, setIsAddDropdownOpen] = useState(false)
+  const [isColumnModalOpen, setIsColumnModalOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
-  const viewer = useMemo(() => EmployeeService.resolveSessionUser(user) || null, [user])
+  const [viewMode, setViewMode] = useState<'lean' | 'detail'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('HOMIES_EMPLOYEE_VIEW_MODE') as 'lean' | 'detail') || 'lean'
+    }
+    return 'lean'
+  })
+
+  const changeViewMode = (mode: 'lean' | 'detail') => {
+    setViewMode(mode)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('HOMIES_EMPLOYEE_VIEW_MODE', mode)
+    }
+  }
+
+  const [columns, setColumns] = useState<ColumnConfig[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('HOMIES_EMPLOYEE_COLUMNS_V4')
+        if (saved) {
+          const parsed = JSON.parse(saved) as ColumnConfig[]
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed
+          }
+        }
+      } catch {}
+    }
+    return DEFAULT_COLUMNS
+  })
+
+  const saveColumns = (newCols: ColumnConfig[]) => {
+    setColumns(newCols)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('HOMIES_EMPLOYEE_COLUMNS_V4', JSON.stringify(newCols))
+    }
+  }
+
+  const toggleColumnVisibility = (colId: ColumnKey) => {
+    const next = columns.map(c => c.id === colId ? { ...c, visible: !c.visible } : c)
+    saveColumns(next)
+  }
+
+  const moveColumn = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= columns.length) return
+    const next = [...columns]
+    const temp = next[index]
+    next[index] = next[targetIndex]
+    next[targetIndex] = temp
+    saveColumns(next)
+  }
+
+  const resetColumnsToDefault = () => {
+    saveColumns(DEFAULT_COLUMNS)
+  }
+
+  const activeColumns = useMemo(() => columns.filter(c => c.visible), [columns])
+
+  const leanGridTemplate = '40px 32px 76px minmax(260px,1.2fr) minmax(200px,1fr) 135px 125px 120px'
+
+  const dynamicGridTemplate = useMemo(() => {
+    if (viewMode === 'lean') {
+      return leanGridTemplate
+    }
+    const middleWidths = activeColumns.map(c => c.width).join(' ')
+    return `40px 32px ${middleWidths} 120px`
+  }, [activeColumns, viewMode])
 
   useEffect(() => {
-    if (hasHydrated && (!isAuthenticated || !viewer)) {
+    storeAdapter.getStores().then(res => setStores(res))
+  }, [])
+
+  const handleResetPasswordSubmit = () => {
+    if (!resetPasswordTarget || !canManageEmployees || !viewer) return
+    const result = EmployeeService.resetEmployeePassword(resetPasswordTarget.id, customNewPassword, viewer)
+    if (result.success) {
+      setResetResult(result)
+      refreshList()
+    }
+  }
+
+  const handleCopyResetInfo = () => {
+    if (!resetPasswordTarget || !resetResult?.password) return
+    const text = `Thông tin tài khoản Homies HRM:\nEmail: ${resetPasswordTarget.email}\nMật khẩu mới: ${resetResult.password}`
+    navigator.clipboard.writeText(text)
+    setCopiedPassword(true)
+    setTimeout(() => setCopiedPassword(false), 2500)
+  }
+
+  const viewer = useMemo(() => EmployeeService.resolveSessionUser(user) || (isAuthenticated && user ? user : null), [user, isAuthenticated])
+
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated) {
       router.push('/login?redirect=/employees')
     }
-  }, [hasHydrated, isAuthenticated, viewer, router])
+  }, [hasHydrated, isAuthenticated, router])
 
   useEffect(() => {
     if (!openActionMenuId) return
@@ -238,10 +402,21 @@ export default function EmployeesPage() {
     }
   }, [openActionMenuId])
 
-  const employeesList = useMemo(() => {
-    void refreshKey
-    if (!viewer) return []
-    return EmployeeService.getEmployees(viewer)
+
+
+  const [employeesList, setEmployeesList] = useState<AuthUser[]>([])
+
+  useEffect(() => {
+    if (!viewer) return
+    let isMounted = true
+    employeeAdapter.getAllEmployees(viewer).then((data) => {
+      if (isMounted) {
+        setEmployeesList(data)
+      }
+    })
+    return () => {
+      isMounted = false
+    }
   }, [viewer, refreshKey])
 
   const filteredEmployees = useMemo(() => {
@@ -262,7 +437,9 @@ export default function EmployeesPage() {
         (employee.job_level || '').toLowerCase().includes(term)
       )
 
-      const matchesStore = !selectedStore || employee.store_id === selectedStore
+      const matchesStore = !selectedStore ||
+        isStoreMatch(employee.store_id, selectedStore) ||
+        Boolean(employee.secondary_store_ids && employee.secondary_store_ids.some(sId => isStoreMatch(sId, selectedStore)))
       const matchesStatus = !selectedStatus || employee.status === selectedStatus
       const matchesAccountStatus = !selectedAccountStatus || employee.account_status === selectedAccountStatus
 
@@ -270,7 +447,15 @@ export default function EmployeesPage() {
     })
   }, [employeesList, searchTerm, selectedStore, selectedStatus, selectedAccountStatus])
 
-  if (!hasHydrated || !viewer || !isAuthenticated) return null
+  if (!hasHydrated || !isAuthenticated || !viewer) {
+    return (
+      <AppShell>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
 
   const canManageEmployees = ['hr_admin', 'ceo'].includes(viewer.role)
   const activeCount = employeesList.filter(employee => employee.status === 'active').length
@@ -332,7 +517,7 @@ export default function EmployeesPage() {
     router.push(buildExportHref())
   }
 
-  const runBulkAction = (action: 'lock' | 'unlock' | 'resign' | 'restore') => {
+  const runBulkAction = async (action: 'lock' | 'unlock' | 'resign' | 'restore' | 'set_dual_role') => {
     if (!canManageEmployees || !viewer || selectedEmployees.length === 0) return
 
     const targetEmployees = selectedEmployees.filter((employee) => {
@@ -340,6 +525,7 @@ export default function EmployeesPage() {
       if (action === 'lock') return employee.account_status !== 'bi_khoa'
       if (action === 'resign') return employee.status !== 'resigned'
       if (action === 'restore') return employee.status === 'resigned'
+      if (action === 'set_dual_role') return employee.status !== 'resigned'
       return false
     })
 
@@ -355,7 +541,9 @@ export default function EmployeesPage() {
         ? 'mở khóa tài khoản'
         : action === 'resign'
           ? 'đánh dấu nghỉ việc'
-          : 'khôi phục làm việc'
+          : action === 'set_dual_role'
+            ? 'gán vị trí kiêm nhiệm (Pha chế & Thu ngân)'
+            : 'khôi phục làm việc'
     const confirmed = confirm(
       skippedCount > 0
         ? `Xác nhận ${actionLabel} cho ${targetEmployees.length} nhân sự? Có ${skippedCount} người sẽ được bỏ qua vì không phù hợp.`
@@ -365,7 +553,7 @@ export default function EmployeesPage() {
 
     for (const employee of targetEmployees) {
       if (action === 'lock') {
-        EmployeeService.updateEmployee(
+        await employeeAdapter.updateEmployee(
           employee.id,
           { account_status: 'bi_khoa' },
           viewer,
@@ -375,7 +563,7 @@ export default function EmployeesPage() {
       }
 
       if (action === 'unlock') {
-        EmployeeService.updateEmployee(
+        await employeeAdapter.updateEmployee(
           employee.id,
           { account_status: 'dang_hoat_dong' },
           viewer,
@@ -384,8 +572,24 @@ export default function EmployeesPage() {
         continue
       }
 
+      if (action === 'set_dual_role') {
+        const dualRoles = employee.position_id === 'pos-001'
+          ? ['pos-002']
+          : employee.position_id === 'pos-002'
+            ? ['pos-001']
+            : ['pos-001', 'pos-002']
+
+        await employeeAdapter.updateEmployee(
+          employee.id,
+          { secondary_position_ids: dualRoles },
+          viewer,
+          'Gán vị trí kiêm nhiệm (Pha chế & Thu ngân) hàng loạt',
+        )
+        continue
+      }
+
       if (action === 'resign') {
-        EmployeeService.updateEmployee(
+        await employeeAdapter.updateEmployee(
           employee.id,
           { status: 'resigned', account_status: 'bi_khoa' },
           viewer,
@@ -394,7 +598,7 @@ export default function EmployeesPage() {
         continue
       }
 
-      EmployeeService.updateEmployee(
+      await employeeAdapter.updateEmployee(
         employee.id,
         {
           status: 'active',
@@ -406,12 +610,14 @@ export default function EmployeesPage() {
     }
 
     setRawSelectedEmployeeIds((current) => current.filter((id) => !targetEmployees.some((employee) => employee.id === id)))
+    const reloaded = await employeeAdapter.getAllEmployees(viewer)
+    setEmployeesList(reloaded)
     refreshList()
   }
 
-  const handleToggleAccountStatus = (employeeId: string) => {
+  const handleToggleAccountStatus = async (employeeId: string) => {
     if (!canManageEmployees || !viewer) return
-    const employee = EmployeeService.getEmployeeById(employeeId, viewer)
+    const employee = employeesList.find((e) => e.id === employeeId) || EmployeeService.getEmployeeById(employeeId, viewer)
     if (!employee) return
 
     const nextStatus = employee.account_status === 'bi_khoa' ? 'dang_hoat_dong' : 'bi_khoa'
@@ -422,7 +628,7 @@ export default function EmployeesPage() {
     )
     if (!confirmed) return
 
-    EmployeeService.updateEmployee(
+    await employeeAdapter.updateEmployee(
       employee.id,
       { account_status: nextStatus },
       viewer,
@@ -431,9 +637,9 @@ export default function EmployeesPage() {
     refreshList()
   }
 
-  const handleToggleWorkStatus = (employeeId: string) => {
+  const handleToggleWorkStatus = async (employeeId: string) => {
     if (!canManageEmployees || !viewer) return
-    const employee = EmployeeService.getEmployeeById(employeeId, viewer)
+    const employee = employeesList.find((e) => e.id === employeeId) || EmployeeService.getEmployeeById(employeeId, viewer)
     if (!employee) return
 
     const nextStatus = employee.status === 'resigned' ? 'active' : 'resigned'
@@ -444,7 +650,7 @@ export default function EmployeesPage() {
     )
     if (!confirmed) return
 
-    EmployeeService.updateEmployee(
+    await employeeAdapter.updateEmployee(
       employee.id,
       {
         status: nextStatus,
@@ -463,197 +669,214 @@ export default function EmployeesPage() {
   return (
     <AppShell showNav>
       <div className="animate-fade-in space-y-4 pb-20">
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-600">Nhân sự</p>
-              <h1 className="mt-2 text-2xl font-bold text-dark-700 font-['Poppins']">Trung tâm nhân sự</h1>
-              <p className="mt-2 max-w-3xl text-sm text-gray-500">
-                Màn này giúp HR nhìn nhanh đội ngũ đang ở trạng thái nào, rồi đi thẳng xuống bảng để lọc và thao tác.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-3xl border border-primary-100 bg-primary-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary-700">Ưu tiên hôm nay</p>
-                <p className="mt-2 text-3xl font-black text-dark-700">{filteredEmployees.length}</p>
-                <p className="mt-1 text-sm text-gray-600">Nhân sự đang nằm trong phạm vi xem hiện tại.</p>
-              </div>
-              <div className="rounded-3xl border border-slate-100 bg-white p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Tổng quan nhanh</p>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <div className="rounded-2xl bg-success-50 px-3 py-3 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-success-700">Đang làm</p>
-                    <p className="mt-1 text-xl font-bold text-dark-700">{activeCount}</p>
-                  </div>
-                  <div className="rounded-2xl bg-warning-50 px-3 py-3 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-warning-700">Thử việc</p>
-                    <p className="mt-1 text-xl font-bold text-dark-700">{probationCount}</p>
-                  </div>
-                  <div className="rounded-2xl bg-primary-50 px-3 py-3 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-700">Sắp nhận</p>
-                    <p className="mt-1 text-xl font-bold text-dark-700">{inactiveCount}</p>
-                  </div>
-                </div>
+        {/* COMPACT TOP BAR */}
+        <section className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-2xl font-bold text-gray-900 font-['Poppins']">Trung tâm nhân sự</h1>
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+                <span className="rounded-full bg-primary-50 px-2.5 py-1 text-primary-700 border border-primary-100">
+                  {filteredEmployees.length} nhân sự
+                </span>
+                <span className="rounded-full bg-success-50 px-2.5 py-1 text-success-700 border border-success-100">
+                  {activeCount} Đang làm
+                </span>
+                <span className="rounded-full bg-warning-50 px-2.5 py-1 text-warning-700 border border-warning-100">
+                  {probationCount} Thử việc
+                </span>
+                {inactiveCount > 0 ? (
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700 border border-blue-100">
+                    {inactiveCount} Sắp nhận
+                  </span>
+                ) : null}
               </div>
             </div>
+            <p className="text-xs text-gray-500">Quản lý toàn bộ đội ngũ nhân sự, theo dõi trạng thái tài khoản và hợp đồng lao động.</p>
           </div>
 
           {canManageEmployees ? (
-            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-primary-100 bg-primary-50/70 p-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2 text-sm text-primary-700">
-                  <button type="button" onClick={() => router.push('/employees/invitations')} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-primary-200 bg-white px-3 font-semibold transition-colors hover:bg-primary-50">
-                    <MailIcon size={14} />
-                    Mời nhân sự
-                  </button>
-                  <button type="button" onClick={() => router.push('/employees/new')} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-primary-500 px-3 font-semibold text-white shadow-sm transition-colors hover:bg-primary-600">
-                    <UserPlusIcon size={14} />
-                    Thêm trực tiếp
-                  </button>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-primary-700">
-                    {quickActionCount} tác vụ nhanh
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-sm text-primary-700">
-                  <button type="button" onClick={toggleSelectAllFiltered} className="inline-flex h-9 items-center justify-center rounded-xl border border-primary-200 bg-white px-3 font-semibold transition-colors hover:bg-primary-50">
-                    {allFilteredSelected ? 'Bỏ chọn trang hiện tại' : 'Chọn tất cả theo bộ lọc'}
-                  </button>
-                  <button type="button" onClick={clearSelection} className="inline-flex h-9 items-center justify-center rounded-xl border border-primary-200 bg-white px-3 font-semibold transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={!hasAnySelection}>
-                    Bỏ chọn
-                  </button>
-                  <span className="rounded-full bg-white px-3 py-1 font-semibold text-primary-700">
-                    Đã chọn {selectedEmployeeIds.length} người
-                  </span>
-                  <span className="text-xs text-primary-700/80">
-                    Hiện trong bộ lọc: {visibleSelectedCount}/{filteredEmployees.length}
-                  </span>
-                </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDropdownOpen(prev => !prev)}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-primary-600"
+                >
+                  <UserPlusIcon size={15} />
+                  <span>+ Thêm nhân sự</span>
+                </button>
+                {isAddDropdownOpen && (
+                  <div className="absolute right-0 top-12 z-30 w-52 rounded-2xl border border-gray-100 bg-white p-2 shadow-xl shadow-gray-200/80">
+                    <button
+                      type="button"
+                      onClick={() => { setIsAddDropdownOpen(false); router.push('/employees/new'); }}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
+                    >
+                      <UserPlusIcon size={15} className="text-primary-600" />
+                      <span>Thêm trực tiếp</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setIsAddDropdownOpen(false); router.push('/employees/invitations'); }}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
+                    >
+                      <MailIcon size={15} className="text-primary-600" />
+                      <span>Gửi lời mời nhận việc</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setIsAddDropdownOpen(false); setIsImportModalOpen(true); }}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-vanilla-50 cursor-pointer"
+                    >
+                      <FileSpreadsheetIcon size={15} className="text-primary-600" />
+                      <span>Nhập từ Excel</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => runBulkAction('lock')} disabled={!hasAnySelection} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
-                  <LockIcon size={14} />
-                  Khóa tài khoản
-                </button>
-                <button type="button" onClick={() => runBulkAction('unlock')} disabled={!hasAnySelection} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
-                  <UnlockIcon size={14} />
-                  Mở khóa
-                </button>
-                <button type="button" onClick={() => runBulkAction('resign')} disabled={!hasAnySelection} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
-                  <UserXIcon size={14} />
-                  Đánh dấu nghỉ việc
-                </button>
-                <button type="button" onClick={() => runBulkAction('restore')} disabled={!hasAnySelection} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
-                  <RotateCcwIcon size={14} />
-                  Khôi phục
-                </button>
-                <button type="button" onClick={handleExportFiltered} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-primary-500 px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-600">
-                  <DownloadIcon size={14} />
-                  Xuất theo bộ lọc
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => router.push('/employees/contracts')}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
+              >
+                <BriefcaseIcon size={15} />
+                <span>Hợp đồng</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/employees/offboarding')}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
+              >
+                <UserXIcon size={15} />
+                <span>Offboarding</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportFiltered}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
+              >
+                <DownloadIcon size={15} />
+                <span>Xuất Excel</span>
+              </button>
             </div>
           ) : null}
         </section>
 
-        {canManageEmployees ? (
-          <section className="grid gap-3 lg:grid-cols-5">
-            <button type="button" onClick={() => router.push('/employees/new')} className="rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm transition-colors hover:bg-primary-50">
-              <div className="flex items-center gap-2 text-primary-600">
-                <UserPlusIcon size={18} />
-                <span className="text-sm font-bold">Thêm trực tiếp</span>
+        {/* INTEGRATED FILTER TOOLBAR & SMART BULK ACTION BAR */}
+        <section className="rounded-3xl border border-gray-100 bg-white p-3.5 shadow-sm">
+          {hasAnySelection && canManageEmployees ? (
+            <div className="flex flex-col gap-3 rounded-2xl border border-primary-200 bg-primary-50 p-3.5 lg:flex-row lg:items-center lg:justify-between animate-fade-in">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-primary-800">
+                <span className="rounded-full bg-white px-3 py-1 font-bold shadow-xs">
+                  Đã chọn {selectedEmployeeIds.length} người
+                </span>
+                <button type="button" onClick={toggleSelectAllFiltered} className="font-semibold text-primary-700 hover:underline">
+                  {allFilteredSelected ? 'Bỏ chọn trang' : 'Chọn tất cả bộ lọc'}
+                </button>
+                <span>·</span>
+                <button type="button" onClick={clearSelection} className="font-semibold text-gray-600 hover:underline">
+                  Bỏ chọn
+                </button>
               </div>
-              <p className="mt-2 text-sm text-gray-500">Tạo nhanh hồ sơ mới và thêm ngay vào danh sách.</p>
-            </button>
-            <button type="button" onClick={() => router.push('/employees/import')} className="rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm transition-colors hover:bg-primary-50">
-              <div className="flex items-center gap-2 text-primary-600">
-                <FileSpreadsheetIcon size={18} />
-                <span className="text-sm font-bold">Nhập từ Excel</span>
-              </div>
-              <p className="mt-2 text-sm text-gray-500">Đọc file mẫu thật, xem lỗi trước rồi nhập vào danh sách.</p>
-            </button>
-            <button type="button" onClick={handleExportFiltered} className="rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm transition-colors hover:bg-primary-50">
-              <div className="flex items-center gap-2 text-primary-600">
-                <DownloadIcon size={18} />
-                <span className="text-sm font-bold">Xuất biểu mẫu</span>
-              </div>
-              <p className="mt-2 text-sm text-gray-500">Xuất danh sách nhân viên theo mẫu Excel quản trị.</p>
-            </button>
-            <button type="button" onClick={() => router.push('/employees/contracts')} className="rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm transition-colors hover:bg-primary-50">
-              <div className="flex items-center gap-2 text-primary-600">
-                <BriefcaseIcon size={18} />
-                <span className="text-sm font-bold">Hợp đồng</span>
-              </div>
-              <p className="mt-2 text-sm text-gray-500">Quản lý hợp đồng, gửi ký và theo dõi trạng thái.</p>
-            </button>
-            <button type="button" onClick={() => router.push('/employees/offboarding')} className="rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm transition-colors hover:bg-primary-50">
-              <div className="flex items-center gap-2 text-primary-600">
-                <UserXIcon size={18} />
-                <span className="text-sm font-bold">Offboarding</span>
-              </div>
-              <p className="mt-2 text-sm text-gray-500">Đi thẳng vào trung tâm chốt nghỉ việc, tài khoản và bàn giao.</p>
-            </button>
-          </section>
-        ) : null}
 
-        <section className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
-          <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-gray-900">Bộ lọc và tìm kiếm</p>
-              <p className="mt-1 text-xs text-gray-500">Giữ phần này gọn để mắt đi thẳng xuống bảng nhân sự.</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => runBulkAction('lock')} className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:bg-vanilla-50">
+                  <LockIcon size={13} /> Khóa
+                </button>
+                <button type="button" onClick={() => runBulkAction('unlock')} className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:bg-vanilla-50">
+                  <UnlockIcon size={13} /> Mở khóa
+                </button>
+                <button type="button" onClick={() => runBulkAction('resign')} className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:bg-vanilla-50">
+                  <UserXIcon size={13} /> Nghỉ việc
+                </button>
+                <button type="button" onClick={() => runBulkAction('restore')} className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:bg-vanilla-50">
+                  <RotateCcwIcon size={13} /> Khôi phục
+                </button>
+                <button type="button" onClick={() => runBulkAction('set_dual_role')} className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-primary-200 bg-primary-50 px-3 text-xs font-semibold text-primary-700 hover:bg-primary-100">
+                  <BriefcaseIcon size={13} /> Gán kiêm nhiệm
+                </button>
+                <button type="button" onClick={handleExportFiltered} className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-primary-500 px-3 text-xs font-semibold text-white shadow-xs hover:bg-primary-600">
+                  <DownloadIcon size={13} /> Xuất file đã chọn
+                </button>
+              </div>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">
-              <span>Bộ lọc đang bật</span>
-              <span className="rounded-full bg-white px-2 py-0.5 text-slate-800">{activeFilterCount}</span>
+          ) : (
+            <div className="grid gap-2.5 sm:flex sm:items-center sm:flex-wrap lg:grid lg:grid-cols-[minmax(180px,1fr)_150px_150px_150px_auto_auto_auto]">
+              <div className="relative min-w-0">
+                <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên, mã, email, số điện thoại..."
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  className="h-10 w-full rounded-2xl border border-gray-200 bg-white pl-10 pr-3 text-sm outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                />
+              </div>
+
+              <select value={selectedStore} onChange={(event) => { setSelectedStore(event.target.value); setRawSelectedEmployeeIds([]); }} className="h-10 w-full rounded-2xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-100" disabled={!canManageEmployees}>
+                <option value="">Tất cả chi nhánh</option>
+                {stores.map(store => (
+                  <option key={store.id} value={store.id}>{store.name.replace('Homies Milk Tea - ', '')}</option>
+                ))}
+              </select>
+
+              <select value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)} className="h-10 w-full rounded-2xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-100">
+                <option value="">Tất cả trạng thái</option>
+                <option value="active">Đang làm việc</option>
+                <option value="probation">Thử việc</option>
+                <option value="inactive">Sắp nhận việc</option>
+                <option value="resigned">Đã nghỉ</option>
+              </select>
+
+              <select value={selectedAccountStatus} onChange={(event) => setSelectedAccountStatus(event.target.value)} className="h-10 w-full rounded-2xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-100" disabled={!canManageEmployees}>
+                <option value="">Tất cả tài khoản</option>
+                <option value="chua_kich_hoat">Chưa kích hoạt</option>
+                <option value="dang_hoat_dong">Đang hoạt động</option>
+                <option value="bi_khoa">Bị khóa</option>
+              </select>
+
+              <button type="button" onClick={resetFilters} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-vanilla-50">
+                <RotateCcwIcon size={15} />
+                <span>Làm mới</span>
+                {activeFilterCount > 0 ? <span className="rounded-full bg-error-500 px-1.5 py-0.5 text-[10px] font-bold text-white">{activeFilterCount}</span> : null}
+              </button>
+
+              <div className="inline-flex h-10 items-center rounded-2xl border border-gray-200 bg-gray-100/80 p-1">
+                <button
+                  type="button"
+                  onClick={() => changeViewMode('lean')}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${viewMode === 'lean' ? 'bg-white text-primary-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                  title="Chế độ Gọn (Chuẩn Notion / SaaS - Nhìn 100% không cuộn ngang)"
+                >
+                  <LayoutGridIcon size={13} />
+                  <span>Gọn</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeViewMode('detail')}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${viewMode === 'detail' ? 'bg-white text-primary-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                  title="Chế độ Chi tiết 14 cột (Cho phép tùy chỉnh từng thuộc tính riêng)"
+                >
+                  <TablePropertiesIcon size={13} />
+                  <span>14 cột</span>
+                </button>
+              </div>
+
+              {viewMode === 'detail' && (
+                <button type="button" onClick={() => setIsColumnModalOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-3.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-vanilla-50 animate-fade-in" title="Tùy chỉnh ẩn/hiện & thứ tự cột">
+                  <SlidersIcon size={15} />
+                  <span>Tùy chỉnh cột</span>
+                </button>
+              )}
             </div>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_180px_190px_190px_auto]">
-            <div className="relative min-w-0">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Tìm theo tên, mã, email, số điện thoại..."
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-3 text-sm outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-              />
-            </div>
-
-            <select value={selectedStore} onChange={(event) => setSelectedStore(event.target.value)} className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-100" disabled={!canManageEmployees}>
-              <option value="">Tất cả chi nhánh</option>
-              {mockStores.map(store => (
-                <option key={store.id} value={store.id}>{store.name.replace('Homies Milk Tea - ', '')}</option>
-              ))}
-            </select>
-
-            <select value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)} className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-100">
-              <option value="">Tất cả trạng thái</option>
-              <option value="active">Đang làm việc</option>
-              <option value="probation">Thử việc</option>
-              <option value="inactive">Sắp nhận việc</option>
-              <option value="resigned">Đã nghỉ</option>
-            </select>
-
-            <select value={selectedAccountStatus} onChange={(event) => setSelectedAccountStatus(event.target.value)} className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-100" disabled={!canManageEmployees}>
-              <option value="">Tất cả tài khoản</option>
-              <option value="chua_kich_hoat">Chưa kích hoạt</option>
-              <option value="dang_hoat_dong">Đang hoạt động</option>
-              <option value="bi_khoa">Bị khóa</option>
-            </select>
-
-            <button type="button" onClick={resetFilters} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
-              <RotateCcwIcon size={16} />
-              Làm mới
-              {activeFilterCount > 0 ? <span className="rounded-full bg-error-500 px-1.5 text-xs font-bold text-white">{activeFilterCount}</span> : null}
-            </button>
-          </div>
+          )}
         </section>
 
         <section className="min-w-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="hidden overflow-x-auto lg:block">
-            <div className="min-w-[1036px]">
-              <div className="grid items-center gap-1.5 border-b border-gray-100 bg-primary-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-dark-700" style={{ gridTemplateColumns: employeeTableGridTemplate }}>
+            <div className="min-w-[1060px]">
+              <div className="grid items-center gap-2 border-b border-gray-100 bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-600" style={{ gridTemplateColumns: dynamicGridTemplate }}>
                 <div>
                   {canManageEmployees ? (
                     <input
@@ -666,15 +889,20 @@ export default function EmployeesPage() {
                   ) : null}
                 </div>
                 <div>#</div>
-                <div>Mã</div>
-                <div>Nhân sự</div>
-                <div>Số điện thoại</div>
-                <div>Chi nhánh</div>
-                <div>Bộ phận</div>
-                <div>Ngày vào</div>
-                <div>Vai trò</div>
-                <div>Trạng thái</div>
-                <div className="text-right">Thao tác</div>
+                {viewMode === 'lean' ? (
+                  <>
+                    <div>Mã</div>
+                    <div>Nhân sự & Liên hệ</div>
+                    <div>Chi nhánh & Vị trí</div>
+                    <div>Ngày vào & Vai trò</div>
+                    <div>Trạng thái</div>
+                  </>
+                ) : (
+                  activeColumns.map(col => (
+                    <div key={col.id}>{col.label}</div>
+                  ))
+                )}
+                <div className="text-right pr-2">Thao tác</div>
               </div>
 
               {filteredEmployees.length === 0 ? (
@@ -689,7 +917,7 @@ export default function EmployeesPage() {
                 const position = getPositionById(employee.position_id)
 
                 return (
-                  <div key={employee.id} className="grid min-h-[74px] items-center gap-1.5 border-b border-gray-50 px-4 py-3 text-sm transition-colors hover:bg-primary-50/40" style={{ gridTemplateColumns: employeeTableGridTemplate }}>
+                  <div key={employee.id} className="grid min-h-[64px] items-center gap-2 border-b border-gray-100 px-4 py-2.5 text-sm transition-colors hover:bg-primary-50/30" style={{ gridTemplateColumns: dynamicGridTemplate }}>
                     <div>
                       {canManageEmployees ? (
                         <input
@@ -701,73 +929,163 @@ export default function EmployeesPage() {
                         />
                       ) : null}
                     </div>
-                    <div className="font-medium text-gray-500">{index + 1}</div>
-                    <div className="font-semibold text-dark-700">{employee.employee_code || '-'}</div>
-                    <button type="button" onClick={() => router.push(`/employees/${employee.id}`)} className="flex min-w-0 items-center gap-3 text-left">
-                      <Avatar name={fullName} size="md" />
-                      <span className="min-w-0">
-                        <span className="block truncate font-semibold text-dark-700">{fullName}</span>
-                        <span className="block truncate text-xs text-gray-500">{employee.email || 'Chưa cập nhật email'}</span>
-                      </span>
-                    </button>
-                    <div className="text-gray-700">{employee.phone || '-'}</div>
-                    <div className="text-gray-700">{storeLabel}</div>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-dark-700">{employee.department_name || getDepartmentLabel(position?.name)}</p>
-                      <p className="truncate text-xs text-gray-500">{position?.name || 'Chưa phân bổ'}</p>
-                    </div>
-                    <div className="text-gray-700">{employee.hire_date}</div>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-dark-700">{getRoleLabel(employee.role)}</p>
-                      <p className="truncate text-xs text-gray-500">{position?.name || 'Chưa phân bổ'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <span className={`inline-flex max-w-full truncate rounded-full px-2 py-1 text-[11px] font-semibold ${workStatus.className}`}>{workStatus.label}</span>
-                      <span className={`inline-flex max-w-full truncate rounded-full px-2 py-1 text-[11px] font-medium ${accountStatus.className}`}>{accountStatus.label}</span>
-                    </div>
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="font-medium text-gray-400 text-xs">{index + 1}</div>
+
+                    {viewMode === 'lean' ? (
+                      <>
+                        <div className="font-mono text-xs font-bold text-gray-700">{employee.employee_code || '-'}</div>
+                        <button type="button" onClick={() => router.push(`/employees/${employee.id}`)} className="flex min-w-0 items-center gap-3 text-left group">
+                          <Avatar name={fullName} size="md" />
+                          <span className="min-w-0">
+                            <span className="block truncate font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">{fullName}</span>
+                            <span className="block truncate text-xs text-gray-500">{employee.phone || 'Chưa SĐT'} · {employee.email || 'Chưa email'}</span>
+                          </span>
+                        </button>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-gray-800">{storeLabel}</p>
+                          {employee.secondary_store_ids && employee.secondary_store_ids.length > 0 && (
+                            <div className="mt-0.5 inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-800">
+                              <span>Tăng ca: {employee.secondary_store_ids.map(id => getStoreById(id)?.name.replace('Homies Milk Tea - ', '').trim()).filter(Boolean).join(', ')}</span>
+                            </div>
+                          )}
+                          <p className="truncate text-xs text-gray-500">{position?.name || employee.department_name || 'Chưa phân bổ'}</p>
+                          {employee.secondary_position_ids && employee.secondary_position_ids.length > 0 && (
+                            <div className="mt-0.5 inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-extrabold text-blue-700">
+                              <span>Kiêm: {employee.secondary_position_ids.map(id => getPositionById(id)?.name).filter(Boolean).join(', ')}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium text-gray-700">{employee.hire_date}</p>
+                          <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 mt-0.5">{getRoleLabel(employee.role)}</span>
+                        </div>
+                        <div className="flex flex-col gap-1 items-start min-w-0">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${workStatus.className}`}>{workStatus.label}</span>
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${accountStatus.className}`}>{accountStatus.label}</span>
+                        </div>
+                      </>
+                    ) : (
+                      activeColumns.map(col => {
+                        switch (col.id) {
+                          case 'code':
+                            return <div key="code" className="font-mono text-xs font-bold text-gray-700">{employee.employee_code || '-'}</div>
+                          case 'name':
+                            return (
+                              <button key="name" type="button" onClick={() => router.push(`/employees/${employee.id}`)} className="flex min-w-0 items-center gap-2.5 text-left group">
+                                <Avatar name={fullName} size="sm" />
+                                <span className="truncate font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">{fullName}</span>
+                              </button>
+                            )
+                          case 'phone':
+                            return <div key="phone" className="text-xs font-medium text-gray-700">{employee.phone || '-'}</div>
+                          case 'email':
+                            return <div key="email" className="truncate text-xs text-gray-600" title={employee.email}>{employee.email || '-'}</div>
+                          case 'store':
+                            return <div key="store" className="truncate text-xs font-semibold text-gray-800">{storeLabel}</div>
+                          case 'position': {
+                            const secNames = (employee.secondary_position_ids || [])
+                              .map(id => getPositionById(id)?.name)
+                              .filter(Boolean)
+                            return (
+                              <div key="position" className="truncate text-xs text-gray-600">
+                                <div className="font-medium text-gray-800">{position?.name || 'Chưa phân bổ'}</div>
+                                {secNames.length > 0 && (
+                                  <span className="inline-flex items-center rounded border border-blue-200 bg-blue-50 px-1.5 py-0.2 text-[10px] font-extrabold text-blue-700 mt-0.5">
+                                    Kiêm: {secNames.join(', ')}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          }
+                          case 'department':
+                            return <div key="department" className="truncate text-xs text-gray-600">{employee.department_name || getDepartmentLabel(employee.position_id, employee.role)}</div>
+                          case 'hire_date':
+                            return <div key="hire_date" className="text-xs text-gray-600">{employee.hire_date}</div>
+                          case 'role':
+                            return (
+                              <div key="role" className="min-w-0">
+                                <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">{getRoleLabel(employee.role)}</span>
+                              </div>
+                            )
+                          case 'status':
+                            return (
+                              <div key="status" className="min-w-0">
+                                <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${workStatus.className}`}>{workStatus.label}</span>
+                              </div>
+                            )
+                          case 'account_status':
+                            return (
+                              <div key="account_status" className="min-w-0">
+                                <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${accountStatus.className}`}>{accountStatus.label}</span>
+                              </div>
+                            )
+                          case 'dob':
+                            return <div key="dob" className="text-xs text-gray-600">{employee.date_of_birth || '-'}</div>
+                          case 'cccd':
+                            return <div key="cccd" className="font-mono text-xs text-gray-700">{employee.cccd || '-'}</div>
+                          case 'address':
+                            return <div key="address" className="truncate text-xs text-gray-600" title={employee.address}>{employee.address || '-'}</div>
+                          default:
+                            return null
+                        }
+                      })
+                    )}
+                    <div className="flex items-center justify-end gap-1.5 whitespace-nowrap pr-1">
                       <button
                         type="button"
                         onClick={() => router.push(`/employees/${employee.id}`)}
-                        className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-100"
+                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-primary-200 bg-primary-50 px-2.5 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100"
                         title="Mở hồ sơ"
                       >
-                        <ChevronRightIcon size={16} />
+                        <ChevronRightIcon size={14} />
                         <span>Xem</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/employees/contracts?employeeId=${employee.id}`)}
-                        className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                        title="Mở hợp đồng đang theo dõi"
-                      >
-                        <BriefcaseIcon size={16} />
-                        <span>Hợp đồng</span>
                       </button>
                       {canManageEmployees ? (
                         <div ref={openActionMenuId === employee.id ? actionMenuRef : null} className="relative">
                           <button
                             type="button"
                             onClick={() => setOpenActionMenuId(currentId => currentId === employee.id ? null : employee.id)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-vanilla-50"
                             title="Thao tác khác"
-                            aria-label={`Mở thêm thao tác cho ${fullName}`}
-                            aria-expanded={openActionMenuId === employee.id}
                           >
                             <MoreHorizontalIcon size={16} />
                           </button>
                           {openActionMenuId === employee.id ? (
-                            <div className="absolute right-0 top-11 z-20 w-48 rounded-2xl border border-gray-100 bg-white p-2 shadow-xl shadow-gray-200/70">
+                            <div className="absolute right-0 top-10 z-30 w-52 rounded-2xl border border-gray-100 bg-white p-2 shadow-xl shadow-gray-200/80">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionMenuId(null)
+                                  router.push(`/employees/contracts?employeeId=${employee.id}`)
+                                }}
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
+                              >
+                                <BriefcaseIcon size={14} className="text-primary-600" />
+                                <span>Hợp đồng lao động</span>
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => {
                                   setOpenActionMenuId(null)
                                   router.push(`/employees/${employee.id}?mode=edit`)
                                 }}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
                               >
-                                <PencilIcon size={15} />
+                                <PencilIcon size={14} className="text-primary-600" />
                                 <span>Sửa hồ sơ</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionMenuId(null)
+                                  setResetPasswordTarget(employee)
+                                  setCustomNewPassword(`Homies@${Math.floor(1000 + Math.random() * 9000)}`)
+                                  setResetResult(null)
+                                }}
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
+                              >
+                                <LockIcon size={14} className="text-primary-600" />
+                                <span>Đặt lại mật khẩu</span>
                               </button>
                               <button
                                 type="button"
@@ -775,20 +1093,21 @@ export default function EmployeesPage() {
                                   setOpenActionMenuId(null)
                                   router.push(`/employees/offboarding?employeeId=${employee.id}`)
                                 }}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
                               >
-                                <UserXIcon size={15} />
-                                <span>Offboarding</span>
+                                <UserXIcon size={14} className="text-gray-500" />
+                                <span>Trung tâm Offboarding</span>
                               </button>
+                              <div className="my-1 border-t border-gray-100" />
                               <button
                                 type="button"
                                 onClick={() => {
                                   setOpenActionMenuId(null)
                                   handleToggleAccountStatus(employee.id)
                                 }}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
                               >
-                                {employee.account_status === 'bi_khoa' ? <UnlockIcon size={15} /> : <LockIcon size={15} />}
+                                {employee.account_status === 'bi_khoa' ? <UnlockIcon size={14} className="text-green-600" /> : <LockIcon size={14} className="text-amber-600" />}
                                 <span>{employee.account_status === 'bi_khoa' ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}</span>
                               </button>
                               <button
@@ -797,9 +1116,9 @@ export default function EmployeesPage() {
                                   setOpenActionMenuId(null)
                                   handleToggleWorkStatus(employee.id)
                                 }}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-vanilla-50"
                               >
-                                <UserXIcon size={15} />
+                                <UserXIcon size={14} className="text-error-500" />
                                 <span>{employee.status === 'resigned' ? 'Khôi phục làm việc' : 'Đánh dấu nghỉ việc'}</span>
                               </button>
                             </div>
@@ -811,23 +1130,23 @@ export default function EmployeesPage() {
                       <button type="button" onClick={() => router.push(`/employees/${employee.id}`)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-primary-200 text-primary-600 transition-colors hover:bg-primary-50" title="Mở hồ sơ">
                         <ChevronRightIcon size={16} />
                       </button>
-                      <button type="button" onClick={() => router.push(`/employees/contracts?employeeId=${employee.id}`)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50" title="Mở hợp đồng đang theo dõi">
+                      <button type="button" onClick={() => router.push(`/employees/contracts?employeeId=${employee.id}`)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-vanilla-50" title="Mở hợp đồng đang theo dõi">
                         <BriefcaseIcon size={16} />
                       </button>
                       {canManageEmployees ? (
-                        <button type="button" onClick={() => router.push(`/employees/offboarding?employeeId=${employee.id}`)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50" title="Mở trung tâm nghỉ việc">
+                        <button type="button" onClick={() => router.push(`/employees/offboarding?employeeId=${employee.id}`)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-vanilla-50" title="Mở trung tâm nghỉ việc">
                           <UserXIcon size={16} />
                         </button>
                       ) : null}
                       {canManageEmployees ? (
                         <>
-                          <button type="button" onClick={() => router.push(`/employees/${employee.id}?mode=edit`)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50" title="Sửa hồ sơ">
+                          <button type="button" onClick={() => router.push(`/employees/${employee.id}?mode=edit`)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-vanilla-50" title="Sửa hồ sơ">
                             <PencilIcon size={16} />
                           </button>
-                          <button type="button" onClick={() => handleToggleAccountStatus(employee.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50" title={employee.account_status === 'bi_khoa' ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}>
+                          <button type="button" onClick={() => handleToggleAccountStatus(employee.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-vanilla-50" title={employee.account_status === 'bi_khoa' ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}>
                             {employee.account_status === 'bi_khoa' ? <UnlockIcon size={16} /> : <LockIcon size={16} />}
                           </button>
-                          <button type="button" onClick={() => handleToggleWorkStatus(employee.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50" title={employee.status === 'resigned' ? 'Khôi phục làm việc' : 'Đánh dấu nghỉ việc'}>
+                          <button type="button" onClick={() => handleToggleWorkStatus(employee.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-vanilla-50" title={employee.status === 'resigned' ? 'Khôi phục làm việc' : 'Đánh dấu nghỉ việc'}>
                             <UserXIcon size={16} />
                           </button>
                         </>
@@ -956,6 +1275,182 @@ export default function EmployeesPage() {
             })}
           </div>
         </section>
+
+        {/* MODAL ĐẶT LẠI MẬT KHẨU NHÂN SỰ */}
+        {resetPasswordTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
+            <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white p-6 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Đặt lại mật khẩu nhân sự</h3>
+                  <p className="mt-1 text-xs text-gray-500">Cấp mật khẩu mới cho {resetPasswordTarget.full_name}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setResetPasswordTarget(null); setResetResult(null); }}
+                  className="rounded-full p-2 text-gray-400 hover:bg-vanilla-100 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {!resetResult ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-gray-100 bg-vanilla-50 p-4 space-y-1 text-xs text-gray-600">
+                    <p className="font-semibold text-gray-900">{resetPasswordTarget.full_name} ({resetPasswordTarget.employee_code || 'Mã chưa cập nhật'})</p>
+                    <p>Email: <span className="font-medium text-gray-800">{resetPasswordTarget.email}</span></p>
+                  </div>
+
+                  <label className="block space-y-2">
+                    <span className="text-sm font-semibold text-gray-800">Mật khẩu mới</span>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customNewPassword}
+                        onChange={e => setCustomNewPassword(e.target.value)}
+                        className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-mono font-bold text-primary-700 outline-none focus:border-primary-500"
+                        placeholder="Nhập mật khẩu mới..."
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCustomNewPassword(`Homies@${Math.floor(1000 + Math.random() * 9000)}`)}
+                        className="shrink-0 rounded-2xl border border-primary-200 bg-primary-50 px-3 py-2.5 text-xs font-semibold text-primary-700 hover:bg-primary-100"
+                      >
+                        Sinh tự động
+                      </button>
+                    </div>
+                  </label>
+
+                  <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => setResetPasswordTarget(null)}
+                      className="rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-semibold text-gray-600 hover:bg-vanilla-50"
+                    >
+                      Hủy bỏ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetPasswordSubmit}
+                      className="rounded-xl bg-primary-500 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-600"
+                    >
+                      Xác nhận đặt lại
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-green-200 bg-green-50 p-4 space-y-2 text-center">
+                    <p className="text-xs font-bold uppercase tracking-wider text-green-700">Đã đặt lại mật khẩu thành công!</p>
+                    <div className="rounded-xl bg-white border border-green-200 p-3">
+                      <p className="text-xs text-gray-500">Mật khẩu mới của {resetPasswordTarget.full_name}:</p>
+                      <p className="text-lg font-mono font-bold text-gray-900 mt-1 select-all">{resetResult.password}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCopyResetInfo}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary-500 text-xs font-semibold text-white shadow-sm hover:bg-primary-600 transition-colors"
+                    >
+                      {copiedPassword ? '✓ Đã sao chép vào bộ nhớ tạm' : '📋 Sao chép thông tin tài khoản gửi nhân viên'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setResetPasswordTarget(null); setResetResult(null); }}
+                      className="h-9 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-vanilla-50"
+                    >
+                      Đóng lại
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {/* MODAL CẤU HÌNH CỘT HIỂN THỊ */}
+        {isColumnModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-12 lg:pt-16 backdrop-blur-sm animate-fade-in">
+            <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-white p-6 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Cấu hình cột hiển thị Bảng nhân sự</h3>
+                  <p className="mt-1 text-xs text-gray-500">Tích chọn 14+ cột thông tin chi tiết hoặc dùng mũi tên để tùy chỉnh vị trí thứ tự cột</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsColumnModalOpen(false)}
+                  className="rounded-full p-2 text-gray-400 hover:bg-vanilla-100 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[60vh] overflow-y-auto pr-1">
+                {columns.map((col, index) => (
+                  <div key={col.id} className={`flex items-center justify-between gap-2.5 rounded-2xl border p-3 transition-colors ${col.visible ? 'border-primary-100 bg-primary-50/20' : 'border-gray-100 bg-gray-50/50'}`}>
+                    <label className="flex items-center gap-2.5 cursor-pointer min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={col.visible}
+                        onChange={() => toggleColumnVisibility(col.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span className={`text-xs font-semibold truncate ${col.visible ? 'text-gray-900' : 'text-gray-400 line-through'}`}>
+                        {col.label}
+                      </span>
+                    </label>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => moveColumn(index, 'up')}
+                        disabled={index === 0}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px]"
+                        title="Di chuyển lên trước"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveColumn(index, 'down')}
+                        disabled={index === columns.length - 1}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px]"
+                        title="Di chuyển xuống sau"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={resetColumnsToDefault}
+                  className="rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-vanilla-50 transition-colors"
+                >
+                  Đặt lại mặc định
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsColumnModalOpen(false)}
+                  className="rounded-xl bg-primary-500 px-6 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary-600 transition-colors"
+                >
+                  Hoàn tất
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <EmployeeImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onSuccess={() => refreshList()}
+        />
       </div>
     </AppShell>
   )

@@ -33,7 +33,7 @@ export default function EditorToolbar({
             disabled={!canUndo}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-all
               disabled:opacity-40 disabled:cursor-not-allowed
-              hover:bg-gray-50 active:bg-gray-100 border-gray-200 text-gray-700"
+              hover:bg-vanilla-50 active:bg-primary-50 border-gray-200 text-gray-700"
             title="Hoàn tác (Ctrl+Z)"
           >
             <Undo2 size={16} /> Hoàn tác
@@ -43,7 +43,7 @@ export default function EditorToolbar({
             disabled={!canRedo}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-all
               disabled:opacity-40 disabled:cursor-not-allowed
-              hover:bg-gray-50 active:bg-gray-100 border-gray-200 text-gray-700"
+              hover:bg-vanilla-50 active:bg-primary-50 border-gray-200 text-gray-700"
             title="Làm lại (Ctrl+Shift+Z)"
           >
             <Redo2 size={16} /> Làm lại

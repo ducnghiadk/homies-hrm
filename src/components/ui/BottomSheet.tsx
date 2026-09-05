@@ -177,7 +177,7 @@ export function BottomSheet({
                 className="
                   w-8 h-8 -mr-1
                   flex items-center justify-center
-                  rounded-full hover:bg-gray-100
+                  rounded-full hover:bg-primary-50
                   transition-colors
                 "
                 aria-label="Đóng"

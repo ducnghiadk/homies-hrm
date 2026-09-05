@@ -27,7 +27,7 @@ const ROLE_COLORS: Record<UserRole, { bg: string; text: string; border: string }
   area_manager: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200' },
   store_manager: { bg: 'bg-success-50', text: 'text-success-700', border: 'border-success-200' },
   shift_leader: { bg: 'bg-warning-50', text: 'text-warning-700', border: 'border-warning-200' },
-  employee: { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' },
+  employee: { bg: 'bg-vanilla-50', text: 'text-gray-700', border: 'border-gray-200' },
 }
 
 const ROLE_ICONS: Record<UserRole, string> = {
@@ -133,7 +133,7 @@ export function PermissionsPanel({
           </div>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1 hover:bg-gray-100 rounded"
+            className="p-1 hover:bg-primary-50 rounded"
           >
             {isCollapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
           </button>
@@ -154,7 +154,7 @@ export function PermissionsPanel({
                     {perms.map((perm) => (
                       <span
                         key={perm}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 text-gray-700 text-xs rounded-full"
                         title={PERMISSION_LABELS[perm]}
                       >
                         <Check size={12} className="text-success-500" />
@@ -171,7 +171,7 @@ export function PermissionsPanel({
               {displayPermissions.map((perm) => (
                 <span
                   key={perm}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 text-gray-700 text-xs rounded-full"
                   title={PERMISSION_LABELS[perm]}
                 >
                   <Check size={12} className="text-success-500" />
@@ -225,7 +225,7 @@ export function CurrentUserPermissionsCard() {
         </div>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="p-2 hover:bg-gray-100 rounded-lg"
+          className="p-2 hover:bg-primary-50 rounded-lg"
           title={isExpanded ? 'Thu gọn' : 'Xem quyền'}
         >
           {isExpanded ? <EyeOff size={20} /> : <Eye size={20} />}

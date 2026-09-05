@@ -10,13 +10,26 @@ import { formatDate } from '@/lib/utils'
 import { TrendingUp, TrendingDown, Settings, Plus } from 'lucide-react'
 
 export default function RewardsPage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const [tab, setTab] = useState<'history'|'rules'>('history')
   const [filter, setFilter] = useState<'all'|'bonus'|'penalty'>('all')
 
-  useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
-  if (!user) return null
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/rewards')
+  }, [hasHydrated, isAuthenticated, router])
+
+  if (!hasHydrated) {
+    return (
+      <AppShell title="Thưởng phạt 🏆">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (!user || !isAuthenticated) return null
 
   const rewards = (user.role === 'employee'
     ? mockRewards.filter(r => r.employee_id === user.id)

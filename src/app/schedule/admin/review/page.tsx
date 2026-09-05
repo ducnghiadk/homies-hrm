@@ -12,20 +12,21 @@ import {
   ShiftQuota,
   getRegistrationWeeks,
   getShiftQuotas,
-  updateRegistrationStatus,
   autoAssignFromPreferences,
   formatDateString,
 } from '@/lib/mock-data-registration-weeks'
 import { 
-  mockEmployees, mockShifts,
-  getShiftById, getSchedulesByStoreWeek, getStoreById, replaceSchedulesForStoreWeek, Schedule
+  mockShifts,
+  getShiftById, getSchedulesByStoreWeek, replaceSchedulesForStoreWeek, Schedule, isStoreMatch
 } from '@/lib/mock-data'
+import { EmployeeService } from '@/lib/services/employees/employee-service'
+import { employeeAdapter } from '@/lib/adapters'
+import { ScheduleService } from '@/lib/services/schedule-service'
 import { getAllPreferencesForWeek, getShiftPreferenceAvailability, ShiftPreference } from '@/lib/mock-data-preferences'
 import { ShiftTemplateService } from '@/lib/services/shift-template-service'
 import { getInitials } from '@/lib/utils'
 import { checkScheduleWarnings, scanWeekWarnings } from '@/lib/mock-data-schedule-rules'
 import { toast } from 'sonner'
-import { notifySchedulePublished } from '@/lib/notifications/schedule-notifications'
 
 const DAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật']
 let manualScheduleCounter = 0
@@ -51,6 +52,15 @@ function AdminReviewContent() {
   useEffect(() => {
     if (!isAuthenticated) router.push('/login')
   }, [isAuthenticated, router])
+
+  useEffect(() => {
+    employeeAdapter.getAllEmployees().then(res => {
+      if (res && res.length) {
+        EmployeeService.syncEmployeesFromAdapter(res)
+        setRefreshTrigger(k => k + 1)
+      }
+    })
+  }, [])
 
   useEffect(() => {
     if (!isAuthenticated || !user || user.role === 'employee') return
@@ -115,10 +125,11 @@ function AdminReviewContent() {
   // Filter store employees
   const storeEmployees = useMemo(() => {
     if (!user) return []
-    return mockEmployees.filter(
-      emp => emp.store_id === storeId && emp.role === 'employee'
+    const all = EmployeeService.getEmployees(user)
+    return all.filter(
+      emp => isStoreMatch(emp.store_id, storeId) && (emp.role === 'employee' || emp.role === 'shift_leader')
     )
-  }, [user, storeId])
+  }, [user, storeId, refreshTrigger])
 
   if (!user || user.role === 'employee') {
     return (
@@ -232,16 +243,13 @@ function AdminReviewContent() {
     )
     if (!confirmPub) return
 
-    updateRegistrationStatus(activeWeek.id, 'published')
-
-    notifySchedulePublished({
-      userIds: storeEmployees.map(emp => emp.id),
-      weekStart: weekDates[0] || activeWeek.week_start_date,
-      weekEnd: weekDates[6] || activeWeek.week_start_date,
-      storeId: activeWeek.store_id,
-      storeName: getStoreById(activeWeek.store_id)?.name || 'cửa hàng của bạn',
-      publishedByName: user.full_name,
-    })
+    const published = ScheduleService.publishWeek(user, activeWeek.store_id, weekDates, { allowSoftWarnings: true })
+    if (!published) {
+      toast.error('Không thể xuất bản lịch', {
+        description: 'Dữ liệu lịch đã thay đổi hoặc còn vi phạm cần xử lý. Vui lòng tải lại và kiểm tra lại.',
+      })
+      return
+    }
 
     setRefreshTrigger(prev => prev + 1)
 
@@ -312,7 +320,7 @@ function AdminReviewContent() {
         </div>
 
         {/* ─── Segment Navigation Bar ─── */}
-        <div className="flex bg-gray-100 p-1 rounded-2xl gap-1 w-full border border-gray-200/50">
+        <div className="flex bg-primary-50 p-1 rounded-2xl gap-1 w-full border border-gray-200/50">
           <button
             onClick={() => router.push('/schedule/manage')}
             className="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all text-gray-500 hover:text-gray-700"
@@ -388,7 +396,7 @@ function AdminReviewContent() {
         {/* ─── Matrix Board Grid ─── */}
         {activeWeek && weekDates.length > 0 && (
           <div className="bg-white border border-gray-100 rounded-3xl shadow-[var(--shadow-card)] overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-vanilla-50/50">
               <span className="text-xs font-extrabold text-gray-700 flex items-center gap-1.5">
                 <Users size={15} className="text-primary-500" /> Bảng so khớp & Duyệt phân ca
               </span>
@@ -398,7 +406,7 @@ function AdminReviewContent() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[850px]">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/20">
+                  <tr className="border-b border-gray-100 bg-vanilla-50/20">
                     <th className="p-3 text-[10px] font-extrabold text-gray-500 tracking-wider w-[180px]">NHÂN VIÊN</th>
                     {DAY_LABELS.map((day, idx) => (
                       <th key={idx} className="p-3 text-[10px] font-extrabold text-gray-500 tracking-wider text-center">
@@ -410,7 +418,7 @@ function AdminReviewContent() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {storeEmployees.map(emp => (
-                    <tr key={emp.id} className="hover:bg-gray-50/30">
+                    <tr key={emp.id} className="hover:bg-vanilla-50/30">
                       {/* Employee details info */}
                       <td className="p-3">
                         <div className="flex items-center gap-2.5">
@@ -438,7 +446,7 @@ function AdminReviewContent() {
                                   <button
                                     key={template.id}
                                     onClick={() => handleManualAssign(emp.id, date, template.id)}
-                                    className="text-[10px] font-bold p-1 hover:bg-gray-50 rounded flex items-center justify-between"
+                                    className="text-[10px] font-bold p-1 hover:bg-vanilla-50 rounded flex items-center justify-between"
                                     style={{ color: template.color }}
                                   >
                                     {template.name}
@@ -510,7 +518,7 @@ function AdminReviewContent() {
 
                 {/* ─── Matrix Footer: Gap Analysis vs Staff Quota ─── */}
                 <tfoot>
-                  <tr className="bg-gray-50/50 border-t border-gray-100">
+                  <tr className="bg-vanilla-50/50 border-t border-gray-100">
                     <td className="p-3 font-extrabold text-[10px] text-gray-600 align-middle">
                       <span>BIỂU ĐỒ ĐỊNH MỨC</span>
                       <span className="block text-[8px] text-gray-400 font-bold mt-0.5">Thực tế / Chỉ tiêu</span>
@@ -528,7 +536,7 @@ function AdminReviewContent() {
                                   <span className={`font-extrabold ${statusColor}`}>{assignedCount}/{max}</span>
                                 </div>
                                 {/* Small progress bar */}
-                                <div className="w-full bg-gray-100 h-1 rounded-full overflow-hidden">
+                                <div className="w-full bg-primary-50 h-1 rounded-full overflow-hidden">
                                   <div className={`${progressBg} h-full transition-all`} style={{ width: `${fillPercent}%` }} />
                                 </div>
                               </div>

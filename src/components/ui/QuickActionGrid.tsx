@@ -57,7 +57,7 @@ export function QuickActionGrid({
           className={`
             flex flex-col items-center justify-center
             ${styles.container} rounded-xl
-            bg-gray-50 hover:bg-gray-100
+            bg-vanilla-50 hover:bg-primary-50
             active:scale-95
             transition-all duration-150
             ${action.disabled ? 'opacity-50 cursor-not-allowed' : ''}

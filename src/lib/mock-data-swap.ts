@@ -104,58 +104,7 @@ export function saveSwapRequests(requests: ShiftSwapRequest[]): void {
 export function getInitialSwapRequests(): ShiftSwapRequest[] {
   const persisted = getPersistedSwapRequests()
   if (persisted.length > 0) return persisted
-  
-  const seeded: ShiftSwapRequest[] = [
-    {
-      id: 'swap-seed-1',
-      requester_id: 'emp-001',
-      requester_schedule_id: 'sch-001',
-      target_user_id: 'emp-002',
-      target_schedule_id: 'sch-002',
-      type: 'swap',
-      reason: 'Có việc gia đình đột xuất',
-      status: 'pending',
-      created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-      events: [
-        {
-          event: 'created',
-          timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-          by_id: 'emp-001',
-          by_name: 'Nguyễn Văn A',
-          note: 'Tạo yêu cầu đổi ca: "Có việc gia đình đột xuất"'
-        }
-      ]
-    },
-    {
-      id: 'swap-seed-2',
-      requester_id: 'emp-002',
-      requester_schedule_id: 'sch-003',
-      target_user_id: 'emp-003',
-      type: 'cover',
-      reason: 'Đi khám bệnh',
-      status: 'accepted',
-      created_at: new Date(Date.now() - 3600000 * 48).toISOString(),
-      target_response_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-      events: [
-        {
-          event: 'created',
-          timestamp: new Date(Date.now() - 3600000 * 48).toISOString(),
-          by_id: 'emp-002',
-          by_name: 'Trần Thị B',
-          note: 'Tạo yêu cầu gánh ca: "Đi khám bệnh"'
-        },
-        {
-          event: 'target_accepted',
-          timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-          by_id: 'emp-003',
-          by_name: 'Lê Văn C',
-          note: 'Đồng ý gánh ca giúp Trần Thị B'
-        }
-      ]
-    }
-  ]
-  saveSwapRequests(seeded)
-  return seeded
+  return []
 }
 
 // ─── CRUD ───

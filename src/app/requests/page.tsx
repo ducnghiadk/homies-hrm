@@ -9,10 +9,24 @@ import { getStatusLabel, getStatusColor, formatDate } from '@/lib/utils'
 import { ArrowLeftRight, CalendarOff, Check, X } from 'lucide-react'
 
 export default function RequestsPage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
-  useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
-  if (!user) return null
+
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/requests')
+  }, [hasHydrated, isAuthenticated, router])
+
+  if (!hasHydrated) {
+    return (
+      <AppShell title="Yêu cầu">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (!user || !isAuthenticated) return null
 
   const requests = mockRequests
 

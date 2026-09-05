@@ -38,7 +38,7 @@ export default function Step1BasicInfo({ state, onUpdate, onNext }: Step1Props) 
           />
           
           {basicInfo.businessModel === 'app-delivery' && (
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 grid grid-cols-2 gap-4 mt-2">
+            <div className="bg-vanilla-50 p-4 rounded-xl border border-gray-100 grid grid-cols-2 gap-4 mt-2">
                <div>
                 <label className="text-xs text-gray-500 mb-1 block">Tỷ lệ đơn App (%)</label>
                 <input 
@@ -127,7 +127,7 @@ export default function Step1BasicInfo({ state, onUpdate, onNext }: Step1Props) 
                                 updateBasicInfo({ operatingDays: newDays });
                             }}
                             className={`w-10 h-10 rounded-full text-xs font-bold transition-all ${
-                                isSelected ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                isSelected ? 'bg-gray-900 text-white' : 'bg-primary-50 text-gray-400 hover:bg-gray-200'
                             }`}
                         >
                             {day}

@@ -29,7 +29,7 @@ export default function AdminSettingsModal({ settings, onSave, onClose }: AdminS
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
-        <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
+        <div className="bg-vanilla-50 p-4 border-b border-gray-200 flex justify-between items-center">
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <Settings size={18} className="text-gray-600" /> Cài đặt hệ thống
           </h3>
@@ -66,7 +66,7 @@ export default function AdminSettingsModal({ settings, onSave, onClose }: AdminS
                 </div>
             </div>
 
-            <div className="h-px bg-gray-100" />
+            <div className="h-px bg-primary-50" />
             
              {/* SALARY DEFAULTS */}
              <div className="space-y-4">
@@ -99,7 +99,7 @@ export default function AdminSettingsModal({ settings, onSave, onClose }: AdminS
                 </div>
             </div>
 
-             <div className="h-px bg-gray-100" />
+             <div className="h-px bg-primary-50" />
             
              {/* WARNINGS */}
              <div className="space-y-4">
@@ -120,7 +120,7 @@ export default function AdminSettingsModal({ settings, onSave, onClose }: AdminS
              </div>
         </div>
 
-        <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-between">
+        <div className="p-4 border-t border-gray-200 bg-vanilla-50 flex justify-between">
             <button 
                 onClick={handleReset}
                 className="flex items-center gap-2 px-4 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"

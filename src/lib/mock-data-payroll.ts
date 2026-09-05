@@ -24,19 +24,39 @@ export interface SalarySlipData {
   id: string
   employee_id: string
   employee_name: string
+  employee_code?: string
+  department?: string
+  level?: string
+  employee_type?: string
   position: string
   store: string
   period: string
   work_days: number
+  regular_days?: number
+  ot_days?: number
   standard_days: number
+  total_shifts?: number
+  total_hours?: number
+  regular_hours?: number
   // Earnings
   base_salary: number
+  base_salary_formatted?: string
+  worked_salary?: number
   allowances: { name: string; amount: number }[]
+  total_allowance_amount?: number
   overtime_hours: number
   overtime_amount: number
   bonus: number
+  bonus_tickets?: number
+  kpi_salary?: number
   total_earnings: number
+  gross_salary?: number
   // Deductions
+  total_penalties?: number
+  deduction_tickets?: number
+  union_fee?: number
+  return_hold_salary?: number
+  hold_salary?: number
   late_deduction: number
   advance_deduction: number
   bhxh: number
@@ -45,8 +65,10 @@ export interface SalarySlipData {
   tax: number
   other_deduction: number
   total_deductions: number
-  // Net
+  // Net & Status
   net_salary: number
+  rounded_net?: number
+  status?: string
 }
 
 export interface SalaryHoldRecord {
@@ -122,70 +144,28 @@ export interface AllowanceType {
 
 // ============ Store Summary ============
 export const mockPayrollByStore: PayrollStoreSummary[] = [
-  { store_id: 'store-001', store_name: 'Homies Milk Tea Q.1', employee_count: 7, total_base: 45500000, total_allowance: 7000000, total_bonus: 1500000, total_deduction: 500000, total_insurance: 5460000, total_tax: 1200000, total_net: 46840000, status: 'approved' },
-  { store_id: 'store-002', store_name: 'Homies Milk Tea Q.3', employee_count: 5, total_base: 30000000, total_allowance: 5000000, total_bonus: 500000, total_deduction: 200000, total_insurance: 3600000, total_tax: 800000, total_net: 30900000, status: 'reviewing' },
-  { store_id: 'store-003', store_name: 'Homies Milk Tea Thủ Đức', employee_count: 5, total_base: 32000000, total_allowance: 5000000, total_bonus: 800000, total_deduction: 0, total_insurance: 3840000, total_tax: 900000, total_net: 33060000, status: 'draft' },
+  { store_id: 'store-001', store_name: 'Homies Milk Tea - Hồ Bá Phấn', employee_count: 0, total_base: 0, total_allowance: 0, total_bonus: 0, total_deduction: 0, total_insurance: 0, total_tax: 0, total_net: 0, status: 'draft' },
+  { store_id: 'store-002', store_name: 'Homies Milk Tea - Đường 429', employee_count: 0, total_base: 0, total_allowance: 0, total_bonus: 0, total_deduction: 0, total_insurance: 0, total_tax: 0, total_net: 0, status: 'draft' },
+  { store_id: 'store-003', store_name: 'Homies Milk Tea - Lê Văn Sỹ', employee_count: 0, total_base: 0, total_allowance: 0, total_bonus: 0, total_deduction: 0, total_insurance: 0, total_tax: 0, total_net: 0, status: 'draft' },
 ]
 
 // ============ Salary Slips ============
-export const mockSalarySlips: SalarySlipData[] = [
-  {
-    id: 'slip-001', employee_id: 'emp-005', employee_name: 'Trần Thị Mai',
-    position: 'Pha chế', store: 'Homies Milk Tea Q.1', period: '01/2026',
-    work_days: 26, standard_days: 26,
-    base_salary: 5500000,
-    allowances: [{ name: 'Ăn trưa', amount: 700000 }, { name: 'Xăng xe', amount: 300000 }],
-    overtime_hours: 6, overtime_amount: 225000, bonus: 500000,
-    total_earnings: 7225000,
-    late_deduction: 0, advance_deduction: 0,
-    bhxh: 440000, bhyt: 82500, bhtn: 55000, tax: 0, other_deduction: 0, total_deductions: 577500,
-    net_salary: 6647500,
-  },
-  {
-    id: 'slip-002', employee_id: 'emp-007', employee_name: 'Đặng Minh Khoa',
-    position: 'Phục vụ', store: 'Homies Milk Tea Q.1', period: '01/2026',
-    work_days: 24, standard_days: 26,
-    base_salary: 5076923,
-    allowances: [{ name: 'Ăn trưa', amount: 700000 }],
-    overtime_hours: 0, overtime_amount: 0, bonus: 0,
-    total_earnings: 5776923,
-    late_deduction: 100000, advance_deduction: 500000,
-    bhxh: 406154, bhyt: 76154, bhtn: 50769, tax: 0, other_deduction: 0, total_deductions: 1133077,
-    net_salary: 4643846,
-  },
-]
+export const mockSalarySlips: SalarySlipData[] = []
 
 // ============ Hold ============
-export const mockSalaryHolds: SalaryHoldRecord[] = [
-  { id: 'hold-001', employee_id: 'emp-015', employee_name: 'NV Mới A', hold_percent: 20, hold_amount: 1000000, start_date: '2026-01-15', release_date: '2026-03-15', status: 'holding' },
-  { id: 'hold-002', employee_id: 'emp-014', employee_name: 'NV Mới B', hold_percent: 20, hold_amount: 1100000, start_date: '2025-12-01', release_date: '2026-02-01', status: 'released', released_by: 'emp-002' },
-]
+export const mockSalaryHolds: SalaryHoldRecord[] = []
 
 // ============ Bonus ============
-export const mockBonuses: BonusRecord[] = [
-  { id: 'bon-001', employee_id: 'emp-005', employee_name: 'Trần Thị Mai', amount: 500000, reason: 'NV xuất sắc tháng 1', month: '01/2026', status: 'approved', created_by: 'emp-002', created_at: '2026-02-01' },
-  { id: 'bon-002', employee_id: 'emp-011', employee_name: 'Hoàng Thị Lan', amount: 300000, reason: 'Hoàn thành dự án training', month: '02/2026', status: 'pending', created_by: 'emp-003', created_at: '2026-02-14' },
-  { id: 'bon-003', employee_id: 'emp-006', employee_name: 'Vũ Hoàng Đức', amount: 200000, reason: 'Hỗ trợ khai trương', month: '02/2026', status: 'pending', created_by: 'emp-002', created_at: '2026-02-15' },
-]
+export const mockBonuses: BonusRecord[] = []
 
 // ============ Deductions ============
-export const mockDeductions: DeductionRecord[] = [
-  { id: 'ded-001', employee_id: 'emp-007', employee_name: 'Đặng Minh Khoa', type: 'penalty', type_label: 'Phạt', amount: 100000, reason: 'Đi muộn 3 lần trong tháng', month: '01/2026', status: 'approved' },
-  { id: 'ded-002', employee_id: 'emp-007', employee_name: 'Đặng Minh Khoa', type: 'repayment', type_label: 'Trả ứng', amount: 500000, reason: 'Trả tạm ứng tháng 12', month: '01/2026', status: 'approved' },
-  { id: 'ded-003', employee_id: 'emp-009', employee_name: 'Bùi Văn Tùng', type: 'compensation', type_label: 'Bồi thường', amount: 150000, reason: 'Làm vỡ bình thủy tinh', month: '02/2026', status: 'pending' },
-]
+export const mockDeductions: DeductionRecord[] = []
 
 // ============ Advance ============
-export const mockAdvances: AdvanceRequest[] = [
-  { id: 'adv-001', employee_id: 'emp-009', employee_name: 'Bùi Văn Tùng', earned_to_date: 2750000, max_advance: 1375000, requested_amount: 1000000, reason: 'Cần gấp trả tiền nhà', status: 'pending', created_at: '2026-02-12' },
-  { id: 'adv-002', employee_id: 'emp-012', employee_name: 'Đinh Văn Phúc', earned_to_date: 3200000, max_advance: 1600000, requested_amount: 1500000, reason: 'Gia đình có việc gấp', status: 'approved', created_at: '2026-02-10' },
-]
+export const mockAdvances: AdvanceRequest[] = []
 
 // ============ Insurance ============
-export const mockInsurance: InsuranceRecord[] = [
-  { employee_id: 'emp-005', employee_name: 'Trần Thị Mai', salary_base: 5500000, bhxh_employee: 440000, bhxh_company: 935000, bhyt_employee: 82500, bhyt_company: 165000, bhtn_employee: 55000, bhtn_company: 55000, total_employee: 577500, total_company: 1155000 },
-  { employee_id: 'emp-006', employee_name: 'Vũ Hoàng Đức', salary_base: 5500000, bhxh_employee: 440000, bhxh_company: 935000, bhyt_employee: 82500, bhyt_company: 165000, bhtn_employee: 55000, bhtn_company: 55000, total_employee: 577500, total_company: 1155000 },
-]
+export const mockInsurance: InsuranceRecord[] = []
 
 // ============ Allowance Types ============
 export const mockAllowanceTypes: AllowanceType[] = [
@@ -197,14 +177,18 @@ export const mockAllowanceTypes: AllowanceType[] = [
 ]
 
 // ============ Payroll History ============
-export const mockPayrollHistory = [
-  { period: '01/2026', status: 'locked' as PayrollStatus, total_net: 110800000, employee_count: 15, locked_at: '2026-02-05', locked_by: 'emp-001' },
-  { period: '12/2025', status: 'locked' as PayrollStatus, total_net: 108500000, employee_count: 14, locked_at: '2026-01-05', locked_by: 'emp-001' },
-  { period: '11/2025', status: 'locked' as PayrollStatus, total_net: 105200000, employee_count: 14, locked_at: '2025-12-05', locked_by: 'emp-001' },
-]
+export const mockPayrollHistory: Array<{
+  period: string
+  status: PayrollStatus
+  total_net: number
+  employee_count: number
+  locked_at?: string
+  locked_by?: string
+}> = []
 
 // Helpers
 export const getPayrollByStore = (storeId: string) => mockPayrollByStore.find(p => p.store_id === storeId)
 export const getSlipByEmployee = (empId: string, period: string) => mockSalarySlips.find(s => s.employee_id === empId && s.period === period)
 export const getPendingBonuses = () => mockBonuses.filter(b => b.status === 'pending')
 export const getPendingAdvances = () => mockAdvances.filter(a => a.status === 'pending')
+

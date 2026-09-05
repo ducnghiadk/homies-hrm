@@ -11,7 +11,7 @@ export default function StaffingLevelBar({ staffing }: StaffingLevelBarProps) {
   const maxCount = Math.max(...staffing.map(s => Math.max(s.count, s.required)), 5)
 
   return (
-    <div className="bg-gray-50 border-t-2 border-gray-200 px-2 py-3">
+    <div className="bg-vanilla-50 border-t-2 border-gray-200 px-2 py-3">
       <div className="flex items-end" style={{ marginLeft: '140px' }}>
         {staffing.map(h => {
           const barHeight = (h.count / maxCount) * 40

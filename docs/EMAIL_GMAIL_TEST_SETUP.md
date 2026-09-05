@@ -13,13 +13,13 @@ SMTP_SECURE=false
 SMTP_USER=yourname@gmail.com
 SMTP_PASS=your_16_char_app_password
 EMAIL_FROM=yourname@gmail.com
-APP_BASE_URL=http://localhost:3333
+APP_BASE_URL=http://localhost:3535
 ```
 
 Luu y:
 - `SMTP_PASS` la `App Password`, khong phai mat khau Gmail thuong.
 - `EMAIL_FROM` nen trung voi `SMTP_USER`.
-- App local dang chay port `3333`, nen `APP_BASE_URL` mac dinh la `http://localhost:3333`.
+- App local dang chay port `3535`, nen `APP_BASE_URL` mac dinh la `http://localhost:3535`.
 
 Sau khi set xong:
 1. restart `npm run dev`

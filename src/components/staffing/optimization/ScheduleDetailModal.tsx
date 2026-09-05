@@ -39,7 +39,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
+        <div className="bg-vanilla-50 p-4 border-b border-gray-200 flex justify-between items-center">
           <div>
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <CalendarDays size={18} className="text-primary-600" />
@@ -73,7 +73,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
                 {plan.fulltime.map((slot, i) => (
                     <div key={`ft-${i}`} className="relative h-10 flex items-center group">
                         <div className="w-24 shrink-0 text-xs font-bold text-gray-700">FT {i+1}</div>
-                        <div className="flex-1 h-full relative border-t border-gray-50 group-hover:bg-gray-50/50">
+                        <div className="flex-1 h-full relative border-t border-gray-50 group-hover:bg-vanilla-50/50">
                             {renderTimeline(slot.startTime, slot.endTime, 'bg-primary-500')}
                             <div className="absolute left-[100px] top-1 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                 {slot.role} ({slot.shiftName})
@@ -84,7 +84,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
                 {plan.parttime.map((slot, i) => (
                     <div key={`pt-${i}`} className="relative h-10 flex items-center group">
                         <div className="w-24 shrink-0 text-xs font-bold text-gray-500">PT {i+1}</div>
-                        <div className="flex-1 h-full relative border-t border-gray-50 group-hover:bg-gray-50/50">
+                        <div className="flex-1 h-full relative border-t border-gray-50 group-hover:bg-vanilla-50/50">
                              {renderTimeline(slot.startTime, slot.endTime, 'bg-warning-400')}
                              <div className="absolute left-[100px] top-1 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                 {slot.role} ({slot.shiftName})
@@ -101,7 +101,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
               <h4 className="text-sm font-bold text-gray-700 mb-4">Bảng tổng hợp chi phí</h4>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full text-sm text-left">
-                      <thead className="bg-gray-50 text-xs text-gray-500 font-bold uppercase">
+                      <thead className="bg-vanilla-50 text-xs text-gray-500 font-bold uppercase">
                           <tr>
                               <th className="p-3">Nhân viên</th>
                               <th className="p-3">Loại</th>
@@ -129,7 +129,7 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
                                   <td className="p-3 text-right font-medium">{s.monthlyCost.toLocaleString('vi-VN')}</td>
                               </tr>
                           ))}
-                          <tr className="bg-gray-50 font-bold text-gray-900 border-t-2 border-gray-200">
+                          <tr className="bg-vanilla-50 font-bold text-gray-900 border-t-2 border-gray-200">
                               <td colSpan={4} className="p-4 text-right">TỔNG CHI PHÍ LƯƠNG</td>
                               <td className="p-4 text-right text-lg text-primary">{plan.totalCost.toLocaleString('vi-VN')}</td>
                           </tr>
@@ -141,10 +141,10 @@ export default function ScheduleDetailModal({ plan, onClose, onSelect }: Schedul
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
+        <div className="p-4 border-t border-gray-200 flex justify-end gap-3 bg-vanilla-50">
           <button 
             onClick={onClose}
-            className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+            className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-primary-50 transition-colors font-medium"
           >
             Đóng
           </button>

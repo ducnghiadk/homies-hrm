@@ -11,12 +11,25 @@ import {
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
 
 export default function ReportsPage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const [tab, setTab] = useState<'revenue'|'labor'|'products'>('revenue')
 
-  useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
-  if (!user) return null
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/reports')
+  }, [hasHydrated, isAuthenticated, router])
+
+  if (!hasHydrated) {
+    return (
+      <AppShell title="Báo cáo & Phân tích 📊">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (!user || !isAuthenticated) return null
 
   const latestMonth = mockRevenueByMonth[mockRevenueByMonth.length - 1]
   const prevMonth = mockRevenueByMonth[mockRevenueByMonth.length - 2]

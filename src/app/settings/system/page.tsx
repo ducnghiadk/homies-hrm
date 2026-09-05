@@ -62,7 +62,7 @@ function StatusCard({
   subtext?: string
 }) {
   return (
-    <div className="bg-gray-50 rounded-xl p-4">
+    <div className="bg-vanilla-50 rounded-xl p-4">
       <div className="flex items-center gap-3">
         <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', color)}>
           <Icon size={20} />
@@ -86,7 +86,7 @@ function SyncStatusCard({
   isOnline: boolean
 }) {
   const statusConfig = {
-    idle: { icon: <Database size={24} />, text: 'Sẵn sàng', color: 'text-gray-500 bg-gray-100' },
+    idle: { icon: <Database size={24} />, text: 'Sẵn sàng', color: 'text-gray-500 bg-primary-50' },
     syncing: { icon: <RefreshCw size={24} className="animate-spin" />, text: 'Đang đồng bộ...', color: 'text-primary-500 bg-primary-100' },
     success: { icon: <CheckCircle size={24} />, text: 'Thành công', color: 'text-success-500 bg-success-100' },
     error: { icon: <XCircle size={24} />, text: 'Có lỗi', color: 'text-error-500 bg-error-100' },
@@ -156,7 +156,7 @@ function PendingOperationsList() {
   return (
     <div className="space-y-2">
       {operations.map((op) => (
-        <div key={op.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+        <div key={op.id} className="flex items-center justify-between p-3 bg-vanilla-50 rounded-lg">
           <div className="flex items-center gap-3">
             <span className="text-xl">{typeLabels[op.type]?.split(' ')[0] || '📋'}</span>
             <div>
@@ -255,7 +255,7 @@ export default function SettingsSystemPage() {
         <StatusCard title="Tổng tác vụ" value={stats.total} icon={Database} color="bg-primary-100 text-primary-600" />
         <StatusCard title="Đang chờ" value={stats.pending} icon={Clock} color="bg-warning-100 text-warning-600" subtext={stats.pending > 0 ? 'Sẽ sync khi online' : undefined} />
         <StatusCard title="Đã đồng bộ" value={stats.synced} icon={CheckCircle} color="bg-success-100 text-success-600" />
-        <StatusCard title="Thất bại" value={stats.failed} icon={AlertTriangle} color={stats.failed > 0 ? 'bg-error-100 text-error-600' : 'bg-gray-100 text-gray-400'} subtext={stats.failed > 0 ? 'Nhấn Sync để thử lại' : undefined} />
+        <StatusCard title="Thất bại" value={stats.failed} icon={AlertTriangle} color={stats.failed > 0 ? 'bg-error-100 text-error-600' : 'bg-primary-50 text-gray-400'} subtext={stats.failed > 0 ? 'Nhấn Sync để thử lại' : undefined} />
       </div>
 
       {/* Pending Operations */}
@@ -313,7 +313,7 @@ export default function SettingsSystemPage() {
       </div>
 
       {/* Info */}
-      <Card className="p-4 mt-4 bg-gray-50">
+      <Card className="p-4 mt-4 bg-vanilla-50">
         <div className="flex items-start gap-3">
           <Info className="w-5 h-5 text-gray-400 mt-0.5" />
           <div className="text-sm text-gray-600">

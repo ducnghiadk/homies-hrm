@@ -53,7 +53,7 @@ export default function SmartActionBanner({ actions }: Props) {
             const c = COLOR_MAP[a.color] ?? COLOR_MAP.blue
             return (
               <Link key={a.id} href={a.action.href}
-                className="flex items-center gap-2 px-3 py-2 text-xs no-underline hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-xs no-underline hover:bg-vanilla-50 transition-colors"
                 style={{ color: c.text }}>
                 <span>{c.dot}</span>
                 <span className="flex-1 font-semibold">{a.title}</span>

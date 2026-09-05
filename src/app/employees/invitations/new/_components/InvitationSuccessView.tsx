@@ -46,7 +46,7 @@ export function InvitationSuccessView({
                 : 'Đã tạo lời mời, nhưng gửi email chưa thành công'}
           </h2>
 
-          <div className="bg-gray-50 rounded-xl p-4 text-left mb-6">
+          <div className="bg-vanilla-50 rounded-xl p-4 text-left mb-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
                 <User size={24} className="text-primary-600" />
@@ -134,7 +134,7 @@ export function InvitationSuccessView({
             </button>
             <button
               onClick={onCreateAnother}
-              className="w-full py-3 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 bg-white border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-vanilla-50 transition-colors flex items-center justify-center gap-2"
             >
               <UserPlus size={18} /> Tạo lời mời khác
             </button>

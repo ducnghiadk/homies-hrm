@@ -97,7 +97,7 @@ export function ConfirmDialog({
           {/* Close button */}
           <button
             onClick={handleClose}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center
+            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center
               hover:bg-gray-200 transition-colors z-10"
           >
             <X size={14} className="text-gray-500" />
@@ -143,7 +143,7 @@ export function ConfirmDialog({
               onClick={handleClose}
               disabled={isLoading}
               className="flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold
-                bg-gray-100 text-gray-700 hover:bg-gray-200
+                bg-primary-50 text-gray-700 hover:bg-gray-200
                 transition-colors disabled:opacity-50"
             >
               {cancelLabel}

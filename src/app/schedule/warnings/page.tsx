@@ -94,7 +94,7 @@ function ScheduleWarningsContent() {
         {/* Header */}
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()}
-            className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+            className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center hover:bg-gray-200 transition-colors">
             <ChevronLeft size={20} className="text-gray-500" />
           </button>
           <div className="flex-1">
@@ -122,18 +122,18 @@ function ScheduleWarningsContent() {
         {/* Type filter */}
         <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
           <button onClick={() => setTypeFilter('all')}
-            className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${typeFilter === 'all' ? 'bg-dark-700 text-white border-dark-700' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+            className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${typeFilter === 'all' ? 'bg-dark-700 text-white border-dark-700' : 'bg-vanilla-50 text-gray-500 border-gray-200'}`}>
             Tất cả
           </button>
           {scheduleRules.filter(r => r.is_active).map(rule => (
             <button key={rule.rule_key} onClick={() => setTypeFilter(typeFilter === rule.rule_key ? 'all' : rule.rule_key)}
-              className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${typeFilter === rule.rule_key ? 'bg-dark-700 text-white border-dark-700' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+              className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${typeFilter === rule.rule_key ? 'bg-dark-700 text-white border-dark-700' : 'bg-vanilla-50 text-gray-500 border-gray-200'}`}>
               {rule.label}
             </button>
           ))}
           {Object.entries(syntheticWarningLabels).map(([key, label]) => (
             <button key={key} onClick={() => setTypeFilter(typeFilter === key ? 'all' : key as ScheduleWarningType)}
-              className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${typeFilter === key ? 'bg-dark-700 text-white border-dark-700' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+              className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${typeFilter === key ? 'bg-dark-700 text-white border-dark-700' : 'bg-vanilla-50 text-gray-500 border-gray-200'}`}>
               {label}
             </button>
           ))}
@@ -259,7 +259,7 @@ function ScheduleWarningsContent() {
               onChange={(e) => setAckReason(e.target.value)}
               placeholder="Nhập lý do (ví dụ: Nhân sự đã đồng ý OT, cửa hàng thiếu người nghiêm trọng...)"
               rows={3}
-              className="w-full text-xs p-3 border border-gray-100 rounded-2xl focus:outline-none focus:ring-1 focus:ring-amber-500/30 focus:border-warning-500 bg-gray-50/50 resize-none font-medium placeholder:text-gray-300"
+              className="w-full text-xs p-3 border border-gray-100 rounded-2xl focus:outline-none focus:ring-1 focus:ring-amber-500/30 focus:border-warning-500 bg-vanilla-50/50 resize-none font-medium placeholder:text-gray-300"
             />
 
             <div className="flex gap-2">
@@ -268,7 +268,7 @@ function ScheduleWarningsContent() {
                   setAckModalWarning(null)
                   setAckReason('')
                 }}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50 active:scale-[0.98] transition-all">
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-vanilla-50 active:scale-[0.98] transition-all">
                 Hủy
               </button>
                 <button

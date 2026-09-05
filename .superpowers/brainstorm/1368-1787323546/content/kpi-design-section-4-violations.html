@@ -1,0 +1,105 @@
+<h2>Thiết kế phần 4: Vi phạm, khiếu nại và chống phạt trùng</h2>
+<p class="subtitle">Mỗi vấn đề được quản lý như một “hồ sơ sự cố” có bằng chứng và nguyên nhân gốc. Mã lỗi chỉ là cách phân loại, không phải một dòng phạt rời rạc.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Hồ sơ sự cố #SC-2026-0184</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1.2fr .8fr;gap:14px">
+      <div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div style="padding:11px;background:#f8fafc;border-radius:6px"><small>Thời gian</small><br><strong>14:35 · 21/08</strong></div>
+          <div style="padding:11px;background:#f8fafc;border-radius:6px"><small>Cửa hàng / ca</small><br><strong>Hồ Bá Phấn · Chiều</strong></div>
+          <div style="padding:11px;background:#f8fafc;border-radius:6px"><small>Nhân viên</small><br><strong>Nguyễn Văn An</strong></div>
+        </div>
+
+        <div style="margin-top:10px;padding:13px;border:1px solid #fecdd3;background:#fff1f2;border-radius:7px">
+          <strong>Lỗi gốc: QT-N03 · Sai topping</strong><br>
+          <small>Mức độ nặng · Tác động nhóm “Tuân thủ vận hành”</small>
+          <p>Đơn Grab #G1286 yêu cầu trân châu trắng nhưng sản phẩm giao trân châu đen. Khách yêu cầu đổi lại.</p>
+        </div>
+
+        <div style="margin-top:10px;padding:13px;border:1px solid #bae6fd;background:#f0f9ff;border-radius:7px">
+          <strong>Nguồn phát sinh và nguyên nhân</strong>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px">
+            <span>Nguồn: <strong>Food app</strong></span>
+            <span>Nguyên nhân: <strong>Store</strong></span>
+            <span>Người ghi: <strong>Shift Leader</strong></span>
+            <span>Nguồn xác nhận: <strong>Đơn app + camera</strong></span>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;padding:13px;border:1px dashed #94a3b8;border-radius:7px">
+          <strong>Bằng chứng</strong><br>
+          <small>Ảnh đơn hàng · ảnh sản phẩm · ghi chú khách · camera ca</small>
+        </div>
+      </div>
+
+      <div style="background:#f8fafc;padding:13px;border-radius:7px">
+        <strong>Tác động dự kiến</strong>
+        <p><small>KPI tháng</small><br><strong>Gợi ý giảm điểm tiêu chí SOP</strong></p>
+        <p><small>Kỷ luật</small><br><strong>1 lỗi nặng trong chu kỳ 180 ngày</strong></p>
+        <p><small>Thăng tiến</small><br><strong style="color:#d97706">Theo dõi lỗi lặp cùng nhóm</strong></p>
+        <p><small>BSC cá nhân</small><br><strong>Chưa tự động chặn</strong></p>
+        <p><small>Liên đới Leader</small><br><strong>Không, chưa đủ điều kiện</strong></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Cơ chế chống phạt trùng</div>
+  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-top:10px">
+    <div style="padding:14px;background:#fff1f2;border:1px solid #fecdd3;border-radius:7px">
+      <strong>Leader định ghi thêm TD-N02</strong><br>
+      Complaint khách có bằng chứng
+    </div>
+    <div style="font-size:28px;color:#e11d48">→</div>
+    <div style="padding:14px;background:#fffbeb;border:1px solid #fde68a;border-radius:7px">
+      <strong>Hệ thống cảnh báo</strong><br>
+      Complaint này là hậu quả của lỗi sai topping đã ghi. Không cộng lỗi thứ hai, trừ khi thái độ xử lý complaint là một hành vi độc lập.
+    </div>
+  </div>
+  <div style="margin-top:10px;padding:13px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:7px">
+    <strong>Quy tắc:</strong> Một sự cố có một mã lỗi gốc chính. Mã lỗi thứ hai chỉ được thêm nếu có hành vi độc lập, bằng chứng riêng và Leader ghi rõ lý do.
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Vòng đời hồ sơ sự cố</div>
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:10px;text-align:center">
+    <div style="padding:11px;background:#f8fafc;border-radius:6px"><strong>Leader ghi nhận</strong><br><small>Chọn lỗi và bằng chứng</small></div>
+    <div style="padding:11px;background:#eff6ff;border-radius:6px"><strong>Hệ thống kiểm tra</strong><br><small>Trùng sự cố, nguồn, logic</small></div>
+    <div style="padding:11px;background:#ecfeff;border-radius:6px"><strong>Nhân viên nhận</strong><br><small>Xem và xác nhận</small></div>
+    <div style="padding:11px;background:#fff1f2;border-radius:6px"><strong>Khiếu nại 48h</strong><br><small>Giải trình và đính kèm</small></div>
+    <div style="padding:11px;background:#f5f3ff;border-radius:6px"><strong>CEO xử lý</strong><br><small>Giữ, đổi hoặc hủy lỗi</small></div>
+    <div style="padding:11px;background:#ecfdf5;border-radius:6px"><strong>Chốt hồ sơ</strong><br><small>Đưa vào KPI và lịch sử</small></div>
+  </div>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Liên đới quản lý</div>
+    <div class="mockup-body">
+      <p>Không tự động phạt Shift Leader chỉ vì nhân viên có lỗi.</p>
+      <p>Chỉ tạo trách nhiệm liên đới khi Leader đang quản lý ca, đáng lẽ phải kiểm soát, và quy tắc của lỗi cho phép liên đới.</p>
+      <p>Trách nhiệm quản lý là một đánh giá riêng, có lý do và bằng chứng.</p>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">Lỗi từ chấm công</div>
+    <div class="mockup-body">
+      <p>Đi trễ được HRM phát hiện tự động nhưng ban đầu chỉ là “đề xuất vi phạm”.</p>
+      <p>Leader xác minh ngoại lệ như đổi ca, sửa công hoặc lý do đã được duyệt trước khi chốt.</p>
+      <p>Nhờ vậy hệ thống không phạt oan vì dữ liệu chấm công chưa hoàn chỉnh.</p>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve-section-4" onclick="toggleSelect(this)">
+    <div class="letter">A</div><div class="content"><h3>Duyệt thiết kế vi phạm</h3><p>Tiếp tục sang thăng tiến, tăng lương, bài test và thử thách.</p></div>
+  </div>
+  <div class="option" data-choice="revise-section-4" onclick="toggleSelect(this)">
+    <div class="letter">B</div><div class="content"><h3>Cần chỉnh</h3><p>Nói phần ghi lỗi, bằng chứng, khiếu nại hoặc liên đới cần thay đổi.</p></div>
+  </div>
+</div>

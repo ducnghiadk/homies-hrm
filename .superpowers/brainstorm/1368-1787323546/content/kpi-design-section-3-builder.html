@@ -1,0 +1,100 @@
+<h2>Thiết kế phần 3: KPI Builder cho Admin</h2>
+<p class="subtitle">Admin tự tạo nhiều bộ KPI theo cấp bậc, vị trí, cửa hàng và giai đoạn. Không cần sửa code, không phụ thuộc mẫu Excel.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Bộ tiêu chí: Nhân viên cửa hàng chính thức · Phiên bản 3</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:210px 1fr 270px;gap:12px;min-height:470px">
+      <div style="background:#f8fafc;padding:12px;border-radius:7px">
+        <strong>Các bộ KPI</strong>
+        <div style="margin-top:12px;display:grid;gap:8px">
+          <div style="padding:10px;background:#dbeafe;border-left:4px solid #2F6FA8;border-radius:5px"><strong>PT1 chính thức</strong><br><small>Đang áp dụng · v3</small></div>
+          <div style="padding:10px;background:white;border:1px solid #e2e8f0;border-radius:5px"><strong>PT2 đa năng</strong><br><small>Đang áp dụng · v2</small></div>
+          <div style="padding:10px;background:white;border:1px solid #e2e8f0;border-radius:5px"><strong>Senior</strong><br><small>Bản nháp · v4</small></div>
+          <div style="padding:10px;background:white;border:1px solid #e2e8f0;border-radius:5px"><strong>Thử thách Shift Leader</strong><br><small>Hiệu lực từ 09/2026</small></div>
+          <button class="mock-button">+ Tạo bộ KPI</button>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div><strong>Cấu trúc tiêu chí</strong><br><small>Kéo thả để sắp xếp thứ tự hiển thị</small></div>
+          <button class="mock-button">+ Thêm nhóm</button>
+        </div>
+
+        <div style="margin-top:12px;border:1px solid #bfdbfe;border-radius:7px;overflow:hidden">
+          <div style="padding:11px;background:#eff6ff;display:flex;justify-content:space-between"><strong>Dịch vụ khách hàng</strong><strong>25%</strong></div>
+          <div style="padding:10px;border-top:1px solid #dbeafe;display:grid;grid-template-columns:1fr auto;gap:8px"><span>Chào hỏi và thái độ phục vụ<br><small>Leader chấm · bắt buộc bằng chứng khi dưới 3</small></span><strong>10%</strong></div>
+          <div style="padding:10px;border-top:1px solid #dbeafe;display:grid;grid-template-columns:1fr auto;gap:8px"><span>Complaint đã xác minh<br><small>Hệ thống gợi ý từ nhật ký lỗi</small></span><strong>15%</strong></div>
+          <div style="padding:9px;text-align:center;background:#f8fafc;color:#2F6FA8">+ Thêm tiêu chí vào nhóm</div>
+        </div>
+
+        <div style="margin-top:10px;border:1px solid #bbf7d0;border-radius:7px;overflow:hidden">
+          <div style="padding:11px;background:#ecfdf5;display:flex;justify-content:space-between"><strong>Tuân thủ vận hành</strong><strong>35%</strong></div>
+          <div style="padding:10px;border-top:1px solid #d1fae5;display:grid;grid-template-columns:1fr auto;gap:8px"><span>Thực hiện SOP pha chế<br><small>Chấm kết hợp dữ liệu lỗi và Leader</small></span><strong>20%</strong></div>
+          <div style="padding:10px;border-top:1px solid #d1fae5;display:grid;grid-template-columns:1fr auto;gap:8px"><span>Vệ sinh, FIFO và checklist<br><small>Hệ thống gợi ý từ lỗi vận hành</small></span><strong>15%</strong></div>
+          <div style="padding:9px;text-align:center;background:#f8fafc;color:#2F6FA8">+ Thêm tiêu chí vào nhóm</div>
+        </div>
+
+        <div style="margin-top:10px;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:7px;display:flex;justify-content:space-between"><span>Các nhóm khác</span><strong>40%</strong></div>
+      </div>
+
+      <div style="background:#f8fafc;padding:12px;border-radius:7px">
+        <strong>Cài đặt bộ KPI</strong>
+        <p><small>Áp dụng cho</small><br><strong>PT1-TN, PT1-PC</strong></p>
+        <p><small>Giai đoạn</small><br><strong>Chính thức</strong></p>
+        <p><small>Cửa hàng</small><br><strong>Tất cả</strong></p>
+        <p><small>Thang điểm</small><br><strong>1–5</strong></p>
+        <p><small>Hiệu lực</small><br><strong>08/2026</strong></p>
+        <p><small>Tổng trọng số</small><br><strong style="color:#1E9E57">100% · Hợp lệ</strong></p>
+        <button class="mock-button">Xem trước phiếu chấm</button>
+        <button class="mock-button">Nhân bản thành phiên bản mới</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Mỗi tiêu chí được cấu hình những gì?</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px">
+    <div style="padding:13px;background:#eff6ff;border-radius:7px"><strong>Nội dung</strong><br><small>Tên, mô tả, hướng dẫn chấm và ví dụ.</small></div>
+    <div style="padding:13px;background:#ecfdf5;border-radius:7px"><strong>Cách chấm</strong><br><small>Tự động, Leader chấm hoặc kết hợp.</small></div>
+    <div style="padding:13px;background:#fffbeb;border-radius:7px"><strong>Quy đổi điểm</strong><br><small>Ngưỡng dữ liệu nào tương ứng điểm 1–5.</small></div>
+    <div style="padding:13px;background:#fff1f2;border-radius:7px"><strong>Bằng chứng</strong><br><small>Khi nào bắt buộc ghi lý do hoặc đính kèm.</small></div>
+    <div style="padding:13px;background:#f5f3ff;border-radius:7px"><strong>Người chấm</strong><br><small>Hệ thống, Leader, CEO hoặc vai trò cụ thể.</small></div>
+    <div style="padding:13px;background:#ecfeff;border-radius:7px"><strong>Đối tượng</strong><br><small>Cấp bậc, vị trí, trạng thái và cửa hàng.</small></div>
+    <div style="padding:13px;background:#f8fafc;border-radius:7px"><strong>Điều kiện áp dụng</strong><br><small>Chỉ hiện khi đủ giờ, có nhiệm vụ hoặc đúng vai trò.</small></div>
+    <div style="padding:13px;background:#f8fafc;border-radius:7px"><strong>Thẻ nghiệp vụ</strong><br><small>Doanh thu, dịch vụ, vận hành, kỷ luật hoặc tùy chỉnh.</small></div>
+  </div>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Quy tắc phiên bản</div>
+    <div class="mockup-body">
+      <p><strong>Bản nháp:</strong> Admin được sửa tự do.</p>
+      <p><strong>Đã công bố:</strong> chỉ dùng để tạo kỳ mới, không sửa trực tiếp.</p>
+      <p><strong>Muốn thay đổi:</strong> nhân bản thành phiên bản tiếp theo và đặt ngày hiệu lực.</p>
+      <p><strong>Kỳ đã mở:</strong> giữ nguyên bản chụp của bộ KPI tại thời điểm mở kỳ.</p>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">Kiểm tra trước khi công bố</div>
+    <div class="mockup-body">
+      <p>✓ Tổng trọng số đúng 100%</p>
+      <p>✓ Tất cả tiêu chí có hướng dẫn chấm</p>
+      <p>✓ Tiêu chí tự động có nguồn dữ liệu</p>
+      <p>✓ Không trùng đối tượng và thời gian hiệu lực</p>
+      <p>✓ Có ít nhất một người chịu trách nhiệm chấm</p>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve-section-3" onclick="toggleSelect(this)">
+    <div class="letter">A</div><div class="content"><h3>Duyệt KPI Builder</h3><p>Tiếp tục sang thiết kế vi phạm, khiếu nại và chống tính lỗi hai lần.</p></div>
+  </div>
+  <div class="option" data-choice="revise-section-3" onclick="toggleSelect(this)">
+    <div class="letter">B</div><div class="content"><h3>Cần chỉnh</h3><p>Nói phần nào Admin cần thêm quyền cấu hình hoặc cần đơn giản hơn.</p></div>
+  </div>
+</div>

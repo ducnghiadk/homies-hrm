@@ -12,14 +12,27 @@ import {
 import { AlertTriangle, TrendingDown, TrendingUp, Plus, Search } from 'lucide-react'
 
 export default function InventoryPage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const [tab, setTab] = useState<'stock'|'history'|'alerts'>('stock')
   const [filterCat, setFilterCat] = useState<string>('all')
   const [search, setSearch] = useState('')
 
-  useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
-  if (!user) return null
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/inventory')
+  }, [hasHydrated, isAuthenticated, router])
+
+  if (!hasHydrated) {
+    return (
+      <AppShell title="Kho & Nguyên liệu 📦">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (!user || !isAuthenticated) return null
 
   const lowStock = getLowStockItems()
   const filtered = mockIngredients.filter(i =>

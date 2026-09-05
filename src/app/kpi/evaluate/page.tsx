@@ -9,10 +9,19 @@ import { getViolationSummary, getCurrentPeriod } from '@/lib/mock-data-kpi'
 import { submitSelfEvaluation, evaluationStore, createEvaluation, initStores } from '@/lib/kpi-evaluation-service'
 import { mockEmployees } from '@/lib/mock-data'
 import { toast } from 'sonner'
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileCheck,
+  Clock,
+  CheckCircle2,
+  Calendar,
+  Save,
+  ArrowRight,
+} from 'lucide-react'
 import Link from 'next/link'
 import type { EmployeeLevel } from '@/lib/kpi-types'
 
-/** Derive KPI EmployeeLevel from Employee role + status */
 function getEmployeeLevel(empId: string): EmployeeLevel {
   const emp = mockEmployees.find(e => e.id === empId)
   if (!emp) return 'L1'
@@ -21,27 +30,26 @@ function getEmployeeLevel(empId: string): EmployeeLevel {
     case 'ceo': return 'L5'
     case 'store_manager': return 'L4'
     case 'shift_leader': return 'L3'
-    default: return 'L1' // employee
+    default: return 'L1'
   }
 }
 
 export default function SelfEvaluatePage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const [tick, setTick] = useState(0)
   const [lastSaved, setLastSaved] = useState<string | null>(null)
   const refresh = useCallback(() => setTick(t => t + 1), [])
 
   useEffect(() => {
-    if (!isAuthenticated) router.push('/login')
-  }, [isAuthenticated, router])
+    if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/kpi/evaluate')
+  }, [hasHydrated, isAuthenticated, router])
 
-  // Seed evaluationStore from localStorage/mock data
   useEffect(() => {
     initStores()
   }, [])
 
-  if (!user) return null
+  if (!hasHydrated || !user) return null
 
   void tick
   const period = getCurrentPeriod()
@@ -50,72 +58,106 @@ export default function SelfEvaluatePage() {
 
   let evaluation = evaluationStore.find(e => e.employee_id === empId && e.period === period)
 
-  // Create draft if not exists
   if (!evaluation) {
-    evaluation = createEvaluation(empId, period, user.store_id, level)
+    evaluation = createEvaluation(empId, period, user.store_id || 'store-001', level)
   }
 
   const violationSummary = getViolationSummary(empId, period)
   const isDraft = evaluation.status === 'draft'
   const isSubmitted = ['self_submitted', 'under_review', 'published', 'finalized'].includes(evaluation.status)
-
-  // Auto-save key
   const draftKey = `kpi-eval-draft-${empId}-${period}`
 
-  // Steps
   const steps = [
-    { label: 'Tự đánh giá', active: isDraft },
-    { label: 'Chờ review', active: evaluation.status === 'self_submitted' || evaluation.status === 'under_review' },
-    { label: 'Kết quả', active: ['published', 'finalized'].includes(evaluation.status) },
+    { label: 'Tự Đánh Giá', active: isDraft, done: !isDraft },
+    { label: 'Quản Lý Review', active: evaluation.status === 'self_submitted' || evaluation.status === 'under_review', done: ['published', 'finalized'].includes(evaluation.status) },
+    { label: 'Công Bố Điểm', active: ['published', 'finalized'].includes(evaluation.status), done: evaluation.status === 'finalized' },
   ]
 
   return (
-    <AppShell title={`📝 Tự đánh giá KPI T${period.slice(5)}/${period.slice(0, 4)}`} backHref="/kpi">
-      <div className="space-y-4">
+    <AppShell showNav className="w-full max-w-none bg-[#FFF8E8] min-h-screen">
+      {/* ══════════════════════════════════════════════════════════════════════
+          TẦNG 1: EXECUTIVE COMMAND HEADER (Cố định sticky top-0 z-30)
+      ══════════════════════════════════════════════════════════════════════ */}
+      <div className="bg-white border-b border-gray-100 px-4 sm:px-6 lg:px-8 py-3.5 shadow-2xs w-full sticky top-0 z-30">
+        <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+          {/* Cột trái: Breadcrumb + Tiêu đề */}
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+              <span>HRM Homies</span>
+              <ChevronRight size={12} className="text-gray-400" />
+              <Link href="/kpi" className="hover:text-[#2F6FA8] transition">
+                Hiệu Suất &amp; Đánh Giá KPI
+              </Link>
+              <ChevronRight size={12} className="text-gray-400" />
+              <span className="text-[#2F6FA8] font-bold">Tự Đánh Giá</span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-lg sm:text-xl font-bold text-[#001D3D] tracking-tight">
+                Tự Đánh Giá Hiệu Suất KPI Tháng {period.slice(5)}/{period.slice(0, 4)}
+              </h1>
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
+                isDraft
+                  ? 'bg-blue-50 text-[#2F6FA8] border-blue-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}>
+                {isDraft ? 'Đang thực hiện' : 'Đã nộp bài'}
+              </span>
+            </div>
+          </div>
 
-        {/* Step indicator */}
-        <div className="flex gap-1">
+          {/* Cột phải: Nút quay lại */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/kpi"
+              className="px-3.5 py-1.5 min-h-[36px] rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition"
+            >
+              <ChevronLeft size={14} />
+              <span>Về Trang KPI</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          NỘI DUNG CHÍNH (FULL WIDTH CONTAINER)
+      ══════════════════════════════════════════════════════════════════════ */}
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-5 max-w-4xl mx-auto space-y-5">
+        {/* Step progress track */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs flex items-center justify-between gap-2">
           {steps.map((s, i) => (
             <div key={i} className="flex-1 text-center">
-              <div className="h-1 rounded-full mb-1" style={{
-                background: s.active ? 'var(--primary)' : 'var(--gray-200)',
+              <div className="h-1.5 rounded-full mb-1.5 transition-all" style={{
+                background: s.active ? '#2F6FA8' : s.done ? '#10B981' : '#E5E7EB',
               }} />
-              <span className="text-[10px] font-semibold" style={{
-                color: s.active ? 'var(--primary)' : 'var(--text-muted)',
-              }}>{i + 1}. {s.label}</span>
+              <div className="flex items-center justify-center gap-1">
+                {s.done ? (
+                  <CheckCircle2 size={12} className="text-emerald-600" />
+                ) : (
+                  <span className={`w-4 h-4 rounded-full text-[10px] font-mono font-bold flex items-center justify-center ${
+                    s.active ? 'bg-[#2F6FA8] text-white' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {i + 1}
+                  </span>
+                )}
+                <span className={`text-xs font-bold ${
+                  s.active ? 'text-[#2F6FA8]' : s.done ? 'text-emerald-700' : 'text-gray-400'
+                }`}>
+                  {s.label}
+                </span>
+              </div>
             </div>
           ))}
         </div>
 
-        {/* Auto-save indicator */}
+        {/* Auto-save timestamp */}
         {isDraft && lastSaved && (
-          <div className="text-right text-[10px]" style={{ color: 'var(--text-muted)' }}>
-            💾 Tự động lưu lúc {lastSaved}
+          <div className="text-right text-xs text-gray-500 font-medium flex items-center justify-end gap-1">
+            <Save size={12} className="text-[#2F6FA8]" />
+            <span>Tự động lưu lúc {lastSaved}</span>
           </div>
         )}
 
-        {/* Status banner */}
-        {isSubmitted && (
-          <div className="card p-3 text-center" style={{
-            background: evaluation.status === 'published' ? '#dcfce7' : '#eff6ff',
-            color: evaluation.status === 'published' ? '#166534' : '#1e40af',
-          }}>
-            <span className="text-sm font-bold">
-              {evaluation.status === 'self_submitted' && '⏳ Đã gửi, chờ Manager review'}
-              {evaluation.status === 'under_review' && '🔍 Manager đang review'}
-              {evaluation.status === 'published' && '✅ Kết quả đã công bố'}
-              {evaluation.status === 'finalized' && '📋 Đã hoàn tất'}
-            </span>
-            {evaluation.status === 'published' && (
-              <Link href="/kpi/result" className="block text-xs font-semibold mt-1 underline"
-                style={{ color: '#166534' }}>
-                Xem kết quả →
-              </Link>
-            )}
-          </div>
-        )}
-
-        {/* Form */}
+        {/* Form or Completed banner */}
         {isDraft ? (
           <SelfEvaluationForm
             optionType={evaluation.option_type}
@@ -127,31 +169,54 @@ export default function SelfEvaluatePage() {
             onAutoSave={(ts) => setLastSaved(ts)}
             onSubmit={(scores, comment) => {
               submitSelfEvaluation(evaluation!.id, scores, comment)
-              // Clear draft on successful submit
               if (typeof window !== 'undefined') localStorage.removeItem(draftKey)
-              toast.success('✅ Đã gửi tự đánh giá! Chờ Manager review.')
+              toast.success('Đã gửi tự đánh giá thành công! Đang chờ Quản lý review.')
               refresh()
             }}
             onCancel={() => router.push('/kpi')}
           />
         ) : (
-          <div className="card p-4 text-center">
-            <div className="text-3xl mb-2">
-              {evaluation.status === 'self_submitted' ? '⏳' : '✅'}
+          <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-xs text-center space-y-4">
+            <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+              <CheckCircle2 size={32} />
             </div>
-            <p className="text-sm font-bold mb-1">
-              {evaluation.status === 'self_submitted'
-                ? 'Bạn đã gửi tự đánh giá'
-                : 'Đánh giá đã hoàn thành'}
-            </p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Điểm tự đánh giá: <strong>{evaluation.total_score}</strong>
-            </p>
-            {evaluation.self_comment && (
-              <p className="text-xs mt-2 p-2 rounded-lg" style={{ background: 'var(--gray-50)' }}>
-                &quot;{evaluation.self_comment}&quot;
+
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-[#001D3D]">
+                {evaluation.status === 'self_submitted'
+                  ? 'Bạn Đã Gửi Bài Tự Đánh Giá'
+                  : 'Đánh Giá KPI Tháng Đã Hoàn Tất'}
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                {evaluation.status === 'self_submitted'
+                  ? 'Quản lý cửa hàng đang tiến hành chấm điểm đối chiếu và phản hồi nhận xét.'
+                  : 'Kết quả đánh giá chính thức đã được công bố.'}
               </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 max-w-sm mx-auto flex items-center justify-between">
+              <span className="text-xs text-gray-600 font-medium">Điểm tự đánh giá của bạn:</span>
+              <span className="text-lg font-bold font-mono tabular-nums text-[#2F6FA8]">
+                {evaluation.total_score} đ
+              </span>
+            </div>
+
+            {evaluation.self_comment && (
+              <div className="p-3.5 rounded-xl bg-blue-50/50 border border-blue-100 max-w-md mx-auto text-left">
+                <div className="text-[11px] font-bold text-[#2F6FA8] uppercase mb-0.5">Nhận xét của bạn:</div>
+                <p className="text-xs text-gray-700 italic">&ldquo;{evaluation.self_comment}&rdquo;</p>
+              </div>
             )}
+
+            <div className="pt-2">
+              <Link
+                href={evaluation.status === 'published' ? '/kpi/result' : '/kpi'}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2F6FA8] hover:bg-[#1D3E61] text-white text-xs font-bold transition shadow-2xs"
+              >
+                <span>{evaluation.status === 'published' ? 'Xem Kết Quả Chi Tiết' : 'Về Trang Tổng Quan KPI'}</span>
+                <ArrowRight size={14} />
+              </Link>
+            </div>
           </div>
         )}
       </div>

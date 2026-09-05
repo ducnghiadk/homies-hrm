@@ -131,7 +131,7 @@ export default function SmartScheduleGenerator({ onPublish }: Props) {
         <p className="text-muted-foreground text-sm">Chọn tuần để bắt đầu. Hệ thống sẽ tự động tải các sự kiện và yêu cầu nghỉ phép.</p>
       </div>
 
-      <div className="flex items-center justify-center gap-4 py-6 bg-gray-50 rounded-xl border border-gray-100">
+      <div className="flex items-center justify-center gap-4 py-6 bg-vanilla-50 rounded-xl border border-gray-100">
         <button onClick={() => setWeekSeed(subWeeks(weekSeed, 1))} 
           className="p-2 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-gray-200">
           <ChevronLeft size={24} />
@@ -250,7 +250,7 @@ export default function SmartScheduleGenerator({ onPublish }: Props) {
 
        <div className="space-y-3">
          {constraints.map(c => (
-            <div key={c.id} className={`p-4 rounded-xl border transition-all ${c.isActive ? 'bg-white border-primary/40 shadow-sm' : 'bg-gray-50 border-gray-100 opacity-70'}`}>
+            <div key={c.id} className={`p-4 rounded-xl border transition-all ${c.isActive ? 'bg-white border-primary/40 shadow-sm' : 'bg-vanilla-50 border-gray-100 opacity-70'}`}>
                 <div className="flex items-start gap-3">
                     <input type="checkbox"
                         checked={c.isActive}
@@ -287,7 +287,7 @@ export default function SmartScheduleGenerator({ onPublish }: Props) {
 
         {/* Simple Heatmap Visualization Mock */}
         <div className="border rounded-xl overflow-hidden">
-            <div className="flex text-xs font-bold bg-gray-100 border-b">
+            <div className="flex text-xs font-bold bg-primary-50 border-b">
                 <div className="w-12 p-2">Giờ</div>
                 {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(d => (
                     <div key={d} className="flex-1 p-2 text-center border-l border-gray-200">{d}</div>
@@ -296,7 +296,7 @@ export default function SmartScheduleGenerator({ onPublish }: Props) {
             <div className="max-h-[300px] overflow-y-auto">
                 {Array.from({ length: 16 }, (_, i) => i + 7).map(h => (
                     <div key={h} className="flex border-b last:border-0 text-xs">
-                        <div className="w-12 p-1.5 font-medium text-gray-500 text-center border-r bg-gray-50">{h}h</div>
+                        <div className="w-12 p-1.5 font-medium text-gray-500 text-center border-r bg-vanilla-50">{h}h</div>
                         {Array.from({ length: 7 }, (_, d) => {
                             const demand = trafficPattern.find(p => p.dayOfWeek === d && p.hour === h)?.staffNeeded || 0
                             let bgClass = 'bg-white'
@@ -367,7 +367,7 @@ export default function SmartScheduleGenerator({ onPublish }: Props) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[600px] flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b bg-gray-50/50 flex justify-between items-center">
+      <div className="p-4 border-b bg-vanilla-50/50 flex justify-between items-center">
         <div className="flex items-center gap-3">
             <div className={`w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm transition-all duration-500`}>
                 {currentStep}
@@ -407,11 +407,11 @@ export default function SmartScheduleGenerator({ onPublish }: Props) {
       </div>
 
       {/* Footer Actions */}
-      <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+      <div className="p-4 border-t bg-vanilla-50 flex justify-between items-center">
         <button 
             onClick={handleBack}
             disabled={currentStep === 1 || isGenerating}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-primary-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
             Quay lại
         </button>

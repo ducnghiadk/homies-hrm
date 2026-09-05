@@ -136,7 +136,7 @@ export function InvitationsToolbar({
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-vanilla-50"
           >
             <RotateCcw size={16} />
             Đặt lại
@@ -160,7 +160,7 @@ export function InvitationsToolbar({
                 className={`inline-flex h-9 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition-colors ${
                   activeTab === tab.id
                     ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    : 'text-gray-500 hover:bg-vanilla-50 hover:text-gray-700'
                 }`}
               >
                 {tab.label}
@@ -168,7 +168,7 @@ export function InvitationsToolbar({
                   className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                     activeTab === tab.id
                       ? 'bg-white text-primary-700'
-                      : 'bg-gray-100 text-gray-500'
+                      : 'bg-primary-50 text-gray-500'
                   }`}
                 >
                   {count}

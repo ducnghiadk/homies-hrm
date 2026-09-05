@@ -324,7 +324,7 @@ export function InvitationFormPanels({
             </div>
           </div>
 
-          <label className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700">
+          <label className="flex items-center gap-3 rounded-xl border border-gray-100 bg-vanilla-50 px-4 py-3 text-sm font-medium text-gray-700">
             <input
               type="checkbox"
               checked={form.is_probationary}

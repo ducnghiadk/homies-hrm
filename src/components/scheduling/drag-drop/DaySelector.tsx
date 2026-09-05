@@ -30,7 +30,7 @@ export default function DaySelector({ weekStart, selectedDate, onSelectDate }: D
         <button
           onClick={handlePrev}
           disabled={selectedIdx <= 0}
-          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="p-2 rounded-lg hover:bg-primary-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft size={20} />
         </button>
@@ -44,7 +44,7 @@ export default function DaySelector({ weekStart, selectedDate, onSelectDate }: D
         <button
           onClick={handleNext}
           disabled={selectedIdx >= 6}
-          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="p-2 rounded-lg hover:bg-primary-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronRight size={20} />
         </button>
@@ -67,7 +67,7 @@ export default function DaySelector({ weekStart, selectedDate, onSelectDate }: D
                   ? 'bg-primary text-white shadow-md shadow-primary/30 scale-105'
                   : isWeekend
                     ? 'bg-warning-50 text-warning-700 hover:bg-warning-100'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-primary-50 text-gray-600 hover:bg-gray-200'
                 }
               `}
             >

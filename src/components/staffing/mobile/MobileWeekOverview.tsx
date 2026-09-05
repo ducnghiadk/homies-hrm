@@ -83,7 +83,7 @@ export default function MobileWeekOverview({
           <button
             key={day.dateStr}
             onClick={() => onSelectDay(day.date)}
-            className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+            className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-vanilla-50 active:bg-primary-50 transition-colors"
           >
             <span className="text-xs text-gray-400 font-medium">{dayLabels[i]}</span>
 
@@ -158,7 +158,7 @@ export default function MobileWeekOverview({
         )}
         <button
           onClick={() => onSelectDay(addDays(weekStart, 0))}
-          className="flex-1 py-2.5 text-xs font-medium text-gray-600 bg-gray-50 rounded-xl active:bg-gray-100 transition-colors"
+          className="flex-1 py-2.5 text-xs font-medium text-gray-600 bg-vanilla-50 rounded-xl active:bg-primary-50 transition-colors"
         >
           Xem chi tiết
         </button>

@@ -58,7 +58,7 @@ export function OptimizationSection({
       </button>
 
       {lastResult ? (
-        <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+        <div className="rounded-2xl border border-gray-100 bg-vanilla-50 p-4">
           <div className="text-xs text-gray-500">Lan phan tich gan nhat: {lastResult.date}</div>
 
           <div className="mt-3 space-y-2 text-sm">
@@ -87,7 +87,7 @@ export function OptimizationSection({
             ) : null}
             <button
               onClick={onStartOptimization}
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-100"
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-primary-50"
             >
               <RefreshCw size={12} />
               Phan tich lai

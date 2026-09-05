@@ -274,7 +274,7 @@ export default function EmployeeDashboard() {
                 <div
                   key={ws.date}
                   className={`text-center py-2 rounded-xl transition-all cursor-pointer
-                    ${isToday ? 'bg-primary-50 ring-2 ring-primary-500 ring-offset-1' : 'hover:bg-gray-50'}
+                    ${isToday ? 'bg-primary-50 ring-2 ring-primary-500 ring-offset-1' : 'hover:bg-vanilla-50'}
                     ${shift ? 'hover:bg-primary-50' : ''}
                   `}
                   onClick={() => shift && router.push(`/schedules?selectedDate=${ws.date}`)}
@@ -336,7 +336,7 @@ export default function EmployeeDashboard() {
               <div
                 key={c.employee.id}
                 className="px-4 py-3 flex items-center gap-3
-                  hover:bg-gray-50 active:bg-gray-100
+                  hover:bg-vanilla-50 active:bg-primary-50
                   transition-colors duration-150
                   cursor-pointer rounded-xl mx-2"
                 onClick={() => router.push(`/employees/${c.employee.id}`)}
@@ -363,7 +363,7 @@ export default function EmployeeDashboard() {
             <button
               onClick={() => router.push('/reports/tasks')}
               className="w-full py-3 text-sm text-primary-600 hover:text-primary-700 font-medium
-                hover:bg-gray-50 rounded-lg transition-colors
+                hover:bg-vanilla-50 rounded-lg transition-colors
                 flex items-center justify-center gap-2"
             >
               <FileText size={16} /> Báo cáo cuối ca

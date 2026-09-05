@@ -166,7 +166,7 @@ export default function LeaveRequestForm({
           </h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center hover:bg-gray-200 transition-colors"
           >
             <X size={16} className="text-gray-500" />
           </button>
@@ -245,7 +245,7 @@ export default function LeaveRequestForm({
                       className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all ${
                         halfDayPeriod === p
                           ? 'bg-primary-500 text-white'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          : 'bg-primary-50 text-gray-500 hover:bg-gray-200'
                       }`}
                     >
                       {p === 'morning' ? <><Sun size={12} className="inline" /> Sáng</> : <><Sunset size={12} className="inline" /> Chiều</>}
@@ -268,7 +268,7 @@ export default function LeaveRequestForm({
                     setStartDate(e.target.value)
                     if (isHalfDay || !endDate || e.target.value > endDate) setEndDate(e.target.value)
                   }}
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-all"
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-vanilla-50 focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-all"
                 />
               </div>
               {!isHalfDay && (
@@ -279,7 +279,7 @@ export default function LeaveRequestForm({
                     value={endDate}
                     min={startDate || todayStr}
                     onChange={e => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-all"
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-vanilla-50 focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-all"
                   />
                 </div>
               )}
@@ -311,7 +311,7 @@ export default function LeaveRequestForm({
               onChange={e => setReason(e.target.value)}
               rows={3}
               placeholder="Nhập lý do chi tiết..."
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 resize-none placeholder-gray-300 focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-all"
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm bg-vanilla-50 resize-none placeholder-gray-300 focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-all"
             />
           </div>
 
@@ -485,7 +485,7 @@ export default function LeaveRequestForm({
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-5 py-4 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-3 rounded-xl text-sm font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="flex-1 py-3 rounded-xl text-sm font-medium text-gray-500 bg-primary-50 hover:bg-gray-200 transition-colors"
           >
             Hủy
           </button>

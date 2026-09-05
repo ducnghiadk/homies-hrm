@@ -45,6 +45,12 @@ export const masterPositions = [
   { id: 'pos-003', name: 'Phục vụ', level: 1, base_salary: 4800000 },
   { id: 'pos-004', name: 'Trưởng ca', level: 2, base_salary: 8000000 },
   { id: 'pos-005', name: 'Quản lý', level: 3, base_salary: 12000000 },
+  { id: 'pos-006', name: 'Quản lý điểm bán hàng', level: 3, base_salary: 12000000 },
+  { id: 'pos-007', name: 'Nhân viên', level: 1, base_salary: 5000000 },
+  { id: 'pos-008', name: 'Chủ thương hiệu', level: 5, base_salary: 25000000 },
+  { id: 'pos-009', name: 'Quản lý nhân sự', level: 4, base_salary: 15000000 },
+  { id: 'pos-010', name: 'Quản lý vùng', level: 4, base_salary: 18000000 },
+  { id: 'pos-011', name: 'Quản lý bộ phận', level: 3, base_salary: 12000000 },
 ]
 
 export const masterEmployeeLevels = [

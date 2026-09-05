@@ -279,11 +279,23 @@ export function getRoleLevel(role: UserRole): number {
 
 export function canAccessResource(
   userRole: UserRole,
-  _userId: string,
-  _resourceOwnerId: string,
+  userId: string,
+  resourceOwnerId: string,
   requiredPermission: Permission
 ): boolean {
-  return hasPermission(userRole, requiredPermission)
+  if (!hasPermission(userRole, requiredPermission)) return false
+
+  const selfScopedPermissions: Permission[] = [
+    'attendance.view_own',
+    'payroll.view_own',
+    'kpi.view_own',
+  ]
+
+  if (selfScopedPermissions.includes(requiredPermission)) {
+    return userId === resourceOwnerId
+  }
+
+  return true
 }
 
 export function canModifyResource(

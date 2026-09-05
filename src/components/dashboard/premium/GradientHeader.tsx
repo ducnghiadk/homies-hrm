@@ -1,7 +1,8 @@
 'use client';
 
-import Image from 'next/image'
+import Image from 'next/image';
 import { ReactNode } from 'react';
+import { Crown, Briefcase, Coffee, Shield, Store } from 'lucide-react';
 
 interface Props {
   user: { name: string; avatar?: string; role: string; subtitle?: string };
@@ -16,10 +17,12 @@ function getGreetingText(): string {
   return 'Chào buổi tối';
 }
 
-function getRoleIcon(role: string): string {
-  if (['admin', 'ceo', 'hr_admin'].includes(role)) return '👑';
-  if (['manager', 'store_manager', 'area_manager'].includes(role)) return '👔';
-  return '☕';
+function renderRoleIcon(role: string) {
+  if (['admin', 'ceo'].includes(role)) return <Crown size={15} className="text-amber-300 flex-shrink-0" />;
+  if (['hr_admin', 'hr_manager'].includes(role)) return <Shield size={15} className="text-blue-300 flex-shrink-0" />;
+  if (['manager', 'store_manager', 'area_manager'].includes(role)) return <Store size={15} className="text-emerald-300 flex-shrink-0" />;
+  if (role === 'shift_leader') return <Briefcase size={15} className="text-amber-300 flex-shrink-0" />;
+  return <Coffee size={15} className="text-amber-200 flex-shrink-0" />;
 }
 
 export function GradientHeader({ user, gradient, rightContent }: Props) {
@@ -29,7 +32,7 @@ export function GradientHeader({ user, gradient, rightContent }: Props) {
   const initialLetter = lastName ? lastName.charAt(0).toUpperCase() : 'H';
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl md:rounded-[24px] bg-gradient-to-r ${gradient || 'from-[#2F6FA8] to-[#001D3D]'} shadow-[0_4px_20px_rgba(0,29,61,0.15)]`}>
+    <div className={`relative overflow-hidden rounded-2xl md:rounded-[24px] bg-gradient-to-r ${gradient || 'from-[#2F6FA8] to-[#001D3D]'} shadow-[0_4px_20px_rgba(0,29,61,0.15)] font-['Inter']`}>
       <div className="absolute -top-24 -right-24 w-48 h-48 bg-white/10 rounded-full blur-2xl" />
       <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-white/10 rounded-full blur-xl" />
 
@@ -41,15 +44,15 @@ export function GradientHeader({ user, gradient, rightContent }: Props) {
                 {user.avatar ? (
                   <Image src={user.avatar} className="h-full w-full object-cover" alt={user.name} width={56} height={56} />
                 ) : (
-                  <span className="text-xl font-bold text-white font-['Poppins']">{initialLetter}</span>
+                  <span className="text-xl font-bold text-white">{initialLetter}</span>
                 )}
               </div>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white shadow-sm" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white shadow-xs" />
             </div>
             <div className="text-white">
-              <h1 className="text-xl font-bold leading-snug">{getGreetingText()}, {lastName}!</h1>
+              <h1 className="text-xl md:text-2xl font-bold leading-snug tracking-tight">{getGreetingText()}, {lastName}!</h1>
               <p className="text-white/80 text-sm flex items-center gap-2 mt-0.5">
-                <span>{getRoleIcon(user.role)}</span>
+                <span>{renderRoleIcon(user.role)}</span>
                 <span className="font-medium">
                   {user.role === 'ceo' 
                     ? 'CEO' 

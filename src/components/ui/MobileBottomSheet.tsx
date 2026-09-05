@@ -136,7 +136,7 @@ export default function MobileBottomSheet({
 
         {/* Footer */}
         {showFooter && footerContent && (
-          <div className="shrink-0 border-t border-gray-200 px-4 py-3 bg-gray-50">
+          <div className="shrink-0 border-t border-gray-200 px-4 py-3 bg-vanilla-50">
             {footerContent}
           </div>
         )}

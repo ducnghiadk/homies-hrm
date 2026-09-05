@@ -35,7 +35,7 @@ const statusConfig: Record<ScheduleStatus, { label: string; className: string }>
   draft: { label: 'Ban nhap', className: 'bg-amber-100 text-amber-700' },
   published: { label: 'Da xuat ban', className: 'bg-emerald-100 text-emerald-700' },
   active: { label: 'Dang ap dung', className: 'bg-primary-100 text-primary-700' },
-  completed: { label: 'Da qua', className: 'bg-gray-100 text-gray-500' },
+  completed: { label: 'Da qua', className: 'bg-primary-50 text-gray-500' },
   conflict: { label: 'Can xu ly', className: 'bg-red-100 text-red-700' },
 }
 
@@ -115,7 +115,7 @@ function ScheduleCard({
         {onAction && schedule.status === 'draft' ? (
           <button
             onClick={onAction}
-            className="flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-100"
+            className="flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-primary-50"
           >
             <Pencil size={12} />
             Tiep tuc sua
@@ -250,7 +250,7 @@ export default function ScheduleOverviewTab({
 
           <div className="mt-4 space-y-3">
             {actionQueue.map((item, index) => (
-              <div key={item} className="flex gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-3">
+              <div key={item} className="flex gap-3 rounded-2xl border border-gray-100 bg-vanilla-50 p-3">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-primary-600 shadow-sm">
                   {index + 1}
                 </div>
@@ -318,7 +318,7 @@ export default function ScheduleOverviewTab({
           {mockHistory.map((week) => (
             <div
               key={week.id}
-              className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm transition-colors hover:bg-gray-100/70"
+              className="flex items-center justify-between rounded-xl border border-gray-100 bg-vanilla-50 p-3 text-sm transition-colors hover:bg-primary-50/70"
             >
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-700">{week.dateRange}</span>

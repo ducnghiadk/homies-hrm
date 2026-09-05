@@ -71,7 +71,7 @@ export function PeakHoursSectionView({ onEdit }: { onEdit: () => void }) {
         ))}
       </div>
 
-      <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+      <div className="mt-4 rounded-2xl border border-gray-100 bg-vanilla-50 p-4">
         <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Tac dong nhin nhanh</div>
         <p className="mt-2 text-sm text-gray-600">
           Hien tai tong cong them {totalExtraStaff} luot nguoi cho cac khung dong khach.

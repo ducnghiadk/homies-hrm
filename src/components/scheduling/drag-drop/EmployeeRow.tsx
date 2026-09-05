@@ -39,7 +39,7 @@ export default function EmployeeRow({
     <div
       className={`
         flex border-b border-gray-100 transition-colors
-        ${isDragOver ? 'bg-primary-50/60' : 'hover:bg-gray-50/50'}
+        ${isDragOver ? 'bg-primary-50/60' : 'hover:bg-vanilla-50/50'}
       `}
       style={{ minHeight: '48px' }}
     >

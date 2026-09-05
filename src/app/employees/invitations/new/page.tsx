@@ -95,7 +95,7 @@ async function sendInvitationEmailRequest(input: {
 }
 
 export default function NewInvitationPage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedPreset, setSelectedPreset] = useState<string>('')
@@ -128,10 +128,10 @@ export default function NewInvitationPage() {
   }
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login')
+    if (hasHydrated && !isAuthenticated) {
+      router.push('/login?redirect=/employees/invitations/new')
     }
-  }, [isAuthenticated, router])
+  }, [hasHydrated, isAuthenticated, router])
 
   const readinessChecks = useMemo(() => {
     return [
@@ -148,8 +148,14 @@ export default function NewInvitationPage() {
   const completedChecks = readinessChecks.filter((item) => item.done).length
   const currentStepMeta = STEP_ITEMS.find((item) => item.step === currentStep)
 
-  if (!isAuthenticated || !user) {
-    return null
+  if (!hasHydrated || !isAuthenticated || !user) {
+    return (
+      <AppShell title={INVITATION_COPY.pageTitle}>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
   }
 
   const canAccess = ['ceo', 'hr_admin'].includes(user.role)
@@ -422,7 +428,7 @@ export default function NewInvitationPage() {
                     type="button"
                     onClick={() => void handleSaveDraft()}
                     disabled={saving}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-vanilla-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Save size={18} />
                     Lưu nháp
@@ -442,7 +448,7 @@ export default function NewInvitationPage() {
                 <button
                   type="button"
                   onClick={() => router.push('/employees/invitations')}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition-colors hover:bg-primary-50"
                 >
                   {INVITATION_COPY.cancelLabel}
                 </button>
@@ -499,7 +505,7 @@ export default function NewInvitationPage() {
                       className={`rounded-2xl border px-4 py-4 text-left transition-colors ${
                         selectedPreset === preset.id
                           ? 'border-primary-200 bg-primary-50'
-                          : 'border-gray-100 bg-gray-50 hover:bg-gray-100'
+                          : 'border-gray-100 bg-vanilla-50 hover:bg-primary-50'
                       }`}
                     >
                       <p className="font-semibold text-gray-900">{preset.label}</p>
@@ -534,7 +540,7 @@ export default function NewInvitationPage() {
 
                 <div className="mt-4 grid gap-2">
                   {readinessChecks.map((item) => (
-                    <div key={item.label} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-3 text-sm">
+                    <div key={item.label} className="flex items-center gap-3 rounded-xl bg-vanilla-50 px-3 py-3 text-sm">
                       <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${
                         item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                       }`}>

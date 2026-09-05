@@ -317,6 +317,68 @@ export const mockViolationRecords: ViolationRecord[] = [
     description: 'Quên mang tạp dề', penalty_points: 5,
     status: 'pending', period: '2026-02',
   },
+
+  // ══════════════════════════════════════════════════════
+  // KỲ 2026-07 (ĐỒNG BỘ VỚI HỆ THỐNG THƯỞNG BSC HOMIES)
+  // ══════════════════════════════════════════════════════
+  // emp-001 (CEO / Admin) - Demo test
+  {
+    id: 'vr-jul-001', org_id: 'org-001', store_id: 'store-001', employee_id: 'emp-001',
+    violation_type_id: 'vio-L01', logged_by: 'emp-002', logged_by_role: 'manager',
+    log_mode: 'realtime', occurred_at: '2026-07-08T08:15:00Z', logged_at: '2026-07-08T08:20:00Z',
+    description: 'Đi trễ 15 phút ca sáng do họp đột xuất', penalty_points: 5,
+    status: 'pending', period: '2026-07',
+  },
+  {
+    id: 'vr-jul-002', org_id: 'org-001', store_id: 'store-001', employee_id: 'emp-001',
+    violation_type_id: 'vio-L02', logged_by: 'emp-002', logged_by_role: 'manager',
+    log_mode: 'realtime', occurred_at: '2026-07-15T14:00:00Z', logged_at: '2026-07-15T14:05:00Z',
+    description: 'Quên đeo bảng tên nhân sự trong ca làm', penalty_points: 5,
+    status: 'acknowledged', acknowledged_at: '2026-07-15T18:00:00Z', period: '2026-07',
+  },
+
+  // emp-002 (Cửa hàng trưởng Hồ Bá Phấn)
+  {
+    id: 'vr-jul-003', org_id: 'org-001', store_id: 'store-001', employee_id: 'emp-002',
+    violation_type_id: 'vio-M02', logged_by: 'emp-001', logged_by_role: 'ceo',
+    log_mode: 'realtime', occurred_at: '2026-07-10T19:00:00Z', logged_at: '2026-07-10T19:30:00Z',
+    description: 'Nộp báo cáo doanh thu ngày trễ hơn khung giờ quy định', penalty_points: 10,
+    status: 'appealed', appeal_reason: 'Do hệ thống POS bị mất kết nối lúc 22h, đã chụp màn hình báo cáo qua Zalo',
+    appeal_at: '2026-07-11T09:00:00Z', period: '2026-07',
+  },
+
+  // emp-003 (Pha chế chính)
+  {
+    id: 'vr-jul-004', org_id: 'org-001', store_id: 'store-001', employee_id: 'emp-003',
+    violation_type_id: 'vio-L01', logged_by: 'emp-002', logged_by_role: 'manager',
+    log_mode: 'realtime', occurred_at: '2026-07-05T08:10:00Z', logged_at: '2026-07-05T08:15:00Z',
+    description: 'Đi trễ 10 phút ca mở cửa', penalty_points: 5,
+    status: 'acknowledged', acknowledged_at: '2026-07-05T12:00:00Z', period: '2026-07',
+  },
+  {
+    id: 'vr-jul-005', org_id: 'org-001', store_id: 'store-001', employee_id: 'emp-003',
+    violation_type_id: 'vio-M02', logged_by: 'emp-002', logged_by_role: 'manager',
+    log_mode: 'realtime', occurred_at: '2026-07-18T15:00:00Z', logged_at: '2026-07-18T15:20:00Z',
+    description: 'Pha sai định lượng đường đá 2 ly Trà Sữa Oolong', penalty_points: 10,
+    status: 'pending', period: '2026-07',
+  },
+
+  // emp-005 (Nhân viên phục vụ)
+  {
+    id: 'vr-jul-006', org_id: 'org-001', store_id: 'store-001', employee_id: 'emp-005',
+    violation_type_id: 'vio-L03', logged_by: 'emp-002', logged_by_role: 'manager',
+    log_mode: 'realtime', occurred_at: '2026-07-12T16:00:00Z', logged_at: '2026-07-12T16:15:00Z',
+    description: 'Sử dụng điện thoại cá nhân tại quầy pha chế', penalty_points: 5,
+    status: 'appealed', appeal_reason: 'Em mở app shipper để kiểm tra đơn hàng bị thiếu mã của khách',
+    appeal_at: '2026-07-12T18:00:00Z', period: '2026-07',
+  },
+  {
+    id: 'vr-jul-007', org_id: 'org-001', store_id: 'store-001', employee_id: 'emp-005',
+    violation_type_id: 'vio-H02', logged_by: 'emp-002', logged_by_role: 'manager',
+    log_mode: 'realtime', occurred_at: '2026-07-20T11:00:00Z', logged_at: '2026-07-20T11:30:00Z',
+    description: 'Khách hàng góp ý thái độ chưa niềm nở khi trả lời câu hỏi của khách', penalty_points: 15,
+    status: 'pending', period: '2026-07',
+  },
 ]
 
 // ══════════════════════════════════════

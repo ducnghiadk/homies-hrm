@@ -18,7 +18,7 @@ const EMPTY_PREVIEW: EmployeeImportPreviewRow[] = []
 
 export default function EmployeeImportPage() {
   const router = useRouter()
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const [previewRows, setPreviewRows] = useState<EmployeeImportPreviewRow[]>(EMPTY_PREVIEW)
   const [selectedFileName, setSelectedFileName] = useState('')
   const [selectedPreset, setSelectedPreset] = useState<string>(EMPLOYEE_IMPORT_PRESETS[0]?.id || 'hrm_standard')
@@ -27,10 +27,10 @@ export default function EmployeeImportPage() {
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login')
+    if (hasHydrated && !isAuthenticated) {
+      router.push('/login?redirect=/employees/import')
     }
-  }, [isAuthenticated, router])
+  }, [hasHydrated, isAuthenticated, router])
 
   const stats = useMemo(() => ({
     valid: previewRows.filter((row) => row.status === 'valid').length,
@@ -44,7 +44,15 @@ export default function EmployeeImportPage() {
     [importMode, previewRows],
   )
 
-  if (!user) return null
+  if (!hasHydrated || !user) {
+    return (
+      <AppShell title="Nhập nhân sự">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
 
   const canManage = ['ceo', 'hr_admin'].includes(user.role)
   if (!canManage) {

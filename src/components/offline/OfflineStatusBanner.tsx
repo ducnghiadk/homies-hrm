@@ -163,7 +163,7 @@ export function SyncStatus({ pendingCount = 0, className = '' }: SyncStatusProps
       disabled={!isOnline || syncState === 'syncing'}
       className={cn(
         'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm',
-        'bg-gray-100 hover:bg-gray-200 transition-colors',
+        'bg-primary-50 hover:bg-gray-200 transition-colors',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         className
       )}
@@ -239,7 +239,7 @@ export function PendingOperationsList({
         {operations.map((op) => (
           <div
             key={op.id}
-            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+            className="flex items-center gap-3 p-3 bg-vanilla-50 rounded-lg"
           >
             <span className="text-2xl">
               {typeLabels[op.type]?.split(' ')[0] || '📋'}

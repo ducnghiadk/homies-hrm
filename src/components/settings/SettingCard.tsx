@@ -1,49 +1,48 @@
-'use client';
+'use client'
 
-import Link from 'next/link';
-import type { SettingItem } from '@/lib/types/settings';
+import Link from 'next/link'
+import type { SettingItem } from '@/lib/types/settings'
 
 interface SettingCardProps {
-  item: SettingItem;
+  item: SettingItem
 }
 
 const statusConfig = {
-  not_started: { icon: '⚠️', bg: '#fff7ed', color: '#ea580c', border: '#fed7aa' },
-  in_progress: { icon: '🔄', bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
-  completed:   { icon: '✅', bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
-} as const;
+  not_started: { icon: '⚠️', bg: '#FFF8E8', color: '#D97706', border: '#FCECC6' },
+  in_progress: { icon: '🔄', bg: '#E6F0FA', color: '#2F6FA8', border: '#C2DBF2' },
+  completed:   { icon: '✅', bg: '#DDF4EC', color: '#107C41', border: '#8EDEA9' },
+} as const
 
 export function SettingCard({ item }: SettingCardProps) {
-  const st = statusConfig[item.status];
+  const st = statusConfig[item.status]
 
   return (
-    <div className="rounded-xl border p-4 transition-all" style={{ background: '#fff', borderColor: '#f3f4f6' }}>
-      <Link
-        href={item.href}
-        className="flex items-start gap-3 group"
-        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
-      >
+    <div 
+      className={`rounded-2xl border bg-white p-4.5 shadow-sm transition-all hover:shadow-md ${
+        item.isRequired ? 'border-l-4 border-l-primary-600 border-gray-100' : 'border-gray-100'
+      }`}
+    >
+      <Link href={item.href} className="flex items-start gap-3.5 group">
         {/* Icon */}
-        <div className={`w-10 h-10 ${item.iconBg} rounded-xl flex items-center justify-center text-xl flex-shrink-0`}>
+        <div className={`w-11 h-11 ${item.iconBg} rounded-xl flex items-center justify-center text-xl flex-shrink-0 shadow-sm`}>
           {item.icon}
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-sm" style={{ color: 'var(--text-primary, #111)' }}>
+          <h3 className="font-bold text-sm text-dark-700 group-hover:text-primary-600 transition-colors">
             {item.title}
           </h3>
-          <p className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
+          <p className="text-xs text-gray-500 mt-0.5 truncate">
             {item.description}
           </p>
 
           {/* Status badge */}
-          <div className="mt-2 flex items-center gap-1.5">
+          <div className="mt-2.5 flex items-center gap-1.5">
             <span className="text-xs">{st.icon}</span>
             <span
-              className="text-xs font-medium px-2 py-0.5 rounded-full"
-              style={{ background: st.bg, color: st.color }}
+              className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border"
+              style={{ background: st.bg, color: st.color, borderColor: st.border }}
             >
               {item.statusText}
             </span>
@@ -51,17 +50,17 @@ export function SettingCard({ item }: SettingCardProps) {
         </div>
 
         {/* Arrow */}
-        <span className="text-sm flex-shrink-0 mt-1 transition-colors" style={{ color: '#d1d5db' }}>→</span>
+        <span className="text-sm flex-shrink-0 mt-1 text-gray-300 group-hover:text-primary-600 transition-colors">→</span>
       </Link>
 
       {/* Sub Items */}
       {item.subItems && item.subItems.length > 0 && (
-        <div className="mt-3 pt-3 space-y-1" style={{ borderTop: '1px solid #f3f4f6' }}>
+        <div className="mt-3 pt-3 space-y-1 border-t border-gray-100">
           {item.subItems.map((sub, idx) => (
             <Link
               key={idx}
               href={sub.href}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-gray-600 hover:bg-gray-50 hover:text-primary-600 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-primary-50 hover:text-primary-600 transition-colors"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
               <span>{sub.title}</span>
@@ -73,15 +72,15 @@ export function SettingCard({ item }: SettingCardProps) {
 
       {/* Quick Actions */}
       {item.quickActions && item.quickActions.length > 0 && (
-        <div className="mt-3 pt-3 flex items-center gap-2" style={{ borderTop: item.subItems ? 'none' : '1px solid #f3f4f6' }}>
+        <div className="mt-3 pt-3 flex items-center gap-2 border-t border-gray-100">
           {item.quickActions.map((action, idx) => (
             <button
               key={idx}
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-              className="text-xs px-2.5 py-1 rounded-full font-medium"
+              className="text-[11px] px-3 py-1 rounded-full font-bold transition-all"
               style={{
-                background: action.value ? '#dcfce7' : '#f3f4f6',
-                color: action.value ? '#15803d' : '#9ca3af',
+                background: action.value ? '#DDF4EC' : '#F3F4F6',
+                color: action.value ? '#107C41' : '#6B7280',
               }}
             >
               {action.value ? '✓' : '○'} {action.label}
@@ -90,5 +89,5 @@ export function SettingCard({ item }: SettingCardProps) {
         </div>
       )}
     </div>
-  );
+  )
 }

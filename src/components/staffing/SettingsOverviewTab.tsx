@@ -166,7 +166,7 @@ export default function SettingsOverviewTab({
 
           <div className="mt-4 space-y-3">
             {explanationRows.map((row, index) => (
-              <div key={row.title} className="flex gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-3">
+              <div key={row.title} className="flex gap-3 rounded-2xl border border-gray-100 bg-vanilla-50 p-3">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-primary-600 shadow-sm">
                   {index + 1}
                 </div>

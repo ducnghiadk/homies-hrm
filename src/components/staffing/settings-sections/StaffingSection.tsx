@@ -74,7 +74,7 @@ export function StaffingSectionView({
         </div>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+      <div className="mt-4 rounded-2xl border border-gray-100 bg-vanilla-50 p-4">
         <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Doc nhanh</div>
         <p className="mt-2 text-sm text-gray-600">
           Neu ca toi da cham nguong cao nhat, manager nen uu tien bo tri truong ca va pha che truoc.
@@ -113,7 +113,7 @@ export function StaffingSectionEdit({
 
       <div className="overflow-x-auto rounded-xl border border-gray-200">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50">
+          <thead className="bg-vanilla-50">
             <tr>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">Ca</th>
               {positions.map((position) => (
@@ -129,7 +129,7 @@ export function StaffingSectionEdit({
               const total = positions.reduce((sum, position) => sum + getReqCount(selectedStore, shift.id, position.id), 0)
 
               return (
-                <tr key={shift.id} className="hover:bg-gray-50/60">
+                <tr key={shift.id} className="hover:bg-vanilla-50/60">
                   <td className="px-3 py-3">
                     <div className="font-medium text-gray-700">{shift.name}</div>
                     <div className="text-xs text-gray-400">{shift.start_time} - {shift.end_time}</div>

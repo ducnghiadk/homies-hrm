@@ -74,7 +74,7 @@ export function Avatar({
         <img
           src={src}
           alt={alt || name}
-          className={`${styles.container} rounded-full object-cover bg-gray-100 ring-2 ring-white`}
+          className={`${styles.container} rounded-full object-cover bg-primary-50 ring-2 ring-white`}
           onError={() => setImgError(true)}
         />
       ) : (

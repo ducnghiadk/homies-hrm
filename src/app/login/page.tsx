@@ -1,112 +1,82 @@
 'use client'
 
 import Image from 'next/image'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore, DEMO_ACCOUNTS, getDashboardPath } from '@/store/auth-store'
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle, Sparkles } from 'lucide-react'
-
-function getSafeRedirectPath(redirect: string | null, fallbackPath: string) {
-  if (!redirect || !redirect.startsWith('/') || redirect.startsWith('//')) {
-    return fallbackPath
-  }
-
-  return redirect
-}
+import { useAuthStore } from '@/store/auth-store'
+import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, loginAsDemo, isAuthenticated, user, isLoading, hasHydrated, rememberMe, setRememberMe } = useAuthStore()
+  const { login, user, isLoading, hasHydrated, rememberMe, setRememberMe } = useAuthStore()
 
+  const [mounted, setMounted] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const redirectParam = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('redirect')
-    : null
-  const redirectPath = getSafeRedirectPath(
-    redirectParam,
-    user ? getDashboardPath(user.role) : '/'
-  )
 
-  // Already logged in → redirect to dashboard
   useEffect(() => {
-    if (hasHydrated && isAuthenticated && user) {
-      router.replace(redirectPath)
+    setMounted(true)
+  }, [])
+
+  // Already logged in → redirect to target page or dashboard
+  useEffect(() => {
+    if (mounted && hasHydrated && !isLoading && user) {
+      const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
+      const redirectParam = searchParams.get('redirect')
+      const target = redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
+        ? redirectParam
+        : '/'
+
+      if (typeof window !== 'undefined') {
+        window.location.href = target
+      } else {
+        router.replace(target)
+      }
     }
-  }, [hasHydrated, isAuthenticated, redirectPath, router, user])
+  }, [mounted, hasHydrated, isLoading, router, user])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isLoading) return
+
     setError('')
 
-    // Set 3-second timeout
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutRef.current = setTimeout(() => {
-        reject(new Error('timeout'))
-      }, 3000)
-    })
-
     try {
-      const result = await Promise.race([
-        login(email, password),
-        timeoutPromise,
-      ])
-
-      // Clear timeout
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      const result = await login(email, password)
 
       if (result.success) {
-        // Get updated user from store
-        const currentUser = useAuthStore.getState().user
-        if (currentUser) {
-          router.push(getSafeRedirectPath(redirectParam, getDashboardPath(currentUser.role)))
-        }
+        // Không redirect thủ công — để useEffect (isAuthenticated) tự xử lý một lần duy nhất
       } else {
         setError(result.error || 'Đăng nhập thất bại')
       }
     } catch (err: unknown) {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      if (err instanceof Error && err.message === 'timeout') {
-        setError('Lỗi kết nối, vui lòng thử lại')
-      } else {
-        setError('Đã có lỗi xảy ra')
-      }
+      setError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra')
       useAuthStore.setState({ isLoading: false })
     }
   }
 
-  const handleQuickLogin = (email: string) => {
-    setError('')
-    loginAsDemo(email)
-    const currentUser = useAuthStore.getState().user
-    if (currentUser) {
-      router.push(getSafeRedirectPath(redirectParam, getDashboardPath(currentUser.role)))
-    }
-  }
-
-  // Don't render form if already authenticated
-  if (!hasHydrated) {
+  // Chờ mount trên client để triệt tiêu 100% lỗi hydration mismatch giữa server và client
+  if (!mounted || !hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6"
            style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
         <div className="flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 text-sm font-semibold text-gray-600 shadow-lg border border-gray-100">
           <Loader2 size={18} className="animate-spin text-primary-500" />
-          Dang tai trang dang nhap...
+          Đang tải trang đăng nhập...
         </div>
       </div>
     )
   }
 
-  if (isAuthenticated && user) {
+  if (!isLoading && user) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6"
            style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
         <div className="flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 text-sm font-semibold text-gray-600 shadow-lg border border-gray-100">
           <Loader2 size={18} className="animate-spin text-primary-500" />
-          Dang chuyen den man hinh chinh...
+          Đang chuyển đến màn hình chính...
         </div>
       </div>
     )
@@ -310,52 +280,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 border-t border-gray-100 pt-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles size={16} style={{ color: '#F6C85F' }} />
-              <h3 className="text-sm font-bold uppercase tracking-wide" style={{ color: '#3971B8' }}>
-                Chọn nhanh tài khoản demo
-              </h3>
-            </div>
-
-            <div className="space-y-2">
-              {DEMO_ACCOUNTS.map((account) => (
-                <button
-                  key={account.email}
-                  type="button"
-                  onClick={() => handleQuickLogin(account.email)}
-                  className="w-full flex items-center justify-between rounded-[16px] border px-4 py-3 text-left transition-all hover:translate-y-[-1px]"
-                  style={{
-                    borderColor: '#E8EEF5',
-                    background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FBFF 100%)',
-                  }}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-10 h-10 rounded-[14px] flex items-center justify-center text-lg shrink-0"
-                      style={{ background: '#EEF4FB' }}
-                    >
-                      {account.icon}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-bold truncate" style={{ color: '#343B1B' }}>
-                        {account.name}
-                      </div>
-                      <div className="text-xs truncate" style={{ color: '#757575' }}>
-                        {account.position} • {account.email}
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className="text-[11px] font-bold px-3 py-1 rounded-full shrink-0"
-                    style={{ background: '#E6F0FA', color: '#3971B8' }}
-                  >
-                    Vào nhanh
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Footer */}

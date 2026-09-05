@@ -48,14 +48,14 @@ const variantDefaults: Record<
     title: 'Chưa có dữ liệu',
     description: 'Bắt đầu bằng cách tạo mục đầu tiên',
     iconColor: 'text-gray-400',
-    iconBg: 'bg-gray-100',
+    iconBg: 'bg-primary-50',
   },
   'no-results': {
     icon: Search,
     title: 'Không tìm thấy kết quả',
     description: 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm',
     iconColor: 'text-gray-400',
-    iconBg: 'bg-gray-100',
+    iconBg: 'bg-primary-50',
   },
   error: {
     icon: AlertTriangle,
@@ -131,7 +131,7 @@ export function EmptyState({
                 px-4 py-2
                 text-gray-700
                 rounded-lg font-medium text-sm
-                hover:bg-gray-100
+                hover:bg-primary-50
                 active:scale-[0.98]
                 transition-all duration-150
               "
@@ -147,7 +147,7 @@ export function EmptyState({
                 active:scale-[0.98] transition-all duration-150
                 ${
                   action.variant === 'secondary'
-                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-primary-50 text-gray-700 hover:bg-gray-200'
                     : 'bg-primary-600 text-white hover:bg-primary-700'
                 }
               `}

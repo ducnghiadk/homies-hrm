@@ -11,7 +11,7 @@ export default function PlanComparisonTable({ plans, selectedId }: PlanCompariso
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200">
       <table className="w-full text-sm text-left">
-        <thead className="bg-gray-50 text-gray-500 font-medium">
+        <thead className="bg-vanilla-50 text-gray-500 font-medium">
           <tr>
             <th className="p-4 w-1/4">Tiêu chí</th>
             {plans.map(plan => (

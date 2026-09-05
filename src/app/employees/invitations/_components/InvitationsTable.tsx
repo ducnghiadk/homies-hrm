@@ -263,7 +263,7 @@ export function InvitationsTable({
                             <button
                               type="button"
                               onClick={() => onCopyLink(invitation.id)}
-                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-vanilla-50"
                             >
                               <Copy size={16} />
                               Sao chép link
@@ -290,7 +290,7 @@ export function InvitationsTable({
                               <button
                                 type="button"
                                 onClick={() => onCancel(invitation.id)}
-                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-vanilla-50"
                               >
                                 <X size={16} />
                                 Hủy

@@ -1,0 +1,146 @@
+import type {
+  CareerGradeDefinition,
+  CareerGradeTransitionDefinition,
+  CareerTransitionDefinition,
+  OperationalSkillDefinition,
+} from './career-grade-types.ts'
+
+export const HOMIES_OPERATIONAL_SKILLS: OperationalSkillDefinition[] = [
+  { code: 'barista', label: 'Pha chế', active: true },
+  { code: 'cashier', label: 'Thu ngân', active: true },
+]
+
+export const HOMIES_CAREER_GRADES: CareerGradeDefinition[] = [
+  {
+    code: 'c1_pc',
+    rank: 1,
+    label: 'C1 - Pha chế',
+    position_key: 'store_employee',
+    required_skill_codes: ['barista'],
+    management: false,
+  },
+  {
+    code: 'c1_tn',
+    rank: 1,
+    label: 'C1 - Thu ngân',
+    position_key: 'store_employee',
+    required_skill_codes: ['cashier'],
+    management: false,
+  },
+  {
+    code: 'c2',
+    rank: 2,
+    label: 'C2 - Nhân viên đa năng',
+    position_key: 'store_employee',
+    required_skill_codes: ['barista', 'cashier'],
+    management: false,
+  },
+  {
+    code: 'c3',
+    rank: 3,
+    label: 'C3 - Senior',
+    position_key: 'store_employee',
+    required_skill_codes: ['barista', 'cashier'],
+    management: false,
+  },
+  {
+    code: 'c4',
+    rank: 4,
+    label: 'C4 - Trưởng ca',
+    position_key: 'shift_leader',
+    required_skill_codes: ['barista', 'cashier'],
+    management: true,
+  },
+  {
+    code: 'c5',
+    rank: 5,
+    label: 'C5 - Quản lý cửa hàng',
+    position_key: 'store_manager',
+    required_skill_codes: ['barista', 'cashier'],
+    management: true,
+  },
+]
+
+export interface HomiesCareerTransitionEntry extends CareerGradeTransitionDefinition, CareerTransitionDefinition {}
+
+export const HOMIES_CAREER_TRANSITIONS: HomiesCareerTransitionEntry[] = [
+  {
+    id: 'c1_pc_to_c2',
+    from: 'c1_pc',
+    to: 'c2',
+    from_grade_code: 'c1_pc',
+    to_grade_code: 'c2',
+    preset_key: 'to_multiskill',
+    required_tenure_months: 2,
+    required_hours_part_time: 160,
+    required_kpi_consecutive_months: 2,
+    required_kpi_min_score: 80,
+    required_skills: ['barista', 'cashier'],
+    approval_authority: 'store_manager',
+    allow_demotion: false,
+  },
+  {
+    id: 'c1_tn_to_c2',
+    from: 'c1_tn',
+    to: 'c2',
+    from_grade_code: 'c1_tn',
+    to_grade_code: 'c2',
+    preset_key: 'to_multiskill',
+    required_tenure_months: 2,
+    required_hours_part_time: 160,
+    required_kpi_consecutive_months: 2,
+    required_kpi_min_score: 80,
+    required_skills: ['barista', 'cashier'],
+    approval_authority: 'store_manager',
+    allow_demotion: false,
+  },
+  {
+    id: 'c2_to_c3',
+    from: 'c2',
+    to: 'c3',
+    from_grade_code: 'c2',
+    to_grade_code: 'c3',
+    preset_key: 'to_senior',
+    required_tenure_months: 3,
+    required_hours_part_time: 150,
+    required_kpi_consecutive_months: 3,
+    required_kpi_min_score: 85,
+    required_skills: ['barista', 'cashier'],
+    approval_authority: 'store_manager',
+    allow_demotion: false,
+  },
+  {
+    id: 'c3_to_c4',
+    from: 'c3',
+    to: 'c4',
+    from_grade_code: 'c3',
+    to_grade_code: 'c4',
+    preset_key: 'to_shift_leader',
+    required_tenure_months: 3,
+    required_hours_part_time: 0,
+    required_kpi_consecutive_months: 2,
+    required_kpi_min_score: 85,
+    required_skills: ['barista', 'cashier'],
+    approval_authority: 'hr_admin',
+    allow_demotion: false,
+  },
+  {
+    id: 'c4_to_c5',
+    from: 'c4',
+    to: 'c5',
+    from_grade_code: 'c4',
+    to_grade_code: 'c5',
+    preset_key: 'to_store_manager',
+    required_tenure_months: 6,
+    required_hours_part_time: 0,
+    required_kpi_consecutive_months: 5,
+    required_kpi_min_score: 88,
+    required_skills: ['barista', 'cashier'],
+    approval_authority: 'ceo',
+    allow_demotion: false,
+  },
+]
+
+export function getCareerGradeByCode(code: string): CareerGradeDefinition | undefined {
+  return HOMIES_CAREER_GRADES.find((item) => item.code === code)
+}

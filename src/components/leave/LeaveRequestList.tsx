@@ -110,7 +110,7 @@ export default function LeaveRequestList({
                 'flex-shrink-0 text-xs px-3 py-2 rounded-full font-medium transition-all whitespace-nowrap',
                 isActive
                   ? 'bg-primary-600 text-white shadow-sm'
-                  : 'bg-gray-50 text-gray-500 hover:bg-gray-100',
+                  : 'bg-vanilla-50 text-gray-500 hover:bg-primary-50',
               )}
             >
               {tab.label}
@@ -134,7 +134,7 @@ export default function LeaveRequestList({
             placeholder="Tìm theo tên, lý do..."
             value={filter.searchQuery || ''}
             onChange={e => setFilter(f => ({ ...f, searchQuery: e.target.value }))}
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-gray-100 text-sm
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-primary-50 text-sm
               placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500
               transition-all"
           />
@@ -145,7 +145,7 @@ export default function LeaveRequestList({
             'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all',
             showFilters || selectedType !== 'all'
               ? 'bg-primary-50 text-primary-600 ring-1 ring-primary-200'
-              : 'bg-gray-100 text-gray-500 hover:bg-gray-200',
+              : 'bg-primary-50 text-gray-500 hover:bg-gray-200',
           )}
         >
           <SlidersHorizontal size={14} />
@@ -162,7 +162,7 @@ export default function LeaveRequestList({
               'flex-shrink-0 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-all',
               selectedType === 'all'
                 ? 'bg-gray-800 text-white'
-                : 'bg-gray-50 text-gray-500 hover:bg-gray-100',
+                : 'bg-vanilla-50 text-gray-500 hover:bg-primary-50',
             )}
           >
             Tất cả loại
@@ -175,7 +175,7 @@ export default function LeaveRequestList({
                 'flex-shrink-0 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-all',
                 selectedType === t.type
                   ? 'text-white shadow-sm'
-                  : 'bg-gray-50 text-gray-500 hover:bg-gray-100',
+                  : 'bg-vanilla-50 text-gray-500 hover:bg-primary-50',
               )}
               style={selectedType === t.type ? { background: t.colorHex } : undefined}
             >

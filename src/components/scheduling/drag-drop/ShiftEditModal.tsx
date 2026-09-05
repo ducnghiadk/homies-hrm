@@ -53,7 +53,7 @@ export default function ShiftEditModal({ shift, onSave, onDelete, onClose }: Shi
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <Pencil size={16} className="text-primary" /> Sửa ca làm việc
           </h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+          <button onClick={onClose} className="p-1 hover:bg-primary-50 rounded-full transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -158,7 +158,7 @@ export default function ShiftEditModal({ shift, onSave, onDelete, onClose }: Shi
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-primary-50 transition-colors"
             >
               Hủy
             </button>

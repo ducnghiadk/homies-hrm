@@ -1,6 +1,8 @@
 'use client'
 
+import React from 'react'
 import type { ViolationType } from '@/lib/kpi-types'
+import { Edit3, Trash2 } from 'lucide-react'
 
 interface Props {
   violation: ViolationType
@@ -10,53 +12,72 @@ interface Props {
 }
 
 const severityConfig = {
-  minor:    { label: 'Nhẹ',         bg: '#dbeafe', color: '#1d4ed8' },
-  medium:   { label: 'Trung bình',  bg: '#FFF8E8', color: '#b45309' },
-  major:    { label: 'Nặng',        bg: '#fed7aa', color: '#c2410c' },
-  critical: { label: 'Nghiêm trọng', bg: '#fee2e2', color: '#b91c1c' },
+  minor:    { label: 'Nhẹ (-5đ)',         class: 'bg-blue-50 text-[#2F6FA8] border-blue-200' },
+  medium:   { label: 'Trung bình (-10đ)',  class: 'bg-amber-50 text-amber-800 border-amber-200' },
+  major:    { label: 'Nặng (-20đ)',        class: 'bg-orange-50 text-orange-800 border-orange-200' },
+  critical: { label: 'Nghiêm trọng (-50đ)', class: 'bg-rose-50 text-rose-700 border-rose-200' },
 }
 
 export default function ViolationRow({ violation, onEdit, onDelete, onToggle }: Props) {
-  const sev = severityConfig[violation.severity]
+  const sev = severityConfig[violation.severity] || severityConfig.minor
 
   return (
-    <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-gray-50 transition-colors">
-      <div className="w-12 text-center flex-shrink-0">
-        <span className="text-xs font-mono font-bold text-gray-600">{violation.code}</span>
+    <div className="flex items-center justify-between gap-3 py-3 px-4 hover:bg-blue-50/20 transition-all">
+      <div className="w-12 text-center shrink-0">
+        <span className="text-xs font-mono font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
+          {violation.code}
+        </span>
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold truncate">{violation.name}</span>
-          <span
-            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-            style={{ background: sev.bg, color: sev.color }}
-          >
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold text-gray-900">{violation.name}</span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${sev.class}`}>
             {sev.label}
           </span>
         </div>
-        <div className="text-xs text-gray-400 mt-0.5 truncate">{violation.description}</div>
+        <div className="text-[11px] text-gray-500 mt-1 truncate font-medium">
+          {violation.description}
+        </div>
       </div>
 
-      <div className="text-right flex-shrink-0">
-        <div className="text-sm font-bold text-error-600">-{violation.penalty_points}</div>
-        <div className="text-[10px] text-gray-400">điểm</div>
+      <div className="text-center shrink-0 px-2">
+        <span className="text-xs font-bold font-mono tabular-nums text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-100">
+          -{violation.penalty_points} đ
+        </span>
       </div>
 
-      <button
-        onClick={() => onToggle(violation.id, !violation.is_active)}
-        className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 relative ${
-          violation.is_active ? 'bg-success-500' : 'bg-gray-300'
-        }`}
-      >
-        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-          violation.is_active ? 'translate-x-4' : 'translate-x-0.5'
-        }`} />
-      </button>
+      <div className="flex items-center gap-3 shrink-0">
+        <button
+          type="button"
+          onClick={() => onToggle(violation.id, !violation.is_active)}
+          className={`w-9 h-5 rounded-full transition-colors relative inline-block cursor-pointer ${
+            violation.is_active ? 'bg-emerald-600' : 'bg-gray-300'
+          }`}
+        >
+          <div
+            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-xs transition-transform ${
+              violation.is_active ? 'translate-x-4' : 'translate-x-0.5'
+            }`}
+          />
+        </button>
 
-      <div className="flex gap-1 flex-shrink-0">
-        <button onClick={() => onEdit(violation)} className="text-xs px-2 py-1 rounded-lg text-primary-600 hover:bg-primary-50">Sửa</button>
-        <button onClick={() => onDelete(violation.id)} className="text-xs px-2 py-1 rounded-lg text-error-500 hover:bg-error-50">Xóa</button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onEdit(violation)}
+            className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-[#2F6FA8] hover:text-white text-gray-700 font-bold text-[11px] transition flex items-center gap-1"
+          >
+            <Edit3 size={11} />
+            <span>Sửa</span>
+          </button>
+          <button
+            onClick={() => onDelete(violation.id)}
+            className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 font-bold text-[11px] border border-rose-100 transition flex items-center gap-1"
+          >
+            <Trash2 size={11} />
+            <span>Xóa</span>
+          </button>
+        </div>
       </div>
     </div>
   )

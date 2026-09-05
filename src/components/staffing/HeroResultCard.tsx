@@ -206,7 +206,7 @@ export default function HeroResultCard({
             </table>
 
             {/* Calculation formula */}
-            <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500">
+            <div className="bg-vanilla-50 rounded-lg p-3 text-xs text-gray-500">
               <FileText size={12} className="inline mr-1" /> Công thức: {dailyCups} ly ÷ {operatingHours}h ÷ 25 ly/giờ ={' '}
               {(dailyCups / operatingHours / 25).toFixed(1)} → {result.baristas} pha chế
             </div>
@@ -235,7 +235,7 @@ export default function HeroResultCard({
             onClick={onAnalyzeDetail}
             className="
               w-full py-3 rounded-xl font-medium text-sm
-              bg-gray-100 text-gray-700
+              bg-primary-50 text-gray-700
               hover:bg-gray-200
               transition-all duration-200
               flex items-center justify-center gap-2

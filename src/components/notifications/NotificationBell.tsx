@@ -36,7 +36,7 @@ function NotificationItem({ notif, onRead, onDelete, onOpen }: {
   return (
     <div
       className={`flex items-start gap-3 p-3 rounded-xl transition-all group ${
-        isUnread ? 'bg-primary-50' : 'hover:bg-gray-50'
+        isUnread ? 'bg-primary-50' : 'hover:bg-vanilla-50'
       }`}
     >
       {/* Icon */}
@@ -133,7 +133,7 @@ export default function NotificationBell({
       {/* Bell button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors active:scale-95"
+        className="relative w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center hover:bg-gray-200 transition-colors active:scale-95"
       >
         <Bell size={18} className="text-gray-500" />
         {unreadCount > 0 && (
@@ -170,7 +170,7 @@ export default function NotificationBell({
           <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="py-12 text-center space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 rounded-2xl bg-vanilla-50 flex items-center justify-center mx-auto">
                   <Bell size={20} className="text-gray-200" />
                 </div>
                 <p className="text-xs text-gray-400">Không có thông báo nào</p>

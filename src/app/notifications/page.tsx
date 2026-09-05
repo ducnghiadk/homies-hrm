@@ -72,7 +72,7 @@ function NotificationCard({
             </div>
             <button
               onClick={() => onDelete(notification.id)}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-50 text-gray-500 transition-colors hover:bg-gray-200"
             >
               <X size={12} />
             </button>
@@ -90,7 +90,7 @@ function NotificationCard({
             {actionUrl && (
               <button
                 onClick={() => onOpen(notification)}
-                className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-50"
+                className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-vanilla-50"
               >
                 Mở liên quan <ArrowRight size={12} />
               </button>
@@ -103,7 +103,7 @@ function NotificationCard({
 }
 
 export default function NotificationsPage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const {
     notifications,
@@ -114,10 +114,20 @@ export default function NotificationsPage() {
   } = useNotifications(user?.id)
 
   useEffect(() => {
-    if (!isAuthenticated) router.push('/login')
-  }, [isAuthenticated, router])
+    if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/notifications')
+  }, [hasHydrated, isAuthenticated, router])
 
-  if (!user) return null
+  if (!hasHydrated) {
+    return (
+      <AppShell title="Thông báo">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (!user || !isAuthenticated) return null
 
   return (
     <AppShell title={`Thông báo ${unreadCount > 0 ? `(${unreadCount})` : ''}`}>

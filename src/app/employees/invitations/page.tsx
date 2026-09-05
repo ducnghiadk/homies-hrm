@@ -59,7 +59,7 @@ type InvitationConfirmState =
   | null
 
 export default function InvitationsPage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
@@ -74,10 +74,10 @@ export default function InvitationsPage() {
   const [confirmState, setConfirmState] = useState<InvitationConfirmState>(null)
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login')
+    if (hasHydrated && !isAuthenticated) {
+      router.push('/login?redirect=/employees/invitations')
     }
-  }, [isAuthenticated, router])
+  }, [hasHydrated, isAuthenticated, router])
 
   const invitations = user ? EmployeeService.getInvitations(user) : []
   void refreshTrigger
@@ -486,6 +486,16 @@ export default function InvitationsPage() {
     })
     .slice(0, 5)
 
+  if (!hasHydrated || !user) {
+    return (
+      <AppShell>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
+
   return (
     <AppShell>
       <div className="animate-fade-in space-y-4 pb-20">
@@ -560,7 +570,7 @@ export default function InvitationsPage() {
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="flex w-full items-start justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50"
+                  className="flex w-full items-start justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left transition-colors hover:bg-vanilla-50"
                 >
                   <div>
                     <p className="text-sm font-semibold text-slate-900">Làm sạch bộ lọc</p>
@@ -586,7 +596,7 @@ export default function InvitationsPage() {
             </div>
 
             {priorityQueue.length === 0 ? (
-              <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-400">
+              <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-vanilla-50 px-4 py-8 text-center text-sm text-gray-400">
                 Không có mục ưu tiên cao nào trong hàng chờ đầu vào.
               </div>
             ) : (
@@ -596,7 +606,7 @@ export default function InvitationsPage() {
                     key={invitation.id}
                     type="button"
                     onClick={() => setSelectedInvitation(invitation)}
-                    className="flex w-full flex-col gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4 text-left transition-colors hover:bg-primary-50/50 lg:flex-row lg:items-center lg:justify-between"
+                    className="flex w-full flex-col gap-3 rounded-2xl border border-gray-100 bg-vanilla-50 px-4 py-4 text-left transition-colors hover:bg-primary-50/50 lg:flex-row lg:items-center lg:justify-between"
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">

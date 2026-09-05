@@ -84,7 +84,7 @@ export default function MobileShiftCard({
         className="
           relative bg-white border border-gray-200 rounded-xl
           transition-transform duration-200 ease-out
-          active:bg-gray-50
+          active:bg-vanilla-50
           touch-pan-y
         "
         style={{
@@ -97,7 +97,7 @@ export default function MobileShiftCard({
           {/* Top row: Name + Time badge */}
           <div className="flex items-start justify-between mb-2">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-sm">
+              <div className="w-9 h-9 bg-primary-50 rounded-full flex items-center justify-center text-sm">
                 <User size={16} className="text-gray-500" />
               </div>
               <div>
@@ -117,7 +117,7 @@ export default function MobileShiftCard({
           </div>
 
           {/* Mini timeline bar */}
-          <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="relative h-2 bg-primary-50 rounded-full overflow-hidden">
             <div
               className="absolute top-0 bottom-0 bg-primary/70 rounded-full"
               style={{ left: `${Math.max(0, barLeft)}%`, width: `${barWidth}%` }}

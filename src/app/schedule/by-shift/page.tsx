@@ -71,7 +71,7 @@ export default function ScheduleByShiftPage() {
 
         {/* ─── Role-Based View Switcher Segment Bar ─── */}
         {isManagerOrAdmin && (
-          <div className="flex bg-gray-100/80 p-1 rounded-2xl gap-1 w-full border border-gray-200/50">
+          <div className="flex bg-primary-50/80 p-1 rounded-2xl gap-1 w-full border border-gray-200/50">
             <button
               onClick={() => router.push('/schedule')}
               className="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all text-gray-500 hover:text-gray-700"
@@ -97,7 +97,7 @@ export default function ScheduleByShiftPage() {
         <div className="flex items-center justify-between bg-white border border-gray-100 rounded-2xl p-2.5 shadow-[var(--shadow-card)]">
           <button
             onClick={() => setWeekOffset(w => w - 1)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-100 transition-colors"
+            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-primary-50 transition-colors"
           >
             <ChevronLeft size={20} className="text-gray-500" />
           </button>
@@ -114,7 +114,7 @@ export default function ScheduleByShiftPage() {
           </div>
           <button
             onClick={() => setWeekOffset(w => w + 1)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-100 transition-colors"
+            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-primary-50 transition-colors"
           >
             <ChevronRight size={20} className="text-gray-500" />
           </button>

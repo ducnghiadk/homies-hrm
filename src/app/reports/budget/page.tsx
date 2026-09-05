@@ -4,7 +4,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
-import { mockStores, mockEmployees, getSchedulesByStoreWeek } from '@/lib/mock-data'
+import { mockStores, mockEmployees, getSchedulesByStoreWeek, isStoreMatch } from '@/lib/mock-data'
+import { storeAdapter, employeeAdapter } from '@/lib/adapters'
+import { EmployeeService } from '@/lib/services/employees/employee-service'
 import {
   calculateWeeklyCost, getEmployeeWeeklyCost, getCostByPosition,
   fmt, fmtFull,
@@ -28,6 +30,18 @@ export default function LaborCostReportPage() {
   const [isHydrated] = useState(() => typeof window !== 'undefined')
   const [selectedStore, setSelectedStore] = useState('store-001')
   const [activeTab, setActiveTab] = useState<'overview' | 'stores' | 'positions' | 'employees'>('overview')
+  const [stores, setStores] = useState(mockStores)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+  useEffect(() => {
+    storeAdapter.getStores().then(res => setStores(res))
+    employeeAdapter.getAllEmployees().then(res => {
+      if (res && res.length) {
+        EmployeeService.syncEmployeesFromAdapter(res)
+        setRefreshTrigger(k => k + 1)
+      }
+    })
+  }, [])
 
   useEffect(() => { if (isHydrated && !isAuthenticated) router.push('/login') }, [isHydrated, isAuthenticated, router])
 
@@ -52,19 +66,22 @@ export default function LaborCostReportPage() {
   const empBreakdown = useMemo(() => {
     const dates = getWeekDates(0)
     const schedules = getSchedulesByStoreWeek(selectedStore, dates)
-    const storeEmps = mockEmployees.filter(e => e.store_id === selectedStore && (e.role === 'employee' || e.role === 'shift_leader'))
+    const allEmps = user ? EmployeeService.getEmployees(user) : []
+    const storeEmps = allEmps.filter(
+      e => isStoreMatch(e.store_id, selectedStore) && (e.role === 'employee' || e.role === 'shift_leader')
+    )
     return storeEmps.map(emp => getEmployeeWeeklyCost(emp.id, dates, schedules)).filter(e => e.totalHours > 0).sort((a, b) => b.totalCost - a.totalCost)
-  }, [selectedStore])
+  }, [selectedStore, user, refreshTrigger])
 
   // Store comparison
   const storesData = useMemo(() => {
     const dates = getWeekDates(0)
-    return mockStores.filter(s => s.is_active).map(store => {
+    return stores.filter(s => s.is_active).map(store => {
       const schedules = getSchedulesByStoreWeek(store.id, dates)
       const cost = calculateWeeklyCost(store.id, dates, schedules)
       return { store, cost }
     })
-  }, [])
+  }, [stores])
 
   if (!isHydrated || !user) return null
 
@@ -104,7 +121,7 @@ export default function LaborCostReportPage() {
             {/* Store selector */}
             <select className="w-full p-2 rounded-xl text-sm border" style={{ borderColor: 'var(--gray-200)', background: 'var(--gray-50)' }}
               value={selectedStore} onChange={e => setSelectedStore(e.target.value)}>
-              {mockStores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {stores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
 
             {/* Summary card */}
@@ -191,7 +208,7 @@ export default function LaborCostReportPage() {
           <div className="space-y-3">
             <select className="w-full p-2 rounded-xl text-sm border" style={{ borderColor: 'var(--gray-200)', background: 'var(--gray-50)' }}
               value={selectedStore} onChange={e => setSelectedStore(e.target.value)}>
-              {mockStores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {stores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             {posBreakdown.length === 0 ? (
               <div className="card text-center text-xs" style={{ color: 'var(--text-muted)' }}>Chưa có dữ liệu</div>
@@ -220,7 +237,7 @@ export default function LaborCostReportPage() {
           <div className="space-y-3">
             <select className="w-full p-2 rounded-xl text-sm border" style={{ borderColor: 'var(--gray-200)', background: 'var(--gray-50)' }}
               value={selectedStore} onChange={e => setSelectedStore(e.target.value)}>
-              {mockStores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {stores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             {empBreakdown.length === 0 ? (
               <div className="card text-center text-xs" style={{ color: 'var(--text-muted)' }}>Chưa có dữ liệu</div>

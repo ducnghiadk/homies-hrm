@@ -44,7 +44,7 @@ export default function ActionableRecommendations({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {recommendations.map((rec, i) => (
-              <tr key={rec.id} className="hover:bg-gray-50/50">
+              <tr key={rec.id} className="hover:bg-vanilla-50/50">
                 <td className="py-2.5 pr-2 text-gray-400 text-xs">{i + 1}</td>
                 <td className="py-2.5 pr-2 text-gray-700">{rec.description}</td>
                 <td className="py-2.5 pr-2 text-right font-bold text-success-600 whitespace-nowrap">

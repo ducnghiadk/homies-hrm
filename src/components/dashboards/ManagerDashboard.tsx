@@ -75,7 +75,7 @@ export default function ManagerDashboard() {
               <div className="w-10 h-10 rounded-full bg-gray-200" />
               <div className="flex-1 space-y-2">
                 <div className="h-4 w-28 bg-gray-200 rounded" />
-                <div className="h-3 w-40 bg-gray-100 rounded" />
+                <div className="h-3 w-40 bg-primary-50 rounded" />
               </div>
               <div className="h-5 w-16 bg-gray-200 rounded-full" />
             </div>
@@ -265,7 +265,7 @@ export default function ManagerDashboard() {
           className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
             filterShift === 'all'
               ? 'bg-primary-600 text-white shadow-sm'
-              : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+              : 'bg-vanilla-50 text-gray-500 hover:bg-primary-50'
           }`}
         >
           Tất cả
@@ -277,7 +277,7 @@ export default function ManagerDashboard() {
             className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
               filterShift === s.id
                 ? 'text-white shadow-sm'
-                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                : 'bg-vanilla-50 text-gray-500 hover:bg-primary-50'
             }`}
             style={filterShift === s.id ? { background: s.color } : undefined}
           >
@@ -319,7 +319,7 @@ export default function ManagerDashboard() {
                 <div
                   key={c.employee.id}
                   className="px-4 py-3 flex items-center gap-3
-                    hover:bg-gray-50 active:bg-gray-100
+                    hover:bg-vanilla-50 active:bg-primary-50
                     transition-colors duration-150
                     cursor-pointer rounded-xl mx-2"
                   onClick={() => router.push(`/employees/${c.employee.id}`)}

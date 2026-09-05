@@ -256,6 +256,36 @@ export function updateRegistrationStatus(
   return registrationWeeks[idx]
 }
 
+function parseTimeToMinutes(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value)
+  if (!match) return null
+
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return null
+  return hours * 60 + minutes
+}
+
+function getShiftWindow(shiftId: string): { start: number; end: number } | null {
+  const shift = mockShifts.find(item => item.id === shiftId)
+  if (!shift) return null
+
+  const start = parseTimeToMinutes(shift.start_time)
+  const rawEnd = parseTimeToMinutes(shift.end_time)
+  if (start === null || rawEnd === null) return null
+
+  return { start, end: rawEnd <= start ? rawEnd + 24 * 60 : rawEnd }
+}
+
+function shiftsOverlap(leftShiftId: string, rightShiftId: string): boolean {
+  const left = getShiftWindow(leftShiftId)
+  const right = getShiftWindow(rightShiftId)
+
+  // Không đủ dữ liệu giờ thì chặn để không tạo lịch có thể bị trùng.
+  if (!left || !right) return true
+  return left.start < right.end && right.start < left.end
+}
+
 // ─── Auto Assign Matching Algorithm ───
 export function autoAssignFromPreferences(weekId: string): { 
   success: boolean
@@ -269,11 +299,17 @@ export function autoAssignFromPreferences(weekId: string): {
     return { success: false, assignmentsCount: 0, message: 'Không tìm thấy tuần đăng ký.' }
   }
 
+  if (week.status === 'published') {
+    return { success: false, assignmentsCount: 0, message: 'Tuần này đã chốt, không thể chạy lại tự xếp ca.' }
+  }
+
   const quotas = getShiftQuotas(weekId)
   const weekStart = week.week_start_date
 
   // Get all store employees
-  const storeEmployees = mockEmployees.filter(emp => emp.store_id === week.store_id)
+  const storeEmployees = mockEmployees.filter(emp =>
+    emp.store_id === week.store_id && ['active', 'probation'].includes(emp.status)
+  )
   
   // Get all submitted preferences for this week
   const allPrefs = getAllPreferencesForWeek(weekStart)
@@ -293,6 +329,17 @@ export function autoAssignFromPreferences(weekId: string): {
   }
 
   // Filter out any existing mockSchedules for this store & week
+  const hasPublishedSchedule = mockSchedules.some(s =>
+    s.store_id === week.store_id && weekDates.includes(s.date) && s.status === 'published'
+  )
+  if (hasPublishedSchedule) {
+    return {
+      success: false,
+      assignmentsCount: 0,
+      message: 'Tuần này đang có ca đã chốt, không thể xóa để tự xếp lại.',
+    }
+  }
+
   for (let i = mockSchedules.length - 1; i >= 0; i--) {
     const sch = mockSchedules[i]
     if (sch.store_id === week.store_id && weekDates.includes(sch.date)) {
@@ -312,7 +359,7 @@ export function autoAssignFromPreferences(weekId: string): {
       // Find employees who:
       // 1. Belong to this store
       // 2. Are available on this date for this shift
-      // 3. Haven't been assigned to another shift on this day yet
+      // 3. Không có ca khác chồng giờ trong cùng ngày
       const availableEmployees = storeEmployees.filter(emp => {
         const key = `${emp.id}_${date}`
         const pref = prefMap.get(key)
@@ -321,10 +368,13 @@ export function autoAssignFromPreferences(weekId: string): {
         // Check if employee is available for this shift type
         const isAvail = getShiftPreferenceAvailability(pref, shiftId)
         
-        // Verify not already scheduled on this day
-        const alreadyScheduled = mockSchedules.some(s => s.employee_id === emp.id && s.date === date)
+        const hasOverlappingSchedule = mockSchedules.some(s =>
+          s.employee_id === emp.id &&
+          s.date === date &&
+          shiftsOverlap(s.shift_id, shiftId)
+        )
         
-        return isAvail && !alreadyScheduled
+        return isAvail && !hasOverlappingSchedule
       })
 
       // Assign up to max_staff
@@ -339,7 +389,8 @@ export function autoAssignFromPreferences(weekId: string): {
           employee_id: emp.id,
           shift_id: shiftId,
           date,
-          notes: 'Phân ca tự động từ Đăng ký ca'
+          notes: 'Phân ca tự động từ Đăng ký ca',
+          status: 'draft',
         })
         assignedCount++
       })

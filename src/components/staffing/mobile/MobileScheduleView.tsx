@@ -157,7 +157,7 @@ export default function MobileScheduleView({
           <div className="flex gap-2">
             <button
               onClick={() => { setShowEditSheet(false); setEditingShift(null) }}
-              className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl active:bg-gray-200"
+              className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-primary-50 rounded-xl active:bg-gray-200"
             >
               Hủy
             </button>
@@ -178,7 +178,7 @@ export default function MobileScheduleView({
           <div className="space-y-4">
             <div>
               <label className="text-xs text-gray-500 mb-1 flex items-center gap-1"><User size={12} /> Nhân viên</label>
-              <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700">
+              <div className="w-full p-3 bg-vanilla-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700">
                 {editingShift.employeeName}
               </div>
             </div>

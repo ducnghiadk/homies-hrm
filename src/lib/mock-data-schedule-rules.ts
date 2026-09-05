@@ -4,9 +4,10 @@
 
 import {
   mockSchedules, mockShifts, mockEmployees, mockPositions,
-  getShiftById,
+  getShiftById, isStoreMatch,
   type Schedule, type Shift, type Employee,
 } from './mock-data'
+import { EmployeeService } from './services/employee-service'
 
 // ─── Types ───
 
@@ -64,10 +65,9 @@ export const syntheticWarningLabels: Record<SyntheticScheduleWarningType, string
   missing_change_reason: 'Thieu ly do sua',
 }
 
-// ─── Default Rules ───
+// ─── Default Rules & Persistence ───
 
-
-export const scheduleRules: ScheduleRule[] = [
+const DEFAULT_SCHEDULE_RULES: ScheduleRule[] = [
   { id: 'rule-001', rule_key: 'clopening', label: 'Clopening (Đóng–Mở)', description: 'NV làm ca tối rồi ca sáng hôm sau, nghỉ không đủ giờ', warning_value: 8, block_value: 6, warning_level: 'warning', is_active: true },
   { id: 'rule-002', rule_key: 'max_weekly_hours_warn', label: 'Overtime tuần (cảnh báo)', description: 'Tổng giờ/tuần vượt ngưỡng cảnh báo', warning_value: 40, block_value: 40, warning_level: 'warning', is_active: true },
   { id: 'rule-003', rule_key: 'max_weekly_hours_block', label: 'Overtime tuần (chặn)', description: 'Tổng giờ/tuần vượt ngưỡng tối đa', warning_value: 48, block_value: 48, warning_level: 'block', is_active: true },
@@ -77,11 +77,60 @@ export const scheduleRules: ScheduleRule[] = [
   { id: 'rule-007', rule_key: 'night_shift_restriction', label: 'Ca đêm cho NV đặc biệt', description: 'NV dưới 18 tuổi không được làm ca đêm', warning_value: 0, block_value: 0, warning_level: 'block', is_active: true },
 ]
 
-export const ruleOverrides: ScheduleRuleOverride[] = [
+const DEFAULT_RULE_OVERRIDES: ScheduleRuleOverride[] = [
   { id: 'ov-001', rule_key: 'max_weekly_hours_warn', position_id: 'pos-004', season_id: null, override_warning: 48, override_block: 48 },
   { id: 'ov-002', rule_key: 'max_weekly_hours_block', position_id: 'pos-005', season_id: null, override_warning: 56, override_block: 56 },
   { id: 'ov-003', rule_key: 'max_consecutive_days', position_id: 'pos-005', season_id: null, override_warning: 7, override_block: 7 },
 ]
+
+function loadPersistedRules(): ScheduleRule[] {
+  if (typeof window === 'undefined') return [...DEFAULT_SCHEDULE_RULES]
+  try {
+    const raw = localStorage.getItem('homies_schedule_rules')
+    if (raw) {
+      const parsed: ScheduleRule[] = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch (e) {
+    console.error('Error loading schedule rules:', e)
+  }
+  return [...DEFAULT_SCHEDULE_RULES]
+}
+
+function loadPersistedOverrides(): ScheduleRuleOverride[] {
+  if (typeof window === 'undefined') return [...DEFAULT_RULE_OVERRIDES]
+  try {
+    const raw = localStorage.getItem('homies_schedule_rule_overrides')
+    if (raw) {
+      const parsed: ScheduleRuleOverride[] = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed
+    }
+  } catch (e) {
+    console.error('Error loading rule overrides:', e)
+  }
+  return [...DEFAULT_RULE_OVERRIDES]
+}
+
+export const scheduleRules: ScheduleRule[] = loadPersistedRules()
+export const ruleOverrides: ScheduleRuleOverride[] = loadPersistedOverrides()
+
+export function saveRulesToStorage(): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem('homies_schedule_rules', JSON.stringify(scheduleRules))
+    localStorage.setItem('homies_schedule_rule_overrides', JSON.stringify(ruleOverrides))
+  } catch (e) {
+    console.error('Failed to save rules to localStorage:', e)
+  }
+}
+
+export function resetRulesToDefault(): void {
+  scheduleRules.length = 0
+  scheduleRules.push(...DEFAULT_SCHEDULE_RULES.map(r => ({ ...r })))
+  ruleOverrides.length = 0
+  ruleOverrides.push(...DEFAULT_RULE_OVERRIDES.map(o => ({ ...o })))
+  saveRulesToStorage()
+}
 
 export const scheduleSeasons: ScheduleSeason[] = [
   { id: 'season-001', name: 'Tết 2026', start_date: '2026-01-25', end_date: '2026-02-10', is_active: true },
@@ -386,14 +435,23 @@ function getWeekDatesFromDate(dateStr: string): string[] {
 export function scanWeekWarnings(storeId: string, weekDates: string[], allSchedules?: Schedule[]): ScheduleWarning[] {
   const allWarnings: ScheduleWarning[] = []
   const schedules = allSchedules || mockSchedules
-  const storeSchedules = schedules.filter(s => s.store_id === storeId && weekDates.includes(s.date))
-  const empsInStore = mockEmployees.filter(e => e.store_id === storeId)
+  const storeSchedules = schedules.filter(s => isStoreMatch(s.store_id, storeId) && weekDates.includes(s.date))
+  
+  let allEmployees = EmployeeService.getEmployees()
+  if (!allEmployees || allEmployees.length === 0) {
+    allEmployees = mockEmployees as unknown as typeof allEmployees
+  }
+
+  const empsInStore = allEmployees.filter(e =>
+    isStoreMatch(e.store_id, storeId) ||
+    e.secondary_store_ids?.some(s => isStoreMatch(s, storeId))
+  )
 
   if (storeSchedules.length === 0 && weekDates[0]) {
     allWarnings.push(createSyntheticWarning({
       warning_type: 'empty_week',
       warning_level: 'warning',
-      message: 'Tuan nay chua xep ca nao cho chi nhanh nay.',
+      message: 'Tuần này chưa có ca nào được xếp cho chi nhánh.',
       date: weekDates[0],
     }))
   }
@@ -414,26 +472,35 @@ export function scanWeekWarnings(storeId: string, weekDates: string[], allSchedu
   }
 
   storeSchedules.forEach(schedule => {
-    const employee = mockEmployees.find(item => item.id === schedule.employee_id)
-    if (!employee || employee.status === 'inactive') {
+    const employee = EmployeeService.getEmployeeById(schedule.employee_id) ||
+      allEmployees.find(item => item.id === schedule.employee_id || item.employee_code === schedule.employee_id) ||
+      mockEmployees.find(item => item.id === schedule.employee_id || item.employee_code === schedule.employee_id)
+
+    if (employee && (employee.status === 'inactive' || employee.status === 'resigned')) {
       allWarnings.push(createSyntheticWarning({
         employee_id: schedule.employee_id,
-        employee_name: employee?.full_name || 'Nhan su khong ton tai',
+        employee_name: employee?.full_name || 'Nhân sự',
         warning_type: 'employee_inactive',
         warning_level: 'block',
-        message: `${employee?.full_name || schedule.employee_id} da nghi hoac chua active nhung van dang bi xep ca.`,
+        message: `${employee?.full_name || schedule.employee_id} đã nghỉ việc hoặc chưa kích hoạt nhưng vẫn đang bị xếp ca.`,
         date: schedule.date,
         shift_id: schedule.shift_id,
       }))
     }
 
-    if (employee && employee.store_id !== storeId) {
+    const isStoreMatched = employee && (
+      isStoreMatch(employee.store_id, storeId) ||
+      employee.secondary_store_ids?.some(sId => isStoreMatch(sId, storeId)) ||
+      ['ceo', 'hr_admin'].includes(employee.role)
+    )
+
+    if (employee && !isStoreMatched) {
       allWarnings.push(createSyntheticWarning({
         employee_id: schedule.employee_id,
         employee_name: employee.full_name,
         warning_type: 'wrong_store_assignment',
-        warning_level: 'block',
-        message: `${employee.full_name} khong thuoc chi nhanh nay nhung dang bi xep vao lich hien tai.`,
+        warning_level: 'warning',
+        message: `${employee.full_name} làm tăng cường/biệt phái từ chi nhánh khác.`,
         date: schedule.date,
         shift_id: schedule.shift_id,
       }))
@@ -445,7 +512,7 @@ export function scanWeekWarnings(storeId: string, weekDates: string[], allSchedu
         employee_name: employee?.full_name || schedule.employee_id,
         warning_type: 'missing_change_reason',
         warning_level: 'warning',
-        message: `${employee?.full_name || schedule.employee_id} co ca da sua sau publish nhung chua ghi ly do.`,
+        message: `${employee?.full_name || schedule.employee_id} có ca đã sửa sau khi chốt nhưng chưa ghi lý do.`,
         date: schedule.date,
         shift_id: schedule.shift_id,
       }))
@@ -507,6 +574,7 @@ export function updateRule(ruleKey: RuleKey, updates: Partial<Pick<ScheduleRule,
   if (updates.block_value !== undefined) rule.block_value = updates.block_value
   if (updates.warning_level !== undefined) rule.warning_level = updates.warning_level
   if (updates.is_active !== undefined) rule.is_active = updates.is_active
+  saveRulesToStorage()
 }
 
 export function addOverride(ruleKey: RuleKey, positionId: string, warnVal: number, blockVal: number): void {
@@ -518,11 +586,15 @@ export function addOverride(ruleKey: RuleKey, positionId: string, warnVal: numbe
     override_warning: warnVal,
     override_block: blockVal,
   })
+  saveRulesToStorage()
 }
 
 export function removeOverride(id: string): void {
   const idx = ruleOverrides.findIndex(o => o.id === id)
-  if (idx !== -1) ruleOverrides.splice(idx, 1)
+  if (idx !== -1) {
+    ruleOverrides.splice(idx, 1)
+    saveRulesToStorage()
+  }
 }
 
 export function addSeason(name: string, startDate: string, endDate: string): void {

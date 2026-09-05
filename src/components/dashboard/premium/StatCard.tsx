@@ -15,7 +15,7 @@ interface Props {
 
 export function StatCard({ value, label, icon, trend, href, highlight = false, size = 'md' }: Props) {
   const sz = { sm: { v: 'text-xl', l: 'text-xs' }, md: { v: 'text-2xl', l: 'text-sm' }, lg: { v: 'text-3xl', l: 'text-base' } };
-  const tColors: Record<string, string> = { up: 'text-emerald-600 bg-emerald-50', down: 'text-error-600 bg-error-50', neutral: 'text-gray-600 bg-gray-50' };
+  const tColors: Record<string, string> = { up: 'text-emerald-600 bg-emerald-50', down: 'text-error-600 bg-error-50', neutral: 'text-gray-600 bg-vanilla-50' };
   const tIcons: Record<string, string> = { up: '↑', down: '↓', neutral: '→' };
 
   const content = (

@@ -91,7 +91,7 @@ export default function AppShell({ children, showNav = true, className = '', bac
   if (!mounted) return null
 
   const isLargeLayout = user?.role === 'ceo' || user?.role === 'hr_admin'
-  const maxWidthClass = isLargeLayout ? 'max-w-[1680px]' : 'max-w-[1200px]'
+  const maxWidthClass = isLargeLayout ? 'w-full' : 'max-w-[1200px]'
   const shellPaddingClass = showNav
     ? isLargeLayout
       ? 'pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-0'
@@ -116,10 +116,10 @@ export default function AppShell({ children, showNav = true, className = '', bac
               href={entry.href}
               onClick={() => setIsMobileSidebarOpen(false)}
               className={`flex items-start gap-3 rounded-2xl px-3 py-3 no-underline transition-colors ${
-                isActive ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'
+                isActive ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-vanilla-50'
               }`}
             >
-              <span className={`mt-0.5 rounded-xl p-2 ${isActive ? 'bg-white text-primary-600' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`mt-0.5 rounded-xl p-2 ${isActive ? 'bg-white text-primary-600' : 'bg-primary-50 text-gray-500'}`}>
                 <Icon size={16} />
               </span>
               <span className="block text-sm font-bold">{entry.label}</span>
@@ -131,7 +131,7 @@ export default function AppShell({ children, showNav = true, className = '', bac
         const hasActiveChild = entry.items?.some(item => item.href === activeHref) ?? false
 
         return (
-          <div key={entry.id} className="rounded-2xl border border-gray-100 bg-gray-50/60 p-1.5">
+          <div key={entry.id} className="rounded-2xl border border-gray-100 bg-vanilla-50/60 p-1.5">
             <button
               type="button"
               onClick={() => setOpenGroups(prev => ({ ...prev, [entry.id]: !isOpen }))}
@@ -189,10 +189,10 @@ export default function AppShell({ children, showNav = true, className = '', bac
           {/* Sidebar Drawer */}
           <aside className="fixed bottom-0 top-0 left-0 z-50 w-[280px] bg-white p-4 shadow-2xl overflow-y-auto animate-in slide-in-from-left duration-200">
             <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
-              <span className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600 font-['Poppins']">Điều Hướng Quản Lý</span>
+              <span className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600">Điều Hướng Quản Lý</span>
               <button 
                 onClick={() => setIsMobileSidebarOpen(false)}
-                className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors font-bold text-sm"
+                className="w-8 h-8 rounded-xl bg-vanilla-50 flex items-center justify-center text-gray-500 hover:bg-primary-50 hover:text-gray-800 transition-colors font-bold text-sm"
               >
                 ✕
               </button>

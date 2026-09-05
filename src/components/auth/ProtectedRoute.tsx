@@ -95,7 +95,7 @@ function AccessDenied({
         <p className="text-gray-600 mb-4">{message}</p>
 
         {/* User Info */}
-        <div className="bg-gray-50 rounded-lg p-3 mb-6">
+        <div className="bg-vanilla-50 rounded-lg p-3 mb-6">
           <p className="text-sm text-gray-500">Tài khoản hiện tại:</p>
           <p className="font-semibold text-gray-900">
             {user?.full_name || 'Người dùng'}

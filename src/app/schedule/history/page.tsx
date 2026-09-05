@@ -173,21 +173,21 @@ function ScheduleHistoryPageContent() {
         </div>
 
         <div className="grid gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:grid-cols-3">
-          <div className="rounded-xl bg-gray-50 p-3">
+          <div className="rounded-xl bg-vanilla-50 p-3">
             <p className="text-xs uppercase tracking-wide text-gray-400">Chi nhánh</p>
             <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-gray-800">
               <Building2 size={14} className="text-gray-400" />
               {requestedStoreId ? getStoreById(requestedStoreId)?.name || requestedStoreId : 'Tất cả chi nhánh'}
             </p>
           </div>
-          <div className="rounded-xl bg-gray-50 p-3">
+          <div className="rounded-xl bg-vanilla-50 p-3">
             <p className="text-xs uppercase tracking-wide text-gray-400">Tuần đang xem</p>
             <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-gray-800">
               <Calendar size={14} className="text-gray-400" />
               {requestedWeekStart || 'Tất cả'}
             </p>
           </div>
-          <div className="rounded-xl bg-gray-50 p-3">
+          <div className="rounded-xl bg-vanilla-50 p-3">
             <p className="text-xs uppercase tracking-wide text-gray-400">Tổng log</p>
             <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-gray-800">
               <History size={14} className="text-gray-400" />
@@ -210,7 +210,7 @@ function ScheduleHistoryPageContent() {
           <select
             value={actionFilter}
             onChange={event => setActionFilter(event.target.value as typeof actionFilter)}
-            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+            className="rounded-xl border border-gray-200 bg-vanilla-50 px-3 py-2 text-sm text-gray-700"
           >
             <option value="all">Tất cả thao tác</option>
             <option value="publish">Chốt lịch</option>
@@ -222,7 +222,7 @@ function ScheduleHistoryPageContent() {
           <select
             value={employeeFilter}
             onChange={event => setEmployeeFilter(event.target.value)}
-            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+            className="rounded-xl border border-gray-200 bg-vanilla-50 px-3 py-2 text-sm text-gray-700"
           >
             <option value="all">Tất cả nhân viên</option>
             {employeeOptions.map(option => (
@@ -232,14 +232,14 @@ function ScheduleHistoryPageContent() {
           <select
             value={actorFilter}
             onChange={event => setActorFilter(event.target.value)}
-            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+            className="rounded-xl border border-gray-200 bg-vanilla-50 px-3 py-2 text-sm text-gray-700"
           >
             <option value="all">Tất cả người sửa</option>
             {actorOptions.map(option => (
               <option key={option.id} value={option.id}>{option.name}</option>
             ))}
           </select>
-          <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-vanilla-50 px-3 py-2 text-sm text-gray-700">
             <Calendar size={14} className="text-gray-400" />
             <input
               type="date"
@@ -295,7 +295,7 @@ function ScheduleHistoryPageContent() {
                       </span>
                     </div>
 
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                    <div className="rounded-xl border border-gray-100 bg-vanilla-50 px-3 py-2">
                       <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                         {actionMeta.reasonLabel}
                       </p>
@@ -303,7 +303,7 @@ function ScheduleHistoryPageContent() {
                     </div>
                   </div>
 
-                  <div className="grid min-w-[240px] grid-cols-1 gap-2 rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
+                  <div className="grid min-w-[240px] grid-cols-1 gap-2 rounded-xl bg-vanilla-50 p-3 text-xs text-gray-600">
                     <div>
                       <p className="font-semibold text-gray-500">Trước</p>
                       <p>{log.before_shift_name || (beforeShift ? `${beforeShift.name} (${beforeShift.start_time} - ${beforeShift.end_time})` : '-')}</p>

@@ -36,7 +36,7 @@ const EXPORT_PRESETS = [
 function EmployeeExportContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const initialPreset = useMemo(() => {
     const preset = searchParams.get('preset')
     return preset && EXPORT_PRESETS.some((item) => item.id === preset) ? preset : 'full'
@@ -55,10 +55,10 @@ function EmployeeExportContent() {
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login')
+    if (hasHydrated && !isAuthenticated) {
+      router.push('/login?redirect=/employees/export')
     }
-  }, [isAuthenticated, router])
+  }, [hasHydrated, isAuthenticated, router])
 
   const selectedIdsFromQuery = useMemo(() => {
     const raw = searchParams.get('selectedIds') || ''
@@ -92,7 +92,15 @@ function EmployeeExportContent() {
     return Array.from(new Set(employees.map((employee) => employee.store_id).filter(Boolean)))
   }, [employees])
 
-  if (!user) return null
+  if (!hasHydrated || !user) {
+    return (
+      <AppShell title="Xuất nhân sự">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
 
   const canManage = ['ceo', 'hr_admin'].includes(user.role)
   if (!canManage) {
@@ -222,7 +230,7 @@ function EmployeeExportContent() {
                     className={`rounded-2xl border px-4 py-4 text-left transition-colors ${
                       selectedPreset === preset.id
                         ? 'border-primary-200 bg-primary-50'
-                        : 'border-gray-100 bg-gray-50 hover:bg-gray-100'
+                        : 'border-gray-100 bg-vanilla-50 hover:bg-primary-50'
                     }`}
                   >
                     <p className="font-semibold text-gray-900">{preset.label}</p>
@@ -259,7 +267,7 @@ function EmployeeExportContent() {
                       type="button"
                       onClick={() => toggle(column)}
                       className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors ${
-                        isChecked ? 'border-primary-200 bg-primary-50' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'
+                        isChecked ? 'border-primary-200 bg-primary-50' : 'border-gray-100 bg-vanilla-50 hover:bg-primary-50'
                       }`}
                     >
                       <span className={`flex h-5 w-5 items-center justify-center rounded-md ${
@@ -336,7 +344,7 @@ function EmployeeExportContent() {
                     setSelectedAccountStatus('all')
                     setMessage(null)
                   }}
-                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-vanilla-50"
                 >
                   <RefreshCcw size={16} />
                   Bỏ lọc
@@ -352,7 +360,7 @@ function EmployeeExportContent() {
                 <p>Số cột sẽ xuất: <span className="font-semibold text-gray-900">{selected.length}</span></p>
                 <p>Bộ lọc tìm nhanh: <span className="font-semibold text-gray-900">{searchTerm.trim() || 'Không có'}</span></p>
                 <p>Lọc tài khoản: <span className="font-semibold text-gray-900">{selectedAccountStatus === 'all' ? 'Tất cả' : selectedAccountStatus}</span></p>
-                <p className="rounded-2xl border border-gray-100 bg-gray-50 px-3 py-3 text-xs text-gray-500">
+                <p className="rounded-2xl border border-gray-100 bg-vanilla-50 px-3 py-3 text-xs text-gray-500">
                   File xuất sẽ giữ thứ tự cột theo danh sách đang chọn, phù hợp cho đối soát nhanh và gửi lại cho bộ phận liên quan.
                 </p>
               </div>

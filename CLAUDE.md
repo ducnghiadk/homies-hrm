@@ -48,7 +48,8 @@ Kiến trúc hiện tại nghiêng về client-side pages + service layer + mock
 15. Khi tôi nói "audit", "kiểm tra", hoặc "health check", chạy skill audit theo đúng quy trình.
 
 ## Lệnh dev
-- `npm run dev`: chạy dev server ở cổng `3333`
+- `npm run dev`: chạy dev server ở cổng `3535`
+- `npm run restart`: restart dev server ở cổng `3535`
 - `npm run build`: build production
 - `npm run start`: chạy bản build
 - `npm run lint`: chạy ESLint

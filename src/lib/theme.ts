@@ -25,7 +25,7 @@ export const colors = {
   // Secondary palette
   secondary: {
     50: '#F5FCFA',
-    100: '#EFFBFAF',
+    100: '#DDF4EC',
     200: '#DDF4EC',
     300: '#8EDEA9',
     400: '#48C079',

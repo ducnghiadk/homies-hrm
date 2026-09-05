@@ -241,121 +241,7 @@ export const STATUS_CONFIG: Record<LeaveStatus, { label: string; color: string; 
 // MOCK DATA
 // ═══════════════════════════════════════════
 
-export const mockLeaveRequests: LeaveRequest[] = [
-  {
-    id: 'LR-001', employee_id: 'emp-005', employee_name: 'Nguyễn Văn An',
-    employee_position: 'Barista', store_id: 'store-001',
-    leave_type: 'annual', leave_type_label: 'Phép năm', status: 'pending',
-    start_date: '2026-02-24', end_date: '2026-02-25', days: 2,
-    isHalfDay: false, reason: 'Về quê thăm gia đình dịp giỗ ông nội',
-    created_at: '2026-02-17T10:00:00', updated_at: '2026-02-17T10:00:00',
-    hasScheduleConflict: true,
-    conflictingShifts: [
-      { shiftId: 'S-024', date: '2026-02-24', time: '08:00 - 16:00', position: 'Barista' },
-      { shiftId: 'S-025', date: '2026-02-25', time: '08:00 - 16:00', position: 'Barista' },
-    ],
-  },
-  {
-    id: 'LR-002', employee_id: 'emp-006', employee_name: 'Trần Thị Bình',
-    employee_position: 'Thu ngân', store_id: 'store-001',
-    leave_type: 'sick', leave_type_label: 'Nghỉ ốm', status: 'approved',
-    start_date: '2026-02-18', end_date: '2026-02-18', days: 1,
-    isHalfDay: false, reason: 'Bị cảm sốt, đã uống thuốc',
-    created_at: '2026-02-17T07:00:00', updated_at: '2026-02-17T08:00:00',
-    approver_id: 'emp-002', approver_name: 'Nguyễn Quản Lý',
-    approved_at: '2026-02-17T08:00:00', approver_comment: 'OK, nghỉ ngơi nhé. Gửi giấy BS qua app nha',
-    hasScheduleConflict: false,
-  },
-  {
-    id: 'LR-003', employee_id: 'emp-007', employee_name: 'Lê Văn Cường',
-    employee_position: 'Barista', store_id: 'store-001',
-    leave_type: 'annual', leave_type_label: 'Phép năm', status: 'rejected',
-    start_date: '2026-02-14', end_date: '2026-02-14', days: 1,
-    isHalfDay: false, reason: 'Nghỉ Valentine',
-    created_at: '2026-02-10T14:00:00', updated_at: '2026-02-11T09:00:00',
-    approver_id: 'emp-002', approver_name: 'Nguyễn Quản Lý',
-    rejected_at: '2026-02-11T09:00:00', approver_comment: 'Ngày cao điểm, thiếu người. Chọn ngày khác nha',
-    hasScheduleConflict: false,
-  },
-  {
-    id: 'LR-004', employee_id: 'emp-008', employee_name: 'Phạm Thị Dung',
-    employee_position: 'Phục vụ', store_id: 'store-001',
-    leave_type: 'personal', leave_type_label: 'Việc riêng', status: 'pending',
-    start_date: '2026-02-26', end_date: '2026-02-26', days: 0.5,
-    isHalfDay: true, halfDayPeriod: 'morning',
-    reason: 'Đưa con đi khám bệnh buổi sáng',
-    created_at: '2026-02-18T20:00:00', updated_at: '2026-02-18T20:00:00',
-    hasScheduleConflict: true,
-    conflictingShifts: [
-      { shiftId: 'S-030', date: '2026-02-26', time: '07:00 - 15:00', position: 'Phục vụ' },
-    ],
-  },
-  {
-    id: 'LR-005', employee_id: 'emp-009', employee_name: 'Hoàng Minh Đức',
-    employee_position: 'Barista', store_id: 'store-002',
-    leave_type: 'wedding', leave_type_label: 'Nghỉ cưới', status: 'approved',
-    start_date: '2026-03-10', end_date: '2026-03-12', days: 3,
-    isHalfDay: false, reason: 'Kết hôn - đã gửi thiệp cho quản lý',
-    document_url: '/docs/wedding-invite.jpg',
-    created_at: '2026-02-01T10:00:00', updated_at: '2026-02-02T09:00:00',
-    approver_id: 'emp-003', approver_name: 'Trần Quản Lý',
-    approved_at: '2026-02-02T09:00:00', approver_comment: 'Chúc mừng! 🎉',
-    hasScheduleConflict: false,
-  },
-  {
-    id: 'LR-006', employee_id: 'emp-010', employee_name: 'Vũ Thị Hoa',
-    employee_position: 'Thu ngân', store_id: 'store-001',
-    leave_type: 'sick', leave_type_label: 'Nghỉ ốm', status: 'pending',
-    start_date: '2026-02-19', end_date: '2026-02-20', days: 2,
-    isHalfDay: false, reason: 'Đau dạ dày, cần nghỉ ngơi',
-    created_at: '2026-02-19T06:30:00', updated_at: '2026-02-19T06:30:00',
-    hasScheduleConflict: true,
-    conflictingShifts: [
-      { shiftId: 'S-040', date: '2026-02-19', time: '10:00 - 18:00', position: 'Thu ngân' },
-      { shiftId: 'S-041', date: '2026-02-20', time: '10:00 - 18:00', position: 'Thu ngân' },
-    ],
-  },
-  {
-    id: 'LR-007', employee_id: 'emp-011', employee_name: 'Đặng Minh Khoa',
-    employee_position: 'Barista', store_id: 'store-001',
-    leave_type: 'unpaid', leave_type_label: 'Không lương', status: 'cancelled',
-    start_date: '2026-02-10', end_date: '2026-02-12', days: 3,
-    isHalfDay: false, reason: 'Thi cuối kỳ đại học',
-    created_at: '2026-02-05T18:00:00', updated_at: '2026-02-07T10:00:00',
-    hasScheduleConflict: false,
-  },
-  {
-    id: 'LR-008', employee_id: 'emp-005', employee_name: 'Nguyễn Văn An',
-    employee_position: 'Barista', store_id: 'store-001',
-    leave_type: 'annual', leave_type_label: 'Phép năm', status: 'approved',
-    start_date: '2026-01-20', end_date: '2026-01-22', days: 3,
-    isHalfDay: false, reason: 'Về quê ăn Tết muộn',
-    created_at: '2026-01-10T10:00:00', updated_at: '2026-01-12T08:00:00',
-    approver_id: 'emp-002', approver_name: 'Nguyễn Quản Lý',
-    approved_at: '2026-01-12T08:00:00',
-    hasScheduleConflict: false,
-  },
-  {
-    id: 'LR-009', employee_id: 'emp-012', employee_name: 'Lý Thị Thanh',
-    employee_position: 'Phục vụ', store_id: 'store-002',
-    leave_type: 'bereavement', leave_type_label: 'Nghỉ tang', status: 'approved',
-    start_date: '2026-02-15', end_date: '2026-02-17', days: 3,
-    isHalfDay: false, reason: 'Bà ngoại mất',
-    created_at: '2026-02-15T05:00:00', updated_at: '2026-02-15T06:00:00',
-    approver_id: 'emp-003', approver_name: 'Trần Quản Lý',
-    approved_at: '2026-02-15T06:00:00', approver_comment: 'Chia buồn. Nghỉ phép được duyệt ngay.',
-    hasScheduleConflict: false,
-  },
-  {
-    id: 'LR-010', employee_id: 'emp-006', employee_name: 'Trần Thị Bình',
-    employee_position: 'Thu ngân', store_id: 'store-001',
-    leave_type: 'annual', leave_type_label: 'Phép năm', status: 'pending',
-    start_date: '2026-03-03', end_date: '2026-03-04', days: 2,
-    isHalfDay: false, reason: 'Đi du lịch Đà Lạt cuối tuần',
-    created_at: '2026-02-19T12:00:00', updated_at: '2026-02-19T12:00:00',
-    hasScheduleConflict: false,
-  },
-]
+export const mockLeaveRequests: LeaveRequest[] = []
 
 // ═══════════════════════════════════════════
 // QUOTAS
@@ -364,152 +250,7 @@ export const mockLeaveRequests: LeaveRequest[] = [
 const emptyQuota = (total: number): QuotaDetail =>
   ({ total, used: 0, pending: 0, remaining: total })
 
-export const mockLeaveQuotas: LeaveQuota[] = [
-  {
-    employee_id: 'emp-005', employee_name: 'Nguyễn Văn An', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 3, pending: 2, remaining: 7, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 0, pending: 0, remaining: 30 },
-      unpaid:      { total: 0,  used: 0, pending: 0, remaining: 999 },
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    { total: 3,  used: 1, pending: 0, remaining: 2 },
-    },
-  },
-  {
-    employee_id: 'emp-006', employee_name: 'Trần Thị Bình', year: 2026,
-    quotas: {
-      annual:      { total: 13, used: 4, pending: 2, remaining: 7, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 1, pending: 0, remaining: 29 },
-      unpaid:      { total: 0,  used: 0, pending: 0, remaining: 999 },
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    { total: 3,  used: 0, pending: 0, remaining: 3 },
-    },
-  },
-  {
-    employee_id: 'emp-007', employee_name: 'Lê Văn Cường', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 10, pending: 0, remaining: 2, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 5,  pending: 0, remaining: 25 },
-      unpaid:      { total: 0,  used: 3,  pending: 0, remaining: 999 },
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    { total: 3,  used: 3,  pending: 0, remaining: 0 },
-    },
-  },
-  {
-    employee_id: 'emp-008', employee_name: 'Phạm Thị Dung', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 0, pending: 0, remaining: 12, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 0, pending: 0, remaining: 30 },
-      unpaid:      { total: 0,  used: 0, pending: 0, remaining: 999 },
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    { total: 3,  used: 0, pending: 1, remaining: 2 },
-    },
-  },
-  {
-    employee_id: 'emp-009', employee_name: 'Hoàng Minh Đức', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 1, pending: 0, remaining: 11, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 2, pending: 0, remaining: 28 },
-      unpaid:      emptyQuota(0),
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    { total: 3, used: 1, pending: 0, remaining: 2 },
-    },
-  },
-  {
-    employee_id: 'emp-010', employee_name: 'Vũ Thị Hoa', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 2, pending: 1, remaining: 9, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 2, pending: 0, remaining: 28 },
-      unpaid:      emptyQuota(0),
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    emptyQuota(3),
-    },
-  },
-  {
-    employee_id: 'emp-011', employee_name: 'Đỗ Văn Khánh', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 0, pending: 0, remaining: 12, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 0, pending: 0, remaining: 30 },
-      unpaid:      emptyQuota(0),
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    emptyQuota(3),
-    },
-  },
-  {
-    employee_id: 'emp-012', employee_name: 'Lý Thị Thanh', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 0, pending: 0, remaining: 12, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 0, pending: 0, remaining: 30 },
-      unpaid:      emptyQuota(0),
-      wedding:     emptyQuota(3),
-      bereavement: { total: 3, used: 3, pending: 0, remaining: 0 },
-      maternity:   emptyQuota(180),
-      personal:    emptyQuota(3),
-    },
-  },
-  {
-    employee_id: 'emp-013', employee_name: 'Trương Văn Nam', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 0, pending: 0, remaining: 12, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 0, pending: 0, remaining: 30 },
-      unpaid:      emptyQuota(0),
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    emptyQuota(3),
-    },
-  },
-  {
-    employee_id: 'emp-014', employee_name: 'Phan Thị Oanh', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 3, pending: 0, remaining: 9, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 1, pending: 0, remaining: 29 },
-      unpaid:      emptyQuota(0),
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    { total: 3, used: 1, pending: 0, remaining: 2 },
-    },
-  },
-  {
-    employee_id: 'emp-015', employee_name: 'Ngô Văn Phúc', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 0, pending: 0, remaining: 12, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 0, pending: 0, remaining: 30 },
-      unpaid:      emptyQuota(0),
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    emptyQuota(3),
-    },
-  },
-  {
-    employee_id: 'emp-016', employee_name: 'Bùi Thị Quỳnh', year: 2026,
-    quotas: {
-      annual:      { total: 12, used: 5, pending: 0, remaining: 7, expiryDate: '2026-12-31' },
-      sick:        { total: 30, used: 3, pending: 0, remaining: 27 },
-      unpaid:      emptyQuota(0),
-      wedding:     emptyQuota(3),
-      bereavement: emptyQuota(3),
-      maternity:   emptyQuota(180),
-      personal:    { total: 3, used: 2, pending: 0, remaining: 1 },
-    },
-  },
-]
+export const mockLeaveQuotas: LeaveQuota[] = []
 
 // ═══════════════════════════════════════════
 // BLACKOUT DATES
@@ -534,21 +275,7 @@ const leaveTypeColors: Record<LeaveType, string> = {
   wedding: '#ec4899', bereavement: '#475569',
 }
 
-export const mockLeaveCalendar: LeaveCalendarEntry[] = [
-  { date: '2026-02-15', employee_id: 'emp-012', employee_name: 'Lý Thị Thanh',  leave_type: 'bereavement', color: leaveTypeColors.bereavement },
-  { date: '2026-02-16', employee_id: 'emp-012', employee_name: 'Lý Thị Thanh',  leave_type: 'bereavement', color: leaveTypeColors.bereavement },
-  { date: '2026-02-17', employee_id: 'emp-012', employee_name: 'Lý Thị Thanh',  leave_type: 'bereavement', color: leaveTypeColors.bereavement },
-  { date: '2026-02-18', employee_id: 'emp-006', employee_name: 'Trần Thị Bình', leave_type: 'sick',        color: leaveTypeColors.sick },
-  { date: '2026-02-19', employee_id: 'emp-010', employee_name: 'Vũ Thị Hoa',    leave_type: 'sick',        color: leaveTypeColors.sick },
-  { date: '2026-02-20', employee_id: 'emp-010', employee_name: 'Vũ Thị Hoa',    leave_type: 'sick',        color: leaveTypeColors.sick },
-  { date: '2026-02-24', employee_id: 'emp-005', employee_name: 'Nguyễn Văn An',  leave_type: 'annual',      color: leaveTypeColors.annual },
-  { date: '2026-02-25', employee_id: 'emp-005', employee_name: 'Nguyễn Văn An',  leave_type: 'annual',      color: leaveTypeColors.annual },
-  { date: '2026-03-03', employee_id: 'emp-006', employee_name: 'Trần Thị Bình', leave_type: 'annual',      color: leaveTypeColors.annual },
-  { date: '2026-03-04', employee_id: 'emp-006', employee_name: 'Trần Thị Bình', leave_type: 'annual',      color: leaveTypeColors.annual },
-  { date: '2026-03-10', employee_id: 'emp-009', employee_name: 'Hoàng Minh Đức', leave_type: 'wedding',     color: leaveTypeColors.wedding },
-  { date: '2026-03-11', employee_id: 'emp-009', employee_name: 'Hoàng Minh Đức', leave_type: 'wedding',     color: leaveTypeColors.wedding },
-  { date: '2026-03-12', employee_id: 'emp-009', employee_name: 'Hoàng Minh Đức', leave_type: 'wedding',     color: leaveTypeColors.wedding },
-]
+export const mockLeaveCalendar: LeaveCalendarEntry[] = []
 
 // ═══════════════════════════════════════════
 // POLICIES
@@ -587,7 +314,22 @@ export function getLeaveStats(requests: LeaveRequest[] = mockLeaveRequests): Lea
 }
 
 export function getMyQuota(employeeId: string): LeaveQuota | undefined {
-  return mockLeaveQuotas.find(q => q.employee_id === employeeId)
+  const found = mockLeaveQuotas.find(q => q.employee_id === employeeId)
+  if (found) return found
+  return {
+    employee_id: employeeId,
+    employee_name: '',
+    year: new Date().getFullYear(),
+    quotas: {
+      annual: { total: 12, used: 0, pending: 0, remaining: 12, expiryDate: `${new Date().getFullYear()}-12-31` },
+      sick: { total: 30, used: 0, pending: 0, remaining: 30 },
+      unpaid: { total: 0, used: 0, pending: 0, remaining: 999 },
+      wedding: emptyQuota(3),
+      bereavement: emptyQuota(3),
+      maternity: emptyQuota(180),
+      personal: { total: 3, used: 0, pending: 0, remaining: 3 },
+    },
+  }
 }
 
 export function getMyRequests(employeeId: string): LeaveRequest[] {

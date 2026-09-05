@@ -10,8 +10,8 @@ export function SetupWizardBanner() {
 
   return (
     <div className="rounded-2xl p-4 border" style={{
-      background: 'linear-gradient(135deg, #f3e8ff 0%, #e0f2fe 100%)',
-      borderColor: '#e9d5ff',
+      background: 'linear-gradient(135deg, #f8f4e8 0%, #fff7d7 100%)',
+      borderColor: '#f8d36b',
     }}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
@@ -24,7 +24,7 @@ export function SetupWizardBanner() {
             <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: '#e5e7eb' }}>
               <div
                 className="h-full rounded-full transition-all"
-                style={{ width: `${progress.percentage}%`, background: 'linear-gradient(90deg, #9333ea, #2F6FA8)' }}
+                style={{ width: `${progress.percentage}%`, background: 'linear-gradient(90deg, #17362f, #113b32)' }}
               />
             </div>
             <span className="text-sm font-semibold" style={{ color: '#6b7280' }}>
@@ -42,8 +42,8 @@ export function SetupWizardBanner() {
         {progress.nextStep && (
           <Link
             href={progress.nextStep.href}
-            className="px-4 py-2 text-white text-xs font-semibold rounded-lg whitespace-nowrap"
-            style={{ background: '#7c3aed', transition: 'opacity 0.2s' }}
+            className="px-4 py-2 text-white text-xs font-semibold rounded-lg whitespace-nowrap shadow-sm"
+            style={{ background: '#17362f', transition: 'opacity 0.2s' }}
           >
             Thiết lập ngay →
           </Link>

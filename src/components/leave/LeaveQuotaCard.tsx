@@ -123,7 +123,7 @@ function QuotaItem({
 
       {/* Progress bar — stacked segments */}
       {!isUnlimited && (
-        <div className="w-full h-2.5 rounded-full bg-gray-100 mb-1.5 overflow-hidden flex">
+        <div className="w-full h-2.5 rounded-full bg-primary-50 mb-1.5 overflow-hidden flex">
           <div
             className="h-full rounded-l-full transition-all duration-700"
             style={{ width: `${usedPct}%`, background: info.colorHex }}
@@ -143,7 +143,7 @@ function QuotaItem({
           'inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-sm font-bold font-numeric',
           isLow ? 'bg-error-100 text-error-700'
           : isMedium ? 'bg-warning-100 text-warning-700'
-          : isUnlimited ? 'bg-gray-100 text-gray-600'
+          : isUnlimited ? 'bg-primary-50 text-gray-600'
           : 'bg-success-100 text-success-700'
         )}>
           {isUnlimited ? '∞' : `${quota.remaining}/${quota.total}`}

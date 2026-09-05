@@ -394,7 +394,7 @@ export default function DragDropScheduleEditor({
         <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 flex items-center gap-1.5"
+            className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-vanilla-50 flex items-center gap-1.5"
           >
             <X size={16} /> Hủy
           </button>

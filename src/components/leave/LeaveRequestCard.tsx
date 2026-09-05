@@ -219,7 +219,7 @@ export default function LeaveRequestCard({
                   {onRequestInfo && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onRequestInfo(r.id) }}
-                      className="h-10 px-4 rounded-xl bg-gray-100 text-gray-600 text-sm font-medium
+                      className="h-10 px-4 rounded-xl bg-primary-50 text-gray-600 text-sm font-medium
                         flex items-center gap-2
                         hover:bg-gray-200 active:scale-[0.98] transition-all"
                     >
@@ -236,7 +236,7 @@ export default function LeaveRequestCard({
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onReject?.(r.id) }}
-                    className="flex-1 h-10 px-4 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold
+                    className="flex-1 h-10 px-4 rounded-xl bg-primary-50 text-gray-700 text-sm font-semibold
                       flex items-center justify-center gap-2
                       hover:bg-error-50 hover:text-error-600 active:scale-[0.98] transition-all"
                   >
@@ -248,7 +248,7 @@ export default function LeaveRequestCard({
               {viewMode === 'employee' && r.status === 'pending' && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onCancel?.(r.id) }}
-                  className="flex-1 h-10 px-4 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold
+                  className="flex-1 h-10 px-4 rounded-xl bg-primary-50 text-gray-700 text-sm font-semibold
                     flex items-center justify-center gap-2
                     hover:bg-error-50 hover:text-error-600 active:scale-[0.98] transition-all"
                 >

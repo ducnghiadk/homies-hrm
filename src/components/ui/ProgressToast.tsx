@@ -72,7 +72,7 @@ export default function ProgressToast({
         </div>
 
         {/* Progress bar */}
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-primary-50 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-300 ${barColor}`}
             style={{ width: `${Math.min(progress, 100)}%` }}

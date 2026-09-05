@@ -73,15 +73,15 @@ function OpenShiftCard({ os, onClaim, highlighted }: { os: OpenShift; onClaim: (
       </div>
 
       <div className="flex gap-2">
-        <div className="flex-1 px-3 py-2 rounded-xl bg-gray-50 space-y-0.5">
+        <div className="flex-1 px-3 py-2 rounded-xl bg-vanilla-50 space-y-0.5">
           <p className="text-[9px] text-gray-400 flex items-center gap-1"><MapPin size={9} /> Cửa hàng</p>
           <p className="text-xs font-bold text-dark-700">{store?.name || ''}</p>
         </div>
-        <div className="flex-1 px-3 py-2 rounded-xl bg-gray-50 space-y-0.5">
+        <div className="flex-1 px-3 py-2 rounded-xl bg-vanilla-50 space-y-0.5">
           <p className="text-[9px] text-gray-400 flex items-center gap-1"><Briefcase size={9} /> Vị trí</p>
           <p className="text-xs font-bold text-dark-700">{position?.name || ''}</p>
         </div>
-        <div className="flex-1 px-3 py-2 rounded-xl bg-gray-50 space-y-0.5">
+        <div className="flex-1 px-3 py-2 rounded-xl bg-vanilla-50 space-y-0.5">
           <p className="text-[9px] text-gray-400 flex items-center gap-1"><Users size={9} /> Cần</p>
           <p className="text-xs font-bold text-dark-700">
             <span className="text-success-600">{approvedCount}</span>/{os.slots_needed}
@@ -302,7 +302,7 @@ function OpenShiftsPageContent() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => router.back()}
-              className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+              className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center hover:bg-gray-200 transition-colors">
               <ChevronLeft size={20} className="text-gray-500" />
             </button>
             <div>
@@ -365,7 +365,7 @@ function OpenShiftsPageContent() {
           </div>
         </div>
 
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        <div className="flex gap-1 bg-primary-50 rounded-xl p-1">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
@@ -385,7 +385,7 @@ function OpenShiftsPageContent() {
           <div className="space-y-3">
             {available.length === 0 ? (
               <div className="text-center py-16 space-y-3">
-                <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto">
+                <div className="w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto">
                   <CheckCircle2 size={28} className="text-gray-300" />
                 </div>
                 <p className="text-sm text-gray-400 font-medium">Không có ca trống phù hợp</p>
@@ -406,7 +406,7 @@ function OpenShiftsPageContent() {
           <div className="space-y-2">
             {myClaims.length === 0 ? (
               <div className="text-center py-16 space-y-3">
-                <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto">
+                <div className="w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto">
                   <AlertCircle size={28} className="text-gray-300" />
                 </div>
                 <p className="text-sm text-gray-400 font-medium">Chưa đăng ký ca nào</p>
@@ -433,7 +433,7 @@ function OpenShiftsPageContent() {
             <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto" />
             <h3 className="text-lg font-bold text-dark-700 text-center">Xác nhận nhận ca</h3>
 
-            <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
+            <div className="bg-vanilla-50 rounded-2xl p-4 space-y-2">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold"
                   style={{ backgroundColor: confirmShiftInfo?.color || '#6B7280' }}>
@@ -462,7 +462,7 @@ function OpenShiftsPageContent() {
 
             <div className="flex gap-3">
               <button onClick={() => setConfirmId(null)}
-                className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-600 text-sm font-medium">
+                className="flex-1 py-3 rounded-xl bg-primary-50 text-gray-600 text-sm font-medium">
                 Hủy
               </button>
               <button onClick={handleConfirmClaim}
@@ -486,7 +486,7 @@ function OpenShiftsPageContent() {
 export default function OpenShiftsPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-vanilla-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-gray-500 text-sm font-medium">Đang tải danh sách ca trống...</p>

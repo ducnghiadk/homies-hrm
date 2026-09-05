@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import "@xyflow/react/dist/style.css"
 import { Toaster } from "sonner"
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
@@ -36,8 +37,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="vi" className={inter.variable}>
-      <body className={inter.className}>
+    <html lang="vi" suppressHydrationWarning className={inter.variable}>
+      <body suppressHydrationWarning className={inter.className}>
         <ErrorBoundary showDetails={process.env.NODE_ENV === 'development'}>
           {children}
         </ErrorBoundary>

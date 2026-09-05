@@ -19,8 +19,8 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  // So Matcha: Rounded-lg (14px), Poppins font, specific shadows
-  const baseStyles = 'inline-flex items-center justify-center font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none rounded-[14px] font-[Poppins]'
+  // Lean Inter font, rounded-xl (12px), smooth transitions
+  const baseStyles = 'inline-flex items-center justify-center font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none rounded-xl'
   
   const variants = {
     primary: 'bg-gradient-to-br from-primary-600 to-primary-700 text-white shadow-[var(--shadow-primary)] hover:brightness-105 hover:scale-[1.02]',

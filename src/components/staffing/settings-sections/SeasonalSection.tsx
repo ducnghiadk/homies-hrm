@@ -52,7 +52,7 @@ export function SeasonalSectionView({ onEdit }: { onEdit: () => void }) {
                 ? 'border-amber-100 bg-amber-50'
                 : season.adjustment < 0
                   ? 'border-primary-100 bg-primary-50'
-                  : 'border-gray-100 bg-gray-50'
+                  : 'border-gray-100 bg-vanilla-50'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -69,7 +69,7 @@ export function SeasonalSectionView({ onEdit }: { onEdit: () => void }) {
         ))}
       </div>
 
-      <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+      <div className="mt-4 rounded-2xl border border-gray-100 bg-vanilla-50 p-4">
         <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Mua can phong nhieu nhat</div>
         <p className="mt-2 text-sm text-gray-600">
           Hien tai <span className="font-semibold text-gray-800">{highestSeason.name}</span> dang co he so cao nhat
