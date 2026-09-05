@@ -365,10 +365,13 @@ export const shiftAdapter: ShiftAdapter = {
     // 2. Remove from Supabase
     if (isSupabaseConfigured && isRealDbMode()) {
       try {
+        const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        const isUuid = UUID_PATTERN.test(id)
+        
         await supabase
           .from('ca_lam')
           .delete()
-          .or(`id.eq.${id},ma_ca.eq.${id}`)
+          .or(isUuid ? `id.eq.${id},ma_ca.eq.${id}` : `ma_ca.eq.${id}`)
       } catch (err) {
         console.warn('[ShiftAdapter] Supabase delete warning:', err)
       }

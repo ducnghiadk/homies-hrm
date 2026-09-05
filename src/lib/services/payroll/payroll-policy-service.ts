@@ -65,6 +65,12 @@ export type PayrollPolicy = {
     otNight: number
     otHoliday: number
   }
+  legal: {
+    personalDeduction: number
+    dependentDeduction: number
+    minRegionSalary: number
+    maxInsuranceSalary: number
+  }
 }
 
 export type PayrollPolicyHistoryEntry = {
@@ -402,6 +408,7 @@ function normalizePayrollPolicy(policy: Partial<PayrollPolicy>): PayrollPolicy {
     allowances: policy.allowances ?? fallback.allowances,
     fnb: { ...fallback.fnb, ...(policy.fnb ?? {}) },
     rates: { ...fallback.rates, ...(policy.rates ?? {}) },
+    legal: { ...fallback.legal, ...(policy.legal ?? {}) },
   }
 }
 

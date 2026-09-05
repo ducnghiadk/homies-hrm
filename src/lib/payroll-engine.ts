@@ -59,6 +59,12 @@ export interface FnbPayrollAllocation {
   breakdown: FnbAllocationBreakdown[]
 }
 
+export interface PayrollAnomaly {
+  type: string
+  date?: string
+  message: string
+}
+
 type PayrollInputResolved = PayrollInput & {
   attendanceSummary?: AttendanceSummaryForPayroll
 }
@@ -120,6 +126,9 @@ export interface PayrollResult {
   // Final
   gross_salary: number
   net_salary: number
+
+  // Warnings
+  anomalies?: PayrollAnomaly[]
 }
 
 // ══════════════════════════════════════
@@ -361,6 +370,7 @@ export interface AttendanceSummaryForPayroll {
   soCaChoDuyet: number
   soCaChuaCheckOut: number
   partTimeOvertimeHours?: number
+  anomalies: PayrollAnomaly[]
 }
 
 function summarizeAttendanceRecords(
@@ -377,6 +387,7 @@ function summarizeAttendanceRecords(
   let soCaChoDuyet = 0
   let soCaChuaCheckOut = 0
   const dailyHoursMap = new Map<string, number>()
+  const anomalies: PayrollAnomaly[] = []
 
   for (const r of records) {
     const isPendingApproval = r.soCaChoDuyet || r.trang_thai_db === 'cho_duyet'
@@ -384,9 +395,11 @@ function summarizeAttendanceRecords(
     const isOpenShift = r.chuaCheckOut || (!r.check_out_time && isWorkStatus)
     if (isPendingApproval) {
       soCaChoDuyet++
+      anomalies.push({ type: 'ca_chua_duyet', date: r.date, message: `Ca ngày ${r.date} chưa được quản lý duyệt.` })
     }
     if (isOpenShift) {
       soCaChuaCheckOut++
+      anomalies.push({ type: 'quen_checkout', date: r.date, message: `Quên check-out hoặc ca ngày ${r.date} đang mở.` })
     }
     if (isPendingApproval || isOpenShift) {
       continue
@@ -442,6 +455,7 @@ function summarizeAttendanceRecords(
     soCaChoDuyet,
     soCaChuaCheckOut,
     partTimeOvertimeHours,
+    anomalies,
   }
 }
 
@@ -507,7 +521,8 @@ export function calculateInsurance(baseSalary: number): {
   total: number
 } {
   const policy = getActivePayrollPolicy()
-  const base = Math.min(baseSalary, INSURANCE_MAX_BASE)
+  const maxBase = policy.legal?.maxInsuranceSalary ?? INSURANCE_MAX_BASE
+  const base = Math.min(baseSalary, maxBase)
   const bhxh = Math.round(base * policy.rates.bhxhEmployee)
   const bhyt = Math.round(base * policy.rates.bhytEmployee)
   const bhtn = Math.round(base * policy.rates.bhtnEmployee)
@@ -522,7 +537,10 @@ export function calculateTax(
   taxableIncome: number,
   dependents: number = 0,
 ): number {
-  const deduction = 11000000 + dependents * 4400000
+  const policy = getActivePayrollPolicy()
+  const personalDeduction = policy.legal?.personalDeduction ?? 11000000
+  const dependentDeduction = policy.legal?.dependentDeduction ?? 4400000
+  const deduction = personalDeduction + dependents * dependentDeduction
   const income = Math.max(0, taxableIncome - deduction)
 
   if (income <= 0) return 0
@@ -645,6 +663,15 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
 
   const isPartTime = input.contractType === 'ban_thoi_gian'
 
+  // ── Step 2.5: Compile anomalies
+  const anomalies: PayrollAnomaly[] = att.anomalies ? [...att.anomalies] : []
+  if (baseSalary === 0) {
+    anomalies.push({ type: 'thieu_luong_co_ban', message: 'Nhân viên chưa được cài đặt mức lương cơ bản (đang lấy giá trị 0đ).' })
+  }
+  if (!input.contractType) {
+    anomalies.push({ type: 'thieu_loai_hop_dong', message: 'Nhân viên chưa được gắn loại hợp đồng (Toàn thời gian/Bán thời gian).' })
+  }
+
   // ── Step 3: Base earned & Step 4: Overtime
   let baseEarned = 0
   let overtimeAmount = 0
@@ -722,7 +749,6 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     position: pos?.name ?? '',
     store: storeName,
     period: `${periodStart.slice(0, 7)}`,
-
     standard_days: standardDays,
     work_days: att.workDays,
     leave_days_paid: att.leavePaid,
@@ -732,11 +758,17 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     soCaChoDuyet: att.soCaChoDuyet,
     soCaChuaCheckOut: att.soCaChuaCheckOut,
     total_hours: att.totalHours,
-
     base_salary: baseSalary,
     base_earned: baseEarned,
     overtime_hours: overtimeHoursToReport,
     overtime_amount: overtimeAmount,
+    other_deductions: otherDeductions,
+    total_other_deductions: totalOtherDeductions,
+    total_deductions: totalDeductions,
+
+    bhxh: insurance.bhxh,
+    bhyt: insurance.bhyt,
+    bhtn: insurance.bhtn,
     allowances,
     total_allowances: totalAllowances,
     bonuses,
@@ -750,7 +782,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
 
     late_deduction: lateDeduction,
     absent_deduction: absentDeduction,
-    advance_deduction: advanceDeduction,
+    advance_deduction: advance_deduction,
     other_deductions: otherDeductions,
     total_other_deductions: totalOtherDeductions,
     total_deductions: totalDeductions,
@@ -765,6 +797,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
 
     gross_salary: grossSalary,
     net_salary: netSalary,
+    anomalies,
   }
 }
 

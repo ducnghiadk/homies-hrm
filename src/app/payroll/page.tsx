@@ -123,6 +123,7 @@ type PayrollTableRow = {
   bankAccount: PayrollRowBankAccount | null
   isResigned: boolean
   pendingShifts: number
+  anomalies: { type: string; date?: string; message: string }[]
 }
 
 type PayrollRowBankAccount = Omit<PayrollPaymentBankAccount, 'bankCode'> & {
@@ -491,6 +492,7 @@ export default function PayrollPage() {
          bankAccount,
          isResigned: res.is_resigned_employee,
          pendingShifts: res.soCaChoDuyet,
+         anomalies: res.anomalies || [],
        }
     }).filter((row): row is PayrollTableRow => row !== null)
   }, [selectedPeriod, payrollResults, employees, positions, stores, bonusOverrides, deductionOverrides, statusOverrides, statusPeriod])
@@ -501,6 +503,22 @@ export default function PayrollPage() {
       totalShifts: pendingRows.reduce((sum, r) => sum + r.pendingShifts, 0),
       employees: pendingRows.map(r => r.name),
     }
+  }, [tableData])
+
+  const anomalySummary = useMemo(() => {
+    const grouped: Record<string, { count: number, type: string, message: string, examples: string[] }> = {}
+    tableData.forEach(row => {
+      row.anomalies?.forEach(a => {
+        if (!grouped[a.type]) {
+          grouped[a.type] = { count: 0, type: a.type, message: a.message, examples: [] }
+        }
+        grouped[a.type].count++
+        if (grouped[a.type].examples.length < 3) {
+          grouped[a.type].examples.push(`${row.name} (${row.code})${a.date ? ` - ${a.date}` : ''}`)
+        }
+      })
+    })
+    return Object.values(grouped)
   }, [tableData])
 
   useEffect(() => {
@@ -881,10 +899,10 @@ export default function PayrollPage() {
             </select>
             {period && (
               <span className="text-xs px-2.5 py-1 rounded-full font-bold" style={{
-                background: period.status === 'paid' ? 'var(--success-light)' : period.status === 'confirmed' ? 'var(--warning-light)' : 'var(--gray-100)',
-                color: period.status === 'paid' ? 'var(--success)' : period.status === 'confirmed' ? 'var(--warning)' : 'var(--text-muted)',
+                background: period.status === 'da_chot' ? 'var(--success-light)' : 'var(--gray-100)',
+                color: period.status === 'da_chot' ? 'var(--success)' : 'var(--text-muted)',
               }}>
-                {period.status === 'paid' ? 'Đã chi trả' : period.status === 'confirmed' ? 'Đã duyệt' : 'Bản nháp'}
+                {period.status === 'da_chot' ? 'Kỳ đã chốt' : 'Bản nháp'}
               </span>
             )}
           </div>
@@ -1051,8 +1069,8 @@ export default function PayrollPage() {
               <div className="flex items-center gap-2 relative">
                 <button
                   onClick={async () => {
-                    if (pendingSummary.totalShifts > 0) {
-                      alert('Không thể chốt lương khi còn ca chưa duyệt!')
+                    if (pendingSummary.totalShifts > 0 || anomalySummary.length > 0) {
+                      alert('Không thể chốt lương khi còn ca chưa duyệt hoặc có cảnh báo dữ liệu. Vui lòng xử lý dứt điểm các lỗi trước.')
                       return
                     }
                     if (!window.confirm('Bạn có chắc chắn muốn chốt bảng lương này? Sau khi chốt sẽ không thể tính lại!')) return
@@ -1066,7 +1084,7 @@ export default function PayrollPage() {
                       alert(`Chốt thất bại: ${res.error}`)
                     }
                   }}
-                  disabled={payrollPeriodStatus === 'da_chot' || pendingSummary.totalShifts > 0 || isPayrollLoading}
+                  disabled={payrollPeriodStatus === 'da_chot' || pendingSummary.totalShifts > 0 || anomalySummary.length > 0 || isPayrollLoading}
                   className={`btn text-xs py-1.5 px-3 border-0 gap-1 font-semibold flex items-center shadow-xs cursor-pointer ${
                     payrollPeriodStatus === 'da_chot' ? 'bg-slate-600 text-slate-300' : 'bg-rose-600 hover:bg-rose-500 text-white'
                   }`}
@@ -1157,6 +1175,21 @@ export default function PayrollPage() {
             </div>
 
             {/* Scrollable Spreadsheet Grid Table with Dynamic Columns */}
+            {anomalySummary.length > 0 && payrollPeriodStatus === 'chua_chot' && (
+              <div className="text-xs mt-2 mx-3 px-3 py-2 bg-amber-50 text-amber-800 rounded-md border border-amber-200">
+                <div className="font-bold flex items-center gap-1.5 mb-1.5">
+                  <AlertTriangle size={14} className="text-amber-600" /> Có một số bất thường dữ liệu, vui lòng xử lý trước khi chốt lương:
+                </div>
+                <ul className="list-disc pl-5 space-y-1">
+                  {anomalySummary.map(a => (
+                    <li key={a.type}>
+                      <strong>{a.count} trường hợp</strong> bị <em>{a.message}</em>. 
+                      (Ví dụ: {a.examples.join(', ')}{a.count > 3 ? ', ...' : ''})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {pendingSummary.totalShifts > 0 && payrollPeriodStatus === 'chua_chot' && (
               <div className="text-xs mt-2 mx-3 px-3 py-2 bg-rose-50 text-rose-700 rounded-md border border-rose-200">
                 <strong>Còn {pendingSummary.totalShifts} ca chưa duyệt</strong> của {pendingSummary.employees.length} nhân viên ({pendingSummary.employees.join(', ')}) — số giờ này đang được tính là 0. Duyệt hết trước khi chốt lương.

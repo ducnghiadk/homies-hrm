@@ -486,6 +486,15 @@ function SettingsPayrollContent() {
     }))
   }
 
+  const updateLegal = (field: 'personalDeduction' | 'dependentDeduction' | 'minRegionSalary' | 'maxInsuranceSalary', value: number) => {
+    if (!canEdit) return
+    setPolicy(current => ({
+      ...current,
+      status: current.status === 'active' ? 'draft' : current.status,
+      legal: { ...(current.legal || { personalDeduction: 11000000, dependentDeduction: 4400000, minRegionSalary: 4680000, maxInsuranceSalary: 29800000 }), [field]: value },
+    }))
+  }
+
   const handleSaveDraft = () => {
     savePolicy({
       ...policy,
@@ -1485,6 +1494,57 @@ function SettingsPayrollContent() {
                           className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-mono font-bold text-[#001D3D] outline-none"
                         />
                         <span className="text-[11px] text-gray-400 block">Khấu trừ lương đóng BH</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Thông Số Pháp Lý (Lương Vùng & Thuế) */}
+                  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs mt-4">
+                    <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
+                      <Shield size={16} className="text-purple-700" />
+                      <span>Thông Số Pháp Lý (Lương Vùng & Thuế)</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mb-4">Các chỉ số được áp dụng để tính thuế TNCN và giới hạn bảo hiểm</p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
+                        <label className="text-[11px] font-bold text-gray-700 block mb-1">Giảm trừ gia cảnh (Bản thân)</label>
+                        <MoneyNumberInput
+                          value={policy.legal?.personalDeduction || 11000000}
+                          step={100000}
+                          disabled={!canEdit}
+                          onChange={val => updateLegal('personalDeduction', val)}
+                        />
+                      </div>
+                      
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
+                        <label className="text-[11px] font-bold text-gray-700 block mb-1">Giảm trừ người phụ thuộc</label>
+                        <MoneyNumberInput
+                          value={policy.legal?.dependentDeduction || 4400000}
+                          step={100000}
+                          disabled={!canEdit}
+                          onChange={val => updateLegal('dependentDeduction', val)}
+                        />
+                      </div>
+                      
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
+                        <label className="text-[11px] font-bold text-gray-700 block mb-1">Lương tối thiểu vùng</label>
+                        <MoneyNumberInput
+                          value={policy.legal?.minRegionSalary || 4680000}
+                          step={100000}
+                          disabled={!canEdit}
+                          onChange={val => updateLegal('minRegionSalary', val)}
+                        />
+                      </div>
+                      
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
+                        <label className="text-[11px] font-bold text-gray-700 block mb-1">Trần lương đóng BH</label>
+                        <MoneyNumberInput
+                          value={policy.legal?.maxInsuranceSalary || 29800000}
+                          step={100000}
+                          disabled={!canEdit}
+                          onChange={val => updateLegal('maxInsuranceSalary', val)}
+                        />
                       </div>
                     </div>
                   </div>

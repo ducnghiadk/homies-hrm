@@ -124,9 +124,9 @@ async function updatePayslipFields(
   periodId: string,
   fields: Record<string, unknown>,
   action: string,
-): Promise<boolean> {
+): Promise<{ success: boolean; error?: string }> {
   const resolvedPeriodId = await resolvePayrollPeriodId(periodId)
-  if (!resolvedPeriodId || !UUID_PATTERN.test(employeeId)) return false
+  if (!resolvedPeriodId || !UUID_PATTERN.test(employeeId)) return { success: false, error: 'Invalid ID' }
 
   try {
     const { data, error } = await supabase
@@ -138,12 +138,12 @@ async function updatePayslipFields(
 
     if (error || !data || data.length === 0) {
       if (error) console.error(`[PayrollAdapter] Error ${action} in DB:`, error)
-      return false
+      return { success: false, error: error?.message || 'Not found' }
     }
-    return true
-  } catch (err) {
+    return { success: true }
+  } catch (err: any) {
     console.error(`[PayrollAdapter] ${action} exception:`, err)
-    return false
+    return { success: false, error: err.message || 'Exception occurred' }
   }
 }
 
@@ -412,20 +412,20 @@ export const payrollAdapter = {
   },
 
   // Update Payslip Status in Supabase Real DB
-  async updatePayslipStatus(employeeId: string, periodId: string, status: string): Promise<boolean> {
-    if (!isRealDbMode()) return true
+  async updatePayslipStatus(employeeId: string, periodId: string, status: string): Promise<{ success: boolean; error?: string }> {
+    if (!isRealDbMode()) return { success: true }
     return updatePayslipFields(employeeId, periodId, { trang_thai: status }, 'updating status')
   },
 
   // Update Bonus Ticket in Supabase Real DB
-  async updatePayslipBonus(employeeId: string, periodId: string, bonusAmount: number): Promise<boolean> {
-    if (!isRealDbMode()) return true
+  async updatePayslipBonus(employeeId: string, periodId: string, bonusAmount: number): Promise<{ success: boolean; error?: string }> {
+    if (!isRealDbMode()) return { success: true }
     return updatePayslipFields(employeeId, periodId, { tong_phieu_cong: bonusAmount }, 'updating bonus')
   },
 
   // Update Deduction Ticket in Supabase Real DB
-  async updatePayslipDeduction(employeeId: string, periodId: string, deductionAmount: number): Promise<boolean> {
-    if (!isRealDbMode()) return true
+  async updatePayslipDeduction(employeeId: string, periodId: string, deductionAmount: number): Promise<{ success: boolean; error?: string }> {
+    if (!isRealDbMode()) return { success: true }
     return updatePayslipFields(employeeId, periodId, { tong_phieu_tru: deductionAmount }, 'updating deduction')
   },
 
