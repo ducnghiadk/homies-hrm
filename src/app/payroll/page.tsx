@@ -201,6 +201,7 @@ export default function PayrollPage() {
   const [payrollResults, setPayrollResults] = useState<Awaited<ReturnType<typeof calculatePayrollBatchAsync>>>([])
   const [isPayrollLoading, setIsPayrollLoading] = useState(true)
   const [payrollError, setPayrollError] = useState<string | null>(null)
+  const [policyUnavailable, setPolicyUnavailable] = useState(false)
   const [dailyAttendanceRecords, setDailyAttendanceRecords] = useState<PayrollAttendanceRecord[]>([])
   const [payrollReloadKey, setPayrollReloadKey] = useState(0)
   const [policySource, setPolicySource] = useState<'system' | 'cache' | null>(null)
@@ -355,20 +356,23 @@ export default function PayrollPage() {
           if (dbPolicy) {
             saveStoredPayrollPolicy(dbPolicy)
             if (isMounted) {
+              setPolicyUnavailable(false)
               setPolicySource('system')
               setPolicyInfo({ days: dbPolicy.standardDaysPerMonth || 26, hours: dbPolicy.standardHoursPerDay || 8 })
             }
+            return calculatePayrollBatchAsync(periodStart, periodEnd)
           } else {
-            const cachedPolicy = getStoredPayrollPolicy()
             if (isMounted) {
-              setPolicySource('cache')
-              setPolicyInfo({ days: cachedPolicy.standardDaysPerMonth || 26, hours: cachedPolicy.standardHoursPerDay || 8 })
+              setPolicyUnavailable(true)
+              setPayrollError('Chưa tải được cấu hình lương, vui lòng thử lại.')
+              setPayrollResults([])
+              setIsPayrollLoading(false)
             }
+            return null
           }
-          return calculatePayrollBatchAsync(periodStart, periodEnd)
         })
           .then(results => {
-            if (isMounted) setPayrollResults(results)
+            if (isMounted && results) setPayrollResults(results)
           })
           .catch(error => {
             if (isMounted) {
@@ -1100,7 +1104,7 @@ export default function PayrollPage() {
                       alert(`Chốt thất bại: ${res.error}`)
                     }
                   }}
-                  disabled={!canClosePeriod(payrollPeriodStatus) || pendingSummary.totalShifts > 0 || anomalySummary.length > 0 || isPayrollLoading}
+                  disabled={!canClosePeriod(payrollPeriodStatus) || pendingSummary.totalShifts > 0 || anomalySummary.length > 0 || isPayrollLoading || policyUnavailable}
                   className={`btn text-xs py-1.5 px-3 border-0 gap-1 font-semibold flex items-center shadow-xs cursor-pointer ${
                     !canClosePeriod(payrollPeriodStatus) ? 'bg-slate-600 text-slate-300' : 'bg-rose-600 hover:bg-rose-500 text-white'
                   }`}
@@ -1110,7 +1114,7 @@ export default function PayrollPage() {
 
                 <button
                   onClick={() => setPayrollReloadKey(key => key + 1)}
-                  disabled={isPayrollLoading || !canEditPeriod(payrollPeriodStatus)}
+                  disabled={isPayrollLoading || !canEditPeriod(payrollPeriodStatus) || policyUnavailable}
                   className="btn bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-1.5 px-3 border-0 gap-1 font-semibold flex items-center shadow-xs cursor-pointer"
                 >
                   <RefreshCw size={13} /> {isPayrollLoading ? 'Đang tính lương...' : 'Tính lại lương'}
@@ -1209,6 +1213,14 @@ export default function PayrollPage() {
             {pendingSummary.totalShifts > 0 && canEditPeriod(payrollPeriodStatus) && (
               <div className="text-xs mt-2 mx-3 px-3 py-2 bg-rose-50 text-rose-700 rounded-md border border-rose-200">
                 <strong>Còn {pendingSummary.totalShifts} ca chưa duyệt</strong> của {pendingSummary.employees.length} nhân viên ({pendingSummary.employees.join(', ')}) — số giờ này đang được tính là 0. Duyệt hết trước khi chốt lương.
+              </div>
+            )}
+            {policyUnavailable && (
+              <div className="text-xs mt-2 mb-3 mx-3 px-3 py-2 bg-rose-50 text-rose-700 rounded-md flex items-center gap-2 border border-rose-200">
+                <AlertTriangle size={15} className="text-rose-600 shrink-0" />
+                <span>
+                  <strong>Chưa tải được cấu hình lương, vui lòng thử lại.</strong> Để đảm bảo tính chính xác, tính năng tính lại và chốt kỳ lương tạm thời bị khóa.
+                </span>
               </div>
             )}
             {policySource && policyInfo && (

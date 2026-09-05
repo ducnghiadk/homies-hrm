@@ -1,6 +1,18 @@
 import { masterPositions, settingsPayroll } from '@/lib/mock-data-settings'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { isRealDbMode } from '@/lib/adapters/repository-config'
+import {
+  type PayrollPolicyMeta,
+  type PolicyFieldDef,
+  POLICY_REGISTRY,
+  validatePolicy,
+  migratePolicy,
+  getPolicyValueByPath,
+  setPolicyValueByPath,
+} from '@/lib/payroll/policy-registry'
+
+export type { PayrollPolicyMeta, PolicyFieldDef }
+export { POLICY_REGISTRY, validatePolicy, migratePolicy, getPolicyValueByPath, setPolicyValueByPath }
 
 export type PayrollPolicyStatus = 'draft' | 'pending_ceo' | 'active'
 
@@ -43,12 +55,17 @@ export type PayrollFnbPolicy = {
 }
 
 export type PayrollPolicy = {
+  meta: PayrollPolicyMeta
   version: string
   status: PayrollPolicyStatus
   updatedBy: string
   updatedAt: string
   standardDaysPerMonth?: number
   standardHoursPerDay?: number
+  work?: {
+    standardDaysPerMonth?: number
+    standardHoursPerDay?: number
+  }
   partTimeOvertimeEnabled?: boolean
   partTimeOvertimeThresholdHours?: number
   partTimeOvertimeMultiplier?: number
@@ -93,8 +110,13 @@ export type PayrollPolicyDiff = {
 
 export const PAYROLL_POLICY_STORAGE_KEY = 'homies-payroll-policy-v1'
 export const PAYROLL_POLICY_HISTORY_KEY = 'homies-payroll-policy-history-v1'
+export const PAYROLL_POLICY_CACHE_KEY_PREFIX = 'homies-payroll-policy-cache-v2'
 export const MIN_REGION_1_SALARY = 4680000
 export const INSURANCE_MAX_BASE = 29800000
+
+export function getPayrollPolicyCacheKey(organizationId: string = 'a0000000-0000-0000-0000-000000000001'): string {
+  return `${PAYROLL_POLICY_CACHE_KEY_PREFIX}::${organizationId}`
+}
 
 const defaultFnbPolicy: PayrollFnbPolicy = {
   mealAllowancePerShift: 30000,
@@ -125,12 +147,24 @@ export function buildDefaultPayrollPolicy(): PayrollPolicy {
   }))
 
   return {
+    meta: {
+      schemaVersion: 1,
+      policyVersion: 1,
+      effectiveFrom: '2026-01-01',
+      updatedAt: '22/05/2026 09:10',
+      updatedBy: 'System preset',
+      note: 'Khởi tạo cấu hình mặc định',
+    },
     version: 'VN-2026.01',
     status: 'active',
     updatedBy: 'System preset',
     updatedAt: '22/05/2026 09:10',
     standardDaysPerMonth: 26,
     standardHoursPerDay: 8,
+    work: {
+      standardDaysPerMonth: 26,
+      standardHoursPerDay: 8,
+    },
     partTimeOvertimeEnabled: false,
     partTimeOvertimeThresholdHours: 8,
     partTimeOvertimeMultiplier: 1.5,
@@ -161,51 +195,143 @@ export function buildDefaultPayrollPolicy(): PayrollPolicy {
   }
 }
 
-export function getStoredPayrollPolicy(): PayrollPolicy {
+let inMemoryActivePolicy: PayrollPolicy | null = null
+
+export function setInMemoryActivePolicy(policy: PayrollPolicy | null): void {
+  inMemoryActivePolicy = policy
+}
+
+export function clearLegacyLocalStoragePolicy(): void {
+  if (typeof window === 'undefined') return
+  try {
+    if (window.localStorage.getItem(PAYROLL_POLICY_STORAGE_KEY)) {
+      window.localStorage.removeItem(PAYROLL_POLICY_STORAGE_KEY)
+      console.info('[PayrollPolicy] Đã chủ động xoá key localStorage cũ:', PAYROLL_POLICY_STORAGE_KEY)
+    }
+  } catch (err) {
+    console.warn('[PayrollPolicy] Không thể xoá key cũ:', err)
+  }
+}
+
+export function getStoredPayrollPolicy(organizationId: string = 'a0000000-0000-0000-0000-000000000001'): PayrollPolicy {
+  clearLegacyLocalStoragePolicy()
+  if (inMemoryActivePolicy) return inMemoryActivePolicy
+
   const fallback = buildDefaultPayrollPolicy()
   if (typeof window === 'undefined') return fallback
 
-  const stored = window.localStorage.getItem(PAYROLL_POLICY_STORAGE_KEY)
+  const cacheKey = getPayrollPolicyCacheKey(organizationId)
+  const stored = window.localStorage.getItem(cacheKey)
   if (!stored) return fallback
 
   try {
-    return normalizePayrollPolicy(JSON.parse(stored) as Partial<PayrollPolicy>)
+    const envelope = JSON.parse(stored)
+    const payload = envelope?.payload || envelope
+    return migratePolicy(payload)
   } catch {
-    window.localStorage.removeItem(PAYROLL_POLICY_STORAGE_KEY)
+    window.localStorage.removeItem(cacheKey)
     return fallback
   }
 }
 
-export function saveStoredPayrollPolicy(policy: PayrollPolicy) {
+export function saveStoredPayrollPolicy(policy: PayrollPolicy, organizationId: string = 'a0000000-0000-0000-0000-000000000001') {
+  clearLegacyLocalStoragePolicy()
+  const migrated = migratePolicy(policy)
+  inMemoryActivePolicy = migrated
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(PAYROLL_POLICY_STORAGE_KEY, JSON.stringify(policy))
+  try {
+    const cacheKey = getPayrollPolicyCacheKey(organizationId)
+    const envelope = {
+      meta: migrated.meta,
+      payload: migrated,
+    }
+    window.localStorage.setItem(cacheKey, JSON.stringify(envelope))
+  } catch (err) {
+    console.warn('[PayrollPolicy] Không thể lưu cache localStorage:', err)
+  }
 }
 
-export async function fetchRemotePayrollPolicy(): Promise<PayrollPolicy | null> {
+export async function fetchRemotePayrollPolicy(
+  organizationId: string = 'a0000000-0000-0000-0000-000000000001'
+): Promise<PayrollPolicy | null> {
+  clearLegacyLocalStoragePolicy()
   if (!isSupabaseConfigured || !isRealDbMode()) return null
   try {
-    const { data, error } = await supabase
+    // 1. Đọc key homies-payroll-policy-v1
+    let { data, error } = await supabase
       .from('cau_hinh_to_chuc')
-      .select('gia_tri')
+      .select('gia_tri, ngay_cap_nhat')
       .eq('khoa', PAYROLL_POLICY_STORAGE_KEY)
-      .eq('to_chuc_id', 'a0000000-0000-0000-0000-000000000001')
+      .eq('to_chuc_id', organizationId)
       .maybeSingle()
 
-    if (error || !data) return null
-    return normalizePayrollPolicy(JSON.parse(data.gia_tri) as Partial<PayrollPolicy>)
+    // Fallback key chinh_sach_luong nếu chưa có key v1
+    if (!data && !error) {
+      const fallbackRes = await supabase
+        .from('cau_hinh_to_chuc')
+        .select('gia_tri, ngay_cap_nhat')
+        .eq('khoa', 'chinh_sach_luong')
+        .eq('to_chuc_id', organizationId)
+        .maybeSingle()
+      if (fallbackRes.data) {
+        data = fallbackRes.data
+      }
+    }
+
+    if (error || !data || !data.gia_tri) {
+      console.warn('[PayrollPolicy] Fetch remote policy failed or empty:', error?.message)
+      return null
+    }
+
+    const rawParsed = JSON.parse(data.gia_tri)
+    const dbPolicy = migratePolicy(rawParsed)
+    if (data.ngay_cap_nhat && (!dbPolicy.meta.updatedAt || dbPolicy.meta.updatedAt === '22/05/2026 09:10')) {
+      dbPolicy.meta.updatedAt = data.ngay_cap_nhat
+    }
+
+    // 2. So sánh với cache: nếu meta.policyVersion hoặc meta.updatedAt khác thì ghi đè cache
+    if (typeof window !== 'undefined') {
+      const cacheKey = getPayrollPolicyCacheKey(organizationId)
+      const cachedRaw = window.localStorage.getItem(cacheKey)
+      let needsCacheUpdate = true
+      if (cachedRaw) {
+        try {
+          const cachedEnvelope = JSON.parse(cachedRaw)
+          if (
+            cachedEnvelope?.meta?.policyVersion === dbPolicy.meta.policyVersion &&
+            cachedEnvelope?.meta?.updatedAt === dbPolicy.meta.updatedAt
+          ) {
+            needsCacheUpdate = false
+          }
+        } catch {
+          needsCacheUpdate = true
+        }
+      }
+      if (needsCacheUpdate) {
+        saveStoredPayrollPolicy(dbPolicy, organizationId)
+      }
+    }
+
+    inMemoryActivePolicy = dbPolicy
+    return dbPolicy
   } catch (err) {
-    console.error('[PayrollPolicy] Fetch remote policy failed:', err)
+    console.error('[PayrollPolicy] Fetch remote policy exception:', err)
     return null
   }
 }
 
-export async function syncRemotePayrollPolicy(policy: PayrollPolicy): Promise<boolean> {
+export async function syncRemotePayrollPolicy(
+  policy: PayrollPolicy,
+  organizationId: string = 'a0000000-0000-0000-0000-000000000001'
+): Promise<boolean> {
+  clearLegacyLocalStoragePolicy()
   if (!isSupabaseConfigured || !isRealDbMode()) return true
   try {
+    const migrated = migratePolicy(policy)
     const { error } = await supabase.from('cau_hinh_to_chuc').upsert({
-      to_chuc_id: 'a0000000-0000-0000-0000-000000000001',
+      to_chuc_id: organizationId,
       khoa: PAYROLL_POLICY_STORAGE_KEY,
-      gia_tri: JSON.stringify(policy),
+      gia_tri: JSON.stringify(migrated),
       ngay_cap_nhat: new Date().toISOString()
     }, {
       onConflict: 'to_chuc_id, khoa'
@@ -215,10 +341,145 @@ export async function syncRemotePayrollPolicy(policy: PayrollPolicy): Promise<bo
       console.error('[PayrollPolicy] Sync remote policy failed:', error.message)
       return false
     }
+    saveStoredPayrollPolicy(migrated, organizationId)
     return true
   } catch (err) {
     console.error('[PayrollPolicy] Sync remote policy exception:', err)
     return false
+  }
+}
+
+export async function resolvePolicyForPeriod(
+  periodStart: string,
+  organizationId: string = 'a0000000-0000-0000-0000-000000000001'
+): Promise<PayrollPolicy> {
+  clearLegacyLocalStoragePolicy()
+
+  if (isSupabaseConfigured && isRealDbMode()) {
+    try {
+      const { data, error } = await supabase
+        .from('cau_hinh_to_chuc')
+        .select('gia_tri')
+        .eq('khoa', PAYROLL_POLICY_HISTORY_KEY)
+        .eq('to_chuc_id', organizationId)
+        .maybeSingle()
+
+      if (!error && data?.gia_tri) {
+        const history = JSON.parse(data.gia_tri) as Array<{ meta: PayrollPolicyMeta; payload: any }>
+        if (Array.isArray(history) && history.length > 0) {
+          const eligible = history
+            .filter(entry => entry.meta?.effectiveFrom && entry.meta.effectiveFrom <= periodStart)
+            .sort((a, b) => (b.meta.effectiveFrom > a.meta.effectiveFrom ? 1 : -1))
+
+          if (eligible.length > 0) {
+            return migratePolicy(eligible[0].payload)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[PayrollPolicy] Đọc lịch sử policy từ DB thất bại:', err)
+    }
+  }
+
+  console.warn(
+    `[PayrollPolicy] Không tìm thấy phiên bản chính sách cho kỳ ${periodStart}, sử dụng chính sách đang hoạt động.`
+  )
+
+  const remote = await fetchRemotePayrollPolicy(organizationId)
+  if (remote) return remote
+
+  return getActivePayrollPolicy(organizationId)
+}
+
+export async function appendPayrollPolicy(
+  nextPolicy: PayrollPolicy,
+  note: string,
+  author: string = 'Admin',
+  effectiveFrom?: string,
+  organizationId: string = 'a0000000-0000-0000-0000-000000000001'
+): Promise<{ success: boolean; policy?: PayrollPolicy; error?: string }> {
+  clearLegacyLocalStoragePolicy()
+  if (!isSupabaseConfigured || !isRealDbMode()) {
+    return { success: false, error: 'Chưa cấu hình Supabase hoặc không ở chế độ Real DB' }
+  }
+
+  try {
+    const currentActive = (await fetchRemotePayrollPolicy(organizationId)) || buildDefaultPayrollPolicy()
+
+    let history: Array<{ meta: PayrollPolicyMeta; payload: PayrollPolicy }> = []
+    const historyRes = await supabase
+      .from('cau_hinh_to_chuc')
+      .select('gia_tri')
+      .eq('khoa', PAYROLL_POLICY_HISTORY_KEY)
+      .eq('to_chuc_id', organizationId)
+      .maybeSingle()
+
+    if (!historyRes.error && historyRes.data?.gia_tri) {
+      try {
+        const parsed = JSON.parse(historyRes.data.gia_tri)
+        if (Array.isArray(parsed)) history = parsed
+      } catch {
+        history = []
+      }
+    }
+
+    // Đẩy bản cũ vào đầu history (mới nhất trước)
+    history.unshift({
+      meta: currentActive.meta,
+      payload: currentActive,
+    })
+
+    const newPolicyVersion = (currentActive.meta?.policyVersion || 1) + 1
+    const nowIso = new Date().toISOString()
+    const newMeta: PayrollPolicyMeta = {
+      schemaVersion: 1,
+      policyVersion: newPolicyVersion,
+      effectiveFrom: effectiveFrom || nextPolicy.meta?.effectiveFrom || nowIso.slice(0, 10),
+      updatedAt: nowIso,
+      updatedBy: author,
+      note: note || 'Cập nhật cấu hình lương mới',
+    }
+
+    const newPolicy = migratePolicy({
+      ...nextPolicy,
+      meta: newMeta,
+      updatedAt: nowIso,
+      updatedBy: author,
+    })
+
+    const saveActiveRes = await supabase.from('cau_hinh_to_chuc').upsert(
+      {
+        to_chuc_id: organizationId,
+        khoa: PAYROLL_POLICY_STORAGE_KEY,
+        gia_tri: JSON.stringify(newPolicy),
+        ngay_cap_nhat: nowIso,
+      },
+      { onConflict: 'to_chuc_id, khoa' }
+    )
+
+    if (saveActiveRes.error) {
+      return { success: false, error: `Ghi policy thất bại: ${saveActiveRes.error.message}` }
+    }
+
+    const saveHistoryRes = await supabase.from('cau_hinh_to_chuc').upsert(
+      {
+        to_chuc_id: organizationId,
+        khoa: PAYROLL_POLICY_HISTORY_KEY,
+        gia_tri: JSON.stringify(history),
+        ngay_cap_nhat: nowIso,
+      },
+      { onConflict: 'to_chuc_id, khoa' }
+    )
+
+    if (saveHistoryRes.error) {
+      console.warn('[PayrollPolicy] Ghi history thất bại:', saveHistoryRes.error.message)
+    }
+
+    saveStoredPayrollPolicy(newPolicy, organizationId)
+    return { success: true, policy: newPolicy }
+  } catch (err: any) {
+    console.error('[PayrollPolicy] appendPayrollPolicy exception:', err)
+    return { success: false, error: err.message || 'Lỗi ngoại lệ khi lưu cấu hình' }
   }
 }
 
@@ -273,9 +534,14 @@ export function rollbackPayrollPolicy(version: string, actor: string = 'CEO'): P
   return rollbackPolicy
 }
 
-export function getActivePayrollPolicy(): PayrollPolicy {
-  const policy = getStoredPayrollPolicy()
-  if (policy.status === 'active') return policy
+export function getActivePayrollPolicy(organizationId: string = 'a0000000-0000-0000-0000-000000000001'): PayrollPolicy {
+  clearLegacyLocalStoragePolicy()
+  if (inMemoryActivePolicy) {
+    return inMemoryActivePolicy
+  }
+
+  const stored = getStoredPayrollPolicy(organizationId)
+  if (stored.status === 'active') return stored
 
   const activeHistory = getStoredPayrollPolicyHistory().find((item) => item.snapshot.status === 'active')
   return activeHistory?.snapshot ?? buildDefaultPayrollPolicy()
@@ -323,63 +589,17 @@ export function comparePayrollPolicies(base: PayrollPolicy, next: PayrollPolicy)
   return diffs
 }
 
-export async function loadPayrollPolicyFromDb(): Promise<PayrollPolicy | null> {
-  if (!isSupabaseConfigured || !isRealDbMode()) {
-    return null
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('cau_hinh_to_chuc')
-      .select('gia_tri')
-      .eq('khoa', 'chinh_sach_luong')
-
-    if (error) {
-      console.warn('loadPayrollPolicyFromDb: Lỗi truy vấn Supabase:', error)
-      return null
-    }
-
-    if (!data || data.length === 0 || !data[0]?.gia_tri) {
-      console.warn('loadPayrollPolicyFromDb: Không tìm thấy dữ liệu chính sách lương trong DB')
-      return null
-    }
-
-    const parsed = JSON.parse(data[0].gia_tri) as Partial<PayrollPolicy>
-    const normalized = normalizePayrollPolicy(parsed)
-    saveStoredPayrollPolicy(normalized)
-    return normalized
-  } catch (err) {
-    console.warn('loadPayrollPolicyFromDb: Lỗi nạp dữ liệu chính sách lương:', err)
-    return null
-  }
+export async function loadPayrollPolicyFromDb(
+  organizationId: string = 'a0000000-0000-0000-0000-000000000001'
+): Promise<PayrollPolicy | null> {
+  return fetchRemotePayrollPolicy(organizationId)
 }
 
-export async function savePayrollPolicyToDb(policy: PayrollPolicy): Promise<boolean> {
-  if (!isSupabaseConfigured || !isRealDbMode()) {
-    return false
-  }
-
-  try {
-    const { error } = await supabase.from('cau_hinh_to_chuc').upsert(
-      {
-        to_chuc_id: 'a0000000-0000-0000-0000-000000000001',
-        khoa: 'chinh_sach_luong',
-        gia_tri: JSON.stringify(policy),
-        ngay_cap_nhat: new Date().toISOString(),
-      },
-      { onConflict: 'to_chuc_id,khoa' }
-    )
-
-    if (error) {
-      console.warn('savePayrollPolicyToDb: Lỗi lưu chính sách lương vào Supabase:', error)
-      return false
-    }
-
-    return true
-  } catch (err) {
-    console.warn('savePayrollPolicyToDb: Lỗi khi lưu chính sách lương vào DB:', err)
-    return false
-  }
+export async function savePayrollPolicyToDb(
+  policy: PayrollPolicy,
+  organizationId: string = 'a0000000-0000-0000-0000-000000000001'
+): Promise<boolean> {
+  return syncRemotePayrollPolicy(policy, organizationId)
 }
 
 function saveStoredPayrollPolicyHistory(history: PayrollPolicyHistoryEntry[]) {
@@ -400,22 +620,7 @@ function createHistoryEntry(policy: PayrollPolicy, note: string): PayrollPolicyH
 }
 
 function normalizePayrollPolicy(policy: Partial<PayrollPolicy>): PayrollPolicy {
-  const fallback = buildDefaultPayrollPolicy()
-
-  return {
-    ...fallback,
-    ...policy,
-    standardDaysPerMonth: policy.standardDaysPerMonth ?? fallback.standardDaysPerMonth,
-    standardHoursPerDay: policy.standardHoursPerDay ?? fallback.standardHoursPerDay,
-    partTimeOvertimeEnabled: policy.partTimeOvertimeEnabled ?? fallback.partTimeOvertimeEnabled,
-    partTimeOvertimeThresholdHours: policy.partTimeOvertimeThresholdHours ?? fallback.partTimeOvertimeThresholdHours,
-    partTimeOvertimeMultiplier: policy.partTimeOvertimeMultiplier ?? fallback.partTimeOvertimeMultiplier,
-    grades: policy.grades ?? fallback.grades,
-    allowances: policy.allowances ?? fallback.allowances,
-    fnb: { ...fallback.fnb, ...(policy.fnb ?? {}) },
-    rates: { ...fallback.rates, ...(policy.rates ?? {}) },
-    legal: { ...fallback.legal, ...(policy.legal ?? {}) },
-  }
+  return migratePolicy(policy)
 }
 
 function addMoneyDiff(
