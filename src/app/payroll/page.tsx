@@ -17,6 +17,8 @@ import {
   type PayrollPeriodStatus,
   PERIOD_STATUS_LABEL_VI,
   PERIOD_STATUS_BADGE,
+  canEditPeriod,
+  canClosePeriod,
 } from '@/lib/payroll/payroll-status'
 import { PayrollPaymentModal, type PayrollPaymentBankAccount } from '@/components/payroll/PayrollPaymentModal'
 import type { PayrollPaymentMethod } from '@/lib/payroll-payment-ledger'
@@ -287,8 +289,8 @@ export default function PayrollPage() {
     payrollPeriodAdapter.fetchPayrollPeriod(thang, nam).then(period => {
       if (!isMounted) return
 
-      if (period && period.trang_thai === PAYROLL_PERIOD_STATUS.CONFIRMED) {
-        setPayrollPeriodStatus(PAYROLL_PERIOD_STATUS.CONFIRMED)
+      if (period && !canEditPeriod(period.trang_thai)) {
+        setPayrollPeriodStatus(period.trang_thai as PayrollPeriodStatus)
         setPolicySource('system')
         setPolicyInfo({ days: 26, hours: 8 })
         
@@ -621,6 +623,10 @@ export default function PayrollPage() {
 
   // Open Modal for adding Bonus or Deduction
   const openAddTicketModal = (emp: Record<string, unknown>, type: 'add_bonus' | 'add_deduction') => {
+    if (!canEditPeriod(payrollPeriodStatus)) {
+      alert('Kỳ lương đã chốt hoặc đã thanh toán, không thể thêm phiếu thưởng/phạt.')
+      return
+    }
     setModalTargetEmp(emp)
     setActiveModal(type)
     setTicketType(type === 'add_bonus' ? 'Phiếu thưởng' : 'Phiếu phạt')
@@ -660,6 +666,10 @@ export default function PayrollPage() {
 
   // Handle Saving Bonus/Deduction Ticket from Modal
   const handleSaveTicket = async () => {
+    if (!canEditPeriod(payrollPeriodStatus)) {
+      alert('Kỳ lương đã chốt hoặc đã thanh toán, không thể chỉnh sửa dữ liệu.')
+      return
+    }
     if (!modalTargetEmp) return
     const empId = String(modalTargetEmp.id || '')
     const rawVal = Number(ticketAmount) || 0
@@ -905,10 +915,10 @@ export default function PayrollPage() {
             </select>
             {period && (
               <span className="text-xs px-2.5 py-1 rounded-full font-bold" style={{
-                background: period.status === PAYROLL_PERIOD_STATUS.CONFIRMED ? PERIOD_STATUS_BADGE[PAYROLL_PERIOD_STATUS.CONFIRMED].bg : PERIOD_STATUS_BADGE[PAYROLL_PERIOD_STATUS.DRAFT].bg,
-                color: period.status === PAYROLL_PERIOD_STATUS.CONFIRMED ? PERIOD_STATUS_BADGE[PAYROLL_PERIOD_STATUS.CONFIRMED].color : PERIOD_STATUS_BADGE[PAYROLL_PERIOD_STATUS.DRAFT].color,
+                background: PERIOD_STATUS_BADGE[payrollPeriodStatus]?.bg || 'var(--gray-100)',
+                color: PERIOD_STATUS_BADGE[payrollPeriodStatus]?.color || 'var(--text-muted)',
               }}>
-                {period.status === PAYROLL_PERIOD_STATUS.CONFIRMED ? PERIOD_STATUS_LABEL_VI[PAYROLL_PERIOD_STATUS.CONFIRMED] : PERIOD_STATUS_LABEL_VI[PAYROLL_PERIOD_STATUS.DRAFT]}
+                {PERIOD_STATUS_LABEL_VI[payrollPeriodStatus] || 'Bản nháp'}
               </span>
             )}
           </div>
@@ -1090,17 +1100,17 @@ export default function PayrollPage() {
                       alert(`Chốt thất bại: ${res.error}`)
                     }
                   }}
-                  disabled={payrollPeriodStatus === PAYROLL_PERIOD_STATUS.CONFIRMED || pendingSummary.totalShifts > 0 || anomalySummary.length > 0 || isPayrollLoading}
+                  disabled={!canClosePeriod(payrollPeriodStatus) || pendingSummary.totalShifts > 0 || anomalySummary.length > 0 || isPayrollLoading}
                   className={`btn text-xs py-1.5 px-3 border-0 gap-1 font-semibold flex items-center shadow-xs cursor-pointer ${
-                    payrollPeriodStatus === PAYROLL_PERIOD_STATUS.CONFIRMED ? 'bg-slate-600 text-slate-300' : 'bg-rose-600 hover:bg-rose-500 text-white'
+                    !canClosePeriod(payrollPeriodStatus) ? 'bg-slate-600 text-slate-300' : 'bg-rose-600 hover:bg-rose-500 text-white'
                   }`}
                 >
-                  <Lock size={13} /> {payrollPeriodStatus === PAYROLL_PERIOD_STATUS.CONFIRMED ? 'ĐÃ CHỐT' : 'Chốt kỳ lương'}
+                  <Lock size={13} /> {!canClosePeriod(payrollPeriodStatus) ? 'ĐÃ CHỐT' : 'Chốt kỳ lương'}
                 </button>
 
                 <button
                   onClick={() => setPayrollReloadKey(key => key + 1)}
-                  disabled={isPayrollLoading || payrollPeriodStatus === PAYROLL_PERIOD_STATUS.CONFIRMED}
+                  disabled={isPayrollLoading || !canEditPeriod(payrollPeriodStatus)}
                   className="btn bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-1.5 px-3 border-0 gap-1 font-semibold flex items-center shadow-xs cursor-pointer"
                 >
                   <RefreshCw size={13} /> {isPayrollLoading ? 'Đang tính lương...' : 'Tính lại lương'}
@@ -1181,7 +1191,7 @@ export default function PayrollPage() {
             </div>
 
             {/* Scrollable Spreadsheet Grid Table with Dynamic Columns */}
-            {anomalySummary.length > 0 && payrollPeriodStatus === PAYROLL_PERIOD_STATUS.DRAFT && (
+            {anomalySummary.length > 0 && canEditPeriod(payrollPeriodStatus) && (
               <div className="text-xs mt-2 mx-3 px-3 py-2 bg-amber-50 text-amber-800 rounded-md border border-amber-200">
                 <div className="font-bold flex items-center gap-1.5 mb-1.5">
                   <AlertTriangle size={14} className="text-amber-600" /> Có một số bất thường dữ liệu, vui lòng xử lý trước khi chốt lương:
@@ -1196,7 +1206,7 @@ export default function PayrollPage() {
                 </ul>
               </div>
             )}
-            {pendingSummary.totalShifts > 0 && payrollPeriodStatus === PAYROLL_PERIOD_STATUS.DRAFT && (
+            {pendingSummary.totalShifts > 0 && canEditPeriod(payrollPeriodStatus) && (
               <div className="text-xs mt-2 mx-3 px-3 py-2 bg-rose-50 text-rose-700 rounded-md border border-rose-200">
                 <strong>Còn {pendingSummary.totalShifts} ca chưa duyệt</strong> của {pendingSummary.employees.length} nhân viên ({pendingSummary.employees.join(', ')}) — số giờ này đang được tính là 0. Duyệt hết trước khi chốt lương.
               </div>
@@ -1313,8 +1323,13 @@ export default function PayrollPage() {
                               <span className="font-semibold text-emerald-700">{row.bonusTickets > 0 ? formatVND(row.bonusTickets) : '0'}</span>
                               <button
                                 onClick={() => openAddTicketModal(row, 'add_bonus')}
-                                title="Thêm phiếu cộng tiền"
-                                className="w-6 h-5 rounded border border-dashed border-emerald-500 hover:bg-emerald-100 hover:border-emerald-600 flex items-center justify-center text-emerald-600 text-xs transition-all cursor-pointer shadow-2xs"
+                                disabled={!canEditPeriod(payrollPeriodStatus)}
+                                title={!canEditPeriod(payrollPeriodStatus) ? 'Kỳ lương đã chốt, không thể thêm phiếu' : 'Thêm phiếu cộng tiền'}
+                                className={`w-6 h-5 rounded border border-dashed flex items-center justify-center text-xs transition-all ${
+                                  !canEditPeriod(payrollPeriodStatus)
+                                    ? 'border-gray-200 text-gray-300 cursor-not-allowed opacity-50'
+                                    : 'border-emerald-500 hover:bg-emerald-100 hover:border-emerald-600 text-emerald-600 cursor-pointer shadow-2xs'
+                                }`}
                               >
                                 <Plus size={12} />
                               </button>
@@ -1334,8 +1349,13 @@ export default function PayrollPage() {
                               <span className="text-rose-700 font-semibold">{row.deductionTickets > 0 ? formatVND(row.deductionTickets) : '0'}</span>
                               <button
                                 onClick={() => openAddTicketModal(row, 'add_deduction')}
-                                title="Thêm phiếu trừ tiền"
-                                className="w-6 h-5 rounded border border-dashed border-rose-500 hover:bg-rose-100 hover:border-rose-600 flex items-center justify-center text-rose-600 text-xs transition-all cursor-pointer shadow-2xs"
+                                disabled={!canEditPeriod(payrollPeriodStatus)}
+                                title={!canEditPeriod(payrollPeriodStatus) ? 'Kỳ lương đã chốt, không thể thêm phiếu' : 'Thêm phiếu trừ tiền'}
+                                className={`w-6 h-5 rounded border border-dashed flex items-center justify-center text-xs transition-all ${
+                                  !canEditPeriod(payrollPeriodStatus)
+                                    ? 'border-gray-200 text-gray-300 cursor-not-allowed opacity-50'
+                                    : 'border-rose-500 hover:bg-rose-100 hover:border-rose-600 text-rose-600 cursor-pointer shadow-2xs'
+                                }`}
                               >
                                 <Plus size={12} />
                               </button>
