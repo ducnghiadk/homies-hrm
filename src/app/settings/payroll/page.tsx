@@ -43,6 +43,7 @@ import {
   Store,
   Coins,
   Clock,
+  Shield,
   Briefcase,
   Info,
   X,

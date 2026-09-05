@@ -782,14 +782,8 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
 
     late_deduction: lateDeduction,
     absent_deduction: absentDeduction,
-    advance_deduction: advance_deduction,
-    other_deductions: otherDeductions,
-    total_other_deductions: totalOtherDeductions,
-    total_deductions: totalDeductions,
+    advance_deduction: advanceDeduction,
 
-    bhxh: insurance.bhxh,
-    bhyt: insurance.bhyt,
-    bhtn: insurance.bhtn,
     total_insurance: insurance.total,
 
     taxable_income: taxableIncome,

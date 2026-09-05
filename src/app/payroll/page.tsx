@@ -19,7 +19,7 @@ import {
   DollarSign, TrendingUp, ChevronDown, ChevronUp, FileText,
   Search, RefreshCw, Download, Building2, Store, PlusCircle, MinusCircle,
   Eye, Send, Plus, MoreHorizontal, X, Calendar, Image as ImageIcon,
-  SlidersHorizontal, CheckSquare, Square, RotateCcw, CreditCard, Lock, Info
+  SlidersHorizontal, CheckSquare, Square, RotateCcw, CreditCard, Lock, Info, AlertTriangle
 } from 'lucide-react'
 
 // Column configuration definition for Step 3: Column Visibility Settings
@@ -899,10 +899,10 @@ export default function PayrollPage() {
             </select>
             {period && (
               <span className="text-xs px-2.5 py-1 rounded-full font-bold" style={{
-                background: period.status === 'da_chot' ? 'var(--success-light)' : 'var(--gray-100)',
-                color: period.status === 'da_chot' ? 'var(--success)' : 'var(--text-muted)',
+                background: period.status === 'confirmed' ? 'var(--success-light)' : 'var(--gray-100)',
+                color: period.status === 'confirmed' ? 'var(--success)' : 'var(--text-muted)',
               }}>
-                {period.status === 'da_chot' ? 'Kỳ đã chốt' : 'Bản nháp'}
+                {period.status === 'confirmed' ? 'Kỳ đã chốt' : 'Bản nháp'}
               </span>
             )}
           </div>

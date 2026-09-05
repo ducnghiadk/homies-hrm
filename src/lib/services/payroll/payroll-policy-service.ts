@@ -141,6 +141,12 @@ export function buildDefaultPayrollPolicy(): PayrollPolicy {
       { name: 'Phụ cấp trách nhiệm', type: 'Theo vai trò', amount: 1200000, taxable: 'Tính PIT', appliesTo: 'Trưởng ca trở lên' },
       { name: 'Thưởng chuyên cần', type: 'Điều kiện', amount: 500000, taxable: 'Tính PIT', appliesTo: 'Không đi trễ, không vắng' },
     ],
+    legal: {
+      personalDeduction: 11000000,
+      dependentDeduction: 4400000,
+      maxInsuranceSalary: 29800000,
+      minRegionSalary: 20000,
+    },
     fnb: defaultFnbPolicy,
     rates: {
       probation: settingsPayroll.salary_coefficients.probation_rate,
