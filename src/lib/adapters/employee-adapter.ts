@@ -520,6 +520,7 @@ export const employeeAdapter: EmployeeAdapter = {
           'cua_hang:cua_hang_id ( ten )',
         ].join(', '))
         .in('id', ids)
+        .neq('trang_thai', 'da_nghi_viec')
         .order('ma_nhan_vien', { ascending: true })
 
       if (error) {

@@ -655,18 +655,23 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   const emp = mockEmployees.find(e => e.id === employeeId)
   const pos = mockPositions.find(p => p.id === emp?.position_id)
   const policyGrade = policy.grades.find(grade => grade.id === pos?.id)
-  const baseSalary = policyGrade?.base_salary ?? pos?.base_salary ?? 0
+  const isPartTime = input.contractType === 'ban_thoi_gian'
+  const baseSalary = isPartTime
+    ? (pos?.base_salary ?? 0)
+    : (policyGrade?.base_salary ?? pos?.base_salary ?? 0)
   const storeName = emp ? getStoreRevenueForPeriod(emp.store_id, periodStart).name : ''
 
   // ── Step 2: Attendance
   const att = input.attendanceSummary ?? getPayrollAttendanceSummary(employeeId, periodStart, periodEnd)
 
-  const isPartTime = input.contractType === 'ban_thoi_gian'
-
   // ── Step 2.5: Compile anomalies
   const anomalies: PayrollAnomaly[] = att.anomalies ? [...att.anomalies] : []
-  if (baseSalary === 0) {
-    anomalies.push({ type: 'thieu_luong_co_ban', message: 'Nhân viên chưa được cài đặt mức lương cơ bản (đang lấy giá trị 0đ).' })
+  if (baseSalary <= 0) {
+    if (isPartTime) {
+      anomalies.push({ type: 'thieu_don_gia_gio', message: 'Nhân viên bán thời gian chưa được cài đặt đơn giá giờ (đang lấy giá trị 0đ).' })
+    } else {
+      anomalies.push({ type: 'thieu_luong_co_ban', message: 'Nhân viên chưa được cài đặt mức lương cơ bản (đang lấy giá trị 0đ).' })
+    }
   }
   if (!input.contractType) {
     anomalies.push({ type: 'thieu_loai_hop_dong', message: 'Nhân viên chưa được gắn loại hợp đồng (Toàn thời gian/Bán thời gian).' })
@@ -680,14 +685,14 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   let absentDeduction = 0
 
   if (isPartTime) {
-    const hourlyRate = baseSalary
+    const hourlyRate = baseSalary > 0 ? baseSalary : 0
     const ptOt = att.partTimeOvertimeHours ?? 0
     const normalHours = Math.max(0, att.totalHours - ptOt)
-    baseEarned = Math.round(normalHours * hourlyRate)
+    baseEarned = hourlyRate > 0 ? Math.round(normalHours * hourlyRate) : 0
     const ptMultiplier = (typeof policy.partTimeOvertimeMultiplier === 'number' && policy.partTimeOvertimeMultiplier > 0)
       ? policy.partTimeOvertimeMultiplier
       : 1.5
-    overtimeAmount = Math.round(ptOt * hourlyRate * ptMultiplier)
+    overtimeAmount = hourlyRate > 0 ? Math.round(ptOt * hourlyRate * ptMultiplier) : 0
     overtimeHoursToReport = ptOt
     dailyRate = 0
     absentDeduction = 0
@@ -850,8 +855,12 @@ export async function calculatePayrollBatchAsync(
     if (role === 'truong_ca') return 'shift_leader'
     return 'employee'
   }
-  const getBaseSalary = (employee: PayrollEmployeeDbRow) =>
-    employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : employee.chuc_vu_luong_co_ban
+  const getBaseSalary = (employee: PayrollEmployeeDbRow) => {
+    if (employee.loai_hop_dong === 'ban_thoi_gian') {
+      return employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : 0
+    }
+    return employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : employee.chuc_vu_luong_co_ban
+  }
   const attendanceRecords = await AttendanceService.getAttendanceRecordsForPeriod(periodStart, periodEnd)
   const activeEmployeeIds = new Set(payrollEmployeesResult.employees.map(employee => employee.id))
   const payrollEligibleAttendanceEmployeeIds = new Set(
