@@ -74,6 +74,7 @@ export interface PayrollResult {
   employee_code: string
   employee_name: string
   is_resigned_employee: boolean
+  is_part_time: boolean           // true nếu loại hợp đồng = ban_thoi_gian
   position: string
   store: string
   period: string
@@ -233,12 +234,17 @@ function getFnbContributionPoints(employee: { position_id: string; role: string 
   return hoursWeight * punctualityWeight * roleWeight * positionWeight * shiftWeight
 }
 
-function buildFnbPayrollAllocations(periodStart: string, periodEnd: string, attendanceRecords?: PayrollAttendanceRecord[]): Record<string, FnbPayrollAllocation> {
+function buildFnbPayrollAllocations(
+  periodStart: string,
+  periodEnd: string,
+  employees: Employee[],
+  attendanceRecords?: PayrollAttendanceRecord[]
+): Record<string, FnbPayrollAllocation> {
   const policy = getActivePayrollPolicy()
   if (policy.fnb.serviceChargePoolRate <= 0 || policy.fnb.tipPoolRate <= 0) return {}
 
-  const employees = mockEmployees.filter((e) => e.status !== 'inactive' && e.role !== 'ceo')
-  const employeeMap = new Map(employees.map((employee) => [employee.id, employee]))
+  const activeEmployees = employees.filter((e) => e.status !== 'inactive' && e.role !== 'ceo')
+  const employeeMap = new Map(activeEmployees.map((employee) => [employee.id, employee]))
   const storePointTotals = new Map<string, number>()
   const shiftBuckets = new Map<string, {
     storeId: string
@@ -351,6 +357,11 @@ export function getEmployeeBaseSalary(employeeId: string): number {
   const emp = mockEmployees.find(e => e.id === employeeId)
   if (!emp) return 0
   const pos = mockPositions.find(p => p.id === emp.position_id)
+  // Part-time: base_salary là đơn giá giờ (lưu trong pos.base_salary),
+  // KHÔNG dùng policy.grades (grades lưu lương tháng toàn thời gian).
+  if (emp.contract_type === 'ban_thoi_gian') {
+    return pos?.base_salary ?? 0
+  }
   const policyGrade = getActivePayrollPolicy().grades.find(grade => grade.id === emp.position_id)
   return policyGrade?.base_salary ?? pos?.base_salary ?? 0
 }
@@ -717,7 +728,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   const totalBonuses = bonuses.reduce((sum, b) => sum + b.amount, 0)
 
   // ── Step 6b: F&B tip/service charge allocation
-  const fnbAllocations = input.fnbAllocations ?? buildFnbPayrollAllocations(periodStart, periodEnd)
+  const fnbAllocations = input.fnbAllocations ?? buildFnbPayrollAllocations(periodStart, periodEnd, mockEmployees)
   const fnbAllocation = fnbAllocations[employeeId]
   const fnbShare = fnbAllocation?.share ?? 0
 
@@ -751,6 +762,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     employee_code: emp?.employee_code ?? '',
     employee_name: emp?.full_name ?? '',
     is_resigned_employee: false,
+    is_part_time: isPartTime,
     position: pos?.name ?? '',
     store: storeName,
     period: `${periodStart.slice(0, 7)}`,
@@ -808,13 +820,24 @@ export function calculatePayrollBatch(
   periodStart: string,
   periodEnd: string,
 ): PayrollResult[] {
-  // Only calculate for active employees, except CEO.
-  const activeEmployees = mockEmployees.filter(
-    e => e.status !== 'inactive' && e.role !== 'ceo',
-  )
-  const fnbAllocations = buildFnbPayrollAllocations(periodStart, periodEnd)
+  const activeEmployees = mockEmployees.filter(e => {
+    if (e.role === 'ceo') return false
+    if (e.status === 'inactive') {
+      if (!e.resign_date) return false
+      return e.resign_date >= periodStart
+    }
+    return true
+  })
+  const fnbAllocations = buildFnbPayrollAllocations(periodStart, periodEnd, mockEmployees)
   return activeEmployees.map(emp =>
-    calculatePayroll({ employeeId: emp.id, periodStart, periodEnd, fnbAllocations }),
+    // BUG-01 fix: truyền contract_type từ mock employee để isPartTime tính đúng
+    calculatePayroll({
+      employeeId: emp.id,
+      periodStart,
+      periodEnd,
+      fnbAllocations,
+      contractType: emp.contract_type,
+    }),
   )
 }
 
@@ -824,15 +847,20 @@ export async function calculatePayrollBatchAsync(
 ): Promise<PayrollResult[]> {
   const payrollEmployeesResult = await employeeAdapter.getPayrollEmployees()
   if (payrollEmployeesResult.coLoi || payrollEmployeesResult.employees.length === 0) {
-    const activeEmployees = mockEmployees.filter(
-      e => e.status !== 'inactive' && e.role !== 'ceo',
-    )
+    const activeEmployees = mockEmployees.filter(e => {
+      if (e.role === 'ceo') return false
+      if (e.status === 'inactive') {
+        if (!e.resign_date) return false
+        return e.resign_date >= periodStart
+      }
+      return true
+    })
     const policy = getActivePayrollPolicy()
     const otThreshold = policy.partTimeOvertimeEnabled === true
       ? ((typeof policy.partTimeOvertimeThresholdHours === 'number' && policy.partTimeOvertimeThresholdHours > 0) ? policy.partTimeOvertimeThresholdHours : 8)
       : 0
     const attendanceRecords = await AttendanceService.getAttendanceRecordsForPeriod(periodStart, periodEnd)
-    const fnbAllocations = buildFnbPayrollAllocations(periodStart, periodEnd, attendanceRecords)
+    const fnbAllocations = buildFnbPayrollAllocations(periodStart, periodEnd, mockEmployees, attendanceRecords)
 
     return activeEmployees.map(emp =>
       calculatePayroll({
@@ -848,19 +876,6 @@ export async function calculatePayrollBatchAsync(
     )
   }
 
-  const mapDbRole = (role: string): Employee['role'] => {
-    if (role === 'ban_giam_doc') return 'ceo'
-    if (role === 'quan_tri_hr') return 'hr_admin'
-    if (role === 'quan_ly_cua_hang' || role === 'quan_ly_khu_vuc') return 'store_manager'
-    if (role === 'truong_ca') return 'shift_leader'
-    return 'employee'
-  }
-  const getBaseSalary = (employee: PayrollEmployeeDbRow) => {
-    if (employee.loai_hop_dong === 'ban_thoi_gian') {
-      return employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : 0
-    }
-    return employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : employee.chuc_vu_luong_co_ban
-  }
   const attendanceRecords = await AttendanceService.getAttendanceRecordsForPeriod(periodStart, periodEnd)
   const activeEmployeeIds = new Set(payrollEmployeesResult.employees.map(employee => employee.id))
   const payrollEligibleAttendanceEmployeeIds = new Set(
@@ -883,7 +898,27 @@ export async function calculatePayrollBatchAsync(
         ...(supplementalEmployeesResult.coLoi ? [] : supplementalEmployeesResult.employees),
       ].map(employee => [employee.id, employee]),
     ).values(),
-  )
+  ).filter(e => {
+    if (e.trang_thai === 'da_nghi_viec') {
+      if (!e.ngay_nghi_viec) return false
+      return e.ngay_nghi_viec >= periodStart
+    }
+    return true
+  })
+  const mapDbRole = (role: string): Employee['role'] => {
+    if (role === 'ban_giam_doc') return 'ceo'
+    if (role === 'quan_tri_hr') return 'hr_admin'
+    if (role === 'quan_ly_cua_hang' || role === 'quan_ly_khu_vuc') return 'store_manager'
+    if (role === 'truong_ca') return 'shift_leader'
+    return 'employee'
+  }
+  const getBaseSalary = (employee: PayrollEmployeeDbRow) => {
+    if (employee.loai_hop_dong === 'ban_thoi_gian') {
+      return employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : 0
+    }
+    return employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : employee.chuc_vu_luong_co_ban
+  }
+
   const dbEmployees = payrollEmployees
     .map<Employee>(employee => ({
       id: employee.id,
@@ -904,6 +939,7 @@ export async function calculatePayrollBatchAsync(
       gamification_level: 'bronze',
     }))
     .filter(employee => employee.role !== 'ceo')
+
   const dbPositions = payrollEmployees.map<Position>(employee => ({
     id: `db-position-${employee.id}`,
     org_id: 'org-001',
@@ -934,7 +970,7 @@ export async function calculatePayrollBatchAsync(
     const otThreshold = policy.partTimeOvertimeEnabled === true
       ? ((typeof policy.partTimeOvertimeThresholdHours === 'number' && policy.partTimeOvertimeThresholdHours > 0) ? policy.partTimeOvertimeThresholdHours : 8)
       : 0
-    const fnbAllocations = buildFnbPayrollAllocations(periodStart, periodEnd, attendanceRecords)
+    const fnbAllocations = buildFnbPayrollAllocations(periodStart, periodEnd, dbEmployees, attendanceRecords)
 
     return dbEmployees.map(emp => {
       const payrollEmp = payrollEmployees.find(employee => employee.id === emp.id)

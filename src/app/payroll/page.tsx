@@ -144,6 +144,15 @@ type PayrollEmployee = Employee & {
   bank_account_holder?: string
 }
 
+// ISSUE-06: Cấu hình hiển thị anomaly theo loại (module-level, không render lại)
+const ANOMALY_CONFIG: Record<string, { label: string; severity: 'error' | 'warning' | 'info' }> = {
+  thieu_don_gia_gio:   { label: 'Thiếu đơn giá giờ (bán thời gian)',   severity: 'error' },
+  thieu_luong_co_ban:  { label: 'Thiếu lương cơ bản',                    severity: 'error' },
+  thieu_loai_hop_dong: { label: 'Thiếu loại hợp đồng',                   severity: 'warning' },
+  ca_chua_duyet:       { label: 'Ca chưa được duyệt',                   severity: 'warning' },
+  quen_checkout:       { label: 'Quên check-out',                        severity: 'warning' },
+}
+
 export default function PayrollPage() {
   const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
@@ -302,6 +311,7 @@ export default function PayrollPage() {
             employee_code: '',
             employee_name: '',
             is_resigned_employee: false,
+            is_part_time: false,             // slip đã chốt: không phân loại lại
             position: '',
             store: '',
             period: selectedPeriod,
@@ -407,7 +417,7 @@ export default function PayrollPage() {
       const pos = sourcePositions.find(p => p.id === emp.position_id)
       const store = sourceStores.find(s => s.id === emp.store_id)
 
-      const isHourly = res.base_salary > 0 && res.base_salary < 100000
+      const isHourly = res.is_part_time   // BUG-02 fix: dùng flag từ engine, không dùng magic < 100k
       const hourlyRate = isHourly ? res.base_salary : Math.round(res.base_salary / 26 / 8)
       const baseSalaryFormatted = isHourly
         ? `${res.base_salary.toLocaleString('vi-VN')}đ/giờ`
@@ -517,12 +527,20 @@ export default function PayrollPage() {
     }
   }, [tableData])
 
+  // ISSUE-06 fix: ANOMALY_CONFIG đã chuyển ra module-level (bên trên component)
+
   const anomalySummary = useMemo(() => {
-    const grouped: Record<string, { count: number, type: string, message: string, examples: string[] }> = {}
+    const grouped: Record<string, { count: number, type: string, message: string, examples: string[], severity: 'error' | 'warning' | 'info' }> = {}
     tableData.forEach(row => {
       row.anomalies?.forEach(a => {
         if (!grouped[a.type]) {
-          grouped[a.type] = { count: 0, type: a.type, message: a.message, examples: [] }
+          grouped[a.type] = {
+            count: 0,
+            type: a.type,
+            message: ANOMALY_CONFIG[a.type]?.label ?? a.message,
+            examples: [],
+            severity: ANOMALY_CONFIG[a.type]?.severity ?? 'info',
+          }
         }
         grouped[a.type].count++
         if (grouped[a.type].examples.length < 3) {
@@ -530,7 +548,11 @@ export default function PayrollPage() {
         }
       })
     })
-    return Object.values(grouped)
+    // Sắp xếp: error trước, sau đó warning, info
+    return Object.values(grouped).sort((a, b) => {
+      const order = { error: 0, warning: 1, info: 2 }
+      return (order[a.severity] ?? 2) - (order[b.severity] ?? 2)
+    })
   }, [tableData])
 
   useEffect(() => {
@@ -1200,11 +1222,22 @@ export default function PayrollPage() {
                 <div className="font-bold flex items-center gap-1.5 mb-1.5">
                   <AlertTriangle size={14} className="text-amber-600" /> Có một số bất thường dữ liệu, vui lòng xử lý trước khi chốt lương:
                 </div>
-                <ul className="list-disc pl-5 space-y-1">
+                <ul className="list-none pl-0 space-y-1">
                   {anomalySummary.map(a => (
-                    <li key={a.type}>
-                      <strong>{a.count} trường hợp</strong> bị <em>{a.message}</em>. 
-                      (Ví dụ: {a.examples.join(', ')}{a.count > 3 ? ', ...' : ''})
+                    <li key={a.type} className={`flex items-start gap-1.5 px-2 py-1 rounded ${
+                      a.severity === 'error'
+                        ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                        : a.severity === 'warning'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                          : 'bg-sky-50 text-sky-700 border border-sky-200'
+                    }`}>
+                      <span className="mt-0.5 shrink-0">
+                        {a.severity === 'error' ? '🔴' : a.severity === 'warning' ? '🟡' : 'ℹ️'}
+                      </span>
+                      <span>
+                        <strong>{a.count} trường hợp</strong> bị <em>{a.message}</em>.{' '}
+                        (Ví dụ: {a.examples.join(', ')}{a.count > 3 ? ', ...' : ''})
+                      </span>
                     </li>
                   ))}
                 </ul>

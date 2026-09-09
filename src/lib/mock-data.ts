@@ -49,6 +49,8 @@ export type Employee = {
   total_points: number
   gamification_level: 'bronze' | 'silver' | 'gold' | 'platinum'
   kpi_level?: 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5'
+  contract_type?: 'toan_thoi_gian' | 'ban_thoi_gian'  // loại hợp đồng (optional, chỉ cần khi khác default)
+  resign_date?: string                // Ngày nghỉ việc
 }
 
 export type Shift = {

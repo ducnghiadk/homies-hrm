@@ -109,6 +109,7 @@ export type PayrollEmployeeDbRow = {
   chuc_vu_luong_co_ban: number
   chuc_vu_ten: string
   cua_hang_ten: string
+  ngay_nghi_viec?: string | null
 }
 
 export type PayrollEmployeeReadResult = {
@@ -330,6 +331,7 @@ function mapPayrollEmployeeRow(row: Record<string, unknown>): PayrollEmployeeDbR
     chuc_vu_luong_co_ban: Number(position.luong_co_ban || 0),
     chuc_vu_ten: String(position.ten || ''),
     cua_hang_ten: String(store.ten || ''),
+    ngay_nghi_viec: row.ngay_nghi_viec ? String(row.ngay_nghi_viec) : null,
   }
 }
 
@@ -483,7 +485,7 @@ export const employeeAdapter: EmployeeAdapter = {
           'chuc_vu:chuc_vu_id ( ten, luong_co_ban )',
           'cua_hang:cua_hang_id ( ten )',
         ].join(', '))
-        .in('trang_thai', ['hoat_dong', 'thu_viec'])
+        .in('trang_thai', ['hoat_dong', 'thu_viec', 'da_nghi_viec'])
         .order('ma_nhan_vien', { ascending: true })
 
       if (error) {
@@ -516,6 +518,7 @@ export const employeeAdapter: EmployeeAdapter = {
           'loai_hop_dong',
           'tham_gia_bao_hiem',
           'so_nguoi_phu_thuoc',
+          'ngay_nghi_viec',
           'chuc_vu:chuc_vu_id ( ten, luong_co_ban )',
           'cua_hang:cua_hang_id ( ten )',
         ].join(', '))
