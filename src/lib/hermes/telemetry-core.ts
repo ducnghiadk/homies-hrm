@@ -79,6 +79,25 @@ export function getRecentNetworkBreadcrumbs(): NetworkBreadcrumb[] {
   return [...breadcrumbBuffer];
 }
 
+const MAX_FINGERPRINTS_CACHE = 200;
+
+function pruneFingerprintCache(now: number): void {
+  // Purge expired entries
+  for (const [key, timestamp] of recentFingerprints.entries()) {
+    if (now - timestamp >= THROTTLE_WINDOW_MS) {
+      recentFingerprints.delete(key);
+    }
+  }
+  // Cap at MAX_FINGERPRINTS_CACHE if still oversized
+  if (recentFingerprints.size > MAX_FINGERPRINTS_CACHE) {
+    const sorted = [...recentFingerprints.entries()].sort((a, b) => a[1] - b[1]);
+    const toRemove = sorted.slice(0, recentFingerprints.size - MAX_FINGERPRINTS_CACHE);
+    for (const [key] of toRemove) {
+      recentFingerprints.delete(key);
+    }
+  }
+}
+
 /**
  * Dispatch telemetry error to server endpoint or Supabase
  */
@@ -86,6 +105,8 @@ export async function sendTelemetryError(payload: Partial<TelemetryErrorLog>): P
   const fp = payload.fingerprint || generateFingerprint(payload.error_name || 'Error', payload.error_message || '', payload.stack_trace);
   
   const now = Date.now();
+  pruneFingerprintCache(now);
+
   const lastSent = recentFingerprints.get(fp);
   if (lastSent && (now - lastSent < THROTTLE_WINDOW_MS)) {
     // Throttled: Already sent recently within window
