@@ -1,9 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import { notFound } from 'next/navigation';
 import { AlertCircle, Bug, Flame, Terminal } from 'lucide-react';
 
 export default function HermesTestPage() {
+  if (process.env.NODE_ENV === 'production') {
+    notFound();
+  }
+
   const [shouldCrash, setShouldCrash] = useState(false);
 
   if (shouldCrash) {
