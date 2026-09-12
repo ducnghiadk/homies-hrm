@@ -6,6 +6,7 @@ import { HermesErrorBoundary } from "@/components/telemetry/HermesErrorBoundary"
 import { TelemetryClientInit } from "@/components/telemetry/TelemetryClientInit"
 import { DevCockpitWrapper } from "@/components/dev/DevCockpitWrapper"
 import { SmartBugReporter } from "@/components/telemetry/SmartBugReporter"
+import { AdminCopilotDrawer } from "@/components/admin/AdminCopilotDrawer"
 
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
@@ -47,6 +48,7 @@ export default function RootLayout({
         </HermesErrorBoundary>
         <DevCockpitWrapper />
         <SmartBugReporter />
+        <AdminCopilotDrawer />
         <Toaster richColors position="top-right" />
       </body>
     </html>
