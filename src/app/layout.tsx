@@ -4,6 +4,7 @@ import "./globals.css"
 import { Toaster } from "sonner"
 import { HermesErrorBoundary } from "@/components/telemetry/HermesErrorBoundary"
 import { TelemetryClientInit } from "@/components/telemetry/TelemetryClientInit"
+import { DevCockpitWrapper } from "@/components/dev/DevCockpitWrapper"
 
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
@@ -43,6 +44,7 @@ export default function RootLayout({
         <HermesErrorBoundary>
           {children}
         </HermesErrorBoundary>
+        <DevCockpitWrapper />
         <Toaster richColors position="top-right" />
       </body>
     </html>
