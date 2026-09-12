@@ -1,0 +1,15 @@
+{
+  "name": "hermes-sre-worker",
+  "version": "1.0.0",
+  "description": "Hermes SRE Autonomous Worker for Automated Root Cause Analysis and Pull Request Creation",
+  "type": "module",
+  "main": "worker.mjs",
+  "scripts": {
+    "start": "node worker.mjs"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.1.1",
+    "@supabase/supabase-js": "^2.95.3",
+    "dotenv": "^16.4.7"
+  }
+}
