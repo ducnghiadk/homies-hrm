@@ -110,10 +110,11 @@ function getStoreLabel(storeId: string) {
   return store.name.replace('Homies Milk Tea - ', '')
 }
 
-function getRoleLabel(employee: AuthUser) {
-  return mockPositions.find((item) => item.id === employee.position_id)?.name
-    || employee.job_level
-    || employee.role
+function getRoleLabel(employee: any) {
+  return mockPositions.find((item) => item.id === employee?.position_id)?.name
+    || employee?.job_level
+    || employee?.role
+    || 'Nhân viên'
 }
 
 function getToneLabel(tone: OnboardingOpsStatusTone): OnboardingOpsListRow['toneLabel'] {

@@ -15,7 +15,7 @@ initCareerPathStores()
 
 export default function OnboardingPage() {
   const user = useAuthStore((state) => state.user)
-  const hasHydrated = useAuthStore((state) => state.hasHydrated)
+  const isLoading = useAuthStore((state) => state.isLoading)
   const [, setRevision] = useState(0)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null)
   const [, startTransition] = useTransition()
@@ -80,7 +80,7 @@ export default function OnboardingPage() {
     refresh()
   }
 
-  if (!hasHydrated) {
+  if (isLoading) {
     return (
       <div style={{ padding: '24px 16px 80px', maxWidth: 720, margin: '0 auto' }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: '#001D3D' }}>Đang tải dữ liệu onboarding...</div>
