@@ -27,6 +27,18 @@ export function ManagerDashboardPremium({ user }: Props) {
     { id: 'leave', icon: '📋', label: 'Duyệt phép', href: '/leave/approvals', badge: 3 },
     { id: 'violations', icon: '📝', label: 'Ghi lỗi', href: '/violations', badge: 2 },
     { id: 'addEmp', icon: '👤', label: 'Thêm NV', href: '/employees/new' },
+  ];
+
+  const medals = ['🥇', '🥈', '🥉'];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <GradientHeader
+        user={{ name: user.name, avatar: user.avatar, role: 'store_manager', subtitle: user.storeName }}
+        gradient="from-indigo-600 via-purple-600 to-pink-500"
+        rightContent={
+          <div className="relative">
+            <button className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white">🔔</button>
             <span className="absolute -top-1 -right-1 w-5 h-5 bg-error-500 text-white text-xs font-bold rounded-full flex items-center justify-center">3</span>
           </div>
         }
