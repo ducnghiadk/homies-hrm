@@ -1,14 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bot, Send, ShieldAlert, X } from 'lucide-react';
+import { useAuthStore } from '@/store/auth-store';
 
 interface Message {
   role: 'user' | 'assistant';
   text: string;
 }
 
+const ALLOWED_ADMIN_ROLES = ['hr_admin', 'ceo', 'store_manager', 'area_manager'];
+
 export function AdminCopilotDrawer() {
+  const { user, isAuthenticated } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
@@ -19,27 +24,45 @@ export function AdminCopilotDrawer() {
   ]);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || !isAuthenticated || !user || !ALLOWED_ADMIN_ROLES.includes(user.role)) {
+    return null;
+  }
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
 
     const userMsg = input.trim();
     setInput('');
-    setMessages((prev) => [...prev, { role: 'user', text: userMsg }]);
+    const updatedMessages = [...messages, { role: 'user' as const, text: userMsg }];
+    setMessages(updatedMessages);
     setLoading(true);
 
     try {
       const res = await fetch('/api/hermes/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, history: messages })
+        body: JSON.stringify({
+          message: userMsg,
+          history: updatedMessages.slice(-6),
+          user_id: user.id,
+          user_role: user.role
+        })
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Có lỗi xảy ra');
+      }
       setMessages((prev) => [...prev, { role: 'assistant', text: data.reply || 'Không có phản hồi' }]);
-    } catch {
+    } catch (err) {
+      const errorText = err instanceof Error ? err.message : 'Lỗi kết nối tới Hermes Copilot API.';
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', text: 'Lỗi kết nối tới Hermes Copilot API.' }
+        { role: 'assistant', text: `⚠️ ${errorText}` }
       ]);
     } finally {
       setLoading(false);

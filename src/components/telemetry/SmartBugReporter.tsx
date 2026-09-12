@@ -1,14 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Send, X, Bot, CheckCircle } from 'lucide-react';
 import { getRecentNetworkBreadcrumbs } from '@/lib/hermes/telemetry-core';
+import { useAuthStore } from '@/store/auth-store';
 
 export function SmartBugReporter() {
+  const { user, isAuthenticated } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [replyMessage, setReplyMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || !isAuthenticated || !user) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,19 +33,22 @@ export function SmartBugReporter() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_description: description,
-          route: window.location.pathname,
+          user_description: description.trim(),
+          route: typeof window !== 'undefined' ? window.location.pathname : '/',
           network_breadcrumbs: breadcrumbs,
-          user_role: 'staff'
+          user_role: user.role || 'employee',
+          user_id: user.id
         })
       });
 
       const data = await res.json();
-      if (data.reply) {
+      if (!res.ok) {
+        setReplyMessage(data.error || 'Có lỗi xảy ra khi gửi báo cáo.');
+      } else if (data.reply) {
         setReplyMessage(data.reply);
       }
     } catch {
-      setReplyMessage('Đã gửi phản ánh thành công! Hermes sẽ rà soát và khắc phục sự cố.');
+      setReplyMessage('Đã gửi phản ánh! Hermes sẽ rà soát và thông báo cho kỹ thuật viên.');
     } finally {
       setIsSubmitting(false);
     }
