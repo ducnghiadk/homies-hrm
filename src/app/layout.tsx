@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "sonner"
+import { HermesErrorBoundary } from "@/components/telemetry/HermesErrorBoundary"
+import { TelemetryClientInit } from "@/components/telemetry/TelemetryClientInit"
 
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
@@ -37,7 +39,10 @@ export default function RootLayout({
   return (
     <html lang="vi" className={inter.variable}>
       <body className={inter.className}>
-        {children}
+        <TelemetryClientInit />
+        <HermesErrorBoundary>
+          {children}
+        </HermesErrorBoundary>
         <Toaster richColors position="top-right" />
       </body>
     </html>
