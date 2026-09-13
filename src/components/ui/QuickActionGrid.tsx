@@ -57,7 +57,7 @@ export function QuickActionGrid({
           className={`
             flex flex-col items-center justify-center
             ${styles.container} rounded-xl
-            bg-gray-50 hover:bg-gray-100
+            bg-vanilla-50 hover:bg-primary-50
             active:scale-95
             transition-all duration-150
             ${action.disabled ? 'opacity-50 cursor-not-allowed' : ''}
@@ -68,12 +68,12 @@ export function QuickActionGrid({
             className={`
               ${styles.icon} rounded-full
               flex items-center justify-center
-              ${action.bgColor || 'bg-blue-100'}
+              ${action.bgColor || 'bg-primary-100'}
             `}
           >
             <action.icon
               size={styles.iconSize}
-              className={action.iconColor || 'text-blue-600'}
+              className={action.iconColor || 'text-primary-600'}
             />
           </div>
           <span

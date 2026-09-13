@@ -6,7 +6,7 @@ interface MobileSummaryBarProps {
   totalShifts: number
   totalHours: number
   estimatedCost: number
-  onAddShift: () => void
+  onAddShift?: () => void
 }
 
 export default function MobileSummaryBar({
@@ -39,20 +39,21 @@ export default function MobileSummaryBar({
           </span>
         </div>
 
-        {/* Add button */}
-        <button
-          onClick={onAddShift}
-          className="
-            flex items-center gap-1.5 px-4 py-2.5
-            bg-primary text-white text-xs font-bold
-            rounded-full shadow-md
-            active:scale-95
-            transition-all duration-150
-          "
-        >
-          <Plus size={14} />
-          Thêm ca
-        </button>
+        {onAddShift && (
+          <button
+            onClick={onAddShift}
+            className="
+              flex items-center gap-1.5 px-4 py-2.5
+              bg-primary text-white text-xs font-bold
+              rounded-full shadow-md
+              active:scale-95
+              transition-all duration-150
+            "
+          >
+            <Plus size={14} />
+            Thêm ca
+          </button>
+        )}
       </div>
     </div>
   )

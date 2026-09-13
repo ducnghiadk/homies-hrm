@@ -156,7 +156,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
           >
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all"
               style={{
-                background: step === s.n ? 'var(--primary)' : s.n < step ? '#10b981' : 'var(--gray-200)',
+                background: step === s.n ? 'var(--primary)' : s.n < step ? '#1E9E57' : 'var(--gray-200)',
                 color: step === s.n || s.n < step ? '#fff' : 'var(--text-muted)',
               }}>
               {s.n < step ? <Check size={14} /> : <s.Icon size={14} />}
@@ -172,7 +172,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
       {step === 1 && (
         <div className="card space-y-3">
           <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-            <Store size={16} className="text-blue-600" />
+            <Store size={16} className="text-primary-600" />
             Thông tin cửa hàng
           </h3>
 
@@ -230,7 +230,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
       {step === 2 && (
         <div className="card space-y-3">
           <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-            <Users size={16} className="text-blue-600" />
+            <Users size={16} className="text-primary-600" />
             Dự báo khách hàng
           </h3>
 
@@ -263,7 +263,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
                 </div>
               </div>
               <div className="p-2 rounded-xl text-xs flex items-center gap-1.5" style={{ background: 'var(--gray-50)', color: 'var(--text-muted)' }}>
-                <Lightbulb size={12} className="text-amber-500 flex-shrink-0" />
+                <Lightbulb size={12} className="text-warning-500 flex-shrink-0" />
                 Hệ thống tự phân bổ theo pattern chuẩn ngành F&B (cao điểm trưa 28%, tối 35%)
               </div>
               <div className="overflow-x-auto">
@@ -322,8 +322,8 @@ export default function StaffingCalculator({ onComplete }: Props) {
 
           {forecastMethod === 'pos' && (
             <div className="py-8 text-center space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center">
-                <BarChart3 size={28} className="text-blue-600" />
+              <div className="w-14 h-14 rounded-2xl bg-primary-100 flex items-center justify-center">
+                <BarChart3 size={28} className="text-primary-600" />
               </div>
               <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Kết nối POS</p>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Tính năng đang phát triển.</p>
@@ -340,7 +340,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
       {step === 3 && (
         <div className="card space-y-3">
           <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-            <Zap size={16} className="text-amber-500" />
+            <Zap size={16} className="text-warning-500" />
             Cấu hình năng suất
           </h3>
 
@@ -410,7 +410,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
         <div className="space-y-3">
           <div className="card">
             <h3 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <BarChart3 size={16} className="text-blue-600" />
+              <BarChart3 size={16} className="text-primary-600" />
               Kết quả đề xuất
             </h3>
             <div className="overflow-x-auto">
@@ -472,7 +472,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
               <div className="card" style={{ background: 'var(--gray-50)' }}>
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="text-xs font-bold flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
-                    <Lightbulb size={14} className="text-amber-500" />
+                    <Lightbulb size={14} className="text-warning-500" />
                     {pos.position_name} — {shift?.shift_name}
                   </h4>
                   <button onClick={() => setExpandedPos(null)} className="text-xs" style={{ color: 'var(--text-muted)' }}>✕</button>
@@ -489,7 +489,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
             )
           })()}
           <div className="text-xs text-center flex items-center justify-center gap-1" style={{ color: 'var(--text-muted)' }}>
-            <Lightbulb size={12} className="text-amber-500" />
+            <Lightbulb size={12} className="text-warning-500" />
             Nhấn vào số để xem lý do tính toán
           </div>
         </div>
@@ -499,7 +499,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
       {step === 5 && (
         <div className="card space-y-3">
           <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-            <RefreshCw size={16} className="text-blue-600" />
+            <RefreshCw size={16} className="text-primary-600" />
             Phân bổ Full-time / Part-time
           </h3>
           <div className="grid grid-cols-2 gap-2">
@@ -519,7 +519,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
               <span className="text-xs font-bold" style={{ color: '#2563eb' }}>FT {ratioFT}%</span>
               <input type="range" className="flex-1" min={20} max={100} value={ratioFT}
                 onChange={e => setRatioFT(Number(e.target.value))} />
-              <span className="text-xs font-bold text-amber-500">PT {100 - ratioFT}%</span>
+              <span className="text-xs font-bold text-warning-500">PT {100 - ratioFT}%</span>
             </div>
           </div>
 
@@ -554,8 +554,8 @@ export default function StaffingCalculator({ onComplete }: Props) {
               <div className="text-xl font-bold" style={{ color: '#2563eb' }}>{split.fulltime_count}</div>
               <div className="text-xs" style={{ color: '#1d4ed8' }}>Full-time ({ftHours}h/tuần)</div>
             </div>
-            <div className="p-3 rounded-xl border" style={{ borderColor: '#f59e0b', background: '#fffbeb' }}>
-              <div className="text-xl font-bold text-amber-500">{split.parttime_count}</div>
+            <div className="p-3 rounded-xl border" style={{ borderColor: '#F6C85F', background: '#fffbeb' }}>
+              <div className="text-xl font-bold text-warning-500">{split.parttime_count}</div>
               <div className="text-xs" style={{ color: '#b45309' }}>Part-time ({ptHours}h/tuần)</div>
             </div>
           </div>
@@ -578,7 +578,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
             <div className="space-y-2">
               {[
                 { label: 'Lương Full-time', value: cost.fulltime_salary, color: '#2563eb' },
-                { label: 'Lương Part-time', value: cost.parttime_salary, color: '#f59e0b' },
+                { label: 'Lương Part-time', value: cost.parttime_salary, color: '#F6C85F' },
                 { label: 'BHXH, BHYT (21%)', value: cost.insurance, color: '#6b7280' },
               ].map(item => (
                 <div key={item.label} className="flex justify-between items-center py-1.5" style={{ borderBottom: '1px solid var(--gray-100)' }}>
@@ -594,7 +594,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
           </div>
 
           <div className="card" style={{
-            background: cost.status === 'good' ? '#d1fae5' : cost.status === 'warning' ? '#fef3c7' : '#fee2e2',
+            background: cost.status === 'good' ? '#d1fae5' : cost.status === 'warning' ? '#FFF8E8' : '#fee2e2',
             borderColor: cost.status === 'good' ? '#a7f3d0' : cost.status === 'warning' ? '#fde68a' : '#fecaca',
           }}>
             <div className="flex items-center gap-2 mb-2">
@@ -602,8 +602,8 @@ export default function StaffingCalculator({ onComplete }: Props) {
                 {cost.status === 'good'
                   ? <CheckCircle size={20} className="text-emerald-600" />
                   : cost.status === 'warning'
-                    ? <AlertTriangle size={20} className="text-amber-500" />
-                    : <Circle size={20} className="fill-red-500 text-red-500" />}
+                    ? <AlertTriangle size={20} className="text-warning-500" />
+                    : <Circle size={20} className="fill-red-500 text-error-500" />}
               </span>
               <span className="text-sm font-bold" style={{
                 color: cost.status === 'good' ? '#065f46' : cost.status === 'warning' ? '#92400e' : '#991b1b',
@@ -613,7 +613,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
               <div className="absolute top-0 h-3 rounded-full" style={{ left: '0%', width: `${cost.benchmark_max}%`, background: 'rgba(16,185,129,0.2)' }} />
               <div className="h-3 rounded-full" style={{
                 width: `${Math.min(cost.percent_revenue, 50)}%`,
-                background: cost.status === 'good' ? '#10b981' : cost.status === 'warning' ? '#f59e0b' : '#ef4444',
+                background: cost.status === 'good' ? '#1E9E57' : cost.status === 'warning' ? '#F6C85F' : '#D9381E',
               }} />
             </div>
             <div className="flex justify-between text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -641,7 +641,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
           {suggestions.length > 0 && (
             <div className="card">
               <h4 className="text-xs font-bold mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
-                <Lightbulb size={14} className="text-amber-500" />
+                <Lightbulb size={14} className="text-warning-500" />
                 Gợi ý tối ưu
               </h4>
               <div className="space-y-2">
@@ -661,7 +661,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
           <div className="space-y-2">
             <button onClick={handleApply} disabled={applied}
               className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all"
-              style={{ background: applied ? '#10b981' : 'var(--primary)', opacity: applied ? 0.8 : 1 }}>
+              style={{ background: applied ? '#1E9E57' : 'var(--primary)', opacity: applied ? 0.8 : 1 }}>
               {applied
                 ? <><CheckCircle size={14} /> Đã áp dụng</>
                 : <><Rocket size={14} /> Áp dụng định biên này</>}
@@ -711,8 +711,8 @@ export default function StaffingCalculator({ onComplete }: Props) {
                             {costStatus === 'good'
                               ? <><CheckCircle size={12} className="text-emerald-600" /> Tốt</>
                               : costStatus === 'warning'
-                                ? <><Circle size={8} className="fill-amber-500 text-amber-500" /> TB</>
-                                : <><AlertTriangle size={12} className="text-amber-500" /> Cao</>}
+                                ? <><Circle size={8} className="fill-amber-500 text-warning-500" /> TB</>
+                                : <><AlertTriangle size={12} className="text-warning-500" /> Cao</>}
                           </span>
                         </div>
                       </div>
@@ -724,7 +724,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
                           <span className="flex items-center gap-1">
                             {revStatus === 'good'
                               ? <><CheckCircle size={12} className="text-emerald-600" /> Tốt</>
-                              : <><Circle size={8} className="fill-amber-500 text-amber-500" /> TB</>}
+                              : <><Circle size={8} className="fill-amber-500 text-warning-500" /> TB</>}
                           </span>
                         </div>
                       </div>
@@ -737,7 +737,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
               {cost.percent_revenue > getAdminSettings().cost_warning_pct && (
                 <div className="p-3 rounded-xl" style={{ background: '#fefce8', borderLeft: '4px solid #eab308' }}>
                   <h4 className="text-xs font-bold mb-1 flex items-center gap-1.5" style={{ color: '#92400e' }}>
-                    <Lightbulb size={14} className="text-amber-600" />
+                    <Lightbulb size={14} className="text-warning-600" />
                     Gợi ý tiết kiệm
                   </h4>
                   <p className="text-xs mb-2" style={{ color: '#78716c' }}>
@@ -767,7 +767,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
           <div className="w-[95%] max-w-md max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-4 space-y-3 shadow-2xl">
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-                <Lightbulb size={16} className="text-amber-500" />
+                <Lightbulb size={16} className="text-warning-500" />
                 Chi tiết gợi ý tối ưu
               </h3>
               <button onClick={() => setShowOptModal(false)}><X size={18} style={{ color: 'var(--text-muted)' }} /></button>
@@ -818,7 +818,7 @@ export default function StaffingCalculator({ onComplete }: Props) {
             {/* Notes */}
             <div className="p-3 rounded-xl" style={{ background: 'var(--gray-50)' }}>
               <div className="text-xs font-bold mb-1 flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
-                <Lightbulb size={14} className="text-amber-500" />
+                <Lightbulb size={14} className="text-warning-500" />
                 Lưu ý khi áp dụng:
               </div>
               <ul className="space-y-1 text-xs" style={{ color: 'var(--text-secondary)' }}>

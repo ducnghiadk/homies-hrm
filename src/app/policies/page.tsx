@@ -5,7 +5,7 @@ import { mockPolicies } from '@/lib/mock-data-communication'
 import { BookOpen, CheckCircle, XCircle, Eye, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
 
-const catColors: Record<string, string> = { hr: '#3b82f6', operations: '#10b981', safety: '#ef4444', benefits: '#8b5cf6' }
+const catColors: Record<string, string> = { hr: '#2F6FA8', operations: '#1E9E57', safety: '#D9381E', benefits: '#001D3D' }
 
 export default function PoliciesPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -39,7 +39,7 @@ export default function PoliciesPage() {
                       {p.is_read ? (
                         <span className="text-[9px] flex items-center gap-0.5 text-emerald-500"><CheckCircle size={8} /> Đã đọc</span>
                       ) : (
-                        <span className="text-[9px] flex items-center gap-0.5 text-amber-500"><XCircle size={8} /> Chưa đọc</span>
+                        <span className="text-[9px] flex items-center gap-0.5 text-warning-500"><XCircle size={8} /> Chưa đọc</span>
                       )}
                       <span className="text-[9px] flex items-center gap-0.5" style={{ color: 'var(--text-muted)' }}>
                         <Eye size={8} /> {p.read_count}/{p.total_employees}

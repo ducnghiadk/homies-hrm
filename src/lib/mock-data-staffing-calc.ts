@@ -2,9 +2,8 @@
 // HRM Trà Sữa 🧋 — Staffing Calculator Engine
 // ============================================
 
-import { mockPositions, mockStores, mockShifts, mockEmployees } from './mock-data'
-import { staffingRequirements, updateRequirement } from './mock-data-staffing'
-import { laborCostSettings } from './mock-data-labor-cost'
+import { mockPositions, mockShifts, mockEmployees } from './mock-data'
+import { updateRequirement } from './mock-data-staffing'
 
 // ─── Types ───
 

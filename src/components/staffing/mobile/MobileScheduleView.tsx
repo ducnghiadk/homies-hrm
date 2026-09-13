@@ -77,13 +77,15 @@ export default function MobileScheduleView({
   }, [])
 
   const handleEditShift = useCallback((shift: ScheduleShift) => {
+    if (!onEditShift) return
     setEditingShift(shift)
     setShowEditSheet(true)
-  }, [])
+  }, [onEditShift])
 
   const handleDeleteShift = useCallback((shiftId: string) => {
+    if (!onDeleteShift) return
     if (confirm('Bạn có chắc muốn xóa ca này?')) {
-      onDeleteShift?.(shiftId)
+      onDeleteShift(shiftId)
     }
   }, [onDeleteShift])
 
@@ -122,7 +124,7 @@ export default function MobileScheduleView({
           <div className="text-center py-12">
             <MailOpen size={32} className="text-gray-300 mx-auto mb-2" />
             <p className="text-sm text-gray-500 font-medium">Không có ca nào</p>
-            <p className="text-xs text-gray-400 mt-1">Nhấn "Thêm ca" để bắt đầu</p>
+            <p className="text-xs text-gray-400 mt-1">Nhấn &quot;Thêm ca&quot; để bắt đầu</p>
           </div>
         )}
 
@@ -141,7 +143,7 @@ export default function MobileScheduleView({
         totalShifts={dayTotals.totalShifts}
         totalHours={dayTotals.totalHours}
         estimatedCost={dayTotals.estimatedCost}
-        onAddShift={() => onAddShift?.()}
+        onAddShift={onAddShift ? () => onAddShift() : undefined}
       />
 
       {/* Edit Bottom Sheet */}
@@ -150,18 +152,18 @@ export default function MobileScheduleView({
         onClose={() => { setShowEditSheet(false); setEditingShift(null) }}
         title="Sửa ca làm việc"
         snapPoints={[0.55, 0.85]}
-        showFooter
+        showFooter={Boolean(onEditShift)}
         footerContent={
           <div className="flex gap-2">
             <button
               onClick={() => { setShowEditSheet(false); setEditingShift(null) }}
-              className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl active:bg-gray-200"
+              className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-primary-50 rounded-xl active:bg-gray-200"
             >
               Hủy
             </button>
             <button
               onClick={() => {
-                if (editingShift) onEditShift?.(editingShift)
+                if (editingShift && onEditShift) onEditShift(editingShift)
                 setShowEditSheet(false)
                 setEditingShift(null)
               }}
@@ -176,7 +178,7 @@ export default function MobileScheduleView({
           <div className="space-y-4">
             <div>
               <label className="text-xs text-gray-500 mb-1 flex items-center gap-1"><User size={12} /> Nhân viên</label>
-              <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700">
+              <div className="w-full p-3 bg-vanilla-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700">
                 {editingShift.employeeName}
               </div>
             </div>

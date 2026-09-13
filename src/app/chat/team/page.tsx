@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import AppShell from '@/components/layout/AppShell'
-import { mockChatGroups, mockChatMessages, mockDMThreads, mockDMMessages } from '@/lib/mock-data-communication'
+import { mockChatGroups, mockChatMessages, mockDMThreads } from '@/lib/mock-data-communication'
 import { Users, Send } from 'lucide-react'
 
 export default function TeamChatPage() {
@@ -70,7 +70,7 @@ export default function TeamChatPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{g.name}</span>
                     {g.unread_count > 0 && (
-                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#ef4444' }}>
+                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#D9381E' }}>
                         {g.unread_count}
                       </span>
                     )}
@@ -96,7 +96,7 @@ export default function TeamChatPage() {
                   <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{d.last_message}</div>
                 </div>
                 {d.unread_count > 0 && (
-                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#ef4444' }}>{d.unread_count}</span>
+                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#D9381E' }}>{d.unread_count}</span>
                 )}
               </div>
             ))}

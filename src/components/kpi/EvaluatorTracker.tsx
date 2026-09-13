@@ -44,7 +44,7 @@ export default function EvaluatorTracker({ evaluators, employeeName, deadline, o
           👥 Tiến độ đánh giá{employeeName ? ` — ${employeeName}` : ''}
         </h3>
         {deadline && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: '#fef3c7', color: '#92400e' }}>
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: '#FFF8E8', color: '#92400e' }}>
             ⏳ {deadline}
           </span>
         )}
@@ -61,7 +61,7 @@ export default function EvaluatorTracker({ evaluators, employeeName, deadline, o
             <div className="flex-1 min-w-0">
               <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                 {ev.role.charAt(0).toUpperCase() + ev.role.slice(1)}
-                {ev.required && <span className="text-[9px] ml-1" style={{ color: '#ef4444' }}>(bắt buộc)</span>}
+                {ev.required && <span className="text-[9px] ml-1" style={{ color: '#D9381E' }}>(bắt buộc)</span>}
               </div>
               <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{ev.name}</div>
               {ev.submitted ? (
@@ -70,7 +70,7 @@ export default function EvaluatorTracker({ evaluators, employeeName, deadline, o
                   {ev.submittedAt && ` • ${new Date(ev.submittedAt).toLocaleDateString('vi')}`}
                 </div>
               ) : (
-                <div className="text-[10px] font-semibold" style={{ color: '#f59e0b' }}>⏳ Chưa đánh giá</div>
+                <div className="text-[10px] font-semibold" style={{ color: '#F6C85F' }}>⏳ Chưa đánh giá</div>
               )}
             </div>
             {!ev.submitted && (
@@ -93,7 +93,7 @@ export default function EvaluatorTracker({ evaluators, employeeName, deadline, o
         <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--gray-100)' }}>
           <div className="h-full rounded-full transition-all" style={{
             width: `${pct}%`,
-            background: pct >= 100 ? '#10b981' : pct >= 50 ? '#3b82f6' : '#f59e0b',
+            background: pct >= 100 ? '#1E9E57' : pct >= 50 ? '#2F6FA8' : '#F6C85F',
           }} />
         </div>
       </div>

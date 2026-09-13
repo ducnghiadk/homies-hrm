@@ -2,6 +2,8 @@
 // Shift Preferences — Mock data store
 // =============================================
 
+export type ShiftPreferenceLevel = 'preferred' | 'available' | 'unavailable'
+
 export interface ShiftPreference {
   id: string
   user_id: string
@@ -11,12 +13,22 @@ export interface ShiftPreference {
   afternoon_available: boolean
   evening_available: boolean
   not_available: boolean
+  shift_preferences?: Record<string, boolean>
+  shift_preference_levels?: Record<string, ShiftPreferenceLevel>
   reason?: string
   note?: string
   status: 'draft' | 'submitted'
   submitted_at?: string
   created_at: string
 }
+
+const LEGACY_SHIFT_FIELD_MAP = {
+  'shift-001': 'morning_available',
+  'shift-002': 'afternoon_available',
+  'shift-003': 'evening_available',
+} as const
+
+type LegacyShiftField = typeof LEGACY_SHIFT_FIELD_MAP[keyof typeof LEGACY_SHIFT_FIELD_MAP]
 
 let prefCounter = 100
 
@@ -31,6 +43,11 @@ function sp(
   return {
     id, user_id: userId, week_start_date: SEED_WEEK, date,
     morning_available: m, afternoon_available: a, evening_available: e,
+    shift_preferences: {
+      'shift-001': m,
+      'shift-002': a,
+      'shift-003': e,
+    },
     not_available: na, reason, note: '', status: 'submitted' as const,
     submitted_at: '2026-02-20T10:00:00', created_at: '2026-02-20T10:00:00',
   }
@@ -124,6 +141,62 @@ export function getAllPreferencesForWeek(weekStart: string): ShiftPreference[] {
   return preferences.filter(p => p.week_start_date === weekStart && p.status === 'submitted')
 }
 
+function buildLegacyShiftPreferences(input: {
+  morning: boolean
+  afternoon: boolean
+  evening: boolean
+}): Record<string, boolean> {
+  return {
+    'shift-001': input.morning,
+    'shift-002': input.afternoon,
+    'shift-003': input.evening,
+  }
+}
+
+function buildLegacyShiftPreferenceLevels(input: {
+  morning: boolean
+  afternoon: boolean
+  evening: boolean
+}): Record<string, ShiftPreferenceLevel> {
+  return {
+    'shift-001': input.morning ? 'preferred' : 'unavailable',
+    'shift-002': input.afternoon ? 'preferred' : 'unavailable',
+    'shift-003': input.evening ? 'preferred' : 'unavailable',
+  }
+}
+
+function getLegacyFieldForShiftTemplate(shiftTemplateId: string): LegacyShiftField | null {
+  return LEGACY_SHIFT_FIELD_MAP[shiftTemplateId as keyof typeof LEGACY_SHIFT_FIELD_MAP] || null
+}
+
+export function getShiftPreferenceAvailability(preference: ShiftPreference, shiftTemplateId: string): boolean {
+  if (preference.not_available) return false
+  const level = preference.shift_preference_levels?.[shiftTemplateId]
+  if (level) return level !== 'unavailable'
+  if (typeof preference.shift_preferences?.[shiftTemplateId] === 'boolean') {
+    return preference.shift_preferences[shiftTemplateId]
+  }
+
+  const legacyField = getLegacyFieldForShiftTemplate(shiftTemplateId)
+  return legacyField ? preference[legacyField] : false
+}
+
+export function getShiftPreferenceLevel(preference: ShiftPreference, shiftTemplateId: string): ShiftPreferenceLevel {
+  if (preference.not_available) return 'unavailable'
+  const level = preference.shift_preference_levels?.[shiftTemplateId]
+  if (level) return level
+  return getShiftPreferenceAvailability(preference, shiftTemplateId) ? 'preferred' : 'unavailable'
+}
+
+import { mockEmployees } from './mock-data'
+
+type StoredRegistrationWeek = {
+  store_id: string
+  week_start_date: string
+  status: string
+  registration_deadline: string
+}
+
 export function savePreferences(
   userId: string,
   weekStart: string,
@@ -133,11 +206,35 @@ export function savePreferences(
     afternoon: boolean
     evening: boolean
     notAvailable: boolean
+    shiftPreferences?: Record<string, boolean>
+    shiftPreferenceLevels?: Record<string, ShiftPreferenceLevel>
     reason?: string
   }[],
   note: string,
   status: 'draft' | 'submitted',
 ): ShiftPreference[] {
+  // Security & Validation checks
+  if (typeof window !== 'undefined') {
+    const savedWeeks = localStorage.getItem('homies_registration_weeks')
+    if (savedWeeks) {
+      const weeks = JSON.parse(savedWeeks) as StoredRegistrationWeek[]
+      const emp = mockEmployees.find(e => e.id === userId)
+      if (emp) {
+        const week = weeks.find(w => w.store_id === emp.store_id && w.week_start_date === weekStart)
+        if (week) {
+          const now = new Date()
+          const deadline = new Date(week.registration_deadline)
+          if (week.status !== 'open') {
+            throw new Error(`Đợt đăng ký ca rảnh đã khóa (Trạng thái đợt xếp ca hiện tại: ${week.status})`)
+          }
+          if (now > deadline) {
+            throw new Error('Không thể đăng ký ca do đã quá hạn chót đăng ký!')
+          }
+        }
+      }
+    }
+  }
+
   // Remove existing preferences for this user+week
   const toRemove = preferences
     .map((p, i) => (p.user_id === userId && p.week_start_date === weekStart ? i : -1))
@@ -157,6 +254,8 @@ export function savePreferences(
       morning_available: day.morning,
       afternoon_available: day.afternoon,
       evening_available: day.evening,
+      shift_preferences: day.shiftPreferences || buildLegacyShiftPreferences(day),
+      shift_preference_levels: day.shiftPreferenceLevels || buildLegacyShiftPreferenceLevels(day),
       not_available: day.notAvailable,
       reason: day.reason,
       note,

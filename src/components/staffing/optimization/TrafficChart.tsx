@@ -32,7 +32,7 @@ export default function TrafficChart({ data }: TrafficChartProps) {
             {data.map((entry, index) => (
               <Cell 
                 key={`cell-${index}`} 
-                fill={entry.percentage > 20 ? '#f97316' : entry.percentage > 10 ? '#3b82f6' : '#94a3b8'} 
+                fill={entry.percentage > 20 ? '#f97316' : entry.percentage > 10 ? '#2F6FA8' : '#94a3b8'} 
               />
             ))}
           </Bar>

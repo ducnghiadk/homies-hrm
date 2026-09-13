@@ -36,8 +36,8 @@ export default function TrendAnalysis({
 
   const dirColor = (() => {
     // For cost: down is good. For efficiency: up is good
-    if (metric === 'cost') return data.direction === 'down' ? 'text-green-500' : data.direction === 'up' ? 'text-red-500' : 'text-gray-400'
-    return data.direction === 'up' ? 'text-green-500' : data.direction === 'down' ? 'text-red-500' : 'text-gray-400'
+    if (metric === 'cost') return data.direction === 'down' ? 'text-success-500' : data.direction === 'up' ? 'text-error-500' : 'text-gray-400'
+    return data.direction === 'up' ? 'text-success-500' : data.direction === 'down' ? 'text-error-500' : 'text-gray-400'
   })()
 
   // SVG line chart points

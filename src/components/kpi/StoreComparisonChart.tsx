@@ -43,7 +43,7 @@ export default function StoreComparisonChart({ period }: Props) {
                 </span>
                 <span className="font-bold text-xs" style={{ color: 'var(--primary)' }}>{Math.round(store.average_score)}</span>
                 <span className="text-[10px] font-bold" style={{
-                  color: change > 0 ? '#10b981' : change < 0 ? '#ef4444' : '#9ca3af',
+                  color: change > 0 ? '#1E9E57' : change < 0 ? '#D9381E' : '#9ca3af',
                 }}>
                   {change > 0 ? `+${change.toFixed(0)} ↑` : change < 0 ? `${change.toFixed(0)} ↓` : '—'}
                 </span>
@@ -51,7 +51,7 @@ export default function StoreComparisonChart({ period }: Props) {
               <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--gray-100)' }}>
                 <div className="h-full rounded-full transition-all" style={{
                   width: `${pct}%`,
-                  background: i === 0 ? '#10b981' : i === 1 ? '#3b82f6' : i === 2 ? '#f59e0b' : 'var(--gray-400)',
+                  background: i === 0 ? '#1E9E57' : i === 1 ? '#2F6FA8' : i === 2 ? '#F6C85F' : 'var(--gray-400)',
                 }} />
               </div>
             </div>

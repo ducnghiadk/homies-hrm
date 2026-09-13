@@ -13,18 +13,28 @@ import type {
   LeaderboardEntry, CareerAnalytics, EmployeeCareerProgress,
   CareerPathReport, CareerWarning, SmartSuggestion, Achievement,
   PromotionConditionProgress, OnboardingOpsSettings, OnboardingOpsStoreOverride,
+  OnboardingCompetencyGroup, OnboardingChecklistTemplate,
+  OnboardingChecklistStage, OnboardingChecklistItemTemplate, OnboardingRoleCode, OnboardingStageCode,
+  EmployeeOnboardingChecklistPlan, EmployeeOnboardingChecklistProgressItem,
+  EmployeeOnboardingChecklistPlanStatus,
+  OnboardingSelfReviewAnswers, OnboardingSelfReviewEntry, OnboardingSelfReviewStageView,
+  OnboardingStageGateCode, OnboardingStageGateRecord, OnboardingStageGateView,
 } from './career-path-types';
 
 import {
   defaultCareerLevels, defaultSkills, defaultSkillLevels, defaultEmployeeTypes,
   defaultPromotionConditions, defaultBuddyRewards, defaultTrialChecklist,
-  defaultOnboardingSteps, defaultSettings,
+  defaultOnboardingSteps, defaultSettings, defaultOnboardingCompetencyGroups,
+  defaultOnboardingChecklistTemplates, defaultOnboardingChecklistStages,
+  defaultOnboardingChecklistItems,
+  sampleEmployeeOnboardingChecklistPlans, sampleEmployeeOnboardingChecklistProgressItems,
   sampleEmployeeSkills, sampleBuddyAssignments, samplePromotionRequests,
   sampleTypeChangeRequests, sampleTrialEvaluations, sampleGoals,
   sampleEndorsements, sampleEmployeeOnboarding, sampleNotifications,
   sampleLeaderboard, sampleChangeLogs, sampleTemplate, sampleAnalytics,
   sampleAchievements, sampleRefreshRecords, sampleCrossTraining,
 } from './mock-data-career-path';
+import { mockEmployees, mockPositions } from './mock-data';
 
 // ─── Storage Keys ────────────────────────────────────────────
 
@@ -38,6 +48,14 @@ const KEYS = {
   buddyRewards: 'cp_buddy_rewards',
   trialChecklist: 'cp_trial_checklist',
   onboardingSteps: 'cp_onboarding_steps',
+  onboardingCompetencyGroups: 'cp_onboarding_competency_groups',
+  onboardingChecklistTemplates: 'cp_onboarding_checklist_templates',
+  onboardingChecklistStages: 'cp_onboarding_checklist_stages',
+  onboardingChecklistItems: 'cp_onboarding_checklist_items',
+  onboardingEmployeePlans: 'cp_onboarding_employee_plans',
+  onboardingEmployeeProgressItems: 'cp_onboarding_employee_progress_items',
+  selfReviewEntries: 'cp_onboarding_self_review_entries',
+  stageGateRecords: 'cp_onboarding_stage_gate_records',
   settings: 'cp_settings',
   promotionRequests: 'cp_promo_requests',
   typeChangeRequests: 'cp_type_change_requests',
@@ -105,6 +123,147 @@ function today(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+function persistOnboardingSelfReviewEntries(): void {
+  save(KEYS.selfReviewEntries, _onboardingSelfReviewEntries);
+}
+
+function sortSelfReviewEntries(entries: OnboardingSelfReviewEntry[]): OnboardingSelfReviewEntry[] {
+  return [...entries].sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+}
+
+function assertSelfReviewNote(note: string): string {
+  return note.trim().slice(0, 280);
+}
+
+function persistOnboardingStageGateRecords(): void {
+  save(KEYS.stageGateRecords, _onboardingStageGateRecords);
+}
+
+function getCurrentStageGateRecord(
+  employeeId: string,
+  onboardingPlanId: string,
+  gateCode: OnboardingStageGateCode,
+): OnboardingStageGateRecord | null {
+  return [..._onboardingStageGateRecords]
+    .filter((record) =>
+      record.employee_id === employeeId
+      && record.onboarding_plan_id === onboardingPlanId
+      && record.gate_code === gateCode)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
+}
+
+type OnboardingEmployeeSnapshot = {
+  id: string;
+  role?: string;
+  store_id?: string;
+  position_id?: string;
+  hire_date?: string;
+  job_level?: string;
+  status?: string;
+  is_probationary?: boolean;
+};
+
+function resolveEmployeeName(employeeId?: string | null): string | null {
+  if (!employeeId) return null;
+  return mockEmployees.find(employee => employee.id === employeeId)?.full_name ?? null;
+}
+
+function resolveStoreManager(storeId?: string): { id: string; full_name: string } | null {
+  if (!storeId) return null;
+  const manager = mockEmployees.find(employee => employee.store_id === storeId && employee.role === 'store_manager');
+  return manager ? { id: manager.id, full_name: manager.full_name } : null;
+}
+
+function mapEmployeeToOnboardingRole(employee: OnboardingEmployeeSnapshot): OnboardingRoleCode {
+  if (employee.role === 'shift_leader' || employee.position_id === 'pos-004' || ['L3', 'L4', 'L5'].includes(employee.job_level || '')) {
+    return 'shift_leader';
+  }
+
+  const positionName = mockPositions.find(position => position.id === employee.position_id)?.name.toLowerCase() ?? '';
+  if (employee.position_id === 'pos-001' || positionName.includes('pha chế')) {
+    return 'barista';
+  }
+
+  return 'counter_staff';
+}
+
+function shouldAutoAssignOnboarding(employee: OnboardingEmployeeSnapshot): boolean {
+  if (employee.is_probationary || employee.status === 'probation') {
+    return true;
+  }
+
+  if (!employee.hire_date) {
+    return false;
+  }
+
+  const startDate = new Date(`${employee.hire_date}T00:00:00`);
+  if (Number.isNaN(startDate.getTime())) {
+    return false;
+  }
+
+  const diffDays = Math.floor((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays >= 0 && diffDays <= 30;
+}
+
+function getChecklistItemFallbackProgress(planId: string, checklistItemId: string): EmployeeOnboardingChecklistProgressItem {
+  return {
+    id: `onb-progress-${planId}-${checklistItemId}`,
+    onboarding_plan_id: planId,
+    checklist_item_id: checklistItemId,
+    status: 'not_started',
+    note: '',
+    started_at: null,
+    completed_at: null,
+    buddy_confirmed_by: null,
+    buddy_confirmed_at: null,
+    manager_confirmed_by: null,
+    manager_confirmed_at: null,
+    quiz_score: null,
+  };
+}
+
+function getPlanStageAndProgress(
+  plan: EmployeeOnboardingChecklistPlan,
+  stages: OnboardingChecklistStage[],
+  items: OnboardingChecklistItemTemplate[],
+  progressItems: EmployeeOnboardingChecklistProgressItem[],
+): {
+  currentStageCode: OnboardingStageCode;
+  overallProgress: number;
+  planStatus: EmployeeOnboardingChecklistPlanStatus;
+} {
+  const requiredItems = items.filter(item => item.is_required);
+  const passedRequiredCount = requiredItems.filter((item) =>
+    progressItems.some((progressItem) => progressItem.checklist_item_id === item.id && progressItem.status === 'passed')
+  ).length;
+  const overallProgress = requiredItems.length === 0
+    ? 0
+    : Math.round((passedRequiredCount / requiredItems.length) * 100);
+
+  const currentStage = stages.find((stage) => {
+    const stageItems = items.filter(item => item.stage_id === stage.id && item.is_required);
+    if (stageItems.length === 0) return false;
+
+    return stageItems.some((item) => {
+      const progressItem = progressItems.find(entry => entry.checklist_item_id === item.id);
+      return !progressItem || progressItem.status !== 'passed';
+    });
+  }) ?? stages[stages.length - 1];
+
+  const hasStarted = progressItems.some(item => item.status !== 'not_started');
+  const planStatus: EmployeeOnboardingChecklistPlanStatus = overallProgress >= 100
+    ? 'completed'
+    : hasStarted || plan.status === 'in_progress'
+      ? 'in_progress'
+      : 'assigned';
+
+  return {
+    currentStageCode: currentStage?.code ?? plan.current_stage_code,
+    overallProgress,
+    planStatus,
+  };
+}
+
 // ─── Store Accessors ─────────────────────────────────────────
 
 let _levels: CareerLevel[] = [];
@@ -116,6 +275,14 @@ let _conditions: PromotionCondition[] = [];
 let _buddyRewards: BuddyRewardConfig[] = [];
 let _trialChecklist: TrialChecklistItem[] = [];
 let _onboardingSteps: OnboardingStep[] = [];
+let _onboardingCompetencyGroups: OnboardingCompetencyGroup[] = [];
+let _onboardingChecklistTemplates: OnboardingChecklistTemplate[] = [];
+let _onboardingChecklistStages: OnboardingChecklistStage[] = [];
+let _onboardingChecklistItems: OnboardingChecklistItemTemplate[] = [];
+let _onboardingEmployeePlans: EmployeeOnboardingChecklistPlan[] = [];
+let _onboardingEmployeeProgressItems: EmployeeOnboardingChecklistProgressItem[] = [];
+let _onboardingSelfReviewEntries: OnboardingSelfReviewEntry[] = [];
+let _onboardingStageGateRecords: OnboardingStageGateRecord[] = [];
 let _settings: CareerPathSettings = normalizeSettings(defaultSettings);
 let _promoRequests: PromotionRequest[] = [];
 let _typeChangeRequests: TypeChangeRequest[] = [];
@@ -145,6 +312,14 @@ export function initCareerPathStores(): void {
   _buddyRewards = load(KEYS.buddyRewards, defaultBuddyRewards);
   _trialChecklist = load(KEYS.trialChecklist, defaultTrialChecklist);
   _onboardingSteps = load(KEYS.onboardingSteps, defaultOnboardingSteps);
+  _onboardingCompetencyGroups = load(KEYS.onboardingCompetencyGroups, defaultOnboardingCompetencyGroups);
+  _onboardingChecklistTemplates = load(KEYS.onboardingChecklistTemplates, defaultOnboardingChecklistTemplates);
+  _onboardingChecklistStages = load(KEYS.onboardingChecklistStages, defaultOnboardingChecklistStages);
+  _onboardingChecklistItems = load(KEYS.onboardingChecklistItems, defaultOnboardingChecklistItems);
+  _onboardingEmployeePlans = load(KEYS.onboardingEmployeePlans, sampleEmployeeOnboardingChecklistPlans);
+  _onboardingEmployeeProgressItems = load(KEYS.onboardingEmployeeProgressItems, sampleEmployeeOnboardingChecklistProgressItems);
+  _onboardingSelfReviewEntries = load(KEYS.selfReviewEntries, []);
+  _onboardingStageGateRecords = load(KEYS.stageGateRecords, []);
   _settings = normalizeSettings(load(KEYS.settings, defaultSettings));
   _promoRequests = load(KEYS.promotionRequests, samplePromotionRequests);
   _typeChangeRequests = load(KEYS.typeChangeRequests, sampleTypeChangeRequests);
@@ -515,6 +690,416 @@ export function createTrialChecklistItem(data: Partial<TrialChecklistItem>): Tri
 
 export function getOnboardingSteps(): OnboardingStep[] { return _onboardingSteps.sort((a, b) => a.order - b.order); }
 
+export function getOnboardingCompetencyGroups(): OnboardingCompetencyGroup[] {
+  return [..._onboardingCompetencyGroups]
+    .filter(group => group.active)
+    .sort((left, right) => left.sort_order - right.sort_order);
+}
+
+export function getOnboardingChecklistTemplates(): OnboardingChecklistTemplate[] {
+  return [..._onboardingChecklistTemplates]
+    .filter(template => template.status !== 'archived')
+    .sort((left, right) => left.role_label.localeCompare(right.role_label));
+}
+
+export function getOnboardingChecklistTemplateByRole(roleCode: OnboardingRoleCode): OnboardingChecklistTemplate | undefined {
+  return getOnboardingChecklistTemplates().find(template => template.role_code === roleCode && template.status === 'active');
+}
+
+export function getOnboardingChecklistStages(templateId: string): OnboardingChecklistStage[] {
+  return _onboardingChecklistStages
+    .filter(stage => stage.template_id === templateId)
+    .sort((left, right) => left.sort_order - right.sort_order);
+}
+
+export function getOnboardingChecklistItems(templateId: string): OnboardingChecklistItemTemplate[] {
+  return _onboardingChecklistItems
+    .filter(item => item.template_id === templateId && item.active)
+    .sort((left, right) => left.sort_order - right.sort_order);
+}
+
+export function getOnboardingChecklistBundle(roleCode: OnboardingRoleCode) {
+  const template = getOnboardingChecklistTemplateByRole(roleCode);
+  if (!template) {
+    return null;
+  }
+
+  return {
+    template,
+    competency_groups: getOnboardingCompetencyGroups(),
+    stages: getOnboardingChecklistStages(template.id),
+    items: getOnboardingChecklistItems(template.id),
+  };
+}
+
+export function getEmployeeOnboardingChecklistPlan(employeeId: string): EmployeeOnboardingChecklistPlan | null {
+  return _onboardingEmployeePlans.find(plan => plan.employee_id === employeeId && plan.status !== 'cancelled') ?? null;
+}
+
+export function getEmployeeOnboardingChecklistProgressItems(planId: string): EmployeeOnboardingChecklistProgressItem[] {
+  return _onboardingEmployeeProgressItems
+    .filter(item => item.onboarding_plan_id === planId)
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+export function getOnboardingSelfReviewStageView(
+  employeeId: string,
+  onboardingPlanId: string,
+  stageCode: OnboardingStageCode,
+): OnboardingSelfReviewStageView {
+  const history = sortSelfReviewEntries(
+    _onboardingSelfReviewEntries.filter((entry) =>
+      entry.employee_id === employeeId
+      && entry.onboarding_plan_id === onboardingPlanId
+      && entry.stage_code === stageCode),
+  );
+
+  return {
+    stage_code: stageCode,
+    latest: history[0] ?? null,
+    history,
+  };
+}
+
+export function submitOnboardingSelfReview(input: {
+  employeeId: string;
+  onboardingPlanId: string;
+  stageCode: OnboardingStageCode;
+  answers: OnboardingSelfReviewAnswers;
+  submittedBy: string;
+}): OnboardingSelfReviewEntry {
+  const entry: OnboardingSelfReviewEntry = {
+    id: `onb-self-review-${uid()}`,
+    employee_id: input.employeeId,
+    onboarding_plan_id: input.onboardingPlanId,
+    stage_code: input.stageCode,
+    answers: {
+      confidence_tag: input.answers.confidence_tag,
+      confidence_note: assertSelfReviewNote(input.answers.confidence_note),
+      coaching_tag: input.answers.coaching_tag,
+      coaching_note: assertSelfReviewNote(input.answers.coaching_note),
+      fear_tag: input.answers.fear_tag,
+      fear_note: assertSelfReviewNote(input.answers.fear_note),
+    },
+    submitted_at: new Date().toISOString(),
+    submitted_by: input.submittedBy,
+  };
+
+  _onboardingSelfReviewEntries = [..._onboardingSelfReviewEntries, entry];
+  persistOnboardingSelfReviewEntries();
+  return entry;
+}
+
+export function getLatestOnboardingSelfReviewForPlan(
+  employeeId: string,
+  onboardingPlanId: string,
+  stageCode: OnboardingStageCode,
+): OnboardingSelfReviewEntry | null {
+  return getOnboardingSelfReviewStageView(employeeId, onboardingPlanId, stageCode).latest;
+}
+
+export function resolveGateCodeForStage(stageCode: OnboardingStageCode): OnboardingStageGateCode | null {
+  if (stageCode === 'day_2_3') return 'ready_for_live_shift';
+  if (stageCode === 'week_1') return 'ready_for_independent_shift';
+  return null;
+}
+
+function getBlockedRequiredProgressItems(
+  planId: string,
+  stageCode: OnboardingStageCode,
+): EmployeeOnboardingChecklistProgressItem[] {
+  const plan = _onboardingEmployeePlans.find((entry) => entry.id === planId);
+  if (!plan) return [];
+
+  const stages = getOnboardingChecklistStages(plan.template_id);
+  const stage = stages.find((entry) => entry.code === stageCode);
+  if (!stage) return [];
+
+  const items = getOnboardingChecklistItems(plan.template_id)
+    .filter((item) => item.stage_id === stage.id && item.is_required);
+  const progressItems = getEmployeeOnboardingChecklistProgressItems(planId);
+
+  return items
+    .map((item) => progressItems.find((progress) => progress.checklist_item_id === item.id) ?? getChecklistItemFallbackProgress(planId, item.id))
+    .filter((progress) => progress.status === 'not_started' || progress.status === 'need_more_coaching');
+}
+
+export function getOnboardingStageGateView(
+  employeeId: string,
+  onboardingPlanId: string,
+  stageCode: OnboardingStageCode,
+): OnboardingStageGateView | null {
+  const gateCode = resolveGateCodeForStage(stageCode);
+  if (!gateCode) return null;
+
+  const selfReview = getOnboardingSelfReviewStageView(employeeId, onboardingPlanId, stageCode);
+  const blockedItems = getBlockedRequiredProgressItems(onboardingPlanId, stageCode);
+  const record = getCurrentStageGateRecord(employeeId, onboardingPlanId, gateCode);
+
+  return {
+    gate_code: gateCode,
+    status: record?.status ?? 'chua_de_xuat',
+    required_self_review: true,
+    has_self_review: Boolean(selfReview.latest),
+    blocked_item_ids: blockedItems.map((item) => item.checklist_item_id),
+    retry_item_ids: record?.retry_item_ids ?? [],
+    buddy_note: record?.buddy_note ?? '',
+    manager_note: record?.manager_note ?? '',
+  };
+}
+
+export function proposeOnboardingStageGate(input: {
+  employeeId: string;
+  onboardingPlanId: string;
+  stageCode: OnboardingStageCode;
+  buddyNote: string;
+}): OnboardingStageGateRecord | null {
+  const gateView = getOnboardingStageGateView(input.employeeId, input.onboardingPlanId, input.stageCode);
+  if (!gateView || !gateView.has_self_review || gateView.blocked_item_ids.length > 0) return null;
+
+  const record: OnboardingStageGateRecord = {
+    id: `onb-stage-gate-${uid()}`,
+    employee_id: input.employeeId,
+    onboarding_plan_id: input.onboardingPlanId,
+    stage_code: input.stageCode,
+    gate_code: gateView.gate_code,
+    status: 'cho_quan_ly_duyet',
+    buddy_recommendation: 'de_xuat_qua_gate',
+    buddy_note: input.buddyNote.trim().slice(0, 280),
+    manager_decision: null,
+    manager_note: '',
+    retry_item_ids: [],
+    created_at: new Date().toISOString(),
+    decided_at: null,
+  };
+
+  _onboardingStageGateRecords = [..._onboardingStageGateRecords, record];
+  persistOnboardingStageGateRecords();
+  return record;
+}
+
+function unlockNextStageFromGate(planId: string, gateCode: OnboardingStageGateCode): void {
+  const planIndex = _onboardingEmployeePlans.findIndex((entry) => entry.id === planId);
+  if (planIndex === -1) return;
+
+  const nextStageCode: OnboardingStageCode =
+    gateCode === 'ready_for_live_shift' ? 'week_1' : 'week_2';
+
+  _onboardingEmployeePlans[planIndex] = {
+    ..._onboardingEmployeePlans[planIndex],
+    current_stage_code: nextStageCode,
+    updated_at: today(),
+  };
+
+  save(KEYS.onboardingEmployeePlans, _onboardingEmployeePlans);
+}
+
+export function approveOnboardingStageGate(input: {
+  employeeId: string;
+  onboardingPlanId: string;
+  stageCode: OnboardingStageCode;
+  managerNote: string;
+}): OnboardingStageGateRecord | null {
+  const gateView = getOnboardingStageGateView(input.employeeId, input.onboardingPlanId, input.stageCode);
+  const record = gateView ? getCurrentStageGateRecord(input.employeeId, input.onboardingPlanId, gateView.gate_code) : null;
+  const managerNote = input.managerNote.trim().slice(0, 280);
+  if (!gateView || !record || !gateView.has_self_review || gateView.blocked_item_ids.length > 0 || !managerNote) return null;
+
+  const updatedRecord: OnboardingStageGateRecord = {
+    ...record,
+    status: 'da_qua_gate',
+    manager_decision: 'duyet_gate',
+    manager_note: managerNote,
+    decided_at: new Date().toISOString(),
+  };
+
+  _onboardingStageGateRecords = _onboardingStageGateRecords.map((entry) => entry.id === record.id ? updatedRecord : entry);
+  persistOnboardingStageGateRecords();
+  unlockNextStageFromGate(input.onboardingPlanId, gateView.gate_code);
+  return updatedRecord;
+}
+
+export function rejectOnboardingStageGate(input: {
+  employeeId: string;
+  onboardingPlanId: string;
+  stageCode: OnboardingStageCode;
+  managerNote: string;
+  retryItemIds: string[];
+}): OnboardingStageGateRecord | null {
+  const gateView = getOnboardingStageGateView(input.employeeId, input.onboardingPlanId, input.stageCode);
+  const record = gateView ? getCurrentStageGateRecord(input.employeeId, input.onboardingPlanId, gateView.gate_code) : null;
+  const managerNote = input.managerNote.trim().slice(0, 280);
+  const normalizedRetryItemIds = input.retryItemIds.slice(0, 3);
+  if (!gateView || !record || !managerNote || normalizedRetryItemIds.length === 0) return null;
+
+  const updatedRecord: OnboardingStageGateRecord = {
+    ...record,
+    status: 'chua_qua_gate',
+    manager_decision: 'chua_duyet_gate',
+    manager_note: managerNote,
+    retry_item_ids: normalizedRetryItemIds,
+    decided_at: new Date().toISOString(),
+  };
+
+  _onboardingStageGateRecords = _onboardingStageGateRecords.map((entry) => entry.id === record.id ? updatedRecord : entry);
+  persistOnboardingStageGateRecords();
+  return updatedRecord;
+}
+
+export function assignOnboardingChecklistTemplateToEmployee(
+  employee: OnboardingEmployeeSnapshot,
+  options?: {
+    role_code?: OnboardingRoleCode;
+    assigned_buddy_id?: string | null;
+    assigned_manager_id?: string | null;
+    start_date?: string;
+    overall_note?: string;
+  },
+): EmployeeOnboardingChecklistPlan | null {
+  const existing = getEmployeeOnboardingChecklistPlan(employee.id);
+  if (existing) {
+    return existing;
+  }
+
+  const roleCode = options?.role_code ?? mapEmployeeToOnboardingRole(employee);
+  const template = getOnboardingChecklistTemplateByRole(roleCode);
+  if (!template) {
+    return null;
+  }
+
+  const buddyAssignment = _buddyAssignments.find(assignment => assignment.mentee_id === employee.id && assignment.status === 'active');
+  const buddyId = options?.assigned_buddy_id ?? buddyAssignment?.mentor_id ?? null;
+  const manager = options?.assigned_manager_id
+    ? { id: options.assigned_manager_id, full_name: resolveEmployeeName(options.assigned_manager_id) ?? options.assigned_manager_id }
+    : resolveStoreManager(employee.store_id);
+  const stages = getOnboardingChecklistStages(template.id);
+  const items = getOnboardingChecklistItems(template.id);
+  const planId = `onb-plan-${uid()}`;
+  const startDate = options?.start_date ?? employee.hire_date ?? today();
+  const plan: EmployeeOnboardingChecklistPlan = {
+    id: planId,
+    employee_id: employee.id,
+    template_id: template.id,
+    role_code: roleCode,
+    assigned_store_id: employee.store_id ?? '',
+    assigned_buddy_id: buddyId,
+    assigned_buddy_name: resolveEmployeeName(buddyId),
+    assigned_manager_id: manager?.id ?? null,
+    assigned_manager_name: manager?.full_name ?? null,
+    start_date: startDate,
+    current_stage_code: stages[0]?.code ?? 'pre_start',
+    status: startDate <= today() ? 'in_progress' : 'assigned',
+    overall_progress: 0,
+    overall_note: options?.overall_note,
+    assigned_at: today(),
+    created_at: today(),
+    updated_at: today(),
+  };
+
+  const progressItems = items.map((item) => getChecklistItemFallbackProgress(planId, item.id));
+
+  _onboardingEmployeePlans.push(plan);
+  _onboardingEmployeeProgressItems.push(...progressItems);
+  save(KEYS.onboardingEmployeePlans, _onboardingEmployeePlans);
+  save(KEYS.onboardingEmployeeProgressItems, _onboardingEmployeeProgressItems);
+
+  return plan;
+}
+
+export function ensureEmployeeOnboardingChecklist(employee: OnboardingEmployeeSnapshot): EmployeeOnboardingChecklistPlan | null {
+  const existing = getEmployeeOnboardingChecklistPlan(employee.id);
+  if (existing) {
+    return existing;
+  }
+
+  if (!shouldAutoAssignOnboarding(employee)) {
+    return null;
+  }
+
+  return assignOnboardingChecklistTemplateToEmployee(employee);
+}
+
+export function getEmployeeOnboardingChecklistBundleForEmployee(employee: OnboardingEmployeeSnapshot) {
+  const plan = ensureEmployeeOnboardingChecklist(employee);
+  if (!plan) {
+    return null;
+  }
+
+  const template = _onboardingChecklistTemplates.find(entry => entry.id === plan.template_id);
+  if (!template) {
+    return null;
+  }
+
+  const stages = getOnboardingChecklistStages(plan.template_id);
+  const items = getOnboardingChecklistItems(plan.template_id);
+  const progressItems = getEmployeeOnboardingChecklistProgressItems(plan.id);
+  const progressMap = new Map(progressItems.map((item) => [item.checklist_item_id, item]));
+  const nextProgressItems = items.map((item) => progressMap.get(item.id) ?? getChecklistItemFallbackProgress(plan.id, item.id));
+  const stageAndProgress = getPlanStageAndProgress(plan, stages, items, nextProgressItems);
+
+  if (
+    plan.current_stage_code !== stageAndProgress.currentStageCode
+    || plan.overall_progress !== stageAndProgress.overallProgress
+    || plan.status !== stageAndProgress.planStatus
+  ) {
+    const planIndex = _onboardingEmployeePlans.findIndex(entry => entry.id === plan.id);
+    if (planIndex !== -1) {
+      _onboardingEmployeePlans[planIndex] = {
+        ...plan,
+        current_stage_code: stageAndProgress.currentStageCode,
+        overall_progress: stageAndProgress.overallProgress,
+        status: stageAndProgress.planStatus,
+        updated_at: today(),
+      };
+      save(KEYS.onboardingEmployeePlans, _onboardingEmployeePlans);
+    }
+  }
+
+  const refreshedPlan = getEmployeeOnboardingChecklistPlan(employee.id) ?? plan;
+  const stageSummaries = stages.map((stage) => {
+    const stageItems = items.filter(item => item.stage_id === stage.id);
+    const doneCount = stageItems.filter((item) => {
+      const progressItem = progressMap.get(item.id);
+      return progressItem?.status === 'passed';
+    }).length;
+    const activeCount = stageItems.filter((item) => {
+      const progressItem = progressMap.get(item.id);
+      return progressItem?.status === 'in_progress';
+    }).length;
+
+    return {
+      ...stage,
+      total_items: stageItems.length,
+      done_items: doneCount,
+      active_items: activeCount,
+      status: doneCount === stageItems.length && stageItems.length > 0
+        ? 'completed'
+        : activeCount > 0 || refreshedPlan.current_stage_code === stage.code
+          ? 'current'
+          : 'upcoming',
+    };
+  });
+
+  return {
+    plan: refreshedPlan,
+    template,
+    competency_groups: getOnboardingCompetencyGroups(),
+    stages: stageSummaries,
+    items: items.map((item) => ({
+      ...item,
+      progress: progressMap.get(item.id) ?? getChecklistItemFallbackProgress(plan.id, item.id),
+    })),
+    summary: {
+      total_items: items.length,
+      done_items: nextProgressItems.filter(item => item.status === 'passed').length,
+      in_progress_items: nextProgressItems.filter(item => item.status === 'in_progress').length,
+      need_more_coaching_items: nextProgressItems.filter(item => item.status === 'need_more_coaching').length,
+      overall_progress: refreshedPlan.overall_progress,
+      current_stage_code: refreshedPlan.current_stage_code,
+    },
+  };
+}
+
 export function createOnboardingStep(data: Partial<OnboardingStep>): OnboardingStep {
   const step: OnboardingStep = {
     id: `onb-${uid()}`, title: data.title || '', description: data.description || '',
@@ -801,7 +1386,21 @@ export function getTemplates(): CareerPathTemplate[] { return _templates; }
 export function createTemplate(name: string, description: string, createdBy: string): CareerPathTemplate {
   const tmpl: CareerPathTemplate = {
     id: `tmpl-${uid()}`, name, description, created_at: today(), created_by: createdBy,
-    data: { levels: [..._levels], skills: [..._skills], conditions: [..._conditions], employee_types: [..._employeeTypes], buddy_rewards: [..._buddyRewards], trial_checklist: [..._trialChecklist], onboarding_steps: [..._onboardingSteps] },
+    data: {
+      levels: [..._levels],
+      skills: [..._skills],
+      conditions: [..._conditions],
+      employee_types: [..._employeeTypes],
+      buddy_rewards: [..._buddyRewards],
+      trial_checklist: [..._trialChecklist],
+      onboarding_steps: [..._onboardingSteps],
+      onboarding_competency_groups: [..._onboardingCompetencyGroups],
+      onboarding_checklist_templates: [..._onboardingChecklistTemplates],
+      onboarding_checklist_stages: [..._onboardingChecklistStages],
+      onboarding_checklist_items: [..._onboardingChecklistItems],
+      onboarding_employee_plans: [..._onboardingEmployeePlans],
+      onboarding_employee_progress_items: [..._onboardingEmployeeProgressItems],
+    },
   };
   _templates.push(tmpl); save(KEYS.templates, _templates);
   return tmpl;
@@ -838,7 +1437,14 @@ export function exportSettings(): string {
   return JSON.stringify({
     levels: _levels, skills: _skills, conditions: _conditions,
     employeeTypes: _employeeTypes, buddyRewards: _buddyRewards,
-    trialChecklist: _trialChecklist, onboardingSteps: _onboardingSteps,
+    trialChecklist: _trialChecklist,
+    onboardingSteps: _onboardingSteps,
+    onboardingCompetencyGroups: _onboardingCompetencyGroups,
+    onboardingChecklistTemplates: _onboardingChecklistTemplates,
+    onboardingChecklistStages: _onboardingChecklistStages,
+    onboardingChecklistItems: _onboardingChecklistItems,
+    onboardingEmployeePlans: _onboardingEmployeePlans,
+    onboardingEmployeeProgressItems: _onboardingEmployeeProgressItems,
     settings: _settings,
   }, null, 2);
 }

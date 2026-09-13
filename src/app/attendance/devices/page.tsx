@@ -2,7 +2,7 @@
 
 import AppShell from '@/components/layout/AppShell'
 import { mockDevices } from '@/lib/mock-data-attendance'
-import { Smartphone, ShieldCheck, ShieldX, Plus } from 'lucide-react'
+import { ShieldCheck, ShieldX } from 'lucide-react'
 
 export default function DeviceManagementPage() {
   const activeCount = mockDevices.filter(d => !d.is_blocked).length
@@ -17,7 +17,7 @@ export default function DeviceManagementPage() {
             <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Hoạt động</div>
           </div>
           <div className="card text-center p-3">
-            <div className="text-lg font-bold text-red-500">{blockedCount}</div>
+            <div className="text-lg font-bold text-error-500">{blockedCount}</div>
             <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Bị chặn</div>
           </div>
         </div>
@@ -27,8 +27,8 @@ export default function DeviceManagementPage() {
             const isActive = !d.is_blocked
             return (
               <div key={d.id} className="card flex items-center gap-3" style={{ opacity: isActive ? 1 : 0.6 }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: isActive ? '#10b98120' : '#ef444420' }}>
-                  {isActive ? <ShieldCheck size={18} className="text-emerald-500" /> : <ShieldX size={18} className="text-red-500" />}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: isActive ? '#1E9E5720' : '#D9381E20' }}>
+                  {isActive ? <ShieldCheck size={18} className="text-emerald-500" /> : <ShieldX size={18} className="text-error-500" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{d.device_name}</div>
@@ -40,7 +40,7 @@ export default function DeviceManagementPage() {
                   </div>
                 </div>
                 <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                  style={{ background: isActive ? '#10b98120' : '#ef444420', color: isActive ? '#10b981' : '#ef4444' }}>
+                  style={{ background: isActive ? '#1E9E5720' : '#D9381E20', color: isActive ? '#1E9E57' : '#D9381E' }}>
                   {isActive ? '✓ Active' : '✕ Blocked'}
                 </span>
               </div>

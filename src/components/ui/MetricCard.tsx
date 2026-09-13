@@ -29,12 +29,12 @@ const variantStyles: Record<MetricVariant, { container: string; value: string }>
     value: 'text-primary',
   },
   success: {
-    container: 'bg-green-50 border border-green-200',
-    value: 'text-green-700',
+    container: 'bg-success-50 border border-success-200',
+    value: 'text-success-700',
   },
   warning: {
-    container: 'bg-yellow-50 border border-yellow-200',
-    value: 'text-yellow-700',
+    container: 'bg-warning-50 border border-warning-200',
+    value: 'text-warning-700',
   },
   compact: {
     container: 'bg-white border border-gray-200',
@@ -45,9 +45,9 @@ const variantStyles: Record<MetricVariant, { container: string; value: string }>
 const TrendIcon = ({ direction }: { direction: MetricTrend['direction'] }) => {
   switch (direction) {
     case 'up':
-      return <TrendingUp size={12} className="text-green-500" />
+      return <TrendingUp size={12} className="text-success-500" />
     case 'down':
-      return <TrendingDown size={12} className="text-red-500" />
+      return <TrendingDown size={12} className="text-error-500" />
     default:
       return <Minus size={12} className="text-gray-400" />
   }
@@ -122,9 +122,9 @@ export default function MetricCard({
           <span
             className={`text-xs font-medium ${
               trend.direction === 'up'
-                ? 'text-green-600'
+                ? 'text-success-600'
                 : trend.direction === 'down'
-                  ? 'text-red-600'
+                  ? 'text-error-600'
                   : 'text-gray-500'
             }`}
           >

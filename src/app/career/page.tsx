@@ -4,8 +4,8 @@ import { useEffect } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
-import { mockCareerLevels, mockCareerProgress, getCareerProgressByEmployee } from '@/lib/mock-data-p2'
-import { CheckCircle, Circle, Lock, ArrowRight, TrendingUp, Zap } from 'lucide-react'
+import { mockCareerLevels, getCareerProgressByEmployee } from '@/lib/mock-data-p2'
+import { CheckCircle, Circle, Lock, TrendingUp, Zap } from 'lucide-react'
 
 export default function CareerPage() {
   const { user, isAuthenticated } = useAuthStore()

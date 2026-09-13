@@ -16,12 +16,12 @@ export function Badge({
   className = '',
 }: BadgeProps) {
   const variants = {
-    default: 'bg-gray-100 text-gray-700',
+    default: 'bg-primary-50 text-gray-700',
     success: 'bg-success-light text-success',
     warning: 'bg-vanilla-100 text-dark-600',
     error: 'bg-error-light text-error',
     info: 'bg-primary-100 text-primary-700',
-    neutral: 'bg-gray-100 text-gray-600',
+    neutral: 'bg-primary-50 text-gray-600',
     accent: 'bg-accent-100 text-accent-600',
     primary: 'bg-primary-100 text-primary-700',
   }

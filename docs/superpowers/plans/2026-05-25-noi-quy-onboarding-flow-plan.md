@@ -651,7 +651,7 @@ const runPolicyAction = (mode: 'summary' | 'full') => {
 }
 ```
 
-- [ ] **Step 3: Them card lich su va action day-1 vao ho so nhan vien**
+- [x] **Step 3: Them card lich su va action day-1 vao ho so nhan vien**
 
 Trong `src/app/employees/[id]/page.tsx`, sau khi co `employee`, them:
 
@@ -680,7 +680,7 @@ Render 1 block trong tab overview:
 </section>
 ```
 
-- [ ] **Step 4: Noi handler cho action day-1 va list lich su**
+- [x] **Step 4: Noi handler cho action day-1 va list lich su**
 
 Them handler vao `src/app/employees/[id]/page.tsx`:
 

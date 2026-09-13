@@ -53,7 +53,7 @@ export default function DragDropTutorial({ onClose, onDismissPermanent }: DragDr
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <BookOpen size={18} className="text-primary" /> Hướng dẫn nhanh <span className="text-xs font-normal text-gray-400">(30 giây)</span>
           </h3>
-          <button onClick={handleClose} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors">
+          <button onClick={handleClose} className="p-1.5 hover:bg-primary-50 rounded-full transition-colors">
             <X size={18} className="text-gray-400" />
           </button>
         </div>
@@ -63,7 +63,7 @@ export default function DragDropTutorial({ onClose, onDismissPermanent }: DragDr
           {STEPS.map((step, i) => (
             <div
               key={i}
-              className="flex items-start gap-4 p-3 bg-gray-50 rounded-xl animate-in fade-in slide-in-from-left-4"
+              className="flex items-start gap-4 p-3 bg-vanilla-50 rounded-xl animate-in fade-in slide-in-from-left-4"
               style={{ animationDelay: `${i * 100}ms`, animationFillMode: 'both' }}
             >
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl shrink-0">
@@ -80,9 +80,9 @@ export default function DragDropTutorial({ onClose, onDismissPermanent }: DragDr
           ))}
 
           {/* Keyboard shortcuts bonus */}
-          <div className="p-3 bg-amber-50 rounded-xl border border-amber-100">
-            <div className="text-xs font-bold text-amber-800 mb-1 flex items-center gap-1"><Keyboard size={12} /> Phím tắt</div>
-            <div className="grid grid-cols-2 gap-1 text-xs text-amber-700">
+          <div className="p-3 bg-warning-50 rounded-xl border border-warning-100">
+            <div className="text-xs font-bold text-warning-800 mb-1 flex items-center gap-1"><Keyboard size={12} /> Phím tắt</div>
+            <div className="grid grid-cols-2 gap-1 text-xs text-warning-700">
               <div><kbd className="px-1 bg-white rounded border text-xs">Ctrl+Z</kbd> Hoàn tác</div>
               <div><kbd className="px-1 bg-white rounded border text-xs">Ctrl+Y</kbd> Làm lại</div>
               <div><kbd className="px-1 bg-white rounded border text-xs">←→</kbd> Dời 1 giờ</div>
@@ -111,7 +111,7 @@ export default function DragDropTutorial({ onClose, onDismissPermanent }: DragDr
           <div className="flex gap-2">
             <button
               onClick={handleClose}
-              className="px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-gray-500 hover:bg-primary-50 rounded-lg transition-colors"
             >
               Bỏ qua
             </button>

@@ -4,19 +4,19 @@ import { useState } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import { mockIncidents, incidentCategories } from '@/lib/mock-data-tasks'
 import type { IncidentSeverity, IncidentStatus } from '@/lib/mock-data-tasks'
-import { AlertTriangle, Plus, Filter, FileText, User, CheckCircle2 } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, User, CheckCircle2 } from 'lucide-react'
 
 const severityConfig: Record<IncidentSeverity, { label: string; color: string }> = {
-  low: { label: 'Thấp', color: '#10b981' },
-  medium: { label: 'Trung bình', color: '#f59e0b' },
+  low: { label: 'Thấp', color: '#1E9E57' },
+  medium: { label: 'Trung bình', color: '#F6C85F' },
   high: { label: 'Cao', color: '#f97316' },
-  critical: { label: 'Nghiêm trọng', color: '#ef4444' },
+  critical: { label: 'Nghiêm trọng', color: '#D9381E' },
 }
 
 const statusConfig: Record<IncidentStatus, { label: string; color: string }> = {
-  open: { label: 'Mở', color: '#ef4444' },
-  in_progress: { label: 'Đang xử lý', color: '#f59e0b' },
-  resolved: { label: 'Đã xử lý', color: '#10b981' },
+  open: { label: 'Mở', color: '#D9381E' },
+  in_progress: { label: 'Đang xử lý', color: '#F6C85F' },
+  resolved: { label: 'Đã xử lý', color: '#1E9E57' },
   closed: { label: 'Đã đóng', color: '#9ca3af' },
 }
 
@@ -34,7 +34,7 @@ export default function IncidentReportPage() {
         {/* Header */}
         <div className="flex items-center justify-between animate-fade-in">
           <div className="flex items-center gap-2">
-            <AlertTriangle size={18} className="text-amber-500" />
+            <AlertTriangle size={18} className="text-warning-500" />
             <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
               {mockIncidents.filter(i => i.status === 'open' || i.status === 'in_progress').length} sự cố đang mở
             </span>

@@ -47,7 +47,7 @@ export function PageHeader({
               w-11 h-11 -ml-2
               flex items-center justify-center
               rounded-full
-              hover:bg-gray-100
+              hover:bg-primary-50
               active:scale-95
               transition-all duration-100
             "

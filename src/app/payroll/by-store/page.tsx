@@ -2,13 +2,12 @@
 
 import AppShell from '@/components/layout/AppShell'
 import { mockPayrollByStore } from '@/lib/mock-data-payroll'
-import { DollarSign, Users, CheckCircle, Clock, Lock, ChevronRight } from 'lucide-react'
-import Link from 'next/link'
+import { Users, CheckCircle, Clock, Lock } from 'lucide-react'
 
 const statusConfig = {
   draft: { label: 'Nháp', color: '#9ca3af', icon: Clock },
-  reviewing: { label: 'Đang duyệt', color: '#f59e0b', icon: Clock },
-  approved: { label: 'Đã duyệt', color: '#10b981', icon: CheckCircle },
+  reviewing: { label: 'Đang duyệt', color: '#F6C85F', icon: Clock },
+  approved: { label: 'Đã duyệt', color: '#1E9E57', icon: CheckCircle },
   locked: { label: 'Đã khóa', color: '#6366f1', icon: Lock },
 }
 
@@ -51,10 +50,10 @@ export default function PayrollByStorePage() {
               <div className="space-y-1.5">
                 {[
                   { label: 'Lương cơ bản', value: store.total_base, color: 'var(--text-primary)' },
-                  { label: '+ Phụ cấp', value: store.total_allowance, color: '#3b82f6' },
-                  { label: '+ Thưởng', value: store.total_bonus, color: '#10b981' },
-                  { label: '- Khấu trừ', value: -store.total_deduction, color: '#ef4444' },
-                  { label: '- Bảo hiểm', value: -store.total_insurance, color: '#f59e0b' },
+                  { label: '+ Phụ cấp', value: store.total_allowance, color: '#2F6FA8' },
+                  { label: '+ Thưởng', value: store.total_bonus, color: '#1E9E57' },
+                  { label: '- Khấu trừ', value: -store.total_deduction, color: '#D9381E' },
+                  { label: '- Bảo hiểm', value: -store.total_insurance, color: '#F6C85F' },
                   { label: '- Thuế TNCN', value: -store.total_tax, color: '#f97316' },
                 ].map(row => (
                   <div key={row.label} className="flex justify-between text-xs">

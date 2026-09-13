@@ -53,7 +53,7 @@ export function ReplacementRequestCard({ request, onStatusChange }: ReplacementR
         'rounded-2xl border p-4',
         localStatus === 'accepted'
           ? 'bg-emerald-50/60 border-emerald-200'
-          : 'bg-red-50/60 border-red-200',
+          : 'bg-error-50/60 border-error-200',
       )}>
         <div className="flex items-center gap-2">
           {localStatus === 'accepted' ? (
@@ -63,8 +63,8 @@ export function ReplacementRequestCard({ request, onStatusChange }: ReplacementR
             </>
           ) : (
             <>
-              <X size={16} className="text-red-500" />
-              <span className="text-sm font-bold text-red-700">Đã từ chối</span>
+              <X size={16} className="text-error-500" />
+              <span className="text-sm font-bold text-error-700">Đã từ chối</span>
             </>
           )}
         </div>
@@ -79,11 +79,11 @@ export function ReplacementRequestCard({ request, onStatusChange }: ReplacementR
   }
 
   return (
-    <div className="rounded-2xl border border-amber-200 bg-white overflow-hidden shadow-sm">
+    <div className="rounded-2xl border border-warning-200 bg-white overflow-hidden shadow-sm">
       {/* Header */}
-      <div className="bg-amber-50 px-4 py-3 flex items-center gap-2">
-        <AlertTriangle size={16} className="text-amber-500" />
-        <span className="text-sm font-bold text-amber-700">Yêu cầu thay ca</span>
+      <div className="bg-warning-50 px-4 py-3 flex items-center gap-2">
+        <AlertTriangle size={16} className="text-warning-500" />
+        <span className="text-sm font-bold text-warning-700">Yêu cầu thay ca</span>
       </div>
 
       {/* Body */}
@@ -102,7 +102,7 @@ export function ReplacementRequestCard({ request, onStatusChange }: ReplacementR
         </div>
 
         {/* Shift details */}
-        <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+        <div className="bg-vanilla-50 rounded-xl p-3 space-y-2">
           <div className="flex items-center gap-2">
             <Clock size={14} className="text-primary-500" />
             <span className="text-sm font-bold text-gray-700">
@@ -137,18 +137,18 @@ export function ReplacementRequestCard({ request, onStatusChange }: ReplacementR
               onChange={e => setRejectReason(e.target.value)}
               placeholder="VD: Em có lịch học..."
               rows={2}
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs bg-gray-50 resize-none placeholder-gray-300 focus:ring-2 focus:ring-red-200 focus:border-red-300"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs bg-vanilla-50 resize-none placeholder-gray-300 focus:ring-2 focus:ring-red-200 focus:border-error-300"
             />
             <div className="flex gap-2">
               <button
                 onClick={() => setShowRejectForm(false)}
-                className="flex-1 py-2 rounded-xl text-xs font-medium text-gray-500 bg-gray-100"
+                className="flex-1 py-2 rounded-xl text-xs font-medium text-gray-500 bg-primary-50"
               >
                 Hủy
               </button>
               <button
                 onClick={handleReject}
-                className="flex-1 py-2 rounded-xl text-xs font-semibold text-white bg-red-500 active:scale-[0.97] transition-transform"
+                className="flex-1 py-2 rounded-xl text-xs font-semibold text-white bg-error-500 active:scale-[0.97] transition-transform"
               >
                 Xác nhận từ chối
               </button>
@@ -162,7 +162,7 @@ export function ReplacementRequestCard({ request, onStatusChange }: ReplacementR
         <div className="px-4 pb-4 flex gap-2">
           <button
             onClick={() => setShowRejectForm(true)}
-            className="flex-1 py-3 rounded-xl text-sm font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors active:scale-[0.97]"
+            className="flex-1 py-3 rounded-xl text-sm font-medium text-gray-500 bg-primary-50 hover:bg-gray-200 transition-colors active:scale-[0.97]"
           >
             Từ chối
           </button>

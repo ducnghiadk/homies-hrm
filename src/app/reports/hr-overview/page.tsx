@@ -2,7 +2,7 @@
 
 import AppShell from '@/components/layout/AppShell'
 import { mockHROverview } from '@/lib/mock-data-reports'
-import { Users, UserPlus, UserMinus, TrendingUp } from 'lucide-react'
+import { Users, UserPlus, UserMinus } from 'lucide-react'
 
 export default function HROverviewPage() {
   const d = mockHROverview
@@ -14,9 +14,9 @@ export default function HROverviewPage() {
         <div className="grid grid-cols-2 gap-2 animate-fade-in">
           {[
             { label: 'Tổng NV', value: d.total_employees, icon: Users, color: 'var(--primary)' },
-            { label: 'Đang làm', value: d.active, icon: Users, color: '#10b981' },
-            { label: 'Mới T2', value: `+${d.new_this_month}`, icon: UserPlus, color: '#3b82f6' },
-            { label: 'Nghỉ việc', value: d.resigned_this_month, icon: UserMinus, color: '#ef4444' },
+            { label: 'Đang làm', value: d.active, icon: Users, color: '#1E9E57' },
+            { label: 'Mới T2', value: `+${d.new_this_month}`, icon: UserPlus, color: '#2F6FA8' },
+            { label: 'Nghỉ việc', value: d.resigned_this_month, icon: UserMinus, color: '#D9381E' },
           ].map(s => {
             const Icon = s.icon
             return (
@@ -40,7 +40,7 @@ export default function HROverviewPage() {
             <div>
               <div className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Giới tính</div>
               <div className="flex gap-1 h-4 rounded-full overflow-hidden">
-                <div style={{ width: `${d.gender_ratio.male / d.total_employees * 100}%`, background: '#3b82f6' }} />
+                <div style={{ width: `${d.gender_ratio.male / d.total_employees * 100}%`, background: '#2F6FA8' }} />
                 <div style={{ width: `${d.gender_ratio.female / d.total_employees * 100}%`, background: '#ec4899' }} />
               </div>
               <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -61,7 +61,7 @@ export default function HROverviewPage() {
           {d.by_store.map(s => (
             <div key={s.store} className="mb-2">
               <div className="flex justify-between text-xs mb-1">
-                <span style={{ color: 'var(--text-secondary)' }}>{s.store.replace('Boba House ', '')}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{s.store.replace('Homies Milk Tea ', '')}</span>
                 <span className="font-bold" style={{ color: 'var(--primary)' }}>{s.count}</span>
               </div>
               <div className="w-full h-2 rounded-full" style={{ background: 'var(--gray-100)' }}>

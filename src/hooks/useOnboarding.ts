@@ -93,9 +93,23 @@ function safeSaveToStorage(key: string, value: unknown): void {
 // --- Hook ---
 
 export function useOnboarding() {
-  const [state, setState] = useState<OnboardingState>(() =>
-    safeGetFromStorage(STORAGE_KEY, DEFAULT_STATE)
-  )
+  const [state, setState] = useState<OnboardingState>(() => {
+    const initialState = safeGetFromStorage(STORAGE_KEY, DEFAULT_STATE)
+
+    if (!initialState.welcomeScreenDismissedAt) {
+      return initialState
+    }
+
+    const dismissDate = new Date(initialState.welcomeScreenDismissedAt)
+    const daysSince = (Date.now() - dismissDate.getTime()) / (1000 * 60 * 60 * 24)
+    const hasCompleted = Object.values(initialState.completedFlows).some(Boolean)
+
+    if (daysSince > STALE_DAYS && !hasCompleted) {
+      return { ...DEFAULT_STATE }
+    }
+
+    return initialState
+  })
 
   // Persist on every state change
   useEffect(() => {
@@ -155,11 +169,6 @@ export function useOnboarding() {
       setState({ ...DEFAULT_STATE })
     }
   }, [state.welcomeScreenDismissedAt, state.completedFlows])
-
-  // Check stale on mount
-  useEffect(() => {
-    checkStaleOnboarding()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Reset ---
   const resetOnboarding = useCallback(() => {

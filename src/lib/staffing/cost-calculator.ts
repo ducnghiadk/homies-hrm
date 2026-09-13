@@ -1,4 +1,4 @@
-import { OptimizationPlan, StaffSlot, SalaryConfig, ComparisonResult } from './types';
+import { OptimizationPlan, StaffSlot, ComparisonResult } from './types';
 
 export function calculateMonthlyCost(plan: OptimizationPlan): number {
   return plan.totalCost;

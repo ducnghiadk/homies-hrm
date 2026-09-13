@@ -70,7 +70,7 @@ export default function AnalyticsPage() {
                 </div>
               ))}
             </div>
-            <div className="card p-4" style={{background:'linear-gradient(135deg,#8b5cf610,#3b82f610)',border:'1px solid #8b5cf630'}}>
+            <div className="card p-4" style={{background:'linear-gradient(135deg,#001D3D10,#2F6FA810)',border:'1px solid #001D3D30'}}>
               <h3 className="text-sm font-bold mb-2">🤖 AI Insights</h3>
               <ul className="space-y-2 text-xs">
                 <li className="flex items-start gap-2"><span>💡</span><span>Engagement tăng {engChange} điểm → gamification phát huy hiệu quả</span></li>
@@ -91,7 +91,7 @@ export default function AnalyticsPage() {
                   <span className="font-bold">Nam {m.gender_ratio.male} / Nữ {m.gender_ratio.female}</span>
                 </div>
                 <div className="flex h-3 rounded-full overflow-hidden">
-                  <div style={{width:`${(m.gender_ratio.male/(m.gender_ratio.male+m.gender_ratio.female))*100}%`,background:'#3b82f6'}} />
+                  <div style={{width:`${(m.gender_ratio.male/(m.gender_ratio.male+m.gender_ratio.female))*100}%`,background:'#2F6FA8'}} />
                   <div style={{width:`${(m.gender_ratio.female/(m.gender_ratio.male+m.gender_ratio.female))*100}%`,background:'#ec4899'}} />
                 </div>
               </div>

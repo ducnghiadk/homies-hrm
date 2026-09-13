@@ -1,6 +1,6 @@
 'use client'
 
-import type { KPIEvaluation, KPIGradeCode } from '@/lib/kpi-types'
+import type { KPIEvaluation } from '@/lib/kpi-types'
 import { mockKPIGrades } from '@/lib/mock-data-kpi'
 import CategoryScoreCard from './CategoryScoreCard'
 import { useState } from 'react'
@@ -20,7 +20,7 @@ export default function EvaluationResultCard({
   const trend = previousScore !== undefined ? evaluation.total_score - previousScore : undefined
 
   const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-    published: { label: 'Đã công bố', color: '#10b981' },
+    published: { label: 'Đã công bố', color: '#1E9E57' },
     finalized: { label: 'Đã hoàn tất', color: '#6b7280' },
     appealed: { label: 'Đang khiếu nại', color: '#7c3aed' },
   }
@@ -57,7 +57,7 @@ export default function EvaluationResultCard({
           </span>
           {trend !== undefined && trend !== 0 && (
             <span className="text-xs font-bold" style={{
-              color: trend > 0 ? '#10b981' : '#ef4444',
+              color: trend > 0 ? '#1E9E57' : '#D9381E',
             }}>
               {trend > 0 ? '↑' : '↓'}{Math.abs(trend)} vs tháng trước
             </span>

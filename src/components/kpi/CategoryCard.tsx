@@ -11,7 +11,7 @@ interface Props {
 
 const typeBadge = {
   auto: { label: 'Tự động', bg: '#dbeafe', color: '#1d4ed8' },
-  manual: { label: 'Thủ công', bg: '#fef3c7', color: '#b45309' },
+  manual: { label: 'Thủ công', bg: '#FFF8E8', color: '#b45309' },
   deduction: { label: 'Trừ điểm', bg: '#fee2e2', color: '#b91c1c' },
 }
 
@@ -48,7 +48,7 @@ export default function CategoryCard({ category, onEdit, onDelete, onToggle }: P
       <button
         onClick={() => onToggle(category.id, !category.is_active)}
         className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 relative ${
-          category.is_active ? 'bg-green-500' : 'bg-gray-300'
+          category.is_active ? 'bg-success-500' : 'bg-gray-300'
         }`}
       >
         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
@@ -60,13 +60,13 @@ export default function CategoryCard({ category, onEdit, onDelete, onToggle }: P
       <div className="flex gap-1 flex-shrink-0">
         <button
           onClick={() => onEdit(category)}
-          className="text-xs px-2 py-1 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+          className="text-xs px-2 py-1 rounded-lg text-primary-600 hover:bg-primary-50 transition-colors"
         >
           Sửa
         </button>
         <button
           onClick={() => onDelete(category.id)}
-          className="text-xs px-2 py-1 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+          className="text-xs px-2 py-1 rounded-lg text-error-500 hover:bg-error-50 transition-colors"
         >
           Xóa
         </button>

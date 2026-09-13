@@ -45,7 +45,7 @@ export default function KPIScoreRing({
   const pct = displayScore / 100
   const offset = circumference * (1 - pct)
 
-  const scoreColor = score >= 85 ? '#10b981' : score >= 70 ? '#3b82f6' : score >= 60 ? '#f59e0b' : '#ef4444'
+  const scoreColor = score >= 85 ? '#1E9E57' : score >= 70 ? '#2F6FA8' : score >= 60 ? '#F6C85F' : '#D9381E'
   const fontSize = size === 'sm' ? 'text-xl' : size === 'md' ? 'text-3xl' : 'text-5xl'
 
   return (

@@ -42,7 +42,7 @@ export const roleRedirectMap: Record<UserRole, string> = {
 export const roleNavConfig: Record<UserRole, { icon: string; label: string; route: string }[]> = {
   employee: [
     { icon: '🏠', label: 'Trang chủ', route: '/' },
-    { icon: '📅', label: 'Lịch làm', route: '/schedule' },
+  { icon: '📅', label: 'Lịch làm', route: '/schedules' },
     { icon: '✅', label: 'Chấm công', route: '/checkin' },
     { icon: '💬', label: 'Thông báo', route: '/notifications' },
     { icon: '👤', label: 'Tài khoản', route: '/profile' },

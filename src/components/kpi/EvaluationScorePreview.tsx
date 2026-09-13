@@ -42,7 +42,7 @@ export default function EvaluationScorePreview({
             <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: 'var(--gray-100)' }}>
               <div className="h-full rounded-full transition-all duration-300" style={{
                 width: `${Math.min(cat.raw_score, 100)}%`,
-                background: cat.raw_score >= 80 ? '#10b981' : cat.raw_score >= 60 ? '#f59e0b' : '#ef4444',
+                background: cat.raw_score >= 80 ? '#1E9E57' : cat.raw_score >= 60 ? '#F6C85F' : '#D9381E',
               }} />
             </div>
             <span className="text-[10px] font-bold w-6 text-right">{cat.weighted_score}</span>
@@ -52,12 +52,12 @@ export default function EvaluationScorePreview({
         {/* Violation deduction */}
         <div className="flex items-center gap-2">
           <span className="text-[10px] w-16 text-right truncate font-semibold"
-            style={{ color: '#ef4444' }}>
+            style={{ color: '#D9381E' }}>
             Vi phạm
           </span>
           <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: '#fee2e2' }}>
             <div className="h-full rounded-full transition-all duration-300" style={{
-              width: `${violationScore}%`, background: '#ef4444',
+              width: `${violationScore}%`, background: '#D9381E',
             }} />
           </div>
           <span className="text-[10px] font-bold w-6 text-right">{violationScore}</span>

@@ -20,7 +20,7 @@ interface ListItemProps {
 
 export function ListItem({
   icon: Icon,
-  iconBgColor = 'bg-gray-100',
+  iconBgColor = 'bg-primary-50',
   iconColor = 'text-gray-600',
   avatar,
   avatarFallback,
@@ -57,8 +57,8 @@ export function ListItem({
           isClickable
             ? `
           cursor-pointer
-          hover:bg-gray-50
-          active:bg-gray-100
+          hover:bg-vanilla-50
+          active:bg-primary-50
           transition-colors duration-100
         `
             : ''
@@ -82,7 +82,7 @@ export function ListItem({
                 className="
                 w-10 h-10 rounded-full
                 flex items-center justify-center
-                bg-blue-100 text-blue-600
+                bg-primary-100 text-primary-600
                 text-sm font-medium
               "
               >

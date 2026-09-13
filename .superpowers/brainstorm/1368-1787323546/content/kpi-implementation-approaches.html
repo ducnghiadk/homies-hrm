@@ -1,0 +1,77 @@
+<h2>Ba hướng xây ứng dụng KPI SaaS</h2>
+<p class="subtitle">Cả ba đều là trải nghiệm web chuyên nghiệp. Điểm khác nhau nằm ở nền móng và khả năng thay đổi tiêu chí trong tương lai.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px;background:#eff6ff">
+      <div style="display:grid;grid-template-columns:150px 1fr;gap:10px;min-height:190px">
+        <div style="background:#1d3e61;color:white;padding:12px;border-radius:6px">
+          <strong>Quản trị KPI</strong><hr style="opacity:.25">
+          Bộ tiêu chí<br><br>Kỳ đánh giá<br><br>Phân quyền<br><br>Phiên bản
+        </div>
+        <div style="display:grid;grid-template-rows:auto 1fr;gap:10px">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div style="background:white;padding:10px;border-radius:6px">Đang chấm<br><strong>24</strong></div>
+            <div style="background:white;padding:10px;border-radius:6px">Cần duyệt<br><strong>6</strong></div>
+            <div style="background:white;padding:10px;border-radius:6px">Đủ lên cấp<br><strong>3</strong></div>
+          </div>
+          <div style="background:white;padding:12px;border-radius:6px">
+            <strong>Bộ KPI tháng 08/2026 - Phiên bản 3</strong>
+            <div style="height:8px;background:#dbeafe;margin-top:14px;width:88%"></div>
+            <div style="height:8px;background:#d1fae5;margin-top:10px;width:70%"></div>
+            <div style="height:8px;background:#fef3c7;margin-top:10px;width:78%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Bộ máy KPI cấu hình động</h3>
+      <p>Admin tạo bộ tiêu chí, trọng số, nhóm nhân viên và thời gian áp dụng. Mỗi kỳ khóa một phiên bản riêng.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Điểm mạnh</h4><ul><li>Đúng mô hình SaaS</li><li>Dễ đổi policy</li><li>Lịch sử không bị sai</li></ul></div>
+        <div class="cons"><h4>Đổi lại</h4><ul><li>Nền móng dữ liệu nhiều hơn</li><li>Phải làm theo giai đoạn</li></ul></div>
+      </div>
+      <p><strong>Khuyến nghị của mình</strong></p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px;background:#f8fafc">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:190px">
+        <div style="background:white;padding:14px;border-radius:6px;border:1px solid #cbd5e1"><strong>KPI hiện tại</strong><br><br>L0-L5<br>Thang 100<br>Nhóm tiêu chí cũ</div>
+        <div style="background:white;padding:14px;border-radius:6px;border:1px solid #cbd5e1"><strong>Gắn policy v2</strong><br><br>PT1-SL<br>Thang 5<br>Thêm test/thử thách</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Nâng cấp trực tiếp hệ thống hiện tại</h3>
+      <p>Giữ tối đa kiểu dữ liệu và trang cũ, bổ sung chức năng mới quanh chúng.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Điểm mạnh</h4><ul><li>Nhanh nhìn thấy kết quả</li><li>Tận dụng nhiều UI sẵn có</li></ul></div>
+        <div class="cons"><h4>Rủi ro</h4><ul><li>Logic cũ và mới dễ lẫn</li><li>Khó cấu hình linh hoạt lâu dài</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px;background:#fff7ed">
+      <div style="min-height:190px;display:flex;align-items:center;justify-content:center">
+        <div style="text-align:center;border:2px dashed #fb923c;border-radius:8px;padding:24px;width:75%">
+          <strong>KPI V2 hoàn toàn mới</strong><br><br>
+          Không dùng service, kiểu dữ liệu hoặc luồng cũ
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Viết lại toàn bộ phân hệ KPI</h3>
+      <p>Tạo một module mới độc lập rồi thay thế hệ thống hiện tại khi hoàn chỉnh.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Điểm mạnh</h4><ul><li>Kiến trúc sạch nhất</li><li>Không bị logic cũ chi phối</li></ul></div>
+        <div class="cons"><h4>Rủi ro</h4><ul><li>Tốn thời gian nhất</li><li>Lặp lại nhiều phần đang có</li><li>Chuyển đổi phức tạp</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:18px;padding:14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px">
+  <strong>Đề xuất:</strong> Chọn A về kiến trúc, nhưng tái sử dụng có chọn lọc các màn hình tốt của hệ thống hiện tại. Nghĩa là nền móng mới, không phải phá đi làm lại mọi giao diện.
+</div>

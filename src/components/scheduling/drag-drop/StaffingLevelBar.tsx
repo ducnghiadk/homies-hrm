@@ -11,7 +11,7 @@ export default function StaffingLevelBar({ staffing }: StaffingLevelBarProps) {
   const maxCount = Math.max(...staffing.map(s => Math.max(s.count, s.required)), 5)
 
   return (
-    <div className="bg-gray-50 border-t-2 border-gray-200 px-2 py-3">
+    <div className="bg-vanilla-50 border-t-2 border-gray-200 px-2 py-3">
       <div className="flex items-end" style={{ marginLeft: '140px' }}>
         {staffing.map(h => {
           const barHeight = (h.count / maxCount) * 40
@@ -34,18 +34,18 @@ export default function StaffingLevelBar({ staffing }: StaffingLevelBarProps) {
                 {/* Actual bar */}
                 <div
                   className={`w-3/5 rounded-t transition-all ${
-                    isUnder ? 'bg-red-400' : isOver ? 'bg-yellow-400' : 'bg-blue-400'
+                    isUnder ? 'bg-error-400' : isOver ? 'bg-warning-400' : 'bg-primary-400'
                   }`}
                   style={{ height: Math.max(barHeight, 2) }}
                 />
               </div>
               {/* Count */}
-              <div className={`text-xs font-bold ${isUnder ? 'text-red-600' : 'text-gray-500'}`}>
+              <div className={`text-xs font-bold ${isUnder ? 'text-error-600' : 'text-gray-500'}`}>
                 {h.count}
               </div>
               {/* Status icon */}
               <div className="text-xs flex justify-center">
-                {isUnder ? <AlertTriangle size={10} className="text-red-500" /> : <Check size={10} className="text-green-500" />}
+                {isUnder ? <AlertTriangle size={10} className="text-error-500" /> : <Check size={10} className="text-success-500" />}
               </div>
             </div>
           )

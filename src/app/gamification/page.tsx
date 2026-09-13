@@ -10,7 +10,6 @@ import {
   getPlayerLevel, getEmployeeBadges, LEVEL_THRESHOLDS
 } from '@/lib/mock-data-p3'
 import { getInitials } from '@/lib/utils'
-import { Trophy, Star, Zap, Gift } from 'lucide-react'
 
 export default function GamificationPage() {
   const { user, isAuthenticated } = useAuthStore()

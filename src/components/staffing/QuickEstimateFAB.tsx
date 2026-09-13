@@ -218,7 +218,7 @@ export default function QuickEstimateFAB({
               <span className="text-xs text-gray-400 font-mono">Esc để đóng</span>
               <button
                 onClick={() => setIsExpanded(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-primary-50 rounded-full transition-colors"
                 aria-label="Đóng"
               >
                 <X size={18} />

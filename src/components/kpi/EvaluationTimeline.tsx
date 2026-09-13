@@ -12,10 +12,10 @@ interface Props {
 
 const PHASE_CONFIG: Record<string, { icon: string; color: string }> = {
   data_collection:  { icon: '📊', color: '#6366f1' },
-  self_evaluation:  { icon: '📝', color: '#3b82f6' },
-  review:           { icon: '✅', color: '#f59e0b' },
-  publish:          { icon: '📢', color: '#10b981' },
-  appeal:           { icon: '⚖️', color: '#ef4444' },
+  self_evaluation:  { icon: '📝', color: '#2F6FA8' },
+  review:           { icon: '✅', color: '#F6C85F' },
+  publish:          { icon: '📢', color: '#1E9E57' },
+  appeal:           { icon: '⚖️', color: '#D9381E' },
 }
 
 function getCurrentPeriodStr(): string {
@@ -117,7 +117,7 @@ export default function EvaluationTimeline({ currentDay, period, editable, onUpd
                 {phase.start_day}–{phase.end_day}
               </span>
               <span className="text-[10px] font-semibold" style={{
-                color: status === 'done' ? '#10b981' : status === 'active' ? cfg.color : 'var(--text-muted)',
+                color: status === 'done' ? '#1E9E57' : status === 'active' ? cfg.color : 'var(--text-muted)',
               }}>
                 {status === 'done' ? 'Xong' : status === 'active' ? `Còn ${daysLeft} ngày` : 'Sắp tới'}
               </span>

@@ -1,0 +1,78 @@
+<h2>Thiết kế phần 2: Luồng chấm KPI hàng tháng</h2>
+<p class="subtitle">Một kỳ KPI có trạng thái rõ ràng. Ai cần làm gì sẽ thấy đúng việc của mình, không phải truyền file hoặc nhắn nhau để hỏi tiến độ.</p>
+
+<div class="section">
+  <div class="label">Vòng đời một kỳ KPI</div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-top:12px;align-items:stretch">
+    <div style="padding:12px;background:#f8fafc;border-top:4px solid #64748b;border-radius:6px"><strong>1. Khởi tạo</strong><br><small>Admin chọn bộ KPI và đối tượng.</small></div>
+    <div style="padding:12px;background:#eff6ff;border-top:4px solid #2F6FA8;border-radius:6px"><strong>2. Thu thập</strong><br><small>HRM tự lấy công; POS nhập tay; Leader ghi lỗi.</small></div>
+    <div style="padding:12px;background:#fffbeb;border-top:4px solid #d97706;border-radius:6px"><strong>3. Chấm điểm</strong><br><small>Hệ thống gợi ý; Leader chấm và giải trình.</small></div>
+    <div style="padding:12px;background:#f5f3ff;border-top:4px solid #7c3aed;border-radius:6px"><strong>4. CEO duyệt sơ bộ</strong><br><small>Duyệt hàng loạt ca sạch; xem kỹ ngoại lệ.</small></div>
+    <div style="padding:12px;background:#ecfeff;border-top:4px solid #0891b2;border-radius:6px"><strong>5. Công bố</strong><br><small>Nhân viên xem kết quả và bằng chứng.</small></div>
+    <div style="padding:12px;background:#fff1f2;border-top:4px solid #e11d48;border-radius:6px"><strong>6. Khiếu nại 48h</strong><br><small>CEO xử lý khiếu nại có minh chứng.</small></div>
+    <div style="padding:12px;background:#ecfdf5;border-top:4px solid #1E9E57;border-radius:6px"><strong>7. Khóa kỳ</strong><br><small>Kết quả cuối đi vào lịch sử và xét nhân sự.</small></div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">Workspace chấm KPI của Shift Leader</div>
+  <div class="mockup-body">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+      <div><strong>Nguyễn Văn An · PT2</strong><br><small>Tháng 08/2026 · Hồ Bá Phấn</small></div>
+      <div style="padding:7px 11px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px"><strong>3/4 tiêu chí hoàn tất</strong></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.25fr .75fr;gap:12px;margin-top:14px">
+      <div>
+        <div style="display:grid;grid-template-columns:2fr .7fr .7fr .7fr;gap:5px;padding:8px;background:#f1f5f9;font-weight:700">
+          <span>Tiêu chí</span><span>Trọng số</span><span>Gợi ý</span><span>Điểm chốt</span>
+        </div>
+        <div style="display:grid;grid-template-columns:2fr .7fr .7fr .7fr;gap:5px;padding:11px 8px;border-bottom:1px solid #e2e8f0"><span>Doanh thu cửa hàng</span><span>20%</span><span>4.2</span><strong>4.2</strong></div>
+        <div style="display:grid;grid-template-columns:2fr .7fr .7fr .7fr;gap:5px;padding:11px 8px;border-bottom:1px solid #e2e8f0"><span>Dịch vụ khách hàng</span><span>25%</span><span>4.5</span><strong>4.0</strong></div>
+        <div style="padding:8px;background:#fff7ed;border-left:4px solid #f97316;font-size:12px">Leader giảm 0.5 điểm: có complaint đã xác minh. Bằng chứng: nhật ký lỗi #VL-184.</div>
+        <div style="display:grid;grid-template-columns:2fr .7fr .7fr .7fr;gap:5px;padding:11px 8px;border-bottom:1px solid #e2e8f0"><span>Tuân thủ vận hành</span><span>35%</span><span>3.8</span><strong>3.8</strong></div>
+        <div style="display:grid;grid-template-columns:2fr .7fr .7fr .7fr;gap:5px;padding:11px 8px;border-bottom:1px solid #e2e8f0"><span>Kỷ luật & thực thi</span><span>20%</span><span>—</span><strong style="color:#e11d48">Chưa chấm</strong></div>
+      </div>
+
+      <div style="background:#f8fafc;padding:13px;border-radius:7px">
+        <strong>Dữ liệu tham chiếu</strong>
+        <p><small>Giờ làm hợp lệ</small><br><strong>116 giờ</strong></p>
+        <p><small>Doanh thu cửa hàng</small><br><strong>103% target</strong></p>
+        <p><small>Lỗi thường / nặng / liệt</small><br><strong>1 / 0 / 0</strong></p>
+        <p><small>Dữ liệu còn thiếu</small><br><strong style="color:#e11d48">Điểm kỷ luật thủ công</strong></p>
+        <button class="mock-button">Mở toàn bộ bằng chứng</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Các chốt kiểm tra trước khi gửi</div>
+    <div class="mockup-body">
+      <p>✓ Tổng trọng số đúng 100%</p>
+      <p>✓ Có đủ dữ liệu chấm công</p>
+      <p>✓ POS đã nhập và xác nhận</p>
+      <p>✓ Mọi điều chỉnh điểm đều có lý do</p>
+      <p>✕ Còn một tiêu chí chưa hoàn tất</p>
+      <button class="mock-button" disabled>Gửi CEO duyệt</button>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">Sau khi khóa kỳ</div>
+    <div class="mockup-body">
+      <p>Kết quả trở thành dữ liệu lịch sử cố định.</p>
+      <p>Không được sửa trực tiếp. Nếu phát hiện sai, phải tạo yêu cầu mở lại kỳ, nêu lý do và được CEO duyệt.</p>
+      <p>Mọi thay đổi đều lưu người sửa, thời gian, giá trị cũ và giá trị mới.</p>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve-section-2" onclick="toggleSelect(this)">
+    <div class="letter">A</div><div class="content"><h3>Duyệt luồng này</h3><p>Tiếp tục sang thiết kế bộ tiêu chí và cách Admin cấu hình.</p></div>
+  </div>
+  <div class="option" data-choice="revise-section-2" onclick="toggleSelect(this)">
+    <div class="letter">B</div><div class="content"><h3>Cần chỉnh</h3><p>Nói bước nào cần đổi người thực hiện, thứ tự hoặc quyền sửa.</p></div>
+  </div>
+</div>

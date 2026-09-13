@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import "@xyflow/react/dist/style.css"
 import { Toaster } from "sonner"
 import { HermesErrorBoundary } from "@/components/telemetry/HermesErrorBoundary"
 import { TelemetryClientInit } from "@/components/telemetry/TelemetryClientInit"
@@ -14,13 +15,13 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "HRM Trà Sữa 🧋",
-  description: "Hệ thống quản lý nhân sự chuỗi trà sữa - Chấm công, Xếp lịch, KPI, Gamification",
+  title: "Homies Milk Tea HRM",
+  description: "Hệ thống quản lý nhân sự chuyên nghiệp cho Homies Milk Tea",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "HRM Trà Sữa",
+    title: "Homies HRM",
   },
 }
 
@@ -39,8 +40,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="vi" className={inter.variable}>
-      <body className={inter.className}>
+    <html lang="vi" suppressHydrationWarning className={inter.variable}>
+      <body suppressHydrationWarning className={inter.className}>
         <TelemetryClientInit />
         <HermesErrorBoundary>
           {children}

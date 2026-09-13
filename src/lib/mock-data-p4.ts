@@ -1,18 +1,22 @@
-// ============================================
-// HRM Trà Sữa — Phase 4 Mock Data
-// Payroll, Inventory, Reports, Settings
-// ============================================
 
-import { mockEmployees } from './mock-data'
+
+import { PAYROLL_PERIOD_STATUS, PayrollPeriodStatus } from '@/lib/payroll/payroll-status'
 
 // ========== PAYROLL ==========
 
-export type PayrollStatus = 'draft' | 'confirmed' | 'paid'
+export type PayrollStatus = PayrollPeriodStatus
 
-export const mockPayrollPeriods = [
-  { id: 'pr-2026-02', period: '2026-02', status: 'draft' as PayrollStatus, total_gross: 87500000, total_net: 78750000, employee_count: 12 },
-  { id: 'pr-2026-01', period: '2026-01', status: 'paid' as PayrollStatus, total_gross: 85200000, total_net: 76680000, employee_count: 12 },
-  { id: 'pr-2025-12', period: '2025-12', status: 'paid' as PayrollStatus, total_gross: 92100000, total_net: 82890000, employee_count: 13 },
+export const mockPayrollPeriods: Array<{
+  id: string
+  period: string
+  status: PayrollPeriodStatus
+  total_gross: number
+  total_net: number
+  employee_count: number
+}> = [
+  { id: 'pr-2026-02', period: '2026-02', status: PAYROLL_PERIOD_STATUS.DRAFT, total_gross: 87500000, total_net: 78750000, employee_count: 12 },
+  { id: 'pr-2026-01', period: '2026-01', status: PAYROLL_PERIOD_STATUS.PAID, total_gross: 85200000, total_net: 76680000, employee_count: 12 },
+  { id: 'pr-2025-12', period: '2025-12', status: PAYROLL_PERIOD_STATUS.PAID, total_gross: 92100000, total_net: 82890000, employee_count: 13 },
 ]
 
 export const mockPayslips = [
@@ -30,10 +34,10 @@ export type IngredientCategory = 'tea' | 'milk' | 'topping' | 'syrup' | 'cup' | 
 
 export const INGREDIENT_CATEGORIES = [
   { key: 'tea' as IngredientCategory, label: '🍵 Trà', color: '#16a34a' },
-  { key: 'milk' as IngredientCategory, label: '🥛 Sữa', color: '#3b82f6' },
-  { key: 'topping' as IngredientCategory, label: '🧋 Topping', color: '#f59e0b' },
-  { key: 'syrup' as IngredientCategory, label: '🍯 Syrup', color: '#ef4444' },
-  { key: 'cup' as IngredientCategory, label: '🥤 Ly/Ống hút', color: '#8b5cf6' },
+  { key: 'milk' as IngredientCategory, label: '🥛 Sữa', color: '#2F6FA8' },
+  { key: 'topping' as IngredientCategory, label: '🧋 Topping', color: '#F6C85F' },
+  { key: 'syrup' as IngredientCategory, label: '🍯 Syrup', color: '#D9381E' },
+  { key: 'cup' as IngredientCategory, label: '🥤 Ly/Ống hút', color: '#001D3D' },
   { key: 'other' as IngredientCategory, label: '📦 Khác', color: '#6b7280' },
 ]
 
@@ -61,9 +65,9 @@ export const mockStockHistory = [
 // ========== REPORTS & ANALYTICS ==========
 
 export const mockRevenueByStore = [
-  { store_id: 'store-001', name: 'Boba House Q.1', revenue: 125000000, orders: 3200, avg_ticket: 39063 },
-  { store_id: 'store-002', name: 'Boba House Q.3', revenue: 98000000, orders: 2800, avg_ticket: 35000 },
-  { store_id: 'store-003', name: 'Boba House Q.7', revenue: 110000000, orders: 3100, avg_ticket: 35484 },
+  { store_id: 'store-001', name: 'Homies Milk Tea Q.1', revenue: 125000000, orders: 3200, avg_ticket: 39063 },
+  { store_id: 'store-002', name: 'Homies Milk Tea Q.3', revenue: 98000000, orders: 2800, avg_ticket: 35000 },
+  { store_id: 'store-003', name: 'Homies Milk Tea Q.7', revenue: 110000000, orders: 3100, avg_ticket: 35484 },
 ]
 
 export const mockRevenueByMonth = [
@@ -95,7 +99,7 @@ export const mockTopProducts = [
 // ========== SETTINGS ==========
 
 export const mockOrgSettings = {
-  org_name: 'Boba House',
+  org_name: 'Homies Milk Tea',
   logo_emoji: '🧋',
   timezone: 'Asia/Ho_Chi_Minh',
   currency: 'VND',

@@ -1,25 +1,16 @@
 'use client'
 
+import React, { useEffect } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useCallback } from 'react'
 import AppShell from '@/components/layout/AppShell'
-import { mockEmployees } from '@/lib/mock-data'
-import { getViolationSummary } from '@/lib/mock-data-kpi'
-import { logViolation, createViolationNotification } from '@/lib/violation-service'
-import ViolationLogForm from '@/components/kpi/ViolationLogForm'
-import EmployeeViolationSummary from '@/components/kpi/EmployeeViolationSummary'
-import { toast } from 'sonner'
-import { ChevronLeft } from 'lucide-react'
+import BSCLogsTab from '@/components/bsc-bonus/BSCLogsTab'
+import { ClipboardList, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 
 export default function ViolationLogPage() {
   const { user, isAuthenticated } = useAuthStore()
   const router = useRouter()
-  const [showForm, setShowForm] = useState(true)
-  const [previewEmpId, setPreviewEmpId] = useState('')
-  const [tick, setTick] = useState(0)
-  const refresh = useCallback(() => setTick(t => t + 1), [])
 
   useEffect(() => {
     if (!isAuthenticated) router.push('/login')
@@ -27,61 +18,47 @@ export default function ViolationLogPage() {
 
   if (!user || user.role === 'employee') return null
 
-  void tick
+  const isManager = ['store_manager', 'shift_leader', 'area_manager', 'hr_admin', 'ceo'].includes(user.role)
   const storeId = user.store_id || 'store-001'
-  const storeEmployees = mockEmployees
-    .filter(e => e.store_id === storeId && e.role === 'employee')
-    .map(e => ({ id: e.id, name: e.full_name }))
-
-  const period = '2026-02'
-  const previewSummary = previewEmpId ? getViolationSummary(previewEmpId, period) : null
+  const period = '2026-07'
 
   return (
-    <AppShell title="📝 Log lỗi vận hành" backHref="/kpi/violations">
-      <div className="space-y-4">
-        <Link href="/kpi/violations" className="inline-flex items-center gap-1 text-sm no-underline" style={{ color: 'var(--primary)' }}>
-          <ChevronLeft size={16} /> Quay lại danh sách
-        </Link>
-
-        {/* Preview summary of selected employee */}
-        {previewSummary && (
-          <EmployeeViolationSummary summary={previewSummary} />
-        )}
-
-        {showForm ? (
-          <ViolationLogForm
-            employees={storeEmployees}
-            storeId={storeId}
-            loggedBy={user.id}
-            loggedByRole={user.role === 'ceo' ? 'ceo' : 'manager'}
-            onSubmit={data => {
-              const record = logViolation(data)
-              createViolationNotification(record, 'new')
-              toast.success('✅ Đã ghi nhận lỗi. Nhân viên sẽ nhận thông báo.')
-              setPreviewEmpId(data.employee_id)
-              setShowForm(false)
-              refresh()
-            }}
-            onCancel={() => router.push('/kpi/violations')}
-          />
-        ) : (
-          <div className="space-y-3 text-center py-4">
-            <div className="text-3xl">✅</div>
-            <p className="text-sm font-bold">Đã ghi nhận lỗi thành công!</p>
-            <div className="flex gap-2">
-              <button onClick={() => { setShowForm(true); setPreviewEmpId('') }}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
-                style={{ background: 'var(--primary)' }}>
-                Log thêm lỗi
-              </button>
-              <button onClick={() => router.push('/kpi/violations')}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ background: 'var(--gray-100)', color: 'var(--text-secondary)' }}>
-                Quay lại
-              </button>
+    <AppShell title="Nhật Ký Vi Phạm & Sự Cố Cửa Hàng">
+      <div className="space-y-6 w-full pb-16 animate-fade-in text-sm">
+        {/* Top Navigation Banner */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.push('/kpi/violations')}
+              className="p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 transition cursor-pointer"
+              title="Quay lại Trung tâm Vi phạm"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <ClipboardList size={20} className="text-rose-600" />
+                <h1 className="text-lg font-bold text-gray-900">Nhật Ký Sự Kiện Vi Phạm &amp; Sự Cố Vận Hành Hằng Ngày</h1>
+              </div>
+              <p className="text-xs text-gray-600 font-medium">
+                Ghi nhận 1-Click vi phạm ca làm việc, đối chiếu camera, theo dõi giải trình &amp; cờ khóa thưởng an toàn dòng tiền.
+              </p>
             </div>
           </div>
-        )}
+
+          <div className="flex items-center gap-2">
+            <Link
+              href="/bsc-bonus"
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-2xs flex items-center gap-1.5 no-underline"
+            >
+              <ShieldCheck size={16} /> Xem Tác Động Thưởng BSC <ArrowRight size={14} />
+            </Link>
+          </div>
+        </div>
+
+        {/* Embedded Complete BSCLogsTab Module */}
+        <BSCLogsTab storeId={storeId} period={period} isManager={isManager} />
       </div>
     </AppShell>
   )

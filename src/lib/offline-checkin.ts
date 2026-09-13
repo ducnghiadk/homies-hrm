@@ -3,7 +3,7 @@
 // Stores pending check-ins when offline, auto-syncs when online
 // ============================================
 
-import { checkinToday } from './mock-data-checkin'
+import { AttendanceService } from './services/attendance-service'
 
 const STORAGE_KEY = 'pending_checkins'
 
@@ -103,15 +103,19 @@ export function getPendingCount(userId?: string): number {
  * Sync all pending check-ins to the main store.
  * Returns number of successfully synced records.
  */
-export function syncPendingCheckins(): { synced: number; needsReview: number } {
+export async function syncPendingCheckins(): Promise<{ synced: number; needsReview: number }> {
   const pending = readPending()
   let synced = 0
   let needsReview = 0
 
   const serverTime = new Date()
+  const updated: PendingCheckin[] = []
 
-  const updated = pending.map(record => {
-    if (record.sync_status !== 'pending') return record
+  for (const record of pending) {
+    if (record.sync_status !== 'pending') {
+      updated.push(record)
+      continue
+    }
 
     // Check time drift (> 5 minutes difference)
     const clientTime = new Date(record.client_time)
@@ -122,12 +126,13 @@ export function syncPendingCheckins(): { synced: number; needsReview: number } {
       // Mark for HR review
       record.sync_status = 'needs_review'
       needsReview++
-      return record
+      updated.push(record)
+      continue
     }
 
     try {
       // Sync to main store
-      checkinToday(
+      const result = await AttendanceService.checkinToday(
         record.user_id,
         record.store_id,
         record.check_in_latitude,
@@ -135,15 +140,18 @@ export function syncPendingCheckins(): { synced: number; needsReview: number } {
         record.check_in_distance_meters,
         record.shift_id,
         record.shift_start_time,
+        { waitForDb: true },
       )
-      record.sync_status = 'synced'
-      synced++
+      if (result.trangThai === 'da_luu_db') {
+        record.sync_status = 'synced'
+        synced++
+      }
     } catch {
       // Keep as pending on failure
     }
 
-    return record
-  })
+    updated.push(record)
+  }
 
   // Remove synced records, keep pending and needs_review
   const remaining = updated.filter(r => r.sync_status !== 'synced')
@@ -163,13 +171,13 @@ export function clearSyncedRecords() {
 /**
  * Manual retry sync for a specific record.
  */
-export function retrySyncRecord(recordId: string): boolean {
+export async function retrySyncRecord(recordId: string): Promise<boolean> {
   const pending = readPending()
   const record = pending.find(r => r.id === recordId)
   if (!record) return false
 
   try {
-    checkinToday(
+    const result = await AttendanceService.checkinToday(
       record.user_id,
       record.store_id,
       record.check_in_latitude,
@@ -177,7 +185,10 @@ export function retrySyncRecord(recordId: string): boolean {
       record.check_in_distance_meters,
       record.shift_id,
       record.shift_start_time,
+      { waitForDb: true },
     )
+    if (result.trangThai !== 'da_luu_db') return false
+
     // Remove from pending
     writePending(pending.filter(r => r.id !== recordId))
     return true

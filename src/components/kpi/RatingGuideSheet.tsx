@@ -68,10 +68,10 @@ export default function RatingGuideSheet({ criteria, open, onClose }: Props) {
           </div>
         ) : criteria.input_type === 'percent' ? (
           <div className="space-y-2 text-xs">
-            <div><span className="font-bold" style={{ color: '#10b981' }}>90-100%:</span> Xuất sắc</div>
-            <div><span className="font-bold" style={{ color: '#3b82f6' }}>80-89%:</span> Tốt</div>
-            <div><span className="font-bold" style={{ color: '#f59e0b' }}>70-79%:</span> Trung bình</div>
-            <div><span className="font-bold" style={{ color: '#ef4444' }}>&lt;70%:</span> Cần cải thiện</div>
+            <div><span className="font-bold" style={{ color: '#1E9E57' }}>90-100%:</span> Xuất sắc</div>
+            <div><span className="font-bold" style={{ color: '#2F6FA8' }}>80-89%:</span> Tốt</div>
+            <div><span className="font-bold" style={{ color: '#F6C85F' }}>70-79%:</span> Trung bình</div>
+            <div><span className="font-bold" style={{ color: '#D9381E' }}>&lt;70%:</span> Cần cải thiện</div>
           </div>
         ) : (
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>

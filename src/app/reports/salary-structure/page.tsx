@@ -6,8 +6,8 @@ import { Download } from 'lucide-react'
 
 const fmt = (n: number) => n.toLocaleString('vi-VN') + '₫'
 const componentColors: Record<string, string> = {
-  'Lương cơ bản': '#3b82f6', 'Phụ cấp': '#10b981', 'Thưởng': '#f59e0b',
-  'OT': '#8b5cf6', 'BHXH (NV)': '#ef4444', 'Thuế TNCN': '#f97316', 'Khấu trừ khác': '#6b7280',
+  'Lương cơ bản': '#2F6FA8', 'Phụ cấp': '#1E9E57', 'Thưởng': '#F6C85F',
+  'OT': '#001D3D', 'BHXH (NV)': '#D9381E', 'Thuế TNCN': '#f97316', 'Khấu trừ khác': '#6b7280',
 }
 
 export default function SalaryStructurePage() {
@@ -17,7 +17,7 @@ export default function SalaryStructurePage() {
   return (
     <AppShell title="Cơ cấu lương">
       <div className="space-y-4">
-        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff' }}>
+        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #001D3D, #6d28d9)', color: '#fff' }}>
           <div className="text-xs opacity-80">Tháng {d.period}</div>
           <div className="text-2xl font-bold mt-1">{fmt(totalCost)}</div>
           <div className="text-xs opacity-80 mt-1">Tổng chi phí nhân sự</div>

@@ -2,7 +2,7 @@
 
 import AppShell from '@/components/layout/AppShell'
 import { mockPayrollByStore, mockPayrollHistory } from '@/lib/mock-data-payroll'
-import { TrendingUp, TrendingDown, DollarSign, Calendar, Lock } from 'lucide-react'
+import { Lock } from 'lucide-react'
 
 const fmt = (n: number) => n.toLocaleString('vi-VN') + '₫'
 
@@ -17,7 +17,7 @@ export default function PayrollCompanyPage() {
     <AppShell title="Tổng hợp lương công ty">
       <div className="space-y-4">
         {/* Total Card */}
-        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}>
+        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #6366f1, #001D3D)', color: '#fff' }}>
           <div className="text-xs opacity-80">Tổng chi phí nhân sự tháng 02/2026</div>
           <div className="text-3xl font-bold mt-1">{fmt(total)}</div>
           <div className="grid grid-cols-3 gap-2 mt-3">
@@ -32,9 +32,9 @@ export default function PayrollCompanyPage() {
           <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>📊 Cơ cấu chi phí</h3>
           {[
             { label: 'Lương cơ bản', value: totalBase, pct: Math.round(totalBase / total * 100), color: 'var(--primary)' },
-            { label: 'Phụ cấp & Thưởng', value: mockPayrollByStore.reduce((s, p) => s + p.total_allowance + p.total_bonus, 0), pct: 15, color: '#10b981' },
-            { label: 'Bảo hiểm (công ty)', value: totalIns, pct: Math.round(totalIns / total * 100), color: '#f59e0b' },
-            { label: 'Thuế TNCN', value: totalTax, pct: Math.round(totalTax / total * 100), color: '#ef4444' },
+            { label: 'Phụ cấp & Thưởng', value: mockPayrollByStore.reduce((s, p) => s + p.total_allowance + p.total_bonus, 0), pct: 15, color: '#1E9E57' },
+            { label: 'Bảo hiểm (công ty)', value: totalIns, pct: Math.round(totalIns / total * 100), color: '#F6C85F' },
+            { label: 'Thuế TNCN', value: totalTax, pct: Math.round(totalTax / total * 100), color: '#D9381E' },
           ].map(row => (
             <div key={row.label} className="mb-3">
               <div className="flex justify-between text-xs mb-1">

@@ -11,13 +11,13 @@ export function TeamOverview({ shifts, onFindReplacement }: Props) {
         const full = shift.members.length >= shift.required;
         const checkedIn = shift.members.filter(m => m.status === 'checked_in').length;
         return (
-          <div key={shift.id} className={`rounded-2xl p-4 border transition-all ${full ? 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200' : 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200'}`}>
+          <div key={shift.id} className={`rounded-2xl p-4 border transition-all ${full ? 'bg-gradient-to-br from-success-50 to-success-100 border-emerald-200' : 'bg-gradient-to-br from-warning-50 to-warning-100 border-warning-200'}`}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <span className="text-xl">{shift.icon}</span>
                 <div><p className="font-semibold text-gray-900">{shift.name}</p><p className="text-xs text-gray-500">{shift.time}</p></div>
               </div>
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${full ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              <div className={`px-3 py-1 rounded-full text-sm font-medium ${full ? 'bg-emerald-100 text-emerald-700' : 'bg-warning-100 text-warning-700'}`}>
                 {shift.members.length}/{shift.required} {full ? '✅' : '⚠️'}
               </div>
             </div>
@@ -25,14 +25,14 @@ export function TeamOverview({ shifts, onFindReplacement }: Props) {
               {shift.members.map(m => (
                 <div key={m.id} className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-gray-200">
                   <div className="relative">
-                    <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-xs">{m.avatar || '👤'}</div>
+                    <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-xs">{m.avatar || '👤'}</div>
                     {m.status === 'checked_in' && <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border border-white" />}
                   </div>
                   <span className="text-sm font-medium text-gray-700">{m.name}</span>
                 </div>
               ))}
               {!full && onFindReplacement && (
-                <button onClick={() => onFindReplacement(shift.id)} className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-full border border-amber-200 hover:bg-amber-200 transition-colors text-sm font-medium">
+                <button onClick={() => onFindReplacement(shift.id)} className="flex items-center gap-2 px-3 py-1.5 bg-warning-100 text-warning-700 rounded-full border border-warning-200 hover:bg-warning-200 transition-colors text-sm font-medium">
                   <span>❓</span><span>Tìm người thay</span>
                 </button>
               )}

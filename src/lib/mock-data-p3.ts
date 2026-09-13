@@ -60,11 +60,11 @@ export const LEVEL_THRESHOLDS = [
 export type KudosType = 'thank_you' | 'great_job' | 'team_player' | 'creative' | 'helpful'
 
 export const KUDOS_TYPES = [
-  { type: 'thank_you' as KudosType, emoji: '🙏', label: 'Cảm ơn', color: '#3b82f6' },
-  { type: 'great_job' as KudosType, emoji: '🌟', label: 'Làm tốt lắm', color: '#f59e0b' },
-  { type: 'team_player' as KudosType, emoji: '🤝', label: 'Team Player', color: '#10b981' },
-  { type: 'creative' as KudosType, emoji: '💡', label: 'Sáng tạo', color: '#8b5cf6' },
-  { type: 'helpful' as KudosType, emoji: '💪', label: 'Nhiệt tình', color: '#ef4444' },
+  { type: 'thank_you' as KudosType, emoji: '🙏', label: 'Cảm ơn', color: '#2F6FA8' },
+  { type: 'great_job' as KudosType, emoji: '🌟', label: 'Làm tốt lắm', color: '#F6C85F' },
+  { type: 'team_player' as KudosType, emoji: '🤝', label: 'Team Player', color: '#1E9E57' },
+  { type: 'creative' as KudosType, emoji: '💡', label: 'Sáng tạo', color: '#001D3D' },
+  { type: 'helpful' as KudosType, emoji: '💪', label: 'Nhiệt tình', color: '#D9381E' },
 ]
 
 export const mockKudos = [
@@ -104,11 +104,11 @@ export const mockMessages = [
 export type MoodLevel = 1 | 2 | 3 | 4 | 5
 
 export const MOOD_EMOJIS: Record<number, { emoji: string; label: string; color: string }> = {
-  1: { emoji: '😢', label: 'Rất tệ', color: '#ef4444' },
+  1: { emoji: '😢', label: 'Rất tệ', color: '#D9381E' },
   2: { emoji: '😕', label: 'Không tốt', color: '#f97316' },
   3: { emoji: '😐', label: 'Bình thường', color: '#eab308' },
-  4: { emoji: '😊', label: 'Tốt', color: '#22c55e' },
-  5: { emoji: '🤩', label: 'Tuyệt vời', color: '#3b82f6' },
+  4: { emoji: '😊', label: 'Tốt', color: '#48C079' },
+  5: { emoji: '🤩', label: 'Tuyệt vời', color: '#2F6FA8' },
 }
 
 export const mockMoodCheckins = [

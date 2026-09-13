@@ -1,23 +1,23 @@
-'use client';
+'use client'
 
-import type { SettingCategoryId } from '@/lib/types/settings';
-import { settingCategories } from '@/lib/mock-data/settings';
+import type { SettingCategoryId } from '@/lib/types/settings'
+import { settingCategories } from '@/lib/mock-data/settings'
 
 interface Props {
-  selected: SettingCategoryId | 'all';
-  onSelect: (category: SettingCategoryId | 'all') => void;
+  selected: SettingCategoryId | 'all'
+  onSelect: (category: SettingCategoryId | 'all') => void
 }
 
 export function SettingCategoryTabs({ selected, onSelect }: Props) {
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
       <button
         onClick={() => onSelect('all')}
-        className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all"
-        style={{
-          background: selected === 'all' ? '#7c3aed' : 'var(--gray-100, #f3f4f6)',
-          color: selected === 'all' ? '#fff' : 'var(--text-secondary, #6b7280)',
-        }}
+        className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all ${
+          selected === 'all'
+            ? 'bg-primary-600 text-white shadow-md shadow-primary-600/20'
+            : 'bg-white text-dark-700 border border-gray-100 hover:bg-primary-50 hover:text-primary-600'
+        }`}
       >
         Tất cả
       </button>
@@ -26,16 +26,16 @@ export function SettingCategoryTabs({ selected, onSelect }: Props) {
         <button
           key={cat.id}
           onClick={() => onSelect(cat.id)}
-          className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5"
-          style={{
-            background: selected === cat.id ? '#7c3aed' : 'var(--gray-100, #f3f4f6)',
-            color: selected === cat.id ? '#fff' : 'var(--text-secondary, #6b7280)',
-          }}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            selected === cat.id
+              ? 'bg-primary-600 text-white shadow-md shadow-primary-600/20'
+              : 'bg-white text-dark-700 border border-gray-100 hover:bg-primary-50 hover:text-primary-600'
+          }`}
         >
           <span>{cat.icon}</span>
           <span>{cat.label}</span>
         </button>
       ))}
     </div>
-  );
+  )
 }

@@ -99,7 +99,7 @@ export default function Step3Salary({ state, onUpdate, onNext, onBack }: Step3Pr
          {/* Template Selector Cards */}
          <div>
            <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5">
-             <Building2 size={14} className="text-blue-600" />
+             <Building2 size={14} className="text-primary-600" />
              Chọn khu vực để áp dụng mức lương:
            </h3>
            <TemplateSelector
@@ -169,14 +169,14 @@ export default function Step3Salary({ state, onUpdate, onNext, onBack }: Step3Pr
       <div className="flex justify-between items-center pt-4">
         <button 
             onClick={onBack}
-            className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-50 transition-all"
+            className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-vanilla-50 transition-all"
         >
             <ArrowLeft size={18} /> Quay lại
         </button>
         <div className="flex gap-2">
           <button
             onClick={handleSkipWithDefault}
-            className="flex items-center gap-1.5 px-4 py-3 text-gray-400 hover:text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-100 transition-all"
+            className="flex items-center gap-1.5 px-4 py-3 text-gray-400 hover:text-gray-600 text-sm font-medium rounded-xl hover:bg-primary-50 transition-all"
           >
             <SkipForward size={14} /> Dùng mặc định, tạo luôn →
           </button>

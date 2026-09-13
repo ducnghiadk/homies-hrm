@@ -16,13 +16,26 @@ import {
 import type { SettingItem, SettingCategoryId } from '@/lib/types/settings'
 
 export default function SettingsPage() {
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const [selectedCategory, setSelectedCategory] = useState<SettingCategoryId | 'all'>('all')
   const [searchResults, setSearchResults] = useState<SettingItem[] | null>(null)
 
-  useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
-  if (!user) return null
+  useEffect(() => {
+    if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/settings')
+  }, [hasHydrated, isAuthenticated, router])
+
+  if (!hasHydrated) {
+    return (
+      <AppShell title="Cài đặt">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (!user || !isAuthenticated) return null
 
   const displayItems = searchResults
     ? searchResults
@@ -38,7 +51,7 @@ export default function SettingsPage() {
     : null
 
   return (
-    <AppShell title="Cài đặt">
+    <AppShell title="Tổng quan Cài đặt">
       <div className="space-y-5 pb-24">
         {/* Setup Wizard */}
         <SetupWizardBanner />

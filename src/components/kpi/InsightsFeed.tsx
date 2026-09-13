@@ -11,7 +11,7 @@ interface InsightsFeedProps {
 export default function InsightsFeed({ insights, maxItems = 6 }: InsightsFeedProps) {
   if (!insights.length) return null
 
-  const prioColor = { high: '#ef4444', medium: '#f59e0b', low: '#6b7280' }
+  const prioColor = { high: '#D9381E', medium: '#F6C85F', low: '#6b7280' }
   const prioLabel = { high: 'QUAN TRỌNG', medium: 'LƯU Ý', low: 'THÔNG TIN' }
 
   return (

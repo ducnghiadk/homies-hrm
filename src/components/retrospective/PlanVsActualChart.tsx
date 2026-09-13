@@ -32,7 +32,7 @@ export default function PlanVsActualChart({
     <div className="bg-white rounded-2xl border border-gray-200 p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-          <TrendingUp size={14} className="text-blue-600" />
+          <TrendingUp size={14} className="text-primary-600" />
           So sánh {metric === 'hours' ? 'Giờ làm' : 'Chi phí'} theo ngày
         </h3>
         <div className="flex items-center gap-3 text-xs">
@@ -40,7 +40,7 @@ export default function PlanVsActualChart({
             <span className="w-2.5 h-2.5 bg-primary/70 rounded-sm" /> Kế hoạch
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 bg-orange-400 rounded-sm" /> Thực tế
+            <span className="w-2.5 h-2.5 bg-warning-400 rounded-sm" /> Thực tế
           </span>
         </div>
       </div>
@@ -66,7 +66,7 @@ export default function PlanVsActualChart({
                 {/* Actual bar */}
                 <div
                   className={`w-[40%] rounded-t transition-all duration-500 ${
-                    isOver ? 'bg-red-400' : 'bg-orange-400'
+                    isOver ? 'bg-error-400' : 'bg-warning-400'
                   }`}
                   style={{ height: `${aHeight}%`, minHeight: actual > 0 ? 4 : 0 }}
                   title={`TT: ${formatVal(actual, metric)}`}
@@ -94,7 +94,7 @@ export default function PlanVsActualChart({
         </span>
         <span className={`font-bold ${
           (metric === 'hours' ? data.variance.hours : data.variance.cost) > 0
-            ? 'text-red-500' : 'text-green-500'
+            ? 'text-error-500' : 'text-success-500'
         }`}>
           {(metric === 'hours' ? data.variance.hours : data.variance.cost) > 0 ? '+' : ''}
           {formatVal(

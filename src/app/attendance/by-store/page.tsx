@@ -7,7 +7,7 @@ import type { AttSymbol } from '@/lib/mock-data-attendance'
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 
 const symbolColors: Record<AttSymbol, string> = {
-  '✓': '#10b981', '½': '#f59e0b', 'X': '#ef4444', 'M': '#8b5cf6', 'P': '#3b82f6', '-': '#9ca3af',
+  '✓': '#1E9E57', '½': '#F6C85F', 'X': '#D9381E', 'M': '#001D3D', 'P': '#2F6FA8', '-': '#9ca3af',
 }
 
 export default function AttendanceByStorePage() {
@@ -36,9 +36,9 @@ export default function AttendanceByStorePage() {
         <div className="grid grid-cols-4 gap-2 animate-slide-up">
           {[
             { label: 'Tổng NV', value: mockAttGrid.length, color: 'var(--primary)' },
-            { label: 'Đúng giờ', value: '87%', color: '#10b981' },
-            { label: 'Đi muộn', value: '8%', color: '#f59e0b' },
-            { label: 'Vắng', value: '5%', color: '#ef4444' },
+            { label: 'Đúng giờ', value: '87%', color: '#1E9E57' },
+            { label: 'Đi muộn', value: '8%', color: '#F6C85F' },
+            { label: 'Vắng', value: '5%', color: '#D9381E' },
           ].map(s => (
             <div key={s.label} className="card text-center p-3">
               <div className="text-lg font-bold" style={{ color: s.color }}>{s.value}</div>

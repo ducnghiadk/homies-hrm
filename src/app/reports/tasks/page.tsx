@@ -15,9 +15,9 @@ export default function TaskReportPage() {
         <div className="grid grid-cols-2 gap-2 animate-fade-in">
           {[
             { label: 'Tổng tác vụ', value: d.total_tasks, color: 'var(--primary)', icon: Clock },
-            { label: 'Hoàn thành', value: d.completed, color: '#10b981', icon: CheckCircle },
-            { label: 'Đang làm', value: inProgress, color: '#f59e0b', icon: Clock },
-            { label: 'Sự cố mở', value: overdue, color: '#ef4444', icon: AlertTriangle },
+            { label: 'Hoàn thành', value: d.completed, color: '#1E9E57', icon: CheckCircle },
+            { label: 'Đang làm', value: inProgress, color: '#F6C85F', icon: Clock },
+            { label: 'Sự cố mở', value: overdue, color: '#D9381E', icon: AlertTriangle },
           ].map(s => {
             const Icon = s.icon
             return (
@@ -32,7 +32,7 @@ export default function TaskReportPage() {
         <div className="card animate-slide-up">
           <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>📊 Hoàn thành theo checklist</h3>
           {d.by_template.map(tpl => {
-            const color = tpl.completion >= 90 ? '#10b981' : tpl.completion >= 70 ? '#f59e0b' : '#ef4444'
+            const color = tpl.completion >= 90 ? '#1E9E57' : tpl.completion >= 70 ? '#F6C85F' : '#D9381E'
             return (
               <div key={tpl.template} className="mb-3">
                 <div className="flex justify-between text-xs mb-1">
@@ -52,7 +52,7 @@ export default function TaskReportPage() {
           <div className="grid grid-cols-3 gap-2 text-center">
             <div><div className="text-lg font-bold" style={{ color: 'var(--primary)' }}>{d.incidents.total}</div><div className="text-xs" style={{ color: 'var(--text-muted)' }}>Tổng</div></div>
             <div><div className="text-lg font-bold text-emerald-500">{d.incidents.resolved}</div><div className="text-xs" style={{ color: 'var(--text-muted)' }}>Xử lý</div></div>
-            <div><div className="text-lg font-bold text-red-500">{d.incidents.open}</div><div className="text-xs" style={{ color: 'var(--text-muted)' }}>Đang mở</div></div>
+            <div><div className="text-lg font-bold text-error-500">{d.incidents.open}</div><div className="text-xs" style={{ color: 'var(--text-muted)' }}>Đang mở</div></div>
           </div>
         </div>
 

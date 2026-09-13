@@ -16,28 +16,28 @@ const typeConfig: Record<Insight['type'], {
   metricBg: string
 }> = {
   warning: {
-    icon: <AlertTriangle size={16} className="text-amber-600" />,
-    bgClass: 'bg-amber-50',
-    borderClass: 'border-amber-200',
-    metricBg: 'bg-amber-100 text-amber-700',
+    icon: <AlertTriangle size={16} className="text-warning-600" />,
+    bgClass: 'bg-warning-50',
+    borderClass: 'border-warning-200',
+    metricBg: 'bg-warning-100 text-warning-700',
   },
   saving: {
-    icon: <TrendingUp size={16} className="text-green-600" />,
-    bgClass: 'bg-green-50',
-    borderClass: 'border-green-200',
-    metricBg: 'bg-green-100 text-green-700',
+    icon: <TrendingUp size={16} className="text-success-600" />,
+    bgClass: 'bg-success-50',
+    borderClass: 'border-success-200',
+    metricBg: 'bg-success-100 text-success-700',
   },
   improvement: {
-    icon: <Lightbulb size={16} className="text-blue-600" />,
-    bgClass: 'bg-blue-50',
-    borderClass: 'border-blue-200',
-    metricBg: 'bg-blue-100 text-blue-700',
+    icon: <Lightbulb size={16} className="text-primary-600" />,
+    bgClass: 'bg-primary-50',
+    borderClass: 'border-primary-200',
+    metricBg: 'bg-primary-100 text-primary-700',
   },
   praise: {
-    icon: <PartyPopper size={16} className="text-purple-600" />,
-    bgClass: 'bg-purple-50',
-    borderClass: 'border-purple-200',
-    metricBg: 'bg-purple-100 text-purple-700',
+    icon: <PartyPopper size={16} className="text-primary-600" />,
+    bgClass: 'bg-primary-50',
+    borderClass: 'border-primary-200',
+    metricBg: 'bg-primary-100 text-primary-700',
   },
 }
 

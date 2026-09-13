@@ -51,7 +51,7 @@ export default function SmartGreeting({ storeId, urgentCount }: SmartGreetingPro
               <div className="flex-1 h-1.5 rounded-full" style={{ background: '#fde68a' }}>
                 <div className="h-full rounded-full transition-all" style={{
                   width: `${pct}%`,
-                  background: pct >= 80 ? '#10b981' : '#f59e0b',
+                  background: pct >= 80 ? '#1E9E57' : '#F6C85F',
                 }} />
               </div>
               <span className="text-[10px] font-semibold" style={{ color: '#92400e' }}>

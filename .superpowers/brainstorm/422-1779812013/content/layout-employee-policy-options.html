@@ -1,0 +1,197 @@
+<h2>De xuat layout: Noi quy nhan viec</h2>
+<p class="subtitle">Muc tieu: nhin 3 giay la biet trang thai hien tai, can lam gi tiep, lich su nam duoi</p>
+
+<div class="section">
+  <div class="options">
+    <div class="option" data-choice="a" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Card don dang mo rong</h3>
+        <p>Giu 1 card, nhung tach thanh 3 tang ro hon: tong quan, viec can lam, lich su.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="b" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Hero + timeline nho</h3>
+        <p><strong>Khuyen dung.</strong> Tren cung chi hien trang thai va nut hanh dong. Duoi moi la checklist va lich su dang dong.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="c" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>2 cot theo vai tro</h3>
+        <p>Trai cho HR theo doi gui/nhac. Phai cho quan ly ngay dau chot tai cua hang.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">A. Card don dang mo rong</div>
+        <div class="mockup-body">
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:24px;padding:18px">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+              <div>
+                <div class="label">Noi quy nhan viec</div>
+                <div style="font-size:26px;font-weight:800;color:#0f172a;margin-top:6px">Can nhac lai</div>
+                <div style="color:#64748b;margin-top:6px">Da gui noi quy, dang cho nhan vien xac nhan</div>
+              </div>
+              <div style="background:#fef3c7;color:#b45309;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700">Can xu ly</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+              <div style="border:1px solid #e5e7eb;border-radius:16px;padding:12px">Xac nhan<br><strong>Chua xac nhan</strong></div>
+              <div style="border:1px solid #e5e7eb;border-radius:16px;padding:12px">Chot ngay dau<br><strong>Chua chot</strong></div>
+            </div>
+            <div style="margin-top:16px;border:1px solid #e2e8f0;border-radius:20px;padding:14px;background:#f8fafc">
+              <div class="label">Viec can lam tiep</div>
+              <div style="margin-top:10px;display:grid;gap:10px">
+                <div style="border:1px solid #cbd5e1;border-radius:14px;padding:10px;background:#fff">1. Da gui noi quy tom tat</div>
+                <div style="border:1px solid #86efac;border-radius:14px;padding:10px;background:#ecfdf5">2. Da gui noi quy day du</div>
+                <div style="border:1px solid #fcd34d;border-radius:14px;padding:10px;background:#fffbeb">3. Nhan vien da phan hoi</div>
+                <div style="border:1px solid #99f6e4;border-radius:14px;padding:10px;background:#f0fdfa">4. Can HR giai thich them</div>
+              </div>
+            </div>
+            <div style="margin-top:16px;display:grid;gap:10px">
+              <div style="background:#f8fafc;border-radius:16px;padding:12px">Da nhac lai • 25/05/2026</div>
+              <div style="background:#f8fafc;border-radius:16px;padding:12px">Gui noi quy day du • 25/05/2026</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. It doi code nhat</h3>
+      <p>De lam nhanh, nhung van con cao va phai cuon nhieu tren mobile.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">B. Hero + timeline nho</div>
+        <div class="mockup-body">
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:24px;padding:18px">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+              <div>
+                <div class="label">Noi quy nhan viec</div>
+                <div style="font-size:26px;font-weight:800;color:#0f172a;margin-top:6px">Can nhac lai</div>
+                <div style="color:#64748b;margin-top:6px">Vie c can lam: nhac lai nhan vien truoc ngay vao lam</div>
+              </div>
+              <button class="mock-button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74">Can nhac lai</button>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px">
+              <div style="border:1px solid #e5e7eb;border-radius:16px;padding:12px;background:#fff">
+                <div class="label">Trang thai</div>
+                <strong>Dang cho xac nhan</strong>
+              </div>
+              <div style="border:1px solid #e5e7eb;border-radius:16px;padding:12px;background:#fff">
+                <div class="label">Xac nhan</div>
+                <strong>Chua co</strong>
+              </div>
+              <div style="border:1px solid #e5e7eb;border-radius:16px;padding:12px;background:#fff">
+                <div class="label">Chot ngay dau</div>
+                <strong>Chua chot</strong>
+              </div>
+            </div>
+
+            <div style="margin-top:18px">
+              <div class="label">Tien do 4 moc</div>
+              <div style="display:grid;gap:10px;margin-top:10px">
+                <div style="display:flex;gap:10px;align-items:flex-start">
+                  <div style="width:24px;height:24px;border-radius:999px;background:#d1fae5;color:#047857;display:flex;align-items:center;justify-content:center;font-weight:800">1</div>
+                  <div><strong>Gui tom tat</strong><div style="color:#64748b">Da xong</div></div>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start">
+                  <div style="width:24px;height:24px;border-radius:999px;background:#d1fae5;color:#047857;display:flex;align-items:center;justify-content:center;font-weight:800">2</div>
+                  <div><strong>Gui day du</strong><div style="color:#64748b">Da xong</div></div>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start">
+                  <div style="width:24px;height:24px;border-radius:999px;background:#fef3c7;color:#b45309;display:flex;align-items:center;justify-content:center;font-weight:800">3</div>
+                  <div><strong>Nhan vien phan hoi</strong><div style="color:#64748b">Dang cho</div></div>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start">
+                  <div style="width:24px;height:24px;border-radius:999px;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;font-weight:800">4</div>
+                  <div><strong>Chot tai cua hang</strong><div style="color:#64748b">Cho ngay dau</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:18px;border-top:1px solid #e5e7eb;padding-top:14px">
+              <div class="label">Lich su gan day</div>
+              <div style="display:grid;gap:8px;margin-top:10px">
+                <div style="background:#f8fafc;border-radius:16px;padding:12px">25/05 • Da nhac lai</div>
+                <div style="background:#f8fafc;border-radius:16px;padding:12px">25/05 • Gui noi quy day du</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. De quet mat nhat</h3>
+      <p>Phan tren tra loi ngay 3 cau hoi: dang o dau, can lam gi, bam nut nao. Lich su day xuong duoi.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">C. 2 cot theo vai tro</div>
+        <div class="mockup-body">
+          <div style="display:grid;grid-template-columns:1.1fr 0.9fr;gap:14px">
+            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:24px;padding:18px">
+              <div class="label">HR theo doi</div>
+              <div style="font-size:24px;font-weight:800;color:#0f172a;margin-top:8px">Can nhac lai</div>
+              <div style="margin-top:14px;display:grid;gap:10px">
+                <div style="border:1px solid #e5e7eb;border-radius:16px;padding:12px">Da gui tom tat</div>
+                <div style="border:1px solid #86efac;border-radius:16px;padding:12px;background:#ecfdf5">Da gui day du</div>
+                <div style="border:1px solid #fcd34d;border-radius:16px;padding:12px;background:#fffbeb">Dang cho phan hoi</div>
+              </div>
+              <div style="margin-top:14px">
+                <button class="mock-button" style="background:#fff7ed;color:#c2410c;border:1px solid #fdba74">Can nhac lai</button>
+              </div>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:24px;padding:18px">
+              <div class="label">Quan ly ngay dau</div>
+              <div style="display:grid;gap:10px;margin-top:10px">
+                <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:12px">Xac nhan: chua co</div>
+                <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:12px">Can giai thich: co</div>
+                <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:12px">Chot tai cua hang</div>
+              </div>
+              <div style="margin-top:14px;background:#fff;border-radius:16px;padding:12px">Lich su nam duoi rieng</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Ro vai tro</h3>
+      <p>Hop neu HR va quan ly deu xem man nay nhieu. Doi lai mobile se dai va can xu ly responsive ky hon.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>Toi khuyen dung B</h4>
+      <ul>
+        <li>De tim thong tin nhat tren mobile</li>
+        <li>Khong con cam giac card trong card trong card</li>
+        <li>Tap trung vao viec can lam tiep, khong de lich su chen len tren</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Ly do khong uu tien A/C</h4>
+      <ul>
+        <li>A van kha dai, giam roi nhung chua giai quyet dut diem</li>
+        <li>C ro vai tro nhung hoi nang, de vo nhac tren mobile</li>
+      </ul>
+    </div>
+  </div>
+</div>

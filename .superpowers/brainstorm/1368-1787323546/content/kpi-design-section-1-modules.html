@@ -1,0 +1,70 @@
+<h2>Thiết kế phần 1: Cấu trúc ứng dụng KPI</h2>
+<p class="subtitle">Một trung tâm KPI thống nhất, nhưng mỗi khu vực phục vụ đúng một công việc. Người dùng không phải tìm chức năng trong một trang quá tải.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Trung tâm KPI</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:220px 1fr;gap:14px">
+      <div style="background:#001D3D;color:white;padding:16px;border-radius:7px">
+        <strong style="font-size:17px">KPI Homies</strong>
+        <div style="margin-top:18px;line-height:2.25">
+          <div style="background:#2F6FA8;padding:2px 9px;border-radius:5px">Tổng quan</div>
+          <div>Chấm KPI tháng</div>
+          <div>Vi phạm & khiếu nại</div>
+          <div>Thăng tiến & lương</div>
+          <div>Bài test & thử thách</div>
+          <div>Báo cáo</div>
+          <div>Cài đặt KPI</div>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">
+          <div style="padding:12px;background:#eff6ff;border-left:4px solid #2F6FA8"><small>Kỳ đang chạy</small><br><strong>08/2026</strong></div>
+          <div style="padding:12px;background:#fffbeb;border-left:4px solid #d97706"><small>Chờ Leader chấm</small><br><strong>12 người</strong></div>
+          <div style="padding:12px;background:#fff1f2;border-left:4px solid #e11d48"><small>Cần xử lý</small><br><strong>4 việc</strong></div>
+          <div style="padding:12px;background:#ecfdf5;border-left:4px solid #1E9E57"><small>Đủ điều kiện xét</small><br><strong>3 người</strong></div>
+        </div>
+        <div style="margin-top:12px;background:#f8fafc;border:1px solid #e2e8f0;padding:14px;border-radius:7px">
+          <strong>Việc cần làm hôm nay</strong>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px">
+            <span>Hoàn tất chấm KPI cửa hàng Hồ Bá Phấn</span><button class="mock-button">Tiếp tục chấm</button>
+            <span>Duyệt 2 khiếu nại đang chờ</span><button class="mock-button">Xem khiếu nại</button>
+            <span>Review 1 ứng viên PT2 → Senior</span><button class="mock-button">Mở hồ sơ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Các khu vực nghiệp vụ</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px">
+    <div style="padding:14px;border:1px solid #bfdbfe;border-radius:7px;background:#eff6ff"><strong>1. Kỳ KPI</strong><br><small>Tạo kỳ, chọn bộ tiêu chí, danh sách nhân viên, khóa phiên bản.</small></div>
+    <div style="padding:14px;border:1px solid #bfdbfe;border-radius:7px;background:#eff6ff"><strong>2. Workspace chấm điểm</strong><br><small>Dữ liệu gợi ý, Leader điều chỉnh có lý do, lưu bằng chứng.</small></div>
+    <div style="padding:14px;border:1px solid #bfdbfe;border-radius:7px;background:#eff6ff"><strong>3. Kết quả cá nhân</strong><br><small>Nhân viên xem điểm, lịch sử, mục tiêu và gửi khiếu nại 48 giờ.</small></div>
+    <div style="padding:14px;border:1px solid #fecdd3;border-radius:7px;background:#fff1f2"><strong>4. Vi phạm</strong><br><small>Leader ghi lỗi vận hành; theo dõi bằng chứng, xác nhận và khiếu nại.</small></div>
+    <div style="padding:14px;border:1px solid #bbf7d0;border-radius:7px;background:#ecfdf5"><strong>5. Thăng tiến & lương</strong><br><small>Hệ thống kiểm điều kiện, CEO xem lý do và quyết định cuối.</small></div>
+    <div style="padding:14px;border:1px solid #fde68a;border-radius:7px;background:#fffbeb"><strong>6. Test & thử thách</strong><br><small>Điểm từng phần, test lại, thời gian thử thách, kết luận bổ nhiệm.</small></div>
+    <div style="padding:14px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc"><strong>7. Báo cáo</strong><br><small>Xu hướng KPI, lỗi, nhân sự rủi ro, pipeline thăng tiến.</small></div>
+    <div style="padding:14px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc"><strong>8. Bộ tiêu chí</strong><br><small>Admin tạo tiêu chí, trọng số, đối tượng áp dụng và phiên bản.</small></div>
+    <div style="padding:14px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc"><strong>9. Cấu hình hệ thống</strong><br><small>Thang điểm, xếp loại, khung lương, quy tắc xét và phân quyền.</small></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Nguyên tắc quan trọng</div>
+  <div style="margin-top:10px;padding:14px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:7px">
+    <strong>Bộ tiêu chí là cấu hình động.</strong> Khi mở kỳ KPI, hệ thống chụp lại một “phiên bản đóng băng”. Admin có thể sửa bộ tiêu chí cho kỳ sau, nhưng kết quả kỳ cũ không thay đổi.
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve-section-1" onclick="toggleSelect(this)">
+    <div class="letter">A</div><div class="content"><h3>Duyệt cấu trúc này</h3><p>Tiếp tục sang thiết kế luồng chấm KPI hàng tháng.</p></div>
+  </div>
+  <div class="option" data-choice="revise-section-1" onclick="toggleSelect(this)">
+    <div class="letter">B</div><div class="content"><h3>Cần chỉnh</h3><p>Nói khu vực nào cần thêm, bớt hoặc đổi cách tổ chức.</p></div>
+  </div>
+</div>

@@ -1,7 +1,5 @@
 'use client'
 
-import type { EvaluationScore } from '@/lib/kpi-types'
-
 interface Props {
   criteriaId: string
   criteriaName: string
@@ -23,7 +21,7 @@ export default function ScoreComparison({
         <span className="text-[10px] font-semibold flex-1 truncate">{criteriaName}</span>
         {diff !== 0 && selfScore !== undefined && managerScore !== undefined && (
           <span className="text-[10px] font-bold" style={{
-            color: diff > 0 ? '#10b981' : '#ef4444',
+            color: diff > 0 ? '#1E9E57' : '#D9381E',
           }}>
             {diff > 0 ? '↑' : '↓'}{Math.abs(diff)}
           </span>
@@ -34,10 +32,10 @@ export default function ScoreComparison({
         <div className="flex-1 relative">
           <div className="h-2 rounded-full overflow-hidden" style={{ background: '#dbeafe' }}>
             <div className="h-full rounded-full" style={{
-              width: `${selfPct}%`, background: '#3b82f6',
+              width: `${selfPct}%`, background: '#2F6FA8',
             }} />
           </div>
-          <span className="text-[8px] font-bold absolute right-0 -top-3" style={{ color: '#3b82f6' }}>
+          <span className="text-[8px] font-bold absolute right-0 -top-3" style={{ color: '#2F6FA8' }}>
             {selfScore ?? '–'}
           </span>
         </div>
@@ -62,7 +60,7 @@ export function ScoreComparisonLegend() {
   return (
     <div className="flex gap-4 text-[10px]">
       <span className="flex items-center gap-1">
-        <span className="w-2 h-2 rounded-full" style={{ background: '#3b82f6' }} />
+        <span className="w-2 h-2 rounded-full" style={{ background: '#2F6FA8' }} />
         <span style={{ color: 'var(--text-muted)' }}>Tự đánh giá</span>
       </span>
       <span className="flex items-center gap-1">

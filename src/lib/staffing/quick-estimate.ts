@@ -1,10 +1,7 @@
 import { QuickEstimateState, QuickEstimateResult } from './types';
 
 // Default constants
-const DEFAULT_PRODUCTIVITY = 25; // Cups per hour per barista
-const DEFAULT_SALARY_FT = 7000000;
-const DEFAULT_SALARY_PT = 25000;
-const APP_ORDER_BUFFER = 0.3; // 30% more time for app orders
+const DEFAULT_PRODUCTIVITY = 25;const APP_ORDER_BUFFER = 0.3; // 30% more time for app orders
 
 export function calculateQuickEstimate(input: QuickEstimateState): QuickEstimateResult {
   // 1. Calculate effective cups (adjusted for App complexity)

@@ -14,9 +14,9 @@ export const settingsPayroll = {
 
 // ===== Master Data (7) =====
 export const masterStores = [
-  { id: 'store-001', name: 'Boba House Q.1', code: 'BH-Q1', address: '123 Nguyễn Huệ, Q.1', phone: '028 1234 5670', is_active: true },
-  { id: 'store-002', name: 'Boba House Q.3', code: 'BH-Q3', address: '456 Võ Văn Tần, Q.3', phone: '028 1234 5671', is_active: true },
-  { id: 'store-003', name: 'Boba House Thủ Đức', code: 'BH-TD', address: '789 Phạm Văn Đồng, Thủ Đức', phone: '028 1234 5672', is_active: true },
+  { id: 'store-001', name: 'Homies Milk Tea Q.1', code: 'BH-Q1', address: '123 Nguyễn Huệ, Q.1', phone: '028 1234 5670', is_active: true },
+  { id: 'store-002', name: 'Homies Milk Tea Q.3', code: 'BH-Q3', address: '456 Võ Văn Tần, Q.3', phone: '028 1234 5671', is_active: true },
+  { id: 'store-003', name: 'Homies Milk Tea Thủ Đức', code: 'BH-TD', address: '789 Phạm Văn Đồng, Thủ Đức', phone: '028 1234 5672', is_active: true },
 ]
 
 export const masterDepartments = [
@@ -26,9 +26,9 @@ export const masterDepartments = [
 ]
 
 export const masterShifts = [
-  { id: 'shift-am', name: 'Ca Sáng', start_time: '07:00', end_time: '14:00', break_minutes: 30, color: '#3b82f6', is_active: true },
-  { id: 'shift-pm', name: 'Ca Chiều', start_time: '14:00', end_time: '21:00', break_minutes: 30, color: '#f59e0b', is_active: true },
-  { id: 'shift-ev', name: 'Ca Tối', start_time: '17:00', end_time: '23:00', break_minutes: 15, color: '#8b5cf6', is_active: true },
+  { id: 'shift-am', name: 'Ca Sáng', start_time: '07:00', end_time: '14:00', break_minutes: 30, color: '#2F6FA8', is_active: true },
+  { id: 'shift-pm', name: 'Ca Chiều', start_time: '14:00', end_time: '21:00', break_minutes: 30, color: '#F6C85F', is_active: true },
+  { id: 'shift-ev', name: 'Ca Tối', start_time: '17:00', end_time: '23:00', break_minutes: 15, color: '#001D3D', is_active: true },
 ]
 
 export const masterLeaveTypes = [
@@ -45,6 +45,12 @@ export const masterPositions = [
   { id: 'pos-003', name: 'Phục vụ', level: 1, base_salary: 4800000 },
   { id: 'pos-004', name: 'Trưởng ca', level: 2, base_salary: 8000000 },
   { id: 'pos-005', name: 'Quản lý', level: 3, base_salary: 12000000 },
+  { id: 'pos-006', name: 'Quản lý điểm bán hàng', level: 3, base_salary: 12000000 },
+  { id: 'pos-007', name: 'Nhân viên', level: 1, base_salary: 5000000 },
+  { id: 'pos-008', name: 'Chủ thương hiệu', level: 5, base_salary: 25000000 },
+  { id: 'pos-009', name: 'Quản lý nhân sự', level: 4, base_salary: 15000000 },
+  { id: 'pos-010', name: 'Quản lý vùng', level: 4, base_salary: 18000000 },
+  { id: 'pos-011', name: 'Quản lý bộ phận', level: 3, base_salary: 12000000 },
 ]
 
 export const masterEmployeeLevels = [
@@ -64,7 +70,7 @@ export const masterApprovalWorkflows = [
 
 // ===== System Settings (9) =====
 export const settingsSystem = {
-  company_info: { name: 'Trà Sữa Boba House', tax_id: '0123456789', address: '123 Nguyễn Huệ, Q.1, TP.HCM', phone: '028 1234 5670', email: 'hr@bobahouse.vn', logo_url: '/logo.png', founded: '2023-01-01' },
+  company_info: { name: 'Homies Milk Tea', tax_id: '0123456789', address: '123 Nguyễn Huệ, Q.1, TP.HCM', phone: '028 1234 5670', email: 'hr@homiesmilktea.vn', logo_url: '/logo.png', founded: '2023-01-01' },
   employee_settings: { max_devices: 3, require_photo: true, require_gps: true, probation_months: 2, auto_birthday_wish: true },
   attendance_settings: { check_in_radius_meters: 100, require_selfie: true, allow_manual_edit: true, late_threshold_minutes: 15, auto_alert_manager: true, duplicate_device_check: true },
   schedule_settings: { min_staff_per_shift: 2, max_ot_hours_per_week: 12, allow_shift_swap: true, auto_schedule_enabled: false, publish_ahead_days: 7 },

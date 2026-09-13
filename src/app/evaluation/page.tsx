@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
-import { mockEvalCycles, mockEvalResults, getEvalResultByEmployee } from '@/lib/mock-data-p2'
-import { mockEmployees, getEmployeeById } from '@/lib/mock-data'
+import { mockEvalCycles, mockEvalResults } from '@/lib/mock-data-p2'
+import { getEmployeeById } from '@/lib/mock-data'
 import { getInitials } from '@/lib/utils'
-import { ClipboardCheck, Star, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 
 const EVAL_DIMS = [
   { key: 'work_quality', label: 'Chất lượng công việc', emoji: '⭐' },
@@ -16,6 +16,55 @@ const EVAL_DIMS = [
   { key: 'communication', label: 'Giao tiếp', emoji: '💬' },
   { key: 'reliability', label: 'Đáng tin cậy', emoji: '🔒' },
 ]
+
+function RadarChart({
+  self,
+  manager,
+  peer,
+}: {
+  self: Record<string, number>
+  manager: Record<string, number>
+  peer: Record<string, number>
+}) {
+  const dims = EVAL_DIMS.map(d => d.key)
+  const size = 130
+  const center = size / 2
+  const maxR = center - 15
+
+  const getPoint = (index: number, value: number) => {
+    const angle = (Math.PI * 2 * index / dims.length) - Math.PI / 2
+    const r = (value / 5) * maxR
+    return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) }
+  }
+
+  const makePath = (scores: Record<string, number>) =>
+    dims.map((d, i) => {
+      const p = getPoint(i, scores[d] || 0)
+      return `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`
+    }).join(' ') + ' Z'
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="mx-auto">
+      {[1, 2, 3, 4, 5].map(r => (
+        <polygon key={r} points={dims.map((_, i) => {
+          const p = getPoint(i, r)
+          return `${p.x},${p.y}`
+        }).join(' ')} fill="none" stroke="var(--gray-200)" strokeWidth="0.5" />
+      ))}
+      {dims.map((_, i) => {
+        const p = getPoint(i, 5)
+        return <line key={i} x1={center} y1={center} x2={p.x} y2={p.y} stroke="var(--gray-200)" strokeWidth="0.5" />
+      })}
+      {dims.map((_, i) => {
+        const p = getPoint(i, 5.8)
+        return <text key={i} x={p.x} y={p.y} fontSize="7" fill="var(--text-muted)" textAnchor="middle" dominantBaseline="central">{EVAL_DIMS[i].emoji}</text>
+      })}
+      <path d={makePath(peer)} fill="rgba(59,130,246,0.1)" stroke="#2F6FA8" strokeWidth="1.5" />
+      <path d={makePath(manager)} fill="rgba(16,185,129,0.1)" stroke="#1E9E57" strokeWidth="1.5" />
+      <path d={makePath(self)} fill="rgba(245,158,11,0.1)" stroke="#F6C85F" strokeWidth="1.5" />
+    </svg>
+  )
+}
 
 export default function EvaluationPage() {
   const { user, isAuthenticated } = useAuthStore()
@@ -31,50 +80,6 @@ export default function EvaluationPage() {
   const myResult = cycleResults.find(r => r.employee_id === user.id)
 
   const scoreColor = (s: number) => s >= 4 ? 'var(--success)' : s >= 3 ? 'var(--warning)' : 'var(--error)'
-
-  const RadarChart = ({ self, manager, peer }: { self: Record<string,number>; manager: Record<string,number>; peer: Record<string,number> }) => {
-    const dims = EVAL_DIMS.map(d => d.key)
-    const size = 130
-    const center = size / 2
-    const maxR = center - 15
-
-    const getPoint = (index: number, value: number) => {
-      const angle = (Math.PI * 2 * index / dims.length) - Math.PI / 2
-      const r = (value / 5) * maxR
-      return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) }
-    }
-
-    const makePath = (scores: Record<string,number>) =>
-      dims.map((d, i) => {
-        const p = getPoint(i, scores[d] || 0)
-        return `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`
-      }).join(' ') + ' Z'
-
-    return (
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="mx-auto">
-        {/* Grid */}
-        {[1,2,3,4,5].map(r => (
-          <polygon key={r} points={dims.map((_, i)=>{
-            const p = getPoint(i,r); return `${p.x},${p.y}`
-          }).join(' ')} fill="none" stroke="var(--gray-200)" strokeWidth="0.5"/>
-        ))}
-        {/* Axes */}
-        {dims.map((_, i) => {
-          const p = getPoint(i, 5)
-          return <line key={i} x1={center} y1={center} x2={p.x} y2={p.y} stroke="var(--gray-200)" strokeWidth="0.5"/>
-        })}
-        {/* Labels */}
-        {dims.map((_, i) => {
-          const p = getPoint(i, 5.8)
-          return <text key={i} x={p.x} y={p.y} fontSize="7" fill="var(--text-muted)" textAnchor="middle" dominantBaseline="central">{EVAL_DIMS[i].emoji}</text>
-        })}
-        {/* Data */}
-        <path d={makePath(peer)} fill="rgba(59,130,246,0.1)" stroke="#3b82f6" strokeWidth="1.5"/>
-        <path d={makePath(manager)} fill="rgba(16,185,129,0.1)" stroke="#10b981" strokeWidth="1.5"/>
-        <path d={makePath(self)} fill="rgba(245,158,11,0.1)" stroke="#f59e0b" strokeWidth="1.5"/>
-      </svg>
-    )
-  }
 
   return (
     <AppShell title="Đánh giá 360°">
@@ -130,7 +135,7 @@ export default function EvaluationPage() {
             <h3 className="text-sm font-bold mb-3">📊 Kết quả của tôi</h3>
             <RadarChart self={myResult.self_scores} manager={myResult.manager_scores} peer={myResult.peer_scores}/>
             <div className="flex gap-4 justify-center mt-2">
-              {[{c:'#f59e0b',l:'Tự đánh giá'},{c:'#10b981',l:'Cấp trên'},{c:'#3b82f6',l:'Đồng nghiệp'}].map(({c,l})=>(
+              {[{c:'#F6C85F',l:'Tự đánh giá'},{c:'#1E9E57',l:'Cấp trên'},{c:'#2F6FA8',l:'Đồng nghiệp'}].map(({c,l})=>(
                 <div key={l} className="flex items-center gap-1 text-xs">
                   <div className="w-2 h-2 rounded-full" style={{background:c}}/> {l}
                 </div>

@@ -36,7 +36,18 @@ function toRad(deg: number): number {
  * Format time for display
  */
 export function formatTime(date: Date | string): string {
+  if (typeof date === "string") {
+    const normalizedTime = date.trim();
+    if (/^\d{1,2}:\d{2}$/.test(normalizedTime)) {
+      return normalizedTime;
+    }
+  }
+
   const d = new Date(date);
+  if (Number.isNaN(d.getTime())) {
+    return typeof date === "string" ? date : "";
+  }
+
   return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
 }
 

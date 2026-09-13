@@ -3,9 +3,9 @@
 import React from 'react';
 
 interface ProgressBarProps {
-  value: number;         // 0-100
-  height?: number;       // px
-  color?: string;
+  value: number; // 0-100
+  height?: number; // px
+  color?: string; // tailwind bg color or hex
   bgColor?: string;
   label?: string;
   showValue?: boolean;
@@ -14,26 +14,48 @@ interface ProgressBarProps {
 }
 
 export default function ProgressBar({
-  value, height = 8,
-  color = 'var(--color-primary, #2196F3)',
-  bgColor = 'var(--color-border, #e0e0e0)',
-  label, showValue = true, animated = true, className = '',
+  value,
+  height = 7,
+  color = 'bg-[#2F6FA8]',
+  bgColor = 'bg-gray-100',
+  label,
+  showValue = true,
+  animated = true,
+  className = '',
 }: ProgressBarProps) {
   const pct = Math.min(100, Math.max(0, value));
 
+  const isHexOrRgb = color.startsWith('#') || color.startsWith('rgb') || color.startsWith('hsl');
+  const isBgHexOrRgb = bgColor.startsWith('#') || bgColor.startsWith('rgb') || bgColor.startsWith('hsl');
+
   return (
-    <div className={`progress-bar-wrapper ${className}`}>
+    <div className={`w-full ${className}`}>
       {(label || showValue) && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
-          {label && <span style={{ color: 'var(--color-text-secondary, #888)' }}>{label}</span>}
-          {showValue && <span style={{ fontWeight: 600, color: 'var(--color-text, #222)' }}>{Math.round(pct)}%</span>}
+        <div className="flex justify-between items-center mb-1.5 text-xs">
+          {label && <span className="font-medium text-gray-600">{label}</span>}
+          {showValue && (
+            <span className="font-mono font-bold tabular-nums text-gray-800">
+              {Math.round(pct)}%
+            </span>
+          )}
         </div>
       )}
-      <div style={{ width: '100%', height, borderRadius: height / 2, background: bgColor, overflow: 'hidden' }}>
-        <div style={{
-          width: `${pct}%`, height: '100%', borderRadius: height / 2, background: color,
-          transition: animated ? 'width 0.5s ease' : 'none',
-        }} />
+      <div
+        className={`w-full overflow-hidden rounded-full ${!isBgHexOrRgb ? bgColor : ''}`}
+        style={{
+          height,
+          backgroundColor: isBgHexOrRgb ? bgColor : undefined,
+        }}
+      >
+        <div
+          className={`h-full rounded-full ${animated ? 'transition-all duration-500 ease-out' : ''} ${
+            !isHexOrRgb ? color : ''
+          }`}
+          style={{
+            width: `${pct}%`,
+            backgroundColor: isHexOrRgb ? color : undefined,
+          }}
+        />
       </div>
     </div>
   );

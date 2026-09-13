@@ -4,7 +4,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
-import { mockStores, mockEmployees, getSchedulesByStoreWeek } from '@/lib/mock-data'
+import { mockStores, mockEmployees, getSchedulesByStoreWeek, isStoreMatch } from '@/lib/mock-data'
+import { storeAdapter, employeeAdapter } from '@/lib/adapters'
+import { EmployeeService } from '@/lib/services/employees/employee-service'
 import {
   calculateWeeklyCost, getEmployeeWeeklyCost, getCostByPosition,
   fmt, fmtFull,
@@ -25,11 +27,22 @@ function getWeekDates(weekOffset: number): string[] {
 export default function LaborCostReportPage() {
   const { user, isAuthenticated } = useAuthStore()
   const router = useRouter()
-  const [isHydrated, setIsHydrated] = useState(false)
+  const [isHydrated] = useState(() => typeof window !== 'undefined')
   const [selectedStore, setSelectedStore] = useState('store-001')
   const [activeTab, setActiveTab] = useState<'overview' | 'stores' | 'positions' | 'employees'>('overview')
+  const [stores, setStores] = useState(mockStores)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
-  useEffect(() => { setIsHydrated(true) }, [])
+  useEffect(() => {
+    storeAdapter.getStores().then(res => setStores(res))
+    employeeAdapter.getAllEmployees().then(res => {
+      if (res && res.length) {
+        EmployeeService.syncEmployeesFromAdapter(res)
+        setRefreshTrigger(k => k + 1)
+      }
+    })
+  }, [])
+
   useEffect(() => { if (isHydrated && !isAuthenticated) router.push('/login') }, [isHydrated, isAuthenticated, router])
 
   // Calculate 4-week data (before early return)
@@ -53,26 +66,29 @@ export default function LaborCostReportPage() {
   const empBreakdown = useMemo(() => {
     const dates = getWeekDates(0)
     const schedules = getSchedulesByStoreWeek(selectedStore, dates)
-    const storeEmps = mockEmployees.filter(e => e.store_id === selectedStore && (e.role === 'employee' || e.role === 'shift_leader'))
+    const allEmps = user ? EmployeeService.getEmployees(user) : []
+    const storeEmps = allEmps.filter(
+      e => isStoreMatch(e.store_id, selectedStore) && (e.role === 'employee' || e.role === 'shift_leader')
+    )
     return storeEmps.map(emp => getEmployeeWeeklyCost(emp.id, dates, schedules)).filter(e => e.totalHours > 0).sort((a, b) => b.totalCost - a.totalCost)
-  }, [selectedStore])
+  }, [selectedStore, user, refreshTrigger])
 
   // Store comparison
   const storesData = useMemo(() => {
     const dates = getWeekDates(0)
-    return mockStores.filter(s => s.is_active).map(store => {
+    return stores.filter(s => s.is_active).map(store => {
       const schedules = getSchedulesByStoreWeek(store.id, dates)
       const cost = calculateWeeklyCost(store.id, dates, schedules)
       return { store, cost }
     })
-  }, [])
+  }, [stores])
 
   if (!isHydrated || !user) return null
 
   const thisWeek = weeksData[3]
   const maxCost = Math.max(...weeksData.map(w => w.cost.totalCost), thisWeek.cost.budget)
 
-  const pctColor = (pct: number) => pct > 100 ? '#ef4444' : pct > 80 ? '#f59e0b' : '#10b981'
+  const pctColor = (pct: number) => pct > 100 ? '#D9381E' : pct > 80 ? '#F6C85F' : '#1E9E57'
 
   const tabs = [
     { key: 'overview' as const, label: 'Tổng quan' },
@@ -105,7 +121,7 @@ export default function LaborCostReportPage() {
             {/* Store selector */}
             <select className="w-full p-2 rounded-xl text-sm border" style={{ borderColor: 'var(--gray-200)', background: 'var(--gray-50)' }}
               value={selectedStore} onChange={e => setSelectedStore(e.target.value)}>
-              {mockStores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {stores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
 
             {/* Summary card */}
@@ -178,7 +194,7 @@ export default function LaborCostReportPage() {
                 <div className="flex justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
                   <span>Budget: {fmt(cost.budget)}</span>
                   <span>Thực tế: {fmt(cost.totalCost)}</span>
-                  <span style={{ color: cost.remaining >= 0 ? '#10b981' : '#ef4444' }}>
+                  <span style={{ color: cost.remaining >= 0 ? '#1E9E57' : '#D9381E' }}>
                     {cost.remaining >= 0 ? '-' : '+'}{fmt(Math.abs(cost.remaining))}
                   </span>
                 </div>
@@ -192,7 +208,7 @@ export default function LaborCostReportPage() {
           <div className="space-y-3">
             <select className="w-full p-2 rounded-xl text-sm border" style={{ borderColor: 'var(--gray-200)', background: 'var(--gray-50)' }}
               value={selectedStore} onChange={e => setSelectedStore(e.target.value)}>
-              {mockStores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {stores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             {posBreakdown.length === 0 ? (
               <div className="card text-center text-xs" style={{ color: 'var(--text-muted)' }}>Chưa có dữ liệu</div>
@@ -221,7 +237,7 @@ export default function LaborCostReportPage() {
           <div className="space-y-3">
             <select className="w-full p-2 rounded-xl text-sm border" style={{ borderColor: 'var(--gray-200)', background: 'var(--gray-50)' }}
               value={selectedStore} onChange={e => setSelectedStore(e.target.value)}>
-              {mockStores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {stores.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             {empBreakdown.length === 0 ? (
               <div className="card text-center text-xs" style={{ color: 'var(--text-muted)' }}>Chưa có dữ liệu</div>
@@ -241,7 +257,7 @@ export default function LaborCostReportPage() {
                       <tr key={e.employee_id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
                         <td className="py-2" style={{ color: 'var(--text-primary)' }}>{e.employee_name}</td>
                         <td className="text-right py-2" style={{ color: 'var(--text-muted)' }}>{e.totalHours}h</td>
-                        <td className="text-right py-2" style={{ color: e.overtimeHours > 0 ? '#f59e0b' : 'var(--text-muted)' }}>
+                        <td className="text-right py-2" style={{ color: e.overtimeHours > 0 ? '#F6C85F' : 'var(--text-muted)' }}>
                           {e.overtimeHours > 0 ? `${e.overtimeHours}h` : '-'}
                         </td>
                         <td className="text-right py-2 font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -256,7 +272,7 @@ export default function LaborCostReportPage() {
                       <td className="text-right py-2 font-bold" style={{ color: 'var(--text-primary)' }}>
                         {empBreakdown.reduce((s, e) => s + e.totalHours, 0)}h
                       </td>
-                      <td className="text-right py-2 font-bold text-amber-500">
+                      <td className="text-right py-2 font-bold text-warning-500">
                         {empBreakdown.reduce((s, e) => s + e.overtimeHours, 0)}h
                       </td>
                       <td className="text-right py-2 font-bold" style={{ color: 'var(--primary)' }}>

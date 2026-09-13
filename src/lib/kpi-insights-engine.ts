@@ -3,13 +3,12 @@
 // Phase 3F-4: Auto-generated insights & notifications
 // =============================================
 
-import type { KPIInsight, KPIPrediction } from '@/lib/kpi-report-service'
+import type { KPIInsight } from '@/lib/kpi-report-service'
 import {
   getStoreKPISummary, getLeaderboard, identifyAtRiskEmployees,
   compareWithPeers,
 } from '@/lib/kpi-report-service'
-import { mockEvaluations, getCurrentPeriod, getPreviousPeriodsHelper, mockPromotionReviews, mockViolationRecords } from '@/lib/mock-data-kpi'
-import { mockEmployees } from '@/lib/mock-data'
+import { mockEvaluations, getCurrentPeriod, mockPromotionReviews } from '@/lib/mock-data-kpi'
 
 // ══════════════════════════════════════
 // INSIGHT TEMPLATES (Vietnamese)

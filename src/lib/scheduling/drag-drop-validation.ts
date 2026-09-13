@@ -1,5 +1,5 @@
 import type { ScheduleShift, StaffAttribute, HourlyTrafficPattern, SchedulingConstraint } from '@/lib/mock-data-smart-schedule'
-import { parseHour, calculateShiftHours, getStaffingByHour, getWeeklyHours } from './shift-calculator'
+import { parseHour, getStaffingByHour, getWeeklyHours } from './shift-calculator'
 
 // --- Types ---
 

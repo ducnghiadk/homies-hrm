@@ -6,7 +6,9 @@ import { useEffect, useState, useCallback } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import TrialEvaluationForm from '@/components/kpi/TrialEvaluationForm'
 import { getCurrentPeriod } from '@/lib/mock-data-kpi'
-import { mockEmployees } from '@/lib/mock-data'
+import { mockEmployees, isStoreMatch } from '@/lib/mock-data'
+import { EmployeeService } from '@/lib/services/employees/employee-service'
+import { employeeAdapter } from '@/lib/adapters'
 import { evaluationStore, submitEvaluatorScore, initStores, getRequiredEvaluators } from '@/lib/kpi-evaluation-service'
 import EvaluatorTracker from '@/components/kpi/EvaluatorTracker'
 import { toast } from 'sonner'
@@ -25,10 +27,16 @@ export default function TrialEvaluatePage() {
     if (!isAuthenticated) router.push('/login')
   }, [isAuthenticated, router])
 
-  // Seed store
+  // Seed store & sync employees
   useEffect(() => {
     initStores()
-  }, [])
+    employeeAdapter.getAllEmployees().then(res => {
+      if (res && res.length) {
+        EmployeeService.syncEmployeesFromAdapter(res)
+        refresh()
+      }
+    })
+  }, [refresh])
 
   if (!user || user.role === 'employee') return null
 
@@ -37,11 +45,12 @@ export default function TrialEvaluatePage() {
   const storeId = user.store_id || 'store-001'
 
   // L0 employees in store
-  const trialEmployees = mockEmployees.filter(
-    e => e.store_id === storeId && e.status === 'probation',
+  const allEmps = user ? EmployeeService.getEmployees(user) : []
+  const trialEmployees = allEmps.filter(
+    e => isStoreMatch(e.store_id, storeId) && (e.status === 'probation' || e.is_probationary),
   )
   const trialEvals = evaluationStore.filter(
-    e => e.store_id === storeId && e.period === period && e.employee_level === 'L0',
+    e => isStoreMatch(e.store_id, storeId) && e.period === period && e.employee_level === 'L0',
   )
 
   const selectedEval = selectedEmpId

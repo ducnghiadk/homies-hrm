@@ -3,8 +3,8 @@
 // Phase 3F-4: Reports, summaries, leaderboard, comparisons
 // =============================================
 
-import type { KPIGradeCode, EmployeeLevel } from '@/lib/kpi-types'
-import { mockEvaluations, mockKPIGrades, mockKPICategories, getCurrentPeriod, getPreviousPeriodsHelper, mockPromotionReviews, mockViolationRecords } from '@/lib/mock-data-kpi'
+import type { KPIGradeCode } from '@/lib/kpi-types'
+import { mockEvaluations, mockKPICategories, getCurrentPeriod, getPreviousPeriodsHelper, mockPromotionReviews, mockViolationRecords } from '@/lib/mock-data-kpi'
 import { mockEmployees, mockStores } from '@/lib/mock-data'
 
 // ══════════════════════════════════════

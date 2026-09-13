@@ -84,9 +84,9 @@ export default function HeroResultCard({
   // Error state
   if (error) {
     return (
-      <div className={`bg-white rounded-2xl shadow-xl border border-red-200 overflow-hidden ${className}`}>
+      <div className={`bg-white rounded-2xl shadow-xl border border-error-200 overflow-hidden ${className}`}>
         <div className="p-8 text-center">
-          <AlertTriangle size={40} className="text-red-400 mx-auto mb-3" />
+          <AlertTriangle size={40} className="text-error-400 mx-auto mb-3" />
           <h3 className="text-lg font-semibold text-gray-800 mb-2">Có lỗi xảy ra</h3>
           <p className="text-sm text-gray-500">{error}</p>
         </div>
@@ -135,19 +135,19 @@ export default function HeroResultCard({
         {/* ═══════════ LEVEL 2: KEY METRICS ═══════════ */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <MetricCard
-            icon={<Users size={20} className="text-blue-500" />}
+            icon={<Users size={20} className="text-primary-500" />}
             value={`${result.totalHires.min}-${result.totalHires.max}`}
             label="TỔNG TUYỂN"
             sublabel="người"
           />
           <MetricCard
-            icon={<DollarSign size={20} className="text-green-500" />}
+            icon={<DollarSign size={20} className="text-success-500" />}
             value={`${(result.costRange.min / 1000000).toFixed(0)}-${(result.costRange.max / 1000000).toFixed(0)}`}
             label="CHI PHÍ"
             sublabel="triệu/tháng"
           />
           <MetricCard
-            icon={<Briefcase size={20} className="text-purple-500" />}
+            icon={<Briefcase size={20} className="text-primary-500" />}
             value={`${result.fulltime} FT + ${result.parttime.min}-${result.parttime.max} PT`}
             label="ĐỀ XUẤT"
           />
@@ -172,7 +172,7 @@ export default function HeroResultCard({
               <tbody className="divide-y divide-gray-50">
                 <tr>
                   <td className="py-2.5 flex items-center gap-2">
-                    <Coffee size={14} className="text-orange-400" />
+                    <Coffee size={14} className="text-warning-400" />
                     <span className="text-gray-700">Pha chế</span>
                   </td>
                   <td className="py-2.5 text-center font-bold text-gray-900">
@@ -182,7 +182,7 @@ export default function HeroResultCard({
                 </tr>
                 <tr>
                   <td className="py-2.5 flex items-center gap-2">
-                    <DollarSign size={14} className="text-green-400" />
+                    <DollarSign size={14} className="text-success-400" />
                     <span className="text-gray-700">Thu ngân</span>
                   </td>
                   <td className="py-2.5 text-center font-bold text-gray-900">
@@ -193,7 +193,7 @@ export default function HeroResultCard({
                 {showPackers && (
                   <tr>
                     <td className="py-2.5 flex items-center gap-2">
-                      <Package size={14} className="text-blue-400" />
+                      <Package size={14} className="text-primary-400" />
                       <span className="text-gray-700">Đóng gói</span>
                     </td>
                     <td className="py-2.5 text-center font-bold text-gray-900">
@@ -206,7 +206,7 @@ export default function HeroResultCard({
             </table>
 
             {/* Calculation formula */}
-            <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500">
+            <div className="bg-vanilla-50 rounded-lg p-3 text-xs text-gray-500">
               <FileText size={12} className="inline mr-1" /> Công thức: {dailyCups} ly ÷ {operatingHours}h ÷ 25 ly/giờ ={' '}
               {(dailyCups / operatingHours / 25).toFixed(1)} → {result.baristas} pha chế
             </div>
@@ -235,7 +235,7 @@ export default function HeroResultCard({
             onClick={onAnalyzeDetail}
             className="
               w-full py-3 rounded-xl font-medium text-sm
-              bg-gray-100 text-gray-700
+              bg-primary-50 text-gray-700
               hover:bg-gray-200
               transition-all duration-200
               flex items-center justify-center gap-2

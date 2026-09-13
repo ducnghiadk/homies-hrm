@@ -54,7 +54,7 @@ export default function QuickEstimateTab({ onApplyToStaffing, onAnalyzeDetail }:
           />
           
           {input.businessModel === 'app-delivery' && (
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 grid grid-cols-2 gap-4 mt-2 animate-in fade-in slide-in-from-top-2">
+            <div className="bg-vanilla-50 p-4 rounded-xl border border-gray-100 grid grid-cols-2 gap-4 mt-2 animate-in fade-in slide-in-from-top-2">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Tỷ lệ đơn App (%)</label>
                 <input 

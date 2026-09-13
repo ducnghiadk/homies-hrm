@@ -77,7 +77,7 @@ export default function TooltipGuide({
         {/* Close button */}
         <button
           onClick={onDismiss}
-          className="absolute top-3 right-3 p-1 text-gray-300 hover:text-gray-500 rounded-full hover:bg-gray-100 transition-colors"
+          className="absolute top-3 right-3 p-1 text-gray-300 hover:text-gray-500 rounded-full hover:bg-primary-50 transition-colors"
           aria-label="Đóng"
         >
           <X size={16} />

@@ -1,0 +1,88 @@
+<h2>Thiết kế phần 6: Nền móng, phân quyền, kiểm thử và rollout</h2>
+<p class="subtitle">Ứng dụng được chia thành các khối độc lập. Giao diện dùng chung một nghiệp vụ, còn nguồn lưu trữ có thể chuyển từ mock sang Supabase mà không phải viết lại màn hình.</p>
+
+<div class="section">
+  <div class="label">Nền móng hệ thống</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px">
+    <div style="padding:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px"><strong>Cấu hình KPI</strong><br><small>Bộ tiêu chí, phiên bản, nhóm, trọng số, quy tắc chấm và đối tượng áp dụng.</small></div>
+    <div style="padding:14px;background:#ecfdf5;border:1px solid #bbf7d0;border-radius:7px"><strong>Kỳ đánh giá</strong><br><small>Bản chụp tiêu chí, danh sách nhân viên, điểm, bằng chứng, trạng thái và audit.</small></div>
+    <div style="padding:14px;background:#fff1f2;border:1px solid #fecdd3;border-radius:7px"><strong>Sự cố & khiếu nại</strong><br><small>Hồ sơ sự cố, lỗi gốc, liên đới, phản hồi, quyết định và chu kỳ hiệu lực.</small></div>
+    <div style="padding:14px;background:#fffbeb;border:1px solid #fde68a;border-radius:7px"><strong>Phát triển nhân sự</strong><br><small>Quy tắc xét, hồ sơ ứng viên, bài test, thử thách, khung lương và quyết định.</small></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-top:14px">
+    <div style="padding:14px;background:#f8fafc;border-radius:7px;text-align:center"><strong>Giao diện & luồng nghiệp vụ</strong><br><small>Không phụ thuộc nơi lưu dữ liệu</small></div>
+    <div style="font-size:26px;color:#2F6FA8">↕</div>
+    <div style="padding:14px;background:#f8fafc;border-radius:7px;text-align:center"><strong>Lớp dịch vụ thống nhất</strong><br><small>Đổi bộ lưu trữ mà không đổi màn hình</small></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+    <div style="padding:13px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:7px;text-align:center"><strong>Giai đoạn đầu: Mock / localStorage</strong><br><small>Chốt luồng nhanh, dữ liệu mẫu có kiểm soát.</small></div>
+    <div style="padding:13px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:7px;text-align:center"><strong>Giai đoạn thật: Supabase</strong><br><small>Dữ liệu bền vững, phân quyền và lịch sử đầy đủ.</small></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Phân quyền tối thiểu</div>
+  <div style="overflow:hidden;border:1px solid #e2e8f0;border-radius:7px;margin-top:10px">
+    <div style="display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:1px;background:#e2e8f0;text-align:center">
+      <div style="padding:10px;background:#f8fafc;text-align:left"><strong>Quyền</strong></div><div style="padding:10px;background:#f8fafc"><strong>Nhân viên</strong></div><div style="padding:10px;background:#f8fafc"><strong>Shift Leader</strong></div><div style="padding:10px;background:#f8fafc"><strong>Admin/HR</strong></div><div style="padding:10px;background:#f8fafc"><strong>CEO</strong></div>
+      <div style="padding:9px;background:white;text-align:left">Xem KPI cá nhân</div><div style="padding:9px;background:white">Của mình</div><div style="padding:9px;background:white">Cửa hàng</div><div style="padding:9px;background:white">Toàn hệ thống</div><div style="padding:9px;background:white">Toàn hệ thống</div>
+      <div style="padding:9px;background:white;text-align:left">Chấm và ghi vi phạm</div><div style="padding:9px;background:white">Không</div><div style="padding:9px;background:white">Cửa hàng</div><div style="padding:9px;background:white">Hỗ trợ</div><div style="padding:9px;background:white">Có quyền ngoại lệ</div>
+      <div style="padding:9px;background:white;text-align:left">Cấu hình KPI</div><div style="padding:9px;background:white">Không</div><div style="padding:9px;background:white">Không</div><div style="padding:9px;background:white">Có</div><div style="padding:9px;background:white">Phê duyệt chính sách</div>
+      <div style="padding:9px;background:white;text-align:left">Xem và quyết định lương</div><div style="padding:9px;background:white">Mức của mình</div><div style="padding:9px;background:white">Không</div><div style="padding:9px;background:white">Theo phân quyền</div><div style="padding:9px;background:white">Toàn quyền</div>
+      <div style="padding:9px;background:white;text-align:left">Khóa/mở lại kỳ</div><div style="padding:9px;background:white">Không</div><div style="padding:9px;background:white">Không</div><div style="padding:9px;background:white">Chuẩn bị</div><div style="padding:9px;background:white">Quyết định</div>
+    </div>
+  </div>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Xử lý lỗi và bảo vệ dữ liệu</div>
+    <div class="mockup-body">
+      <p>• Tự lưu bản nháp khi Leader đang chấm.</p>
+      <p>• Không cho gửi nếu thiếu tiêu chí, bằng chứng hoặc dữ liệu nguồn.</p>
+      <p>• Chặn bấm gửi hai lần và chặn hai người sửa cùng một hồ sơ mà không cảnh báo.</p>
+      <p>• Kỳ đã khóa chỉ mở lại bằng yêu cầu có lý do và CEO duyệt.</p>
+      <p>• Mọi thay đổi quan trọng đều có nhật ký giá trị cũ/mới.</p>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">Kiểm thử bắt buộc</div>
+    <div class="mockup-body">
+      <p>• Công thức điểm, trọng số và xếp loại.</p>
+      <p>• Phiên bản tiêu chí không làm đổi kỳ cũ.</p>
+      <p>• Không tính trùng lỗi cùng sự cố.</p>
+      <p>• Đúng thời hạn khiếu nại 48 giờ.</p>
+      <p>• Đúng điều kiện từng tuyến thăng tiến.</p>
+      <p>• Nhân viên/Leader không xem được dữ liệu ngoài quyền.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Lộ trình rollout đề xuất</div>
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:10px">
+    <div style="padding:12px;background:#f8fafc;border-top:4px solid #64748b;border-radius:6px"><strong>Pass A</strong><br><small>Nền dữ liệu, cấu hình động, phiên bản và bộ tính điểm.</small></div>
+    <div style="padding:12px;background:#eff6ff;border-top:4px solid #2F6FA8;border-radius:6px"><strong>Pass B</strong><br><small>Kỳ KPI, workspace Leader, CEO duyệt và kết quả nhân viên.</small></div>
+    <div style="padding:12px;background:#fff1f2;border-top:4px solid #e11d48;border-radius:6px"><strong>Pass C</strong><br><small>Sự cố, vi phạm, bằng chứng, khiếu nại và chống trùng.</small></div>
+    <div style="padding:12px;background:#fffbeb;border-top:4px solid #d97706;border-radius:6px"><strong>Pass D</strong><br><small>Thăng tiến, test, thử thách, khung lương và ngoại lệ.</small></div>
+    <div style="padding:12px;background:#f5f3ff;border-top:4px solid #7c3aed;border-radius:6px"><strong>Pass E</strong><br><small>Supabase, phân quyền thật, chuyển dữ liệu và báo cáo.</small></div>
+    <div style="padding:12px;background:#ecfdf5;border-top:4px solid #1E9E57;border-radius:6px"><strong>Pilot</strong><br><small>Chạy một cửa hàng, một kỳ; sửa ổn rồi mở rộng.</small></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Điều kiện hoàn thành pilot</div>
+  <div style="padding:14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:7px;margin-top:9px">
+    Chấm trọn một kỳ cho toàn bộ nhân viên cửa hàng pilot; mọi điểm truy được nguồn; không phạt trùng; nhân viên xem và khiếu nại được; CEO khóa kỳ; ít nhất một hồ sơ xét thăng tiến chạy xuyên suốt; dữ liệu lương không lộ sai quyền; không cần quay lại Excel để hoàn thành quy trình.
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve-section-6" onclick="toggleSelect(this)">
+    <div class="letter">A</div><div class="content"><h3>Duyệt thiết kế tổng thể</h3><p>Mình sẽ viết design spec chính thức, tự rà soát và commit để bạn duyệt trước khi viết implementation plan.</p></div>
+  </div>
+  <div class="option" data-choice="revise-section-6" onclick="toggleSelect(this)">
+    <div class="letter">B</div><div class="content"><h3>Cần chỉnh</h3><p>Nói phần dữ liệu, phân quyền, kiểm thử hoặc thứ tự rollout cần thay đổi.</p></div>
+  </div>
+</div>

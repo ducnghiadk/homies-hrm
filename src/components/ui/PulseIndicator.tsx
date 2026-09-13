@@ -7,10 +7,10 @@ interface PulseIndicatorProps {
 }
 
 const colorMap = {
-  red:    { dot: 'bg-red-500',    ring: 'bg-red-400' },
-  yellow: { dot: 'bg-amber-500',  ring: 'bg-amber-400' },
-  green:  { dot: 'bg-green-500',  ring: 'bg-green-400' },
-  blue:   { dot: 'bg-blue-500',   ring: 'bg-blue-400' },
+  red:    { dot: 'bg-error-500',    ring: 'bg-error-400' },
+  yellow: { dot: 'bg-warning-500',  ring: 'bg-warning-400' },
+  green:  { dot: 'bg-success-500',  ring: 'bg-success-400' },
+  blue:   { dot: 'bg-primary-500',   ring: 'bg-primary-400' },
 }
 
 const sizeMap = {

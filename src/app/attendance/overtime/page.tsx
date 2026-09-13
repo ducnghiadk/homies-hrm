@@ -4,15 +4,17 @@ import { useState } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import { mockOTRequests } from '@/lib/mock-data-attendance'
 import type { OTRequest } from '@/lib/mock-data-attendance'
-import { Clock, CheckCircle, XCircle, AlertCircle, Plus } from 'lucide-react'
+import { useAuthStore } from '@/store/auth-store'
+import { Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 
 const statusMap = {
-  pending: { label: 'Chờ duyệt', color: '#f59e0b', icon: AlertCircle },
-  approved: { label: 'Đã duyệt', color: '#10b981', icon: CheckCircle },
-  rejected: { label: 'Từ chối', color: '#ef4444', icon: XCircle },
+  pending: { label: 'Chờ duyệt', color: '#F6C85F', icon: AlertCircle },
+  approved: { label: 'Đã duyệt', color: '#1E9E57', icon: CheckCircle },
+  rejected: { label: 'Từ chối', color: '#D9381E', icon: XCircle },
 }
 
 export default function OvertimeRequestPage() {
+  const { user } = useAuthStore()
   const [tab, setTab] = useState<'list' | 'form'>('list')
   const [requests, setRequests] = useState<OTRequest[]>(mockOTRequests)
   const [formData, setFormData] = useState({ date: '', start_time: '', end_time: '', reason: '' })
@@ -21,8 +23,12 @@ export default function OvertimeRequestPage() {
     if (!formData.date || !formData.start_time || !formData.end_time || !formData.reason) return
     const hours = (parseInt(formData.end_time.split(':')[0]) - parseInt(formData.start_time.split(':')[0]))
     const newReq: OTRequest = {
-      id: `ot-new-${Date.now()}`, employee_id: 'emp-005', employee_name: 'Trần Thị Mai',
-      ...formData, hours: Math.abs(hours), status: 'pending',
+      id: `ot-new-${Date.now()}`,
+      employee_id: user?.id || 'emp-001',
+      employee_name: user?.full_name || 'Nhân viên',
+      ...formData,
+      hours: Math.abs(hours),
+      status: 'pending',
     }
     setRequests(prev => [newReq, ...prev])
     setTab('list')

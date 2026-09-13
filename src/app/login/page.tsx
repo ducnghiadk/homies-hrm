@@ -1,69 +1,86 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore, getDashboardPath } from '@/store/auth-store'
+import { useAuthStore } from '@/store/auth-store'
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, isAuthenticated, user, isLoading, rememberMe, setRememberMe } = useAuthStore()
+  const { login, user, isLoading, hasHydrated, rememberMe, setRememberMe } = useAuthStore()
 
+  const [mounted, setMounted] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Already logged in → redirect to dashboard
   useEffect(() => {
-    if (isAuthenticated && user) {
-      router.replace(getDashboardPath(user.role))
+    setMounted(true)
+  }, [])
+
+  // Already logged in → redirect to target page or dashboard
+  useEffect(() => {
+    if (mounted && hasHydrated && !isLoading && user) {
+      const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
+      const redirectParam = searchParams.get('redirect')
+      const target = redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
+        ? redirectParam
+        : '/'
+
+      if (typeof window !== 'undefined') {
+        window.location.href = target
+      } else {
+        router.replace(target)
+      }
     }
-  }, [isAuthenticated, user, router])
+  }, [mounted, hasHydrated, isLoading, router, user])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isLoading) return
+
     setError('')
 
-    // Set 3-second timeout
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutRef.current = setTimeout(() => {
-        reject(new Error('timeout'))
-      }, 3000)
-    })
-
     try {
-      const result = await Promise.race([
-        login(email, password),
-        timeoutPromise,
-      ])
-
-      // Clear timeout
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      const result = await login(email, password)
 
       if (result.success) {
-        // Get updated user from store
-        const currentUser = useAuthStore.getState().user
-        if (currentUser) {
-          router.push(getDashboardPath(currentUser.role))
-        }
+        // Không redirect thủ công — để useEffect (isAuthenticated) tự xử lý một lần duy nhất
       } else {
         setError(result.error || 'Đăng nhập thất bại')
       }
     } catch (err: unknown) {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      if (err instanceof Error && err.message === 'timeout') {
-        setError('Lỗi kết nối, vui lòng thử lại')
-      } else {
-        setError('Đã có lỗi xảy ra')
-      }
+      setError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra')
       useAuthStore.setState({ isLoading: false })
     }
   }
 
-  // Don't render form if already authenticated
-  if (isAuthenticated && user) return null
+  // Chờ mount trên client để triệt tiêu 100% lỗi hydration mismatch giữa server và client
+  if (!mounted || !hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6"
+           style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
+        <div className="flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 text-sm font-semibold text-gray-600 shadow-lg border border-gray-100">
+          <Loader2 size={18} className="animate-spin text-primary-500" />
+          Đang tải trang đăng nhập...
+        </div>
+      </div>
+    )
+  }
+
+  if (!isLoading && user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6"
+           style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
+        <div className="flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 text-sm font-semibold text-gray-600 shadow-lg border border-gray-100">
+          <Loader2 size={18} className="animate-spin text-primary-500" />
+          Đang chuyển đến màn hình chính...
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden"
@@ -78,17 +95,20 @@ export default function LoginPage() {
       <div className="w-full max-w-[400px] z-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
 
         {/* ===== LOGO ===== */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-[22px] mb-5 shadow-lg"
-               style={{ background: 'linear-gradient(135deg, #3971B8, #2A5A8F)' }}>
-            <span className="text-white text-[28px] font-bold tracking-tight"
-                  style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>H</span>
-          </div>
-          <h1 className="text-[28px] font-bold tracking-tight mb-1"
-              style={{ color: '#343B1B', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-            HOMIES
+        <div className="text-center mb-10 flex flex-col items-center">
+          <Image
+            src="/logo.png"
+            alt="Homies Milk Tea Logo"
+            width={160}
+            height={80}
+            className="h-20 w-auto object-contain mb-4"
+            priority
+          />
+          <h1 className="text-[26px] font-black tracking-tight mb-1"
+              style={{ color: '#343B1B', fontFamily: 'Poppins, system-ui, sans-serif' }}>
+            HOMIES MILK TEA
           </h1>
-          <p className="text-[15px] font-medium" style={{ color: '#9E9E9E' }}>
+          <p className="text-xs font-bold uppercase tracking-widest text-primary-700 bg-primary-50 px-3 py-0.5 rounded-full border border-primary-100/30">
             Quản trị nhân sự thông minh
           </p>
         </div>
@@ -259,48 +279,15 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
         </div>
 
         {/* Footer */}
         <p className="text-center text-sm mt-8 text-gray-400">
-          © 2026 HOMIES. Quản trị nhân sự chuỗi F&B
+          © 2026 Homies Milk Tea. Quản trị nhân sự chuỗi F&B
         </p>
 
-        {/* Quick Login Hint (for demo) */}
-        <div className="mt-6 p-4 rounded-[16px] border border-dashed text-center"
-             style={{ borderColor: '#E4EDCF', backgroundColor: '#F8FAF3' }}>
-          <p className="text-[12px] font-semibold mb-2" style={{ color: '#9AB86E' }}>🧪 Demo — Đăng nhập nhanh</p>
-          <div className="flex flex-wrap gap-2 justify-center">
-            {[
-              { label: 'CEO', email: 'tuan@bobahouse.vn' },
-              { label: 'HR Admin', email: 'yen@bobahouse.vn' },
-              { label: 'Store Mgr', email: 'lan@bobahouse.vn' },
-              { label: 'Shift Lead', email: 'huong@bobahouse.vn' },
-              { label: 'Nhân viên', email: 'binh@bobahouse.vn' },
-            ].map(({ label, email: e }) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => { setEmail(e); setPassword('123456'); setError('') }}
-                className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all border"
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  color: '#3971B8',
-                  borderColor: '#E1EBF6',
-                }}
-                onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLElement).style.backgroundColor = '#E1EBF6'
-                }}
-                onMouseLeave={(e) => {
-                  ;(e.currentTarget as HTMLElement).style.backgroundColor = '#FFFFFF'
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs mt-2 text-gray-400">Mật khẩu: 123456</p>
-        </div>
+
       </div>
     </div>
   )

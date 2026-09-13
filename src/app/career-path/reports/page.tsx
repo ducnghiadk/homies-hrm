@@ -1,18 +1,16 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { initCareerPathStores, getCareerPathReport, getCareerAnalytics } from '@/lib/career-path-service';
-import type { CareerPathReport, CareerAnalytics } from '@/lib/career-path-types';
+import { initCareerPathStores, getCareerPathReport } from '@/lib/career-path-service';
+import type { CareerPathReport } from '@/lib/career-path-types';
 import ProgressBar from '@/components/career-path/ProgressBar';
 
 export default function CareerPathReportsPage() {
-  const [report, setReport] = useState<CareerPathReport | null>(null);
-
-  useEffect(() => {
+  const [report] = useState<CareerPathReport | null>(() => {
     initCareerPathStores();
-    setReport(getCareerPathReport('store-q1', '2026-02'));
-  }, []);
+    return getCareerPathReport('store-q1', '2026-02');
+  });
 
   if (!report) return <div style={{ padding: 20, textAlign: 'center', color: '#888' }}>Đang tải...</div>;
 

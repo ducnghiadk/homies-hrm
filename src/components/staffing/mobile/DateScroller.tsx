@@ -42,7 +42,7 @@ export default function DateScroller({
       <div className="flex items-center justify-between px-4 pt-3 pb-1">
         <button
           onClick={() => onWeekChange('prev')}
-          className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full active:bg-gray-100"
+          className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full active:bg-primary-50"
           aria-label="Tuần trước"
         >
           <ChevronLeft size={18} />
@@ -52,7 +52,7 @@ export default function DateScroller({
         </span>
         <button
           onClick={() => onWeekChange('next')}
-          className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full active:bg-gray-100"
+          className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full active:bg-primary-50"
           aria-label="Tuần sau"
         >
           <ChevronRight size={18} />
@@ -76,7 +76,7 @@ export default function DateScroller({
                 transition-all duration-200 active:scale-95
                 ${sel
                   ? 'bg-primary text-white shadow-md shadow-primary/25'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  : 'text-gray-600 hover:bg-primary-50'
                 }
               `}
             >

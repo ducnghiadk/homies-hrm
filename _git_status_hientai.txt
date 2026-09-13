@@ -1,0 +1,470 @@
+ M AGENTS.md
+ M CLAUDE.md
+ M DESIGN_RULE_HOMIES_FINAL.md
+ D HANDOFF_AI_CODE_NEXT_STEP.md
+ D HANDOFF_REVIEW_FEEDBACK_AI_CODE_ROUND_1.md
+ D HANDOFF_REVIEW_FEEDBACK_AI_CODE_ROUND_2.md
+ D PHAN_VIEC_AI_CODE_PILOT_READY_V1.md
+ M docs/CODEMAP.md
+ M docs/EMAIL_GMAIL_TEST_SETUP.md
+ M docs/KNOWN_ISSUES.md
+A  docs/KPI_PILOT_RESULT.md
+A  docs/KPI_PILOT_RUNBOOK.md
+ M docs/TO_CODE.md
+A  docs/superpowers/plans/2026-08-21-kpi-saas-implementation-plan.md
+ D genesis/v1/00_MANIFEST.md
+ D genesis/v1/01_PRD.md
+ D genesis/v1/02_ARCHITECTURE_OVERVIEW.md
+ D genesis/v1/03_ADR/ADR_001_TECH_STACK.md
+ D genesis/v1/03_ADR/ADR_002_AUTHENTICATION.md
+ D genesis/v1/03_ADR/ADR_003_CHECKIN_STRATEGY.md
+ D genesis/v1/05_TASKS.md
+ D genesis/v1/06_CHANGELOG.md
+ D genesis/v1/concept_model.json
+ D genesis/v2/00_MANIFEST.md
+ D genesis/v2/01_PRD.md
+ D genesis/v2/02_ARCHITECTURE_OVERVIEW.md
+ D genesis/v2/03_ADR/ADR_001_TECH_STACK.md
+ D genesis/v2/03_ADR/ADR_002_AUTH.md
+ D genesis/v2/03_ADR/ADR_002_AUTHENTICATION.md
+ D genesis/v2/03_ADR/ADR_003_CHECKIN_STRATEGY.md
+ D genesis/v2/03_ADR/ADR_003_DATA_OFFLINE.md
+ D genesis/v2/05_TASKS.md
+ D genesis/v2/06_CHANGELOG.md
+ D genesis/v2/07_ORCHESTRATION.md
+ D genesis/v2/concept_model.json
+ D genesis/v3/00_MANIFEST.md
+ D genesis/v3/01_PRD.md
+ D genesis/v3/02_ARCHITECTURE_OVERVIEW.md
+ D genesis/v3/05_TASKS.md
+ D genesis/v3/06_CHANGELOG.md
+ D genesis/v3/08_HANDOFF_SCHEDULING_MINIMAX.md
+ D genesis/v3/concept_model.json
+ M next.config.ts
+ M open-hrm.bat
+ M package-lock.json
+ M package.json
+ M restart-hrm-dev.bat
+ M src/app/api/invitations/send/route.ts
+ M src/app/attendance/overtime/page.tsx
+ M src/app/attendance/page.tsx
+ M src/app/career-path/goals/page.tsx
+ M src/app/career-path/leaderboard/page.tsx
+ M src/app/career-path/notifications/page.tsx
+ M src/app/career-path/page.tsx
+ M src/app/career-path/promotion/page.tsx
+ M src/app/career-path/skills/page.tsx
+ M src/app/checkin/page.tsx
+ M src/app/employees/[id]/page.tsx
+ M src/app/employees/export/page.tsx
+ M src/app/employees/import/page.tsx
+ M src/app/employees/invitations/_components/InvitationDetailModal.tsx
+ M src/app/employees/invitations/_components/InvitationsTable.tsx
+ M src/app/employees/invitations/_components/InvitationsToolbar.tsx
+ M src/app/employees/invitations/new/_components/InvitationFormPanels.tsx
+ M src/app/employees/invitations/new/_components/InvitationSuccessView.tsx
+ M src/app/employees/invitations/new/page.tsx
+ M src/app/employees/invitations/page.tsx
+ M src/app/employees/new/page.tsx
+ M src/app/employees/offboarding/page.tsx
+ M src/app/employees/page.tsx
+ M src/app/globals.css
+ M src/app/inventory/page.tsx
+ M src/app/kpi/evaluate/page.tsx
+ M src/app/kpi/evaluate/trial/page.tsx
+ M src/app/kpi/leaderboard/page.tsx
+ M src/app/kpi/page.tsx
+ M src/app/kpi/promotion/page.tsx
+ M src/app/kpi/reports/page.tsx
+ M src/app/kpi/result/page.tsx
+ M src/app/kpi/review/page.tsx
+ M src/app/kpi/settings/page.tsx
+ M src/app/kpi/violations/appeals/page.tsx
+ M src/app/kpi/violations/log/page.tsx
+ M src/app/kpi/violations/page.tsx
+ M src/app/kpi/violations/store/page.tsx
+ M src/app/layout.tsx
+ M src/app/learning/page.tsx
+ M src/app/leave/page.tsx
+ M src/app/leave/request/page.tsx
+ M src/app/login/page.tsx
+ M src/app/more/page.tsx
+ M src/app/my-schedule/page.tsx
+ M src/app/notifications/page.tsx
+ M src/app/offline-demo/page.tsx
+ M src/app/page.tsx
+ M src/app/payroll/bonus/page.tsx
+ M src/app/payroll/calculate/page.tsx
+ M src/app/payroll/deductions/page.tsx
+ M src/app/payroll/page.tsx
+ M src/app/payroll/salary-slip/page.tsx
+ M src/app/profile/page.tsx
+ D src/app/rbac/page.tsx
+ M src/app/reports/budget/page.tsx
+ M src/app/reports/page.tsx
+ M src/app/requests/page.tsx
+ M src/app/rewards/page.tsx
+ M src/app/schedule/admin/registration/page.tsx
+ M src/app/schedule/admin/review/page.tsx
+ M src/app/schedule/assign/page.tsx
+ M src/app/schedule/by-shift/page.tsx
+ M src/app/schedule/history/page.tsx
+ M src/app/schedule/manage/page.tsx
+ M src/app/schedule/open-shifts/claims/page.tsx
+ M src/app/schedule/open-shifts/page.tsx
+ M src/app/schedule/page.tsx
+ M src/app/schedule/preferences/page.tsx
+ M src/app/schedule/swap/list/page.tsx
+ M src/app/schedule/swap/page.tsx
+ M src/app/schedule/templates/page.tsx
+ M src/app/schedule/warnings/page.tsx
+ M src/app/schedules/page.tsx
+ M src/app/settings/labor-cost/page.tsx
+ M src/app/settings/master-data/page.tsx
+ M src/app/settings/page.tsx
+ M src/app/settings/payroll/page.tsx
+ M src/app/settings/schedule-rules/page.tsx
+ M src/app/settings/schedule-rules/preferences/overview/page.tsx
+ M src/app/settings/schedule-rules/preferences/page.tsx
+ M src/app/settings/schedule-rules/shifts/page.tsx
+ M src/app/settings/staffing/page.tsx
+ M src/app/settings/system/page.tsx
+ M src/app/settings/wifi/page.tsx
+ M src/app/staffing/page.tsx
+ D src/app/verify/page.tsx
+ M src/app/wellness/page.tsx
+ M src/components/auth/ProtectedRoute.tsx
+ M src/components/auth/RoleGuard.tsx
+ M src/components/career-path/ProgressBar.tsx
+ M src/components/career-path/ProgressRing.tsx
+ M src/components/career-path/SkillHexagon.tsx
+ M src/components/checkin/WifiSimulator.tsx
+ M src/components/dashboard/AdminDashboardPremium.tsx
+ M src/components/dashboard/EmployeeDashboardPremium.tsx
+ M src/components/dashboard/ManagerDashboardPremium.tsx
+ M src/components/dashboard/premium/ActionList.tsx
+ M src/components/dashboard/premium/GradientHeader.tsx
+ M src/components/dashboard/premium/QuickActions.tsx
+ M src/components/dashboard/premium/StatCard.tsx
+ M src/components/dashboard/premium/WeekCalendar.tsx
+ M src/components/dashboards/AdminDashboard.tsx
+ M src/components/dashboards/EmployeeDashboard.tsx
+ M src/components/dashboards/ManagerDashboard.tsx
+ M src/components/kpi/AnimatedPodium.tsx
+ M src/components/kpi/AppealDialog.tsx
+ M src/components/kpi/CriteriaRow.tsx
+ M src/components/kpi/EmployeeViolationSummary.tsx
+ M src/components/kpi/GradeRow.tsx
+ M src/components/kpi/LevelRow.tsx
+ M src/components/kpi/PromotionEligibilityCard.tsx
+ M src/components/kpi/ReviewAppealDialog.tsx
+ M src/components/kpi/SmartActionBanner.tsx
+ M src/components/kpi/ViolationCard.tsx
+ M src/components/kpi/ViolationRow.tsx
+ M src/components/layout/AppShell.tsx
+ M src/components/layout/BottomNav.tsx
+ M src/components/layout/Header.tsx
+ M src/components/leave/LeaveQuotaCard.tsx
+ M src/components/leave/LeaveRequestCard.tsx
+ M src/components/leave/LeaveRequestForm.tsx
+ M src/components/leave/LeaveRequestList.tsx
+ M src/components/leave/ReplacementRequestCard.tsx
+ M src/components/notifications/NotificationBell.tsx
+ M src/components/offline/OfflineCheckin.tsx
+ M src/components/offline/OfflineStatusBanner.tsx
+ M src/components/retrospective/ActionableRecommendations.tsx
+ M src/components/scheduling/DragDropScheduleEditor.tsx
+ M src/components/scheduling/PreferenceAnalysisPanel.tsx
+ M src/components/scheduling/ScheduleResultView.tsx
+ M src/components/scheduling/SmartScheduleGenerator.tsx
+ M src/components/scheduling/drag-drop/ChangesSummary.tsx
+ M src/components/scheduling/drag-drop/DaySelector.tsx
+ M src/components/scheduling/drag-drop/DragDropTutorial.tsx
+ M src/components/scheduling/drag-drop/EditorToolbar.tsx
+ M src/components/scheduling/drag-drop/EmployeeRow.tsx
+ M src/components/scheduling/drag-drop/ShiftEditModal.tsx
+ M src/components/scheduling/drag-drop/StaffingLevelBar.tsx
+ M src/components/scheduling/drag-drop/TimelineGrid.tsx
+ M src/components/scheduling/drag-drop/WarningPanel.tsx
+ M src/components/settings/SettingCard.tsx
+ M src/components/settings/SettingCategoryTabs.tsx
+ M src/components/settings/SettingSearch.tsx
+ M src/components/settings/SetupWizardBanner.tsx
+ M src/components/staffing/AdminSettingsModal.tsx
+ M src/components/staffing/FeaturedPlanCard.tsx
+ M src/components/staffing/HeroResultCard.tsx
+ M src/components/staffing/ProgressBar.tsx
+ M src/components/staffing/QuickEstimateFAB.tsx
+ M src/components/staffing/QuickEstimateTab.tsx
+ M src/components/staffing/ScheduleOverviewTab.tsx
+ M src/components/staffing/SettingsOverviewTab.tsx
+ M src/components/staffing/StaffingQuickCalc.tsx
+ M src/components/staffing/TooltipGuide.tsx
+ M src/components/staffing/mobile/DateScroller.tsx
+ M src/components/staffing/mobile/MobileScheduleView.tsx
+ M src/components/staffing/mobile/MobileShiftCard.tsx
+ M src/components/staffing/mobile/MobileWeekOverview.tsx
+ M src/components/staffing/optimization/PlanComparisonTable.tsx
+ M src/components/staffing/optimization/ScheduleDetailModal.tsx
+ M src/components/staffing/optimization/Step1BasicInfo.tsx
+ M src/components/staffing/optimization/Step2Traffic.tsx
+ M src/components/staffing/optimization/Step3Salary.tsx
+ M src/components/staffing/optimization/Step4Results.tsx
+ M src/components/staffing/settings-sections/OptimizationSection.tsx
+ M src/components/staffing/settings-sections/PeakHoursSection.tsx
+ M src/components/staffing/settings-sections/SeasonalSection.tsx
+ M src/components/staffing/settings-sections/StaffingSection.tsx
+ M src/components/staffing/shared/TimeRangeSlider.tsx
+ M src/components/ui/Avatar.tsx
+ M src/components/ui/Badge.tsx
+ M src/components/ui/BottomSheet.tsx
+ M src/components/ui/Button.tsx
+ M src/components/ui/CollapsibleSection.tsx
+ M src/components/ui/ConfirmDialog.tsx
+ M src/components/ui/EditDrawer.tsx
+ M src/components/ui/EmptyState.tsx
+ M src/components/ui/ErrorBoundary.tsx
+ M src/components/ui/ListItem.tsx
+ M src/components/ui/MobileBottomSheet.tsx
+ M src/components/ui/MonthCalendar.tsx
+ M src/components/ui/PageHeader.tsx
+ M src/components/ui/ProgressToast.tsx
+ M src/components/ui/QuickActionGrid.tsx
+ M src/components/ui/SkeletonCard.tsx
+ M src/components/ui/TabBar.tsx
+ M src/lib/component-templates.tsx
+AM src/lib/kpi/default-policy.test.ts
+AM src/lib/kpi/default-policy.ts
+AM src/lib/kpi/types.ts
+ M src/lib/mock-data-attendance.ts
+ M src/lib/mock-data-checkin.ts
+ M src/lib/mock-data-employee-ext.ts
+ M src/lib/mock-data-kpi.ts
+ M src/lib/mock-data-leave.ts
+ M src/lib/mock-data-open-shifts.ts
+ M src/lib/mock-data-payroll.ts
+ M src/lib/mock-data-registration-weeks.ts
+ M src/lib/mock-data-reports.ts
+ M src/lib/mock-data-schedule-rules.ts
+ M src/lib/mock-data-scheduling.ts
+ M src/lib/mock-data-settings.ts
+ M src/lib/mock-data-swap.ts
+ M src/lib/mock-data-wifi.ts
+ M src/lib/mock-data.ts
+ M src/lib/mock-data/settings.ts
+ M src/lib/navigation/sidebar-config.ts
+ M src/lib/payroll-engine.ts
+ M src/lib/rbac.ts
+ M src/lib/services/attendance-service.ts
+ M src/lib/services/contract-service-data.ts
+ M src/lib/services/contract-service.ts
+ M src/lib/services/contract-template-placeholder.ts
+ M src/lib/services/dashboard-service.ts
+ M src/lib/services/employee-excel-service.ts
+ M src/lib/services/employee-service.ts
+ M src/lib/services/onboarding-operations-service.ts
+ M src/lib/services/onboarding-policy-service.ts
+ M src/lib/services/payroll-policy-service.ts
+ M src/lib/services/schedule-email-service.ts
+ M src/lib/services/schedule-service.ts
+ M src/lib/services/shift-template-service.ts
+ M src/lib/theme.ts
+ M src/lib/types/settings.ts
+ M src/proxy.ts
+ M src/store/auth-store.ts
+ D supabase/pilot_ready_v1_schema.sql
+ D supabase/pilot_ready_v1_seed_store_001.sql
+ D supabase/rls-policies.sql
+ D supabase/schema-p2.sql
+ D supabase/schema-p3.sql
+ D supabase/schema-p4.sql
+ D supabase/schema-v2.sql
+ D supabase/schema.sql
+ D supabase/seed-v2.sql
+ D supabase/seed.sql
+ M tsconfig.json
+?? .superpowers/brainstorm/1082-1787628865/
+?? .superpowers/brainstorm/1321-1787628848/
+?? .superpowers/brainstorm/1368-1787323546/
+?? .superpowers/brainstorm/career-grade-20260825/
+?? .superpowers/brainstorm/kpi-flow-review-20260823-01/
+?? .tmp-kpi-inspect/
+?? .tmp-spreadsheet-inspect/
+?? _git_status_hientai.txt
+?? docs/HOMIES_DESIGN_SYSTEM_GOLDEN_RULES.md
+?? docs/HRM_STATUS.md
+?? docs/IDENTITY_SCHEMA.md
+?? docs/KPI_RLS_TEST_MATRIX.md
+?? docs/_history/
+?? docs/superpowers/plans/2026-08-22-kpi-fnb-template-targets-implementation-plan.md
+?? docs/superpowers/plans/2026-08-23-kpi-danh-gia-thang-peer-an-danh-implementation-plan.md
+?? docs/superpowers/plans/2026-08-23-kpi-lo-trinh-chuan-homies-implementation-plan.md
+?? docs/superpowers/plans/2026-08-23-kpi-phat-trien-giai-doan-1-implementation-plan.md
+?? docs/superpowers/plans/2026-08-24-kpi-homies-career-map-drag-drop-implementation-plan.md
+?? docs/superpowers/plans/2026-08-25-kpi-homies-multiskill-career-grade-implementation-plan.md
+?? docs/superpowers/plans/2026-08-26-master-data-career-grade-alignment-plan.md
+?? docs/superpowers/plans/2026-08-28-payroll-payment-ledger-implementation-plan.md
+?? docs/superpowers/reviews/
+?? docs/superpowers/specs/2026-08-22-kpi-fnb-template-targets-design.md
+?? docs/superpowers/specs/2026-08-23-kpi-danh-gia-thang-peer-an-danh-design.md
+?? docs/superpowers/specs/2026-08-23-kpi-phat-trien-nhan-vien-master-design.md
+?? docs/superpowers/specs/2026-08-24-kpi-homies-career-map-drag-drop-design.md
+?? docs/superpowers/specs/2026-08-25-kpi-guided-user-flow-hdsd-design.md
+?? docs/superpowers/specs/2026-08-25-kpi-homies-multiskill-career-grade-design.md
+?? docs/superpowers/specs/2026-08-26-master-data-career-grade-alignment-design.md
+?? docs/superpowers/specs/2026-08-28-payroll-payment-ledger-design.md
+?? src/app/approvals/
+?? src/app/attendance/published-schedule-flow.test.ts
+?? src/app/bsc-bonus/
+?? src/app/kpi/development/
+?? src/app/kpi/periods/
+?? src/app/kpi/settings/migration/
+?? src/app/kpi/violations/settings/
+?? src/app/my-schedule/registration/
+?? src/app/schedule/admin/review/publish-flow.test.ts
+?? src/app/schedule/by-employee/
+?? src/app/settings/bsc/
+?? src/app/settings/organization/
+?? src/app/staffing/workspace/
+?? src/components/approvals/
+?? src/components/bsc-bonus/
+?? src/components/career-path/SkillDetailModal.tsx
+?? src/components/employee-profile/
+?? src/components/employee/
+?? src/components/kpi/KPICategoryTable.tsx
+?? src/components/kpi/KPIDetailModal.tsx
+?? src/components/kpi/KPIExecutiveWidgets.tsx
+?? src/components/kpi/KPIMacroCards.tsx
+?? src/components/kpi/KPITeamTable.tsx
+?? src/components/kpi/builder/
+?? src/components/kpi/career-map/
+?? src/components/kpi/incidents/
+?? src/components/kpi/monthly/
+?? src/components/kpi/periods/
+?? src/components/kpi/program/
+?? src/components/kpi/workspace/
+?? src/components/payroll/
+?? src/components/scheduling/AssignScheduleGrid.tsx
+?? src/components/scheduling/EmployeeScheduleRegistration.tsx
+?? src/components/scheduling/EmployeeSchedulingBoard.tsx
+?? src/components/scheduling/ManagerSchedulingBoard.tsx
+?? src/components/settings/ApprovalWorkflowManager.tsx
+?? src/components/settings/OrganizationGeneralTab.tsx
+?? src/components/settings/VisualOrgChart.tsx
+?? src/components/staffing/StaffingDashboard.tsx
+?? src/components/ui/DataSourceStatusBadge.tsx
+?? src/hooks/useStaffingWorkspace.ts
+?? src/lib/adapters/
+?? src/lib/bsc-engine.ts
+?? src/lib/bsc-types.ts
+?? src/lib/career-path-icon-helper.tsx
+?? src/lib/data/
+?? src/lib/kpi/appeal-service.test.ts
+?? src/lib/kpi/appeal-service.ts
+?? src/lib/kpi/career-grade-catalog.test.ts
+?? src/lib/kpi/career-grade-catalog.ts
+?? src/lib/kpi/career-grade-migration-service.test.ts
+?? src/lib/kpi/career-grade-migration-service.ts
+?? src/lib/kpi/career-grade-placement-service.test.ts
+?? src/lib/kpi/career-grade-placement-service.ts
+?? src/lib/kpi/career-grade-types.ts
+?? src/lib/kpi/career-grade-ui-contract.test.ts
+?? src/lib/kpi/career-map-aggregate-contract.test.ts
+?? src/lib/kpi/career-map-criteria-service.test.ts
+?? src/lib/kpi/career-map-criteria-service.ts
+?? src/lib/kpi/career-map-deployment-service.test.ts
+?? src/lib/kpi/career-map-deployment-service.ts
+?? src/lib/kpi/career-map-service.test.ts
+?? src/lib/kpi/career-map-service.ts
+?? src/lib/kpi/career-map-sql-contract.test.ts
+?? src/lib/kpi/career-map-types.ts
+?? src/lib/kpi/challenge-service.test.ts
+?? src/lib/kpi/challenge-service.ts
+?? src/lib/kpi/configuration-service.test.ts
+?? src/lib/kpi/configuration-service.ts
+?? src/lib/kpi/development-service.test.ts
+?? src/lib/kpi/development-service.ts
+?? src/lib/kpi/evaluation-integrity-service.test.ts
+?? src/lib/kpi/evaluation-integrity-service.ts
+?? src/lib/kpi/evaluation-notification-service.test.ts
+?? src/lib/kpi/evaluation-notification-service.ts
+?? src/lib/kpi/evaluation-service.test.ts
+?? src/lib/kpi/evaluation-service.ts
+?? src/lib/kpi/fnb-template-catalog.test.ts
+?? src/lib/kpi/fnb-template-catalog.ts
+?? src/lib/kpi/incident-service.test.ts
+?? src/lib/kpi/incident-service.ts
+?? src/lib/kpi/index.ts
+?? src/lib/kpi/local-peer-review-repository.test.ts
+?? src/lib/kpi/local-peer-review-repository.ts
+?? src/lib/kpi/local-repository.test.ts
+?? src/lib/kpi/local-repository.ts
+?? src/lib/kpi/migration-service.test.ts
+?? src/lib/kpi/migration-service.ts
+?? src/lib/kpi/monthly-review-integration.test.ts
+?? src/lib/kpi/monthly-review-service.test.ts
+?? src/lib/kpi/monthly-review-service.ts
+?? src/lib/kpi/peer-aggregation-service.test.ts
+?? src/lib/kpi/peer-aggregation-service.ts
+?? src/lib/kpi/peer-assignment-service.test.ts
+?? src/lib/kpi/peer-assignment-service.ts
+?? src/lib/kpi/peer-response-service.test.ts
+?? src/lib/kpi/peer-response-service.ts
+?? src/lib/kpi/peer-review-policy-service.test.ts
+?? src/lib/kpi/peer-review-policy-service.ts
+?? src/lib/kpi/peer-review-repository.ts
+?? src/lib/kpi/period-service.test.ts
+?? src/lib/kpi/period-service.ts
+?? src/lib/kpi/permissions.test.ts
+?? src/lib/kpi/permissions.ts
+?? src/lib/kpi/program-service.test.ts
+?? src/lib/kpi/program-service.ts
+?? src/lib/kpi/report-service.test.ts
+?? src/lib/kpi/report-service.ts
+?? src/lib/kpi/repository.ts
+?? src/lib/kpi/salary-service.test.ts
+?? src/lib/kpi/salary-service.ts
+?? src/lib/kpi/scoring-engine.test.ts
+?? src/lib/kpi/scoring-engine.ts
+?? src/lib/kpi/seed.ts
+?? src/lib/kpi/source-service.test.ts
+?? src/lib/kpi/source-service.ts
+?? src/lib/kpi/supabase-peer-review-repository.test.ts
+?? src/lib/kpi/supabase-peer-review-repository.ts
+?? src/lib/kpi/supabase-repository.test.ts
+?? src/lib/kpi/supabase-repository.ts
+?? src/lib/kpi/target-policy-service.test.ts
+?? src/lib/kpi/target-policy-service.ts
+?? src/lib/kpi/test-service.test.ts
+?? src/lib/kpi/test-service.ts
+?? src/lib/mock-data-bsc.ts
+?? src/lib/mock-data/approvals.ts
+?? src/lib/mock-data/attendance.ts
+?? src/lib/mock-data/index.ts
+?? src/lib/navigation/sidebar-config.test.ts
+?? src/lib/payroll-payment-ledger-sql-contract.test.ts
+?? src/lib/payroll-payment-ledger.test.ts
+?? src/lib/payroll-payment-ledger.ts
+?? src/lib/services/attendance/
+?? src/lib/services/dashboard/
+?? src/lib/services/employees/
+?? src/lib/services/index.ts
+?? src/lib/services/onboarding/
+?? src/lib/services/payroll/
+?? src/lib/services/scheduling/
+?? src/proxy-access.test.ts
+?? supabase/_archive/
+?? supabase/_audit/
+?? supabase/clear_nhan_vien.sql
+?? supabase/delete_regular_staff_only.sql
+?? supabase/migrations/
+?? supabase/rls_v3_policies.sql
+?? supabase/schema_v3_master_fixed.sql
+?? supabase/schema_v4_schedule_rules.sql
+?? supabase/seed_kpi_career_map_demo.sql
+?? supabase/seed_kpi_monthly_peer_review_demo.sql
+?? supabase/seed_kpi_saas_pilot.sql
+?? supabase/seed_nhan_vien.sql
+?? supabase/seed_pilot_operations_bsc.sql
+?? supabase/seed_v3_clean.sql
+?? supabase/seed_v3_master.sql

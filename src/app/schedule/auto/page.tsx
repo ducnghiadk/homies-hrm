@@ -1,17 +1,41 @@
 'use client'
 
+import { useAuthStore } from '@/store/auth-store'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import { mockAutoScheduleOutput, mockWorkLocations } from '@/lib/mock-data-scheduling'
 import { Cpu, MapPin, CheckCircle, RefreshCw, AlertTriangle } from 'lucide-react'
 
 export default function AutoSchedulePage() {
+  const { user, isAuthenticated } = useAuthStore()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/login')
+    }
+  }, [isAuthenticated, router])
+
+  if (!user) return null
+
+  if (user.role === 'employee') {
+    return (
+      <AppShell title="Xếp ca tự động">
+        <div className="py-20 text-center" style={{ color: 'var(--text-muted)' }}>
+          Không có quyền
+        </div>
+      </AppShell>
+    )
+  }
+
   const totalCoverage = Math.round(mockAutoScheduleOutput.reduce((s, o) => s + o.coverage, 0) / mockAutoScheduleOutput.length)
   const totalWarnings = mockAutoScheduleOutput.reduce((s, o) => s + o.warnings.length, 0)
 
   return (
     <AppShell title="Xếp ca tự động">
       <div className="space-y-4">
-        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}>
+        <div className="card animate-fade-in" style={{ background: 'linear-gradient(135deg, #6366f1, #001D3D)', color: '#fff' }}>
           <div className="flex items-center gap-2">
             <Cpu size={20} />
             <div>
@@ -48,10 +72,10 @@ export default function AutoSchedulePage() {
                 </div>
               </div>
               <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
-                background: s.coverage === 100 ? '#10b98120' : '#f59e0b20',
-                color: s.coverage === 100 ? '#10b981' : '#f59e0b',
+                background: s.coverage === 100 ? '#1E9E5720' : '#F6C85F20',
+                color: s.coverage === 100 ? '#1E9E57' : '#F6C85F',
               }}>{s.coverage}%</span>
-              {s.warnings.length > 0 && <AlertTriangle size={12} className="text-amber-500" />}
+              {s.warnings.length > 0 && <AlertTriangle size={12} className="text-warning-500" />}
             </div>
           ))}
         </div>
@@ -65,7 +89,7 @@ export default function AutoSchedulePage() {
                 <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{loc.name}</div>
                 <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{loc.address}</div>
               </div>
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: loc.is_active ? '#10b98120' : '#ef444420', color: loc.is_active ? '#10b981' : '#ef4444' }}>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: loc.is_active ? '#1E9E5720' : '#D9381E20', color: loc.is_active ? '#1E9E57' : '#D9381E' }}>
                 {loc.is_active ? 'Active' : 'Inactive'}
               </span>
             </div>

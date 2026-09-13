@@ -15,7 +15,7 @@ export default function MyPositionCard({ rank, total, score, gapToTop3, prevRank
 
   return (
     <div className="card-elevated p-4 text-center animate-fade-in" style={{
-      background: rank <= 3 ? 'linear-gradient(135deg, #fef9c3, #fef3c7)' : undefined,
+      background: rank <= 3 ? 'linear-gradient(135deg, #fef9c3, #FFF8E8)' : undefined,
     }}>
       <div className="text-[10px] font-bold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
         📍 Vị trí của bạn
@@ -34,8 +34,8 @@ export default function MyPositionCard({ rank, total, score, gapToTop3, prevRank
 
       <div className="flex items-center justify-center gap-4 text-[11px]">
         <span>Điểm: <b>{score}</b></span>
-        {rank > 3 && <span>Cách Top 3: <b style={{ color: '#f59e0b' }}>{gapToTop3} điểm</b></span>}
-        {rank <= 3 && <span style={{ color: '#10b981' }}>🏆 Top 3!</span>}
+        {rank > 3 && <span>Cách Top 3: <b style={{ color: '#F6C85F' }}>{gapToTop3} điểm</b></span>}
+        {rank <= 3 && <span style={{ color: '#1E9E57' }}>🏆 Top 3!</span>}
       </div>
 
       {prevRank !== undefined && rankChange !== 0 && (

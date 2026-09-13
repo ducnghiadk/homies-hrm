@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import CriteriaInput from './CriteriaInput'
 import EvaluationScorePreview from './EvaluationScorePreview'
-import { mockKPICategories, mockKPICriteria, getViolationSummary } from '@/lib/mock-data-kpi'
+import { mockKPICategories, mockKPICriteria } from '@/lib/mock-data-kpi'
 import { calculateCategoryScore, determineGrade } from '@/lib/kpi-evaluation-service'
 import type { EvaluationScore, CategoryScore, KPIOptionType } from '@/lib/kpi-types'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -24,37 +24,41 @@ interface Props {
 }
 
 export default function SelfEvaluationForm({
-  optionType, employeeId, period, existingScores, violationScore, onSubmit, onCancel,
+  optionType, existingScores, violationScore, onSubmit, onCancel,
   draftKey, onAutoSave,
 }: Props) {
   const categories = mockKPICategories.filter(c => c.option_type === optionType && c.is_active)
   const criteria = mockKPICriteria.filter(c => c.is_active)
   const restoredRef = useRef(false)
+  const restoredDraft = useMemo(() => {
+    if (!draftKey || typeof window === 'undefined') return null
+    try {
+      const saved = localStorage.getItem(draftKey)
+      return saved ? JSON.parse(saved) as { scores: Record<string, number>; comment: string } : null
+    } catch {
+      return null
+    }
+  }, [draftKey])
 
   const [scores, setScores] = useState<Record<string, number>>(() => {
+    if (restoredDraft?.scores && Object.keys(restoredDraft.scores).length > 0) {
+      return restoredDraft.scores
+    }
     const init: Record<string, number> = {}
     existingScores?.forEach(s => { init[s.criteria_id] = s.final_score })
     return init
   })
-  const [comment, setComment] = useState('')
+  const [comment, setComment] = useState(() => restoredDraft?.comment || '')
   const [showConfirm, setShowConfirm] = useState(false)
 
   // Restore draft from localStorage on mount
   useEffect(() => {
-    if (!draftKey || restoredRef.current) return
+    if (!restoredDraft || restoredRef.current) return
     restoredRef.current = true
-    try {
-      const saved = localStorage.getItem(draftKey)
-      if (saved) {
-        const parsed = JSON.parse(saved) as { scores: Record<string, number>; comment: string }
-        if (parsed.scores && Object.keys(parsed.scores).length > 0) {
-          setScores(parsed.scores)
-          if (parsed.comment) setComment(parsed.comment)
-          toast.info('📝 Đã khôi phục bản nháp từ phiên trước')
-        }
-      }
-    } catch { /* ignore parse errors */ }
-  }, [draftKey])
+    if (restoredDraft.scores && Object.keys(restoredDraft.scores).length > 0) {
+      toast.info('📝 Đã khôi phục bản nháp từ phiên trước')
+    }
+  }, [restoredDraft])
 
   // Auto-save to localStorage with 2s debounce
   useEffect(() => {
@@ -150,7 +154,7 @@ export default function SelfEvaluationForm({
               {cat.type === 'deduction' ? (
                 <div className="py-2 text-center">
                   <span className="text-2xl font-black" style={{
-                    color: violationScore >= 80 ? '#10b981' : violationScore >= 60 ? '#f59e0b' : '#ef4444',
+                    color: violationScore >= 80 ? '#1E9E57' : violationScore >= 60 ? '#F6C85F' : '#D9381E',
                   }}>
                     {violationScore}/100
                   </span>
