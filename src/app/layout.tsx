@@ -5,7 +5,6 @@ import "@xyflow/react/dist/style.css"
 import { Toaster } from "sonner"
 import { HermesErrorBoundary } from "@/components/telemetry/HermesErrorBoundary"
 import { TelemetryClientInit } from "@/components/telemetry/TelemetryClientInit"
-import { DevCockpitWrapper } from "@/components/dev/DevCockpitWrapper"
 import { HermesWidgetsWrapper } from "@/components/hermes/HermesWidgetsWrapper"
 
 const inter = Inter({
@@ -46,7 +45,6 @@ export default function RootLayout({
         <HermesErrorBoundary>
           {children}
         </HermesErrorBoundary>
-        <DevCockpitWrapper />
         <HermesWidgetsWrapper />
         <Toaster richColors position="top-right" />
       </body>

@@ -65,10 +65,10 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - File chinh: `src/app/settings/schedule-rules/**/*`, `src/app/settings/staffing/page.tsx`, `src/lib/adapters/staffing-adapter.ts`, `src/components/staffing/*`, `src/lib/staffing/*`, `src/lib/mock-data-settings.ts`
 - Dung khi: sua dinh muc ca, nhu cau tuan, cong cu tinh nhan su
 
-### CÃ i Ä‘áº·t vÃ  Danh má»¥c chuáº©n SaaS
+### Cài đặt và Danh mục chuẩn SaaS
 - Mo ta: he thong cai dat duoc gom thanh 5 nhom SaaS chuyen nghiep (Doanh nghiep, Danh muc nhan su, Luong & Phu cap, Phan ca & Cham cong, He thong & Phan quyen).
-- File chinh: `src/app/settings/page.tsx`, `src/app/settings/organization/page.tsx`, `src/components/settings/OrganizationGeneralTab.tsx`, `src/app/settings/master-data/page.tsx`, `src/components/settings/VisualOrgChart.tsx`, `src/lib/adapters/master-data-adapter.ts`, `src/app/settings/payroll/page.tsx`, `src/app/settings/schedule-rules/page.tsx`, `src/app/settings/schedule-rules/shifts/page.tsx`, `src/app/settings/schedule-rules/preferences/page.tsx`, `src/app/settings/staffing/page.tsx`, `src/app/settings/wifi/page.tsx`, `src/app/settings/permissions/page.tsx`, `src/app/settings/system/page.tsx`, `src/lib/navigation/sidebar-config.ts`, `src/lib/mock-data/settings.ts`
-- Dung khi: sua thong tin chuoi, chi nhanh GPS, danh muc nhan su, so do cay to chuc (Visual Org Chart), luu tru va dong bo Supabase/LocalStorage master data, khung luong & OT, quy tac phan ca, WiFi check-in, RBAC phan quyen.
+- File chinh: `src/app/settings/page.tsx`, `src/app/settings/hermes/page.tsx`, `src/app/settings/organization/page.tsx`, `src/components/settings/OrganizationGeneralTab.tsx`, `src/app/settings/master-data/page.tsx`, `src/components/settings/VisualOrgChart.tsx`, `src/lib/adapters/master-data-adapter.ts`, `src/app/settings/payroll/page.tsx`, `src/app/settings/schedule-rules/page.tsx`, `src/app/settings/schedule-rules/shifts/page.tsx`, `src/app/settings/schedule-rules/preferences/page.tsx`, `src/app/settings/staffing/page.tsx`, `src/app/settings/wifi/page.tsx`, `src/app/settings/permissions/page.tsx`, `src/app/settings/system/page.tsx`, `src/lib/navigation/sidebar-config.ts`, `src/lib/mock-data/settings.ts`, `src/lib/hermes/hermes-config-service.ts`, `src/components/admin/AdminCopilotDrawer.tsx`, `src/components/telemetry/SmartBugReporter.tsx`
+- Dung khi: sua thong tin chuoi, chi nhanh GPS, danh muc nhan su, so do cay to chuc (Visual Org Chart), luu tru va dong bo Supabase/LocalStorage master data, khung luong & OT, quy tac phan ca, WiFi check-in, RBAC phan quyen, cau hinh Hermes Copilot & Webhook.
 
 # CODEMAP
 

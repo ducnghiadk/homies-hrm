@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore, getRoleLabel, getRoleColor } from '@/store/auth-store'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
-import { LogOut, ChevronDown, Menu } from 'lucide-react'
+import { LogOut, ChevronDown, Menu, Bot } from 'lucide-react'
 import Link from 'next/link'
 import MobileBottomSheet from '@/components/ui/MobileBottomSheet'
 import Image from 'next/image'
@@ -105,6 +105,21 @@ export default function Header() {
           {/* User Profile Navigation Bar & Switcher */}
           <div className="flex items-center gap-3 sm:gap-4">
             <DataSourceStatusBadge />
+
+            {/* Nút Trợ lý Hermes trên Header (Chuẩn Apple SaaS) */}
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('open-hermes-copilot'));
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/90 hover:bg-blue-100 text-[#2F6FA8] border border-[#2F6FA8]/25 transition-all text-xs font-bold active:scale-95 shadow-2xs"
+              title="Mở Trợ lý Hermes (Soát lỗi & Cố vấn vận hành)"
+            >
+              <Bot size={15} className="text-[#2F6FA8]" />
+              <span className="hidden sm:inline">Trợ lý Hermes</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            </button>
 
             <NotificationBell
               notifications={notifications}

@@ -91,6 +91,12 @@ export const settingItems: SettingItem[] = [
 
   // === 5. HỆ THỐNG & PHÂN QUYỀN ===
   {
+    id: 'hermes-ai', category: 'system', icon: '🤖', iconBg: 'bg-primary-100',
+    title: 'Cấu hình Trợ lý AI & Bot Hermes', description: 'Cắm kết nối Hermes Gateway/Webhook, API Key, chọn Bot chuyên gia và tùy chỉnh não bộ AI',
+    href: '/settings/hermes', status: 'completed', statusText: 'Multi-Bot • Sẵn sàng',
+    isRequired: false, setupOrder: 6.8,
+  },
+  {
     id: 'permissions', category: 'system', icon: '🔐', iconBg: 'bg-error-100',
     title: 'Phân quyền & Bảo mật (RBAC)', description: 'Vai trò, phân quyền theo chi nhánh, quyền duyệt đơn',
     href: '/settings/permissions', status: 'completed', statusText: '6 vai trò hệ thống',
