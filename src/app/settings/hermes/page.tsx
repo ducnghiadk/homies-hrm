@@ -372,18 +372,78 @@ export default function HermesSettingsPage() {
                 </select>
               </div>
 
-              {/* Tên Model */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                  Tên Mô hình (Model Name)
-                </label>
-                <input
-                  type="text"
-                  value={config.model}
-                  onChange={(e) => setConfig({ ...config, model: e.target.value })}
-                  placeholder="nousresearch/hermes-3-llama-3.1-8b"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none focus:border-[#2F6FA8]"
-                />
+              {/* Tên Model với Dropdown gợi ý cho 9router / OpenAI / Gemini */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-gray-700">
+                    Tên Mô hình (Model Name)
+                  </label>
+                  <span className="text-[11px] text-gray-400">Hỗ trợ 9router • Gemini • GPT</span>
+                </div>
+
+                {/* Dropdown chọn nhanh */}
+                <select
+                  value={
+                    [
+                      'google/gemini-2.5-flash',
+                      'google/gemini-1.5-pro',
+                      'gemini-2.0-flash',
+                      'gemini-1.5-flash',
+                      'openai/gpt-4o-mini',
+                      'openai/gpt-4o',
+                      'gpt-4o-mini',
+                      'gpt-4o',
+                      'nousresearch/hermes-3-llama-3.1-8b',
+                      'nousresearch/hermes-3-llama-3.1-70b',
+                      'anthropic/claude-3-5-sonnet',
+                    ].includes(config.model)
+                      ? config.model
+                      : 'custom'
+                  }
+                  onChange={(e) => {
+                    if (e.target.value !== 'custom') {
+                      setConfig({ ...config, model: e.target.value });
+                    }
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-medium text-gray-800 bg-white focus:outline-none focus:border-[#2F6FA8]"
+                >
+                  <optgroup label="✨ Google Gemini (9router)">
+                    <option value="google/gemini-2.5-flash">google/gemini-2.5-flash (Gemini 2.5 Flash - Nhanh &amp; Rẻ)</option>
+                    <option value="google/gemini-1.5-pro">google/gemini-1.5-pro (Gemini 1.5 Pro - Suy luận sâu)</option>
+                    <option value="gemini-2.0-flash">gemini-2.0-flash (Gemini 2.0 Flash)</option>
+                    <option value="gemini-1.5-flash">gemini-1.5-flash (Gemini 1.5 Flash)</option>
+                  </optgroup>
+                  <optgroup label="⚡ OpenAI GPT (9router)">
+                    <option value="openai/gpt-4o-mini">openai/gpt-4o-mini (GPT-4o Mini - Khuyên dùng)</option>
+                    <option value="openai/gpt-4o">openai/gpt-4o (GPT-4o Đỉnh cao)</option>
+                    <option value="gpt-4o-mini">gpt-4o-mini (Chuẩn OpenAI)</option>
+                    <option value="gpt-4o">gpt-4o (Chuẩn OpenAI)</option>
+                  </optgroup>
+                  <optgroup label="🤖 Hermes 3 (Nous Research)">
+                    <option value="nousresearch/hermes-3-llama-3.1-8b">nousresearch/hermes-3-llama-3.1-8b (Hermes 3)</option>
+                    <option value="nousresearch/hermes-3-llama-3.1-70b">nousresearch/hermes-3-llama-3.1-70b (Hermes 3 70B)</option>
+                  </optgroup>
+                  <optgroup label="🎭 Anthropic Claude">
+                    <option value="anthropic/claude-3-5-sonnet">anthropic/claude-3-5-sonnet (Claude 3.5 Sonnet)</option>
+                  </optgroup>
+                  <optgroup label="✏️ Tùy chỉnh khác">
+                    <option value="custom">Tự gõ mô hình khác...</option>
+                  </optgroup>
+                </select>
+
+                {/* Ô input tự gõ hoặc tinh chỉnh */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={config.model}
+                    onChange={(e) => setConfig({ ...config, model: e.target.value })}
+                    placeholder="Nhập mã mô hình, ví dụ: google/gemini-2.5-flash hoặc openai/gpt-4o-mini"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs font-mono text-gray-800 focus:outline-none focus:border-[#2F6FA8]"
+                  />
+                  <span className="absolute right-3 top-2.5 text-[10px] text-gray-400 pointer-events-none">
+                    Mã gửi đi
+                  </span>
+                </div>
               </div>
 
               {/* Webhook / Base URL */}
