@@ -491,7 +491,7 @@ export async function POST(req: Request) {
 ```
 
 ### 4.2. Admin Copilot Endpoint (`/api/hermes/copilot/route.ts`)
-*Kiểm tra quyền hạn Admin (RBAC), nạp 5 lỗi gần nhất làm context, duy trì hội thoại và lưu session.*
+*Kiểm tra quyền hạn Admin (RBAC), nạp 5 lỗi gần nhất làm context, điều phối persona theo `bot_id` ('auto' | 'tech' | 'inventory' | 'hr'), duy trì hội thoại và lưu session.*
 
 ```typescript
 import { NextResponse } from 'next/server';
@@ -504,7 +504,7 @@ const ALLOWED_ADMIN_ROLES = ['hr_admin', 'admin', 'ceo', 'store_manager', 'area_
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { message, history, user_role, user_id } = body;
+    const { message, history, user_role, user_id, bot_id = 'auto' } = body;
 
     if (!user_role || !ALLOWED_ADMIN_ROLES.includes(user_role)) {
       return NextResponse.json({ error: 'Forbidden: Bạn không có quyền truy cập Hermes Copilot' }, { status: 403 });
@@ -532,24 +532,42 @@ export async function POST(req: Request) {
       }
     }
 
-    let reply = `Chào Quản lý! Hermes đã kiểm tra trạng thái hệ thống:\n\n**Các sự cố ghi nhận gần đây:**\n${errorContext}\n\nHermes sẵn sàng hỗ trợ rà soát logic hoặc kiểm tra báo cáo!`;
     const q = trimmedMsg.toLowerCase();
-    if (q.includes('lỗi') || q.includes('sự cố') || q.includes('log')) {
-      reply = `Hiện tại hệ thống đang theo dõi các mẫu lỗi sau:\n\n${errorContext}`;
+    let reply = '';
+    let answeredBy = bot_id;
+
+    if (bot_id === 'auto') {
+      if (q.includes('lỗi') || q.includes('sự cố') || q.includes('status') || q.includes('log') || q.includes('crash')) {
+        answeredBy = 'tech';
+      } else if (q.includes('kho') || q.includes('btp') || q.includes('nvl') || q.includes('công thức')) {
+        answeredBy = 'inventory';
+      } else if (q.includes('lương') || q.includes('nhân sự') || q.includes('ca làm') || q.includes('kpi')) {
+        answeredBy = 'hr';
+      }
+    }
+
+    if (answeredBy === 'tech') {
+      reply = `[🛠️ Bác sĩ Kỹ thuật Hermes]\nTôi đã kiểm tra dữ liệu Telemetry Logs:\n\n${errorContext}\n\n💡 Kiểm tra breadcrumb trong Dev Cockpit để xem request chi tiết.`;
+    } else if (answeredBy === 'inventory') {
+      reply = `[📦 Chuyên gia Kho & BTP Hermes]\nQuy trình BTP áp dụng: Pre-grouping NVL, tính hao hụt tự động và ghi nhận phiên kiểm kê atomic.`;
+    } else if (answeredBy === 'hr') {
+      reply = `[👥 Trợ lý Nhân sự & KPI Hermes]\nQuy chế ca làm, điểm Gamification và xử lý khiếu nại KPI được ghi nhận theo đúng quy chuẩn.`;
+    } else {
+      reply = `[⚡ Hermes Router]\nXin chào Quản lý! Hệ thống Telemetry, Kho BTP và Nhân sự đang hoạt động ổn định.`;
     }
 
     if (supabaseClient && user_id) {
       try {
         const sessionMessages = Array.isArray(history)
-          ? [...history, { role: 'assistant', text: reply }]
-          : [{ role: 'user', text: trimmedMsg }, { role: 'assistant', text: reply }];
+          ? [...history, { role: 'assistant', text: reply, bot_id: answeredBy }]
+          : [{ role: 'user', text: trimmedMsg }, { role: 'assistant', text: reply, bot_id: answeredBy }];
         await supabaseClient.from('copilot_chat_sessions').insert({ admin_id: user_id, messages: sessionMessages });
       } catch (e) {
         console.warn('Session save skipped:', e);
       }
     }
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({ reply, answeredBy });
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Unknown error' }, { status: 500 });
   }
