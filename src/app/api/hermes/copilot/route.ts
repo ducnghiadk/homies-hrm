@@ -112,7 +112,8 @@ export async function POST(req: Request) {
     }
 
     // 6. Best-effort log session to copilot_chat_sessions table
-    if (supabaseClient && user_id) {
+    const isValidUuid = typeof user_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id);
+    if (supabaseClient && isValidUuid) {
       try {
         const sessionMessages = Array.isArray(history)
           ? [...history, { role: 'assistant', text: reply, bot_id: answeredBy }]
