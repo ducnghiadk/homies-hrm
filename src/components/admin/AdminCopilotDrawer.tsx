@@ -135,9 +135,9 @@ export function AdminCopilotDrawer() {
         </button>
       )}
 
-      {/* KHUNG Ô CHAT HERMES (CHUẨN MINIMALIST NHƯ CHATGPT / MESSAGES) */}
+      {/* KHUNG Ô CHAT HERMES DẠNG HỘP NỔI COMPACT (CHUẨN CHAT WIDGET APPLE / INTERCOM) */}
       {isOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-white text-gray-900 shadow-2xl border-l border-gray-200 flex flex-col font-sans animate-in slide-in-from-right duration-200">
+        <div className="fixed bottom-6 right-6 z-50 w-[92vw] sm:w-[400px] h-[540px] max-h-[82vh] bg-white text-gray-900 shadow-2xl border border-gray-200/90 rounded-2xl flex flex-col font-sans animate-in fade-in slide-in-from-bottom-4 duration-200 overflow-hidden">
           {/* 1. Header Tối Giản */}
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-white">
             <div className="flex items-center gap-3">
@@ -224,7 +224,7 @@ export function AdminCopilotDrawer() {
           </div>
 
           {/* 3. Gợi Ý Soát Nhanh (Thanh lịch ngay trên ô nhập) */}
-          <div className="px-3 py-1.5 bg-white border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[11px]">
+          <div className="px-3 py-1.5 bg-white border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden text-[11px]">
             <button
               onClick={() => handleSendPrompt('Kiểm tra logic tính lương')}
               disabled={loading}
