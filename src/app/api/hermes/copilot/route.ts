@@ -14,7 +14,7 @@ interface HistoryMessage {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { message, history, user_role, user_id } = body;
+    const { message, history, user_role, user_id, bot_id = 'auto' } = body;
 
     // 1. Role Guard
     if (!user_role || !ALLOWED_ADMIN_ROLES.includes(user_role)) {
@@ -63,29 +63,60 @@ export async function POST(req: Request) {
         .slice(-5)
         .map((h) => `${h.role === 'user' ? 'Admin' : 'Hermes'}: ${h.text}`)
         .join('\n');
-      conversationContext = `\n\n**Lịch sử đối thoại trước đó:**\n${recentHistory}`;
+      conversationContext = `\n\n**Lịch sử đối thoại:**\n${recentHistory}`;
     }
 
-    // 5. Build intelligent response
+    // 5. Build intelligent persona response based on bot_id & query
     const q = trimmedMsg.toLowerCase();
-    let reply = `Chào Quản lý (${user_role})! Hermes đã kiểm tra trạng thái hệ thống:\n\n**Các sự cố ghi nhận gần đây:**\n${errorContext}\n\nHermes sẵn sàng hỗ trợ rà soát logic hoặc kiểm tra các báo cáo sự cố!`;
+    let reply = '';
+    let answeredBy = bot_id;
 
-    if (q.includes('lỗi') || q.includes('sự cố') || q.includes('status') || q.includes('log')) {
-      reply = `Hiện tại hệ thống đang theo dõi các mẫu lỗi sau:\n\n${errorContext}\n\nBạn có muốn Hermes phân tích chi tiết lỗi nào không?`;
-    } else if (q.includes('kiểm kho') || q.includes('btp') || q.includes('nvl') || q.includes('formula')) {
-      reply = `Quy trình kiểm kho và BTP tuân theo cơ chế: pre-grouping NVL, tính lượng hao hụt tự động và ghi nhận phiên kiểm kho dạng atomic transaction. Nếu có dữ liệu lệch, vui lòng kiểm tra tab Lịch sử phiên kiểm kho.`;
-    } else if (q.includes('nhân sự') || q.includes('chấm công') || q.includes('kpi') || q.includes('gamification')) {
-      reply = `Mô-đun nhân sự đang hoạt động bình thường. Dữ liệu ca làm, điểm thưởng và thăng hạng nhân viên được đồng bộ tự động theo chu kỳ.`;
-    } else if (conversationContext) {
-      reply = `Hermes đã ghi nhận yêu cầu: "${trimmedMsg}". Dựa trên bối cảnh vận hành hiện tại, hệ thống ổn định và không có xung đột nghiêm trọng nào được phát hiện.`;
+    // Auto router intent detection if bot_id is 'auto'
+    if (bot_id === 'auto') {
+      if (q.includes('lỗi') || q.includes('sự cố') || q.includes('status') || q.includes('log') || q.includes('crash') || q.includes('500')) {
+        answeredBy = 'tech';
+      } else if (q.includes('kho') || q.includes('btp') || q.includes('nvl') || q.includes('công thức') || q.includes('hao hụt') || q.includes('kiểm kê')) {
+        answeredBy = 'inventory';
+      } else if (q.includes('lương') || q.includes('nhân sự') || q.includes('ca làm') || q.includes('kpi') || q.includes('chấm công') || q.includes('thưởng') || q.includes('phạt')) {
+        answeredBy = 'hr';
+      }
+    }
+
+    if (answeredBy === 'tech') {
+      reply = `[🛠️ Bác sĩ Kỹ thuật Hermes]\n` +
+        `Tôi đã kiểm tra dữ liệu Telemetry Logs mới nhất của hệ thống:\n\n` +
+        `**Chi tiết các mẫu sự cố ghi nhận:**\n${errorContext}\n\n` +
+        `💡 *Khuyến nghị chẩn đoán:* Nếu gặp sự cố trắng trang hoặc lỗi mạng cục bộ, bạn có thể kiểm tra danh sách breadcrumb trong Dev Cockpit hoặc tab Network DevTools để phân tích chi tiết request.`;
+    } else if (answeredBy === 'inventory') {
+      reply = `[📦 Chuyên gia Kho & BTP Hermes]\n` +
+        `Về quy trình kiểm kho và BTP trà sữa:\n\n` +
+        `- **Cơ chế Pre-Grouping NVL:** Nhóm trước các nguyên vật liệu trùng mã để tránh lỗi công thức formula-poisoning.\n` +
+        `- **Tính lượng hao hụt tự động:** So sánh giữa số tồn lý thuyết trên đơn bán và số thực tế đếm tại quầy.\n` +
+        `- **Giao dịch Atomic:** Phiên kiểm kho được khóa dữ liệu snapshot khi chốt, tránh tình trạng 2 ca cùng sửa làm sai lệch tồn kho.\n\n` +
+        `Bạn có cần rà soát lại phiên kiểm kho của chi nhánh cụ thể nào không?`;
+    } else if (answeredBy === 'hr') {
+      reply = `[👥 Trợ lý Nhân sự & KPI Hermes]\n` +
+        `Về vận hành nhân sự và chấm công:\n\n` +
+        `- **Quy chế Ca làm:** Nhân viên cần điểm danh trước giờ vào ca tối thiểu 5 phút qua vị trí GPS hoặc Wifi cửa hàng.\n` +
+        `- **Đánh giá KPI & Điểm thưởng:** Điểm Gamification được cộng tự động sau mỗi ca hoàn thành đúng checklist và không có khiếu nại.\n` +
+        `- **Giải quyết khiếu nại:** Khiếu nại trừ điểm KPI được gửi trực tiếp tới Cửa hàng trưởng/HR Admin xét duyệt trong vòng 24h.\n\n` +
+        `Bạn muốn tra cứu thêm về thang lương hay quy trình thăng hạng nhân viên?`;
+    } else {
+      reply = `[⚡ Hermes Router - Điều phối Hệ thống]\n` +
+        `Xin chào Quản lý (${user_role})! Hệ thống Hermes đang hoạt động ổn định.\n\n` +
+        `**Tóm tắt trạng thái:**\n` +
+        `- Telemetry: Đang theo dõi và gom nhóm lỗi tự động\n` +
+        `- BTP & Kho: Dữ liệu kiểm kê đồng bộ theo ca\n` +
+        `- Nhân sự & KPI: Hệ thống tính điểm vận hành bình thường\n\n` +
+        `Bạn có thể bấm chọn Tab chuyên gia tương ứng ở trên để tra cứu sâu hơn!`;
     }
 
     // 6. Best-effort log session to copilot_chat_sessions table
     if (supabaseClient && user_id) {
       try {
         const sessionMessages = Array.isArray(history)
-          ? [...history, { role: 'assistant', text: reply }]
-          : [{ role: 'user', text: trimmedMsg }, { role: 'assistant', text: reply }];
+          ? [...history, { role: 'assistant', text: reply, bot_id: answeredBy }]
+          : [{ role: 'user', text: trimmedMsg }, { role: 'assistant', text: reply, bot_id: answeredBy }];
 
         await supabaseClient.from('copilot_chat_sessions').insert({
           admin_id: user_id,
@@ -96,7 +127,7 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({ reply, answeredBy });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
