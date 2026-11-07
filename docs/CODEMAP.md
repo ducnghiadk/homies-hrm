@@ -1,4 +1,4 @@
-﻿# CODEMAP
+# CODEMAP
 
 Muc tieu: vao dung diem sua, giam doc full file, giam token.
 
@@ -73,7 +73,7 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `scripts/test_ipos_cloud_worker.mjs`: bo kiem thu tu dong Backend Worker dong bo ngam iPOS Private Cloud.
   + `scripts/test_ipos_schema_detector.mjs`: bo kiem thu tu dong Bo doi soat schema va ap dung de xuat 1-cham.
   + `extensions/homies-ipos-bridge/`: tien ich Chrome Manifest V3 tu dong bat goi tin ngam tu hrm.ipos.vn / fabi.ipos.vn (manifest.json, injected-hook.js, content.js, popup.html/js/css, icons, HUONG_DAN_CAI_DAT.md).
-  + `src/app/bsc-bonus/page.tsx`: man hinh Bao cao diem & Phe duyet thuong BSC chuoi Homies, phan quyen ro ret giua CEO va Quan ly; tich hop bang phan bo thuong nhan vien realtime dua theo gio cong (>=110h), he so cap bac (QL 1.5, TC 1.2, FT 1.0, PT 0.8) va he so loi ca nhan ngay duoi form quyet toan.
+  + `src/app/bsc-bonus/page.tsx`: man hinh Bao cao diem & Phe duyet thuong BSC chuoi Homies, phan quyen ro ret giua CEO va Quan ly; tich hop bo chon ky dong theo thoi gian thuc (tu dong chon thang hien tai va rolling 12 thang gan nhat), bang phan bo thuong nhan vien realtime dua theo gio cong (>=110h), he so cap bac (QL 1.5, TC 1.2, FT 1.0, PT 0.8) va he so loi ca nhan ngay duoi form quyet toan.
   + `src/components/bsc-bonus/BSCTeamTable.tsx`: bang phan bo chi tiet tien thuong tung nhan vien, tinh toan theo cong thuc BSC chuan F&B kem xuat file CSV.
   + `src/components/bsc-bonus/BSCHandbookTab.tsx`: So tay nghiep vu va the le tinh thuong BSC truc quan, 3 chot chan mo quy, cong thuc diem nhan vien va case study tien that.
   + `src/components/bsc-bonus/BSCMonthlyInputForm.tsx`: form quyet toan thang tu dong dong bo iPOS, khoa sua doi voi Quan ly khi pending_ceo hoac da ban hanh.
