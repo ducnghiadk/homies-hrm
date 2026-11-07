@@ -3,6 +3,11 @@ import { getServerDb, saveServerDb, type ServerBscTarget } from '@/lib/server/db
 import { isRealDbMode } from '@/lib/adapters/repository-config'
 import { supabase } from '@/lib/supabase'
 
+function currentPeriod(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -25,7 +30,7 @@ export async function GET(req: NextRequest) {
             id: String(row.id || ''),
             store_id: String(row.cua_hang_id || 'store-001'),
             store_name: String(row.ten_cua_hang || 'Homies Cửa Hàng'),
-            period: String(row.ky_luong_id || period || '2026-08'),
+            period: String(row.ky_luong_id || period || currentPeriod()),
             profit_threshold_daily: Number(row.moc_hoa_von_ngay || 6500000),
             avg_3_6_months_daily: Number(row.doanh_thu_trung_binh_ngay || 7000000),
             target_daily: Number(row.target_ngay || 8000000),
@@ -66,7 +71,7 @@ export async function GET(req: NextRequest) {
       { id: 'store-002', name: 'Homies Milk Tea - Đường 429', targetDaily: 7500000, posRevenue: 241800000, cogsBudget: 80000000, cogsActual: 81680000, wastePct: 2.1 },
     ]
 
-    const targetPeriod = period && period !== 'all' ? period : '2026-08'
+    const targetPeriod = period && period !== 'all' ? period : currentPeriod()
     for (const defStore of defaultStores) {
       let existing = targets.find(t => t.store_id === defStore.id && t.period === targetPeriod)
       if (!existing) {

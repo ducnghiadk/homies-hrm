@@ -44,6 +44,11 @@ import {
 type ActiveTab = 'overview' | 'settlement' | 'audit_report' | 'settings' | 'handbook'
 export type BSCBonusPeriodStatus = 'draft' | 'pending_ceo' | 'published'
 
+function getCurrentRealPeriod(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 function getDynamicPeriods(currentPeriod: string, count: number = 3): string[] {
   const [yearStr, monthStr] = currentPeriod.split('-')
   const year = parseInt(yearStr, 10) || 2026
@@ -78,7 +83,7 @@ function BSCBonusContent() {
   // ── URL SearchParams Synchronization ──
   const canSwitchStore = isCEO || (user?.secondary_store_ids && user.secondary_store_ids.length > 1) || isStoreManager
   const requestedTab = (searchParams.get('tab') as ActiveTab) || defaultTab
-  const currentPeriod = searchParams.get('period') || '2026-08'
+  const currentPeriod = searchParams.get('period') || getCurrentRealPeriod()
   const currentStoreId = canSwitchStore ? (searchParams.get('storeId') || user?.store_id || 'store-001') : (user?.store_id || 'store-001')
 
   const [allowStoreManagerViewBonus, setAllowStoreManagerViewBonus] = useState<boolean>(true)
@@ -326,8 +331,12 @@ function BSCBonusContent() {
   const currentEmpData = empDataList.find(e => e.employee_id === inspectedEmpId)
   const myErrors: BSCPersonalErrorRecord[] = currentEmpData?.errors || []
 
-  // Dynamic available periods
-  const availablePeriods = ['2026-08', '2026-07', '2026-06', '2026-05', '2026-04']
+  // Dynamic available periods: tự động sinh từ tháng hiện tại lùi về 12 tháng, bảo toàn các kỳ đã có
+  const currentRealPeriod = getCurrentRealPeriod()
+  const generatedPeriods = getDynamicPeriods(currentRealPeriod, 12)
+  const existingTargetPeriods = revenueTargets.map(t => t.period).filter(Boolean)
+  const availablePeriods = Array.from(new Set([...generatedPeriods, ...existingTargetPeriods, '2026-08']))
+    .sort((a, b) => b.localeCompare(a))
   const dynamicHistoryPeriods = getDynamicPeriods(selectedPeriod, 3)
   const historyData: BSCStoreResult[] = dynamicHistoryPeriods.map(p => {
     const summary = calculateBSCTeamBonus(storeId, p, targetsSource, empSource, undefined, criteriaSource)

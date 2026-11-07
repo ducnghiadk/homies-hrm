@@ -3,6 +3,11 @@ import { getServerDb, saveServerDb, type ServerBscLog } from '@/lib/server/db'
 import { isRealDbMode } from '@/lib/adapters/repository-config'
 import { supabase } from '@/lib/supabase'
 
+function currentPeriod(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -26,7 +31,7 @@ export async function GET(req: NextRequest) {
             id: String(row.id || ''),
             event_id: String(row.event_id || row.id || ''),
             store_id: String(row.store_id || 'store-001'),
-            period: String(row.period || period || '2026-08'),
+            period: String(row.period || period || currentPeriod()),
             log_type: 'operation',
             group_key: String(row.group_key || 'lam_don'),
             group_name: String(row.group_name || 'Vận hành'),
@@ -131,7 +136,7 @@ export async function POST(req: NextRequest) {
       id: logId,
       event_id: event_id || `EVT-${Date.now().toString().slice(-6)}`,
       store_id,
-      period: period || '2026-08',
+      period: period || currentPeriod(),
       log_type: log_type || 'operation',
       event_category,
       group_key,
