@@ -18,6 +18,7 @@ import type {
   BSCDeductionPolicy,
   BSCSafetySettings,
   BSCEmployeePersonalData,
+  BSCApprovalStatus,
 } from '../bsc-types'
 import {
   mockBSCRevenueTargets,
@@ -111,7 +112,10 @@ export const bscAdapter = {
       if (res.ok) {
         const json = await res.json()
         if (json.success && Array.isArray(json.data)) {
-          return json.data as BSCOperationErrorRecord[]
+          return json.data.map((item: Record<string, unknown>) => ({
+            ...item,
+            example: String(item.example || item.sub_error_name || item.evidence_note || 'Lỗi vận hành quán'),
+          })) as BSCOperationErrorRecord[]
         }
       }
     } catch (err) {
@@ -168,6 +172,31 @@ export const bscAdapter = {
     return false
   },
 
+  async approveLog(id: string, approverName: string = 'CEO Nguyễn Đức Nghĩa'): Promise<boolean> {
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          action: 'approve',
+          approval_status: 'confirmed',
+          verifier_name: approverName,
+        }),
+      })
+
+      if (res.ok) {
+        const json = await res.json()
+        return Boolean(json.success)
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error approving log:', err)
+    }
+
+    return false
+  },
+
   // ═══════════════════════════════════
   // 3. PERSONAL ERRORS & EMPLOYEE DATA
   // ═══════════════════════════════════
@@ -179,6 +208,8 @@ export const bscAdapter = {
 
     // 1. Lấy lỗi cá nhân từ server REST API /api/bsc/logs?type=personal
     const dbPersonalErrors: Record<string, BSCPersonalErrorRecord[]> = {}
+    const empNameById: Record<string, string> = {}
+    const empStoreById: Record<string, string> = {}
     try {
       const base = getApiBase()
       const params = new URLSearchParams()
@@ -194,8 +225,24 @@ export const bscAdapter = {
         const json = await res.json()
         if (json.success && Array.isArray(json.data)) {
           json.data.forEach((item: Record<string, unknown>) => {
-            const empId = String(item.employee_id || '')
+            let empId = String(item.employee_id || '')
+            const empName = String(item.employee_name || '')
+            if (!empId && empName) {
+              const q = empName.trim().toLowerCase()
+              const found = mockEmployees.find(e => {
+                if (!e?.full_name) return false
+                const fn = e.full_name.toLowerCase()
+                return fn === q || fn.includes(q) || q.includes(fn)
+              })
+              if (found) {
+                empId = found.id
+              } else {
+                empId = `emp-${q.replace(/\s+/g, '-')}`
+              }
+            }
             if (empId) {
+              if (empName) empNameById[empId] = empName
+              if (item.store_id) empStoreById[empId] = String(item.store_id)
               if (!dbPersonalErrors[empId]) dbPersonalErrors[empId] = []
               dbPersonalErrors[empId].push({
                 id: String(item.id || ''),
@@ -206,12 +253,12 @@ export const bscAdapter = {
                 group_name: String(item.group_name || ''),
                 sub_error_id: String(item.sub_error_id || item.code || 'ERR-01'),
                 sub_error_name: String(item.sub_error_name || item.name || item.group_name || ''),
-                example: String(item.example || item.sub_error_name || item.name || ''),
+                example: String(item.example || item.sub_error_name || item.evidence_note || item.name || 'Lỗi cá nhân'),
                 impact: String(item.impact || ''),
                 points: Number(item.points || 1),
                 occurred_at: String(item.occurred_at || new Date().toISOString()),
                 is_serious: Boolean(item.locks_personal_bonus ?? item.is_serious),
-                approval_status: 'approved_ceo',
+                approval_status: (item.approval_status as BSCApprovalStatus) || 'proposed_manager',
               })
             }
           })
@@ -276,8 +323,24 @@ export const bscAdapter = {
         }
 
         // Map danh sách nhân sự thực và gán giờ công, lỗi cá nhân
-        return storeEmployees.map(emp => {
-          const errors = dbPersonalErrors[emp.id] || dbPersonalErrors[emp.employee_code] || []
+        const matchedKeys = new Set<string>()
+        const result: BSCEmployeePersonalData[] = storeEmployees.map(emp => {
+          let errors = dbPersonalErrors[emp.id] || dbPersonalErrors[emp.employee_code] || []
+          if (dbPersonalErrors[emp.id]) matchedKeys.add(emp.id)
+          if (dbPersonalErrors[emp.employee_code]) matchedKeys.add(emp.employee_code)
+          if (errors.length === 0 && emp.full_name) {
+            const fnLower = emp.full_name.trim().toLowerCase()
+            for (const [k, v] of Object.entries(dbPersonalErrors)) {
+              if (!matchedKeys.has(k)) {
+                const knownName = (empNameById[k] || '').trim().toLowerCase()
+                if (knownName && (knownName.includes(fnLower) || fnLower.includes(knownName))) {
+                  errors = v
+                  matchedKeys.add(k)
+                  break
+                }
+              }
+            }
+          }
           const targetStoreId = (!isAllStores && storeId) ? storeId : (emp.store_id || 'store-001')
 
           let payrollHours: number
@@ -319,6 +382,28 @@ export const bscAdapter = {
             bank_account_holder: (emp as { bank_account_holder?: string }).bank_account_holder,
           }
         })
+
+        // Bổ sung nhân sự có lỗi từ Bot Hermes nhưng chưa có hồ sơ nhân viên chính thức
+        for (const [k, errList] of Object.entries(dbPersonalErrors)) {
+          if (!matchedKeys.has(k) && errList.length > 0) {
+            const itemStoreId = empStoreById[k] || 'store-001'
+            if (isAllStores || itemStoreId === storeId) {
+              result.push({
+                employee_id: k,
+                employee_name: empNameById[k] || 'Nhân sự',
+                employee_code: k,
+                role: 'full_time',
+                store_id: itemStoreId,
+                period: targetPeriod,
+                work_hours: 0,
+                total_work_hours: 0,
+                errors: errList,
+              })
+            }
+          }
+        }
+
+        return result
       }
     } catch (err) {
       console.warn('[BSCAdapter] Error loading master employees:', err)

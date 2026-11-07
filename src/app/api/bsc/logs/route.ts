@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     const logType = searchParams.get('type') // 'operation' | 'personal' | 'all'
 
     const db = await getServerDb()
-    let logs: ServerBscLog[] = db.bsc_logs || []
+    const logs: ServerBscLog[] = db.bsc_logs || []
 
     // 1. Đồng bộ từ Supabase nếu có
     if (isRealDbMode()) {
@@ -74,7 +74,13 @@ export async function GET(req: NextRequest) {
       filtered = filtered.filter(l => l.period === period)
     }
     if (logType && logType !== 'all') {
-      filtered = filtered.filter(l => l.log_type === logType)
+      if (logType === 'operation') {
+        filtered = filtered.filter(l => l.log_type === 'operation' || l.affects_op_score === true)
+      } else if (logType === 'personal') {
+        filtered = filtered.filter(l => l.log_type === 'personal' || l.affects_personal_multiplier === true || Boolean(l.employee_id || l.employee_name))
+      } else {
+        filtered = filtered.filter(l => l.log_type === logType)
+      }
     }
 
     return NextResponse.json({
@@ -92,6 +98,35 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+
+    // Hỗ trợ Duyệt 1 chạm trực tiếp từ UI
+    if (body.action === 'approve' || body.approval_status === 'confirmed') {
+      const logId = String(body.id || body.log_id || '')
+      if (logId) {
+        const db = await getServerDb()
+        let found = false
+        if (db.bsc_logs) {
+          const idx = db.bsc_logs.findIndex(l => l.id === logId || l.event_id === logId)
+          if (idx >= 0) {
+            db.bsc_logs[idx].approval_status = 'confirmed'
+            if (body.verifier_name) db.bsc_logs[idx].verifier_name = body.verifier_name
+            found = true
+          }
+        }
+        if (db.incidents) {
+          const incIdx = db.incidents.findIndex(i => i.id === logId || i.id === `inc-${logId}`)
+          if (incIdx >= 0) {
+            db.incidents[incIdx].status = 'confirmed'
+            found = true
+          }
+        }
+        if (found) {
+          await saveServerDb(db)
+          return NextResponse.json({ success: true, message: 'CEO đã phê duyệt biên bản thành công' })
+        }
+      }
+    }
+
     const {
       id,
       event_id,

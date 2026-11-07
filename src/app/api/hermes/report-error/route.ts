@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'node:crypto'
-import { getServerDb, saveServerDb, type ServerBscLog } from '@/lib/server/db'
+import { getServerDb, saveServerDb, type ServerBscLog, type ServerViolationIncident } from '@/lib/server/db'
 import { bscSubErrorCatalog } from '@/lib/mock-data-bsc'
+import { isRealDbMode } from '@/lib/adapters/repository-config'
+import { supabase } from '@/lib/supabase'
 
 // ══════════════════════════════════════════════════════════════════════════
 // CỔNG TÍCH HỢP HERMES BOT - TỰ ĐỘNG TRA CỨU & GHI NHẬN LỖI BSC (VẬN HÀNH & CÁ NHÂN)
@@ -147,7 +149,8 @@ export async function POST(req: NextRequest) {
 
     // ── BƯỚC 2: XÁC ĐỊNH LOẠI LỖI (VẬN HÀNH HAY CÁ NHÂN) ──
     const groupKey = body.group_key || matchedItem?.group_key || 'lam_don'
-    const isPersonal = body.log_type === 'personal' || (matchedItem && PERSONAL_GROUP_KEYS.has(matchedItem.group_key))
+    const hasEmployee = Boolean((body.employee_name && String(body.employee_name).trim()) || body.employee_id)
+    const isPersonal = body.log_type === 'personal' || (matchedItem && PERSONAL_GROUP_KEYS.has(matchedItem.group_key)) || hasEmployee
     const logType: 'operation' | 'personal' = isPersonal ? 'personal' : 'operation'
 
     // Tự động nhận diện cửa hàng nếu thiếu
@@ -156,16 +159,24 @@ export async function POST(req: NextRequest) {
       storeId = db.stores[0].id // Mặc định chi nhánh đầu tiên nếu chưa gán
     }
 
-    // Kiểm tra nhân viên nếu là lỗi cá nhân
+    // Kiểm tra nhân viên nếu là lỗi cá nhân hoặc có truyền tên nhân viên
     let employeeId = body.employee_id
     let employeeName = body.employee_name
 
     // Tự động rà tên nhân viên trong danh sách nếu có
-    if (logType === 'personal' && !employeeId && employeeName && db.employees) {
-      const foundEmp = db.employees.find(e => e?.full_name && e.full_name.toLowerCase() === employeeName.toLowerCase())
+    if (!employeeId && employeeName && db.employees) {
+      const q = String(employeeName).trim().toLowerCase()
+      const foundEmp = db.employees.find(e => {
+        if (!e?.full_name) return false
+        const fn = e.full_name.toLowerCase()
+        return fn === q || fn.includes(q) || q.includes(fn)
+      })
       if (foundEmp) {
         employeeId = foundEmp.id
         employeeName = foundEmp.full_name
+        if (!body.store_id && foundEmp.store_id) {
+          storeId = foundEmp.store_id
+        }
       }
     }
 
@@ -217,7 +228,67 @@ export async function POST(req: NextRequest) {
 
     if (!db.bsc_logs) db.bsc_logs = []
     db.bsc_logs.unshift(newLog)
+
+    // Đồng thời đồng bộ sang bảng sự cố kỷ luật KPI (kpi_incidents) để hiển thị trên /kpi/violations
+    let kpiViolationCode = 'wrong_topping'
+    if (groupKey === 'gio_lam_cham_cong' || (matchedItem?.code && matchedItem.code.startsWith('ATT'))) {
+      kpiViolationCode = 'attendance_late'
+    } else if (groupKey === 'thai_do_khach') {
+      kpiViolationCode = 'customer_complaint'
+    } else if (groupKey === 'thu_ngan_pos' || (matchedItem?.code && matchedItem.code.startsWith('HAND'))) {
+      kpiViolationCode = 'cash_shortage'
+    } else if (groupKey === 'attp_tem_date' || groupKey === 've_sinh_5s' || (matchedItem?.code && matchedItem.code.startsWith('CHK'))) {
+      kpiViolationCode = 'hygiene_breach'
+    }
+
+    const newIncident: ServerViolationIncident = {
+      id: `inc-${newLog.id}`,
+      store_id: String(storeId || 'store-001'),
+      employee_id: employeeId || 'all_store_staff',
+      employee_name: employeeName || (logType === 'operation' ? 'Cả quán (Vận hành)' : 'Nhân sự'),
+      occurred_at: body.occurred_at || new Date().toISOString(),
+      source: 'manual',
+      status: 'proposed',
+      violation_code: kpiViolationCode,
+      reason: subErrorName,
+      description: note,
+      penalty_amount: points * 50000,
+      evidence_refs: body.evidence_url ? [body.evidence_url] : [],
+      created_at: new Date().toISOString(),
+    }
+    if (!db.incidents) db.incidents = []
+    db.incidents.unshift(newIncident)
+
     await saveServerDb(db)
+
+    // Nếu Supabase khả dụng, đồng bộ lên đám mây
+    if (isRealDbMode()) {
+      try {
+        await supabase.from('bsc_loi_van_hanh').upsert([
+          {
+            id: newLog.id,
+            event_id: newLog.event_id,
+            store_id: newLog.store_id,
+            period: newLog.period,
+            group_key: newLog.group_key,
+            group_name: newLog.group_name,
+            sub_error_id: newLog.sub_error_id,
+            sub_error_name: newLog.sub_error_name,
+            points: newLog.points,
+            occurred_at: newLog.occurred_at,
+            shift_name: newLog.shift_name,
+            order_code: newLog.order_code,
+            evidence_url: newLog.evidence_url,
+            evidence_note: newLog.evidence_note,
+            verifier_name: newLog.verifier_name,
+            approval_status: newLog.approval_status,
+            created_at: newLog.created_at,
+          },
+        ])
+      } catch (err) {
+        console.warn('[Hermes Bot] Supabase sync warning:', err)
+      }
+    }
 
     // Tạo thông điệp báo cáo định dạng đẹp để Bot gửi ngay vào nhóm Zalo/Telegram
     const targetLabel = logType === 'personal' ? `👤 Nhân viên: ${employeeName}` : `🏪 Cửa hàng: ${storeId}`

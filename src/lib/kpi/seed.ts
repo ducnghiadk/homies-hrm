@@ -39,6 +39,160 @@ export function buildKpiSeed(): KpiDatabase {
   db.development_cases = developmentCases
   db.career_maps = [careerMapSeed.map]
   db.position_criteria_profiles = careerMapSeed.profiles
+  db.incidents = [
+    {
+      id: 'inc-bot-156348',
+      store_id: 'store-001',
+      employee_id: 'd4a29e33-7645-4852-8062-824215ee3a52',
+      occurred_at: '2026-11-07T14:20:00.000Z',
+      source: 'operation',
+      status: 'proposed',
+      violations: [
+        {
+          code: 'wrong_topping',
+          primary: true,
+          independent_behavior: true,
+          reason: 'Pha sai món giao khách',
+          evidence_refs: [],
+        },
+      ],
+      description: 'Pha sai món giao khách (OP-02) [Bot Hermes ghi]',
+      evidence_refs: [],
+    },
+    {
+      id: 'inc-bot-156816',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0031',
+      occurred_at: '2026-11-07T11:45:00.000Z',
+      source: 'operation',
+      status: 'proposed',
+      violations: [
+        {
+          code: 'hygiene_breach',
+          primary: true,
+          independent_behavior: true,
+          reason: 'Bỏ dở việc vệ sinh ca sáng',
+          evidence_refs: [],
+        },
+      ],
+      description: 'Bỏ dở việc vệ sinh ca sáng (CHK-01) [Bot Hermes ghi]',
+      evidence_refs: [],
+    },
+    {
+      id: 'inc-bot-157275',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0031',
+      occurred_at: '2026-11-06T17:54:00.000Z',
+      source: 'attendance',
+      status: 'proposed',
+      violations: [
+        {
+          code: 'attendance_late',
+          primary: true,
+          independent_behavior: true,
+          reason: 'Đi trễ 54 phút ca tối',
+          evidence_refs: [],
+        },
+      ],
+      description: 'Đi trễ 54 phút ca tối (ATT-03) [Bot Hermes ghi]',
+      evidence_refs: [],
+    },
+    {
+      id: 'inc-bot-157733',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0031',
+      occurred_at: '2026-11-05T17:14:00.000Z',
+      source: 'attendance',
+      status: 'proposed',
+      violations: [
+        {
+          code: 'attendance_late',
+          primary: true,
+          independent_behavior: true,
+          reason: 'Đi trễ 14 phút ca tối',
+          evidence_refs: [],
+        },
+      ],
+      description: 'Đi trễ 14 phút ca tối (ATT-01) [Bot Hermes ghi]',
+      evidence_refs: [],
+    },
+    {
+      id: 'inc-bot-158200',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0031',
+      occurred_at: '2026-11-04T08:30:00.000Z',
+      source: 'attendance',
+      status: 'proposed',
+      violations: [
+        {
+          code: 'attendance_late',
+          primary: true,
+          independent_behavior: true,
+          reason: 'Quên chấm công ca sáng',
+          evidence_refs: [],
+        },
+      ],
+      description: 'Quên chấm công ca sáng (ATT-01) [Bot Hermes ghi]',
+      evidence_refs: [],
+    },
+    {
+      id: 'inc-bot-158656',
+      store_id: 'store-002',
+      employee_id: 'emp-nv0027',
+      occurred_at: '2026-11-07T13:30:00.000Z',
+      source: 'operation',
+      status: 'proposed',
+      violations: [
+        {
+          code: 'hygiene_breach',
+          primary: true,
+          independent_behavior: true,
+          reason: 'Bỏ dở vệ sinh trưa không báo',
+          evidence_refs: [],
+        },
+      ],
+      description: 'Bỏ dở vệ sinh trưa không báo (CHK-01) [Bot Hermes ghi]',
+      evidence_refs: [],
+    },
+    {
+      id: 'inc-bot-159266',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0034',
+      occurred_at: '2026-11-06T22:15:00.000Z',
+      source: 'operation',
+      status: 'proposed',
+      violations: [
+        {
+          code: 'cash_shortage',
+          primary: true,
+          independent_behavior: true,
+          reason: 'Bỏ quên báo cáo doanh thu kết ca',
+          evidence_refs: [],
+        },
+      ],
+      description: 'Bỏ quên báo cáo doanh thu kết ca (HAND-01) [Bot Hermes ghi]',
+      evidence_refs: [],
+    },
+    {
+      id: 'inc-bot-866191',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0031',
+      occurred_at: '2026-11-07T09:38:32.466Z',
+      source: 'operation',
+      status: 'proposed',
+      violations: [
+        {
+          code: 'hygiene_breach',
+          primary: true,
+          independent_behavior: true,
+          reason: 'Quên chụp và gửi báo cáo vệ sinh đầu ca sáng',
+          evidence_refs: [],
+        },
+      ],
+      description: 'Quên chụp và gửi báo cáo vệ sinh đầu ca sáng [Bot Hermes ghi từ: zalo / HBP - GIỮ VỆ SINH CHUNG / Nghia Nguyen]',
+      evidence_refs: [],
+    },
+  ]
   db.audit_logs = [
     {
       id: 'audit_seed_publish',

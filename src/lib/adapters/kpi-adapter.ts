@@ -82,13 +82,30 @@ const INCIDENT_POLICY: KpiIncidentPolicy = {
 }
 
 async function ensureSeeded() {
-  const current = await repository.load()
-
-  if (current.sets.length === 0 && current.periods.length === 0 && current.audit_logs.length === 0) {
-    if (process.env.NEXT_PUBLIC_KPI_REPOSITORY === 'supabase' || isRealDbMode()) {
-      return current
+  let current: KpiDatabase
+  try {
+    current = await repository.load()
+  } catch (err) {
+    console.warn('[kpiAdapter] repository.load() failed, fallback to local repository:', err)
+    try {
+      const localRepo = createLocalKpiRepository()
+      current = await localRepo.load()
+    } catch {
+      current = seed
     }
-    await repository.reset(seed)
+  }
+
+  if (!current || (current.sets.length === 0 && current.periods.length === 0 && current.audit_logs.length === 0)) {
+    try {
+      await repository.reset(seed)
+    } catch {
+      try {
+        const localRepo = createLocalKpiRepository()
+        await localRepo.reset(seed)
+      } catch {
+        // Safe fallback
+      }
+    }
     return seed
   }
 

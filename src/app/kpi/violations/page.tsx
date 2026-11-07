@@ -60,7 +60,7 @@ export default function KpiViolationsPage() {
   const mounted = useMounted()
 
   const [database, setDatabase] = useState<KpiDatabase | null>(null)
-  const [selectedMonth, setSelectedMonth] = useState('2026-09')
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [selectedStoreId, setSelectedStoreId] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState<'all' | KpiIncident['status']>('all')
   const [drawerMode, setDrawerMode] = useState<'create' | 'detail'>('detail')
@@ -132,24 +132,28 @@ export default function KpiViolationsPage() {
   }, [hasHydrated, isAuthenticated, router])
 
   const refreshData = useCallback(async () => {
-    const db = await kpiAdapter.getDatabase()
-    setDatabase(db)
+    try {
+      const db = await kpiAdapter.getDatabase()
+      setDatabase(db)
 
-    const nowMonth = new Date().toISOString().slice(0, 7)
-    const incidentMonths = (db.incidents || []).map((inc) => inc.occurred_at.slice(0, 7))
-    const periodMonths = (db.periods || []).map((period) => period.month)
-    const sortedMonths = Array.from(new Set([...incidentMonths, ...periodMonths, nowMonth, '2026-09', '2026-08'])).sort().reverse()
-    
-    // Nếu tháng hiện tại chưa có hồ sơ nào, tự động chọn tháng gần nhất có dữ liệu
-    const monthsWithIncidents = sortedMonths.filter((m) => (db.incidents || []).some((inc) => inc.occurred_at.startsWith(m)))
-    const bestMonth = monthsWithIncidents[0] || sortedMonths[0] || '2026-08'
+      const nowMonth = new Date().toISOString().slice(0, 7)
+      const incidentMonths = (db.incidents || []).map((inc) => inc.occurred_at.slice(0, 7))
+      const periodMonths = (db.periods || []).map((period) => period.month)
+      const sortedMonths = Array.from(new Set([...incidentMonths, ...periodMonths, nowMonth, '2026-11', '2026-10', '2026-09', '2026-08'])).sort().reverse()
+      
+      // Nếu tháng hiện tại chưa có hồ sơ nào, tự động chọn tháng gần nhất có dữ liệu
+      const monthsWithIncidents = sortedMonths.filter((m) => (db.incidents || []).some((inc) => inc.occurred_at.startsWith(m)))
+      const bestMonth = monthsWithIncidents[0] || sortedMonths[0] || nowMonth
 
-    setSelectedMonth((current) => {
-      if (current && (db.incidents || []).some((inc) => inc.occurred_at.startsWith(current))) {
-        return current
-      }
-      return bestMonth
-    })
+      setSelectedMonth((current) => {
+        if (current && (db.incidents || []).some((inc) => inc.occurred_at.startsWith(current))) {
+          return current
+        }
+        return bestMonth
+      })
+    } catch (err) {
+      console.warn('[KPI Violations] refreshData error:', err)
+    }
   }, [])
 
   useEffect(() => {
@@ -166,7 +170,7 @@ export default function KpiViolationsPage() {
     const nowMonth = new Date().toISOString().slice(0, 7)
     const monthsFromPeriods = (database?.periods ?? []).map((period) => period.month)
     const monthsFromIncidents = (database?.incidents ?? []).map((inc) => inc.occurred_at.slice(0, 7))
-    const months = Array.from(new Set([...monthsFromPeriods, ...monthsFromIncidents, nowMonth, '2026-09', '2026-08', '2026-07'])).sort().reverse()
+    const months = Array.from(new Set([...monthsFromPeriods, ...monthsFromIncidents, nowMonth, '2026-11', '2026-10', '2026-09', '2026-08', '2026-07'])).sort().reverse()
     return months
   }, [database])
 
@@ -609,8 +613,16 @@ function getStoreName(storeId: string) {
   return mockStores.find((store) => store.id === storeId)?.name ?? storeId
 }
 
+const KNOWN_EMPLOYEE_NAMES: Record<string, string> = {
+  'd4a29e33-7645-4852-8062-824215ee3a52': 'Mai Thảo Uyên (NV0040)',
+  'emp-nv0031': 'Cao Văn Thắng',
+  'emp-nv0027': 'Trần Công Huy',
+  'emp-nv0034': 'Nguyễn Thị Thu',
+}
+
 function getEmployeeName(employeeId: string) {
-  return mockEmployees.find((employee) => employee.id === employeeId)?.full_name ?? employeeId
+  if (KNOWN_EMPLOYEE_NAMES[employeeId]) return KNOWN_EMPLOYEE_NAMES[employeeId]
+  return mockEmployees.find((employee) => employee.id === employeeId || employee.employee_code === employeeId)?.full_name ?? employeeId
 }
 
 function getViolationLabel(code?: string) {

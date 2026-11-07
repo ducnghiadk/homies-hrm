@@ -56,6 +56,24 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
   const [expandedEmployees, setExpandedEmployees] = useState<Record<string, boolean>>({})
   const [isLogEditorOpen, setIsLogEditorOpen] = useState(false)
   const [editingLogItem, setEditingLogItem] = useState<CombinedLogItem | null>(null)
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+
+  const handleQuickApprove = async (item: CombinedLogItem) => {
+    setApprovingId(item.id)
+    try {
+      const ok = await bscAdapter.approveLog(item.id)
+      if (ok) {
+        toast.success(`CEO đã duyệt biên bản: ${item.sub_error_name || item.example || item.group_name}`)
+        await loadLogs()
+      } else {
+        toast.error('Không thể duyệt biên bản, vui lòng thử lại!')
+      }
+    } catch {
+      toast.error('Lỗi kết nối khi duyệt biên bản')
+    } finally {
+      setApprovingId(null)
+    }
+  }
 
   // Adapter States
   const [opLogsData, setOpLogsData] = useState<BSCOperationErrorRecord[]>([])
@@ -185,6 +203,8 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
         )
     }
   }
+
+  const isApproved = (status?: string) => status === 'approved_ceo' || status === 'confirmed'
 
   const getPersonalMultiplierBadge = (points: number) => {
     if (points <= 1) {
@@ -515,6 +535,24 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
 
                                 <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-auto">
                                   {getStatusBadge(err.approval_status)}
+                                  {!isApproved(err.approval_status) && (
+                                    <button
+                                      type="button"
+                                      disabled={approvingId === err.id}
+                                      onClick={() => handleQuickApprove({
+                                        ...err,
+                                        employee_name: emp.employee_name,
+                                        store_id: emp.store_id,
+                                        period: emp.period,
+                                        log_kind: 'personal',
+                                      })}
+                                      className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                                      title="CEO Duyệt 1 chạm biên bản này"
+                                    >
+                                      <Check size={13} className="stroke-[3]" />
+                                      <span>{approvingId === err.id ? 'Đang duyệt...' : 'Duyệt'}</span>
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => setViewingProofItem({
@@ -598,14 +636,28 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                           {getStatusBadge(item.approval_status)}
                         </td>
                         <td className="py-3.5 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setViewingProofItem(item)}
-                            className="px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer"
-                          >
-                            <Eye size={13} className="text-[#2F6FA8]" />
-                            <span>Xem</span>
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            {!isApproved(item.approval_status) && (
+                              <button
+                                type="button"
+                                disabled={approvingId === item.id}
+                                onClick={() => handleQuickApprove(item)}
+                                className="px-2.5 py-1 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                                title="CEO Duyệt 1 chạm biên bản này"
+                              >
+                                <Check size={12} className="stroke-[3]" />
+                                <span>{approvingId === item.id ? '...' : 'Duyệt'}</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setViewingProofItem(item)}
+                              className="px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer"
+                            >
+                              <Eye size={13} className="text-[#2F6FA8]" />
+                              <span>Xem</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -746,6 +798,18 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                       </td>
                       <td className="py-3.5 px-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          {!isApproved(item.approval_status) && (
+                            <button
+                              type="button"
+                              disabled={approvingId === item.id}
+                              onClick={() => handleQuickApprove(item)}
+                              className="px-2.5 py-1 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                              title="CEO Duyệt 1 chạm biên bản này"
+                            >
+                              <Check size={12} className="stroke-[3]" />
+                              <span>{approvingId === item.id ? '...' : 'Duyệt'}</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setViewingProofItem(item)}
@@ -851,6 +915,20 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
               </button>
 
               <div className="flex items-center gap-2">
+                {!isApproved(viewingProofItem.approval_status) && (
+                  <button
+                    type="button"
+                    disabled={approvingId === viewingProofItem.id}
+                    onClick={async () => {
+                      await handleQuickApprove(viewingProofItem)
+                      setViewingProofItem(null)
+                    }}
+                    className="px-3.5 py-2 rounded-xl border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                  >
+                    <Check size={14} className="stroke-[3]" />
+                    <span>{approvingId === viewingProofItem.id ? 'Đang duyệt...' : 'Duyệt Biên Bản Ngay'}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {

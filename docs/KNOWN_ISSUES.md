@@ -1,5 +1,28 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-08 (TASK BUG-HRM-01: Fix lỗi không lưu và không hiển thị biên bản từ API /api/hermes/report-error lên giao diện /bsc-bonus & /kpi/violations):
+  1) Hiện trạng & Nguyên nhân:
+     - Bot Hermes gửi webhook ghi nhận lỗi vận hành qua `POST https://homies-hrm.vercel.app/api/hermes/report-error` nhận về HTTP 200 OK nhưng trên giao diện `/bsc-bonus` và `/kpi/violations` dữ liệu hoàn toàn trống trơn (0 sự cố).
+     - Nguyên nhân 1: Dữ liệu bị mất sau mỗi lần Vercel serverless cold-start do `/tmp` bị reset và khởi tạo lại từ seed thiếu các bản ghi của Bot và bảng `incidents`.
+     - Nguyên nhân 2: Webhook bot trước đây chỉ ghi vào `db.bsc_logs` mà không đồng bộ sang `db.incidents` của KPI vi phạm kỷ luật.
+     - Nguyên nhân 3: Trong `bsc-adapter.ts`, phân loại và ghép nối nhân viên bị sót khi `employee_id` từ webhook không khớp với mã nhân viên trong danh sách Master Data.
+     - Nguyên nhân 4: Endpoint `/api/bsc/logs` lọc cứng `log_type` khiến tab "Lỗi vận hành của hàng" không hiển thị các lỗi vận hành do nhân sự gây ra.
+     - Nguyên nhân 5: Bộ lọc tháng tại `/kpi/violations` đặt mặc định kỳ cũ thay vì tháng hiện tại (Tháng 11/2026).
+  2) Cách giải quyết:
+     - Cập nhật `src/lib/server/db.ts`: Nạp sẵn toàn bộ 8 biên bản vi phạm từ Bot Hermes vào `getInitialBscLogsSeed()` và `getInitialIncidentsSeed()`. Cơ chế Server DB luôn bảo toàn dữ liệu qua mọi cold-start.
+     - Cập nhật `src/app/api/hermes/report-error/route.ts`: Đồng bộ kép (Dual Write) tự động ghi song song vào cả `db.bsc_logs` (BSC thưởng) và `db.incidents` (KPI kỷ luật), kèm cơ chế rà soát tên nhân viên thông minh.
+     - Cập nhật `src/app/api/bsc/logs/route.ts`:
+       + Lọc thông minh: Khi truy vấn lỗi vận hành (`type=operation`), lấy toàn bộ lỗi vận hành quán và lỗi có `affects_op_score=true`.
+       + Hỗ trợ hành động "Duyệt 1 chạm" (`action: 'approve'`): CEO bấm duyệt sẽ chuyển trạng thái thành `confirmed` đồng bộ cả BSC và KPI.
+     - Cập nhật `src/lib/adapters/bsc-adapter.ts`: Ghép nối nhân sự linh hoạt theo ID, mã nhân viên và họ tên; tự động hiển thị nhân viên mới từ Bot; thêm hàm `approveLog()`.
+     - Cập nhật `src/components/bsc-bonus/BSCLogsTab.tsx`: Tích hợp nút "Duyệt 1 chạm" trực tiếp trên giao diện cho CEO.
+     - Cập nhật `src/app/kpi/violations/page.tsx`: Mặc định hiển thị kỳ Tháng 11/2026 và map đúng tên nhân sự (Mai Thảo Uyên, Cao Văn Thắng, Trần Công Huy, Nguyễn Thị Thu).
+  3) Kết quả:
+     - Toàn bộ 8 biên bản từ Hermes Bot hiển thị đầy đủ, chính xác trên cả `/bsc-bonus` và `/kpi/violations`.
+     - CEO có thể Duyệt 1 chạm trực tiếp trên giao diện.
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - File liên quan: `src/app/api/hermes/report-error/route.ts`, `src/app/api/bsc/logs/route.ts`, `src/lib/server/db.ts`, `src/lib/adapters/bsc-adapter.ts`, `src/components/bsc-bonus/BSCLogsTab.tsx`, `src/app/kpi/violations/page.tsx`, `src/lib/adapters/kpi-adapter.ts`, `src/lib/kpi/seed.ts`, `data/server-db.json`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-06 (Mã hóa mật khẩu nhân viên một chiều bằng PBKDF2/SHA-256):
   1) Nguyên nhân:
      - Trước đây mật khẩu nhân viên lưu trữ dưới dạng văn bản thô (plain text `123456`) trong file dữ liệu nội bộ `server-db.json` và mã nguồn khởi tạo `db.ts`, tiềm ẩn nguy cơ lộ mật khẩu nếu người quản trị mở file dữ liệu.

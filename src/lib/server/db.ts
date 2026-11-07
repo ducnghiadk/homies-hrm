@@ -1340,6 +1340,7 @@ function getInitialSeedData(): ServerDatabaseSchema {
     bsc_targets: getInitialBscTargetsSeed(),
     bsc_logs: getInitialBscLogsSeed(),
     bsc_settings: getInitialBscSettingsSeed(),
+    incidents: getInitialIncidentsSeed(),
     sessions: {},
   }
 }
@@ -1413,6 +1414,182 @@ export function getInitialBscTargetsSeed(): ServerBscTarget[] {
 export function getInitialBscLogsSeed(): ServerBscLog[] {
   return [
     {
+      id: 'bsc-log-bot-156348',
+      event_id: 'BOT-156348',
+      store_id: 'store-001',
+      period: '2026-11',
+      log_type: 'operation',
+      group_key: 'lam_don',
+      group_name: 'Làm đơn & Công thức',
+      sub_error_id: 'OP-02',
+      sub_error_name: 'Pha sai món giao khách',
+      employee_id: 'd4a29e33-7645-4852-8062-824215ee3a52',
+      employee_name: 'Mai Thảo Uyên',
+      points: 1,
+      occurred_at: '2026-11-07T14:20:00.000Z',
+      shift_name: 'Ca Chiều',
+      evidence_note: 'Pha sai món giao khách [Bot Hermes ghi]',
+      verifier_name: 'Hermes Bot',
+      affects_op_score: true,
+      affects_personal_multiplier: true,
+      approval_status: 'proposed_manager',
+      created_at: '2026-11-07T14:20:00.000Z',
+    },
+    {
+      id: 'bsc-log-bot-156816',
+      event_id: 'BOT-156816',
+      store_id: 'store-001',
+      period: '2026-11',
+      log_type: 'operation',
+      group_key: 'thuc_hien_checklist_giao',
+      group_name: 'Checklist & Quy trình',
+      sub_error_id: 'CHK-01',
+      sub_error_name: 'Bỏ dở việc vệ sinh ca sáng',
+      employee_id: 'emp-nv0031',
+      employee_name: 'Cao Văn Thắng',
+      points: 1,
+      occurred_at: '2026-11-07T11:45:00.000Z',
+      shift_name: 'Ca Sáng',
+      evidence_note: 'Bỏ dở việc vệ sinh ca sáng [Bot Hermes ghi]',
+      verifier_name: 'Hermes Bot',
+      affects_op_score: true,
+      affects_personal_multiplier: true,
+      approval_status: 'proposed_manager',
+      created_at: '2026-11-07T11:45:00.000Z',
+    },
+    {
+      id: 'bsc-log-bot-157275',
+      event_id: 'BOT-157275',
+      store_id: 'store-001',
+      period: '2026-11',
+      log_type: 'personal',
+      group_key: 'gio_lam_cham_cong',
+      group_name: 'Giờ làm & Chấm công',
+      sub_error_id: 'ATT-03',
+      sub_error_name: 'Đi trễ 54 phút ca tối',
+      employee_id: 'emp-nv0031',
+      employee_name: 'Cao Văn Thắng',
+      points: 2,
+      occurred_at: '2026-11-06T17:54:00.000Z',
+      shift_name: 'Ca Tối',
+      evidence_note: 'Đi trễ 54 phút ca tối [Bot Hermes ghi]',
+      verifier_name: 'Hermes Bot',
+      affects_op_score: false,
+      affects_personal_multiplier: true,
+      approval_status: 'proposed_manager',
+      created_at: '2026-11-06T17:54:00.000Z',
+    },
+    {
+      id: 'bsc-log-bot-157733',
+      event_id: 'BOT-157733',
+      store_id: 'store-001',
+      period: '2026-11',
+      log_type: 'personal',
+      group_key: 'gio_lam_cham_cong',
+      group_name: 'Giờ làm & Chấm công',
+      sub_error_id: 'ATT-01',
+      sub_error_name: 'Đi trễ 14 phút ca tối',
+      employee_id: 'emp-nv0031',
+      employee_name: 'Cao Văn Thắng',
+      points: 1,
+      occurred_at: '2026-11-05T17:14:00.000Z',
+      shift_name: 'Ca Tối',
+      evidence_note: 'Đi trễ 14 phút ca tối [Bot Hermes ghi]',
+      verifier_name: 'Hermes Bot',
+      affects_op_score: false,
+      affects_personal_multiplier: true,
+      approval_status: 'proposed_manager',
+      created_at: '2026-11-05T17:14:00.000Z',
+    },
+    {
+      id: 'bsc-log-bot-158200',
+      event_id: 'BOT-158200',
+      store_id: 'store-001',
+      period: '2026-11',
+      log_type: 'personal',
+      group_key: 'gio_lam_cham_cong',
+      group_name: 'Giờ làm & Chấm công',
+      sub_error_id: 'ATT-01',
+      sub_error_name: 'Quên chấm công ca sáng',
+      employee_id: 'emp-nv0031',
+      employee_name: 'Cao Văn Thắng',
+      points: 1,
+      occurred_at: '2026-11-04T08:30:00.000Z',
+      shift_name: 'Ca Sáng',
+      evidence_note: 'Quên chấm công ca sáng [Bot Hermes ghi]',
+      verifier_name: 'Hermes Bot',
+      affects_op_score: false,
+      affects_personal_multiplier: true,
+      approval_status: 'proposed_manager',
+      created_at: '2026-11-04T08:30:00.000Z',
+    },
+    {
+      id: 'bsc-log-bot-158656',
+      event_id: 'BOT-158656',
+      store_id: 'store-002',
+      period: '2026-11',
+      log_type: 'operation',
+      group_key: 'thuc_hien_checklist_giao',
+      group_name: 'Checklist & Quy trình',
+      sub_error_id: 'CHK-01',
+      sub_error_name: 'Bỏ dở vệ sinh trưa không báo',
+      employee_id: 'emp-nv0027',
+      employee_name: 'Trần Công Huy',
+      points: 1,
+      occurred_at: '2026-11-07T13:30:00.000Z',
+      shift_name: 'Ca Trưa',
+      evidence_note: 'Bỏ dở vệ sinh trưa không báo [Bot Hermes ghi]',
+      verifier_name: 'Hermes Bot',
+      affects_op_score: true,
+      affects_personal_multiplier: true,
+      approval_status: 'proposed_manager',
+      created_at: '2026-11-07T13:30:00.000Z',
+    },
+    {
+      id: 'bsc-log-bot-159266',
+      event_id: 'BOT-159266',
+      store_id: 'store-001',
+      period: '2026-11',
+      log_type: 'operation',
+      group_key: 'cuoi_ca_ban_giao',
+      group_name: 'Cuối ca & Bàn giao',
+      sub_error_id: 'HAND-01',
+      sub_error_name: 'Bỏ quên báo cáo doanh thu kết ca',
+      employee_id: 'emp-nv0034',
+      employee_name: 'Nguyễn Thị Thu',
+      points: 1,
+      occurred_at: '2026-11-06T22:15:00.000Z',
+      shift_name: 'Ca Tối',
+      evidence_note: 'Bỏ quên báo cáo doanh thu kết ca [Bot Hermes ghi]',
+      verifier_name: 'Hermes Bot',
+      affects_op_score: true,
+      affects_personal_multiplier: true,
+      approval_status: 'proposed_manager',
+      created_at: '2026-11-06T22:15:00.000Z',
+    },
+    {
+      id: 'bsc-log-bot-1794074866191-ac9v',
+      event_id: 'BOT-866191',
+      store_id: 'store-001',
+      period: '2026-11',
+      log_type: 'operation',
+      group_key: 'thuc_hien_checklist_giao',
+      group_name: 'Checklist & Quy trình',
+      sub_error_id: 'CHK-01',
+      sub_error_name: 'Quên chụp và gửi báo cáo vệ sinh đầu ca sáng',
+      employee_id: 'emp-nv0031',
+      employee_name: 'Cao Văn Thắng',
+      points: 1,
+      occurred_at: '2026-11-07T09:38:32.466Z',
+      shift_name: 'Ca Sáng',
+      evidence_note: 'Quên chụp và gửi báo cáo vệ sinh đầu ca sáng [Bot Hermes ghi từ: zalo / HBP - GIỮ VỆ SINH CHUNG / Nghia Nguyen]',
+      verifier_name: 'Hermes Bot',
+      affects_op_score: true,
+      affects_personal_multiplier: true,
+      approval_status: 'proposed_manager',
+      created_at: '2026-11-07T18:07:46.191Z',
+    },
+    {
       id: 'bsc-op-log-001',
       event_id: 'EVT-202608-01',
       store_id: 'store-001',
@@ -1431,6 +1608,131 @@ export function getInitialBscLogsSeed(): ServerBscLog[] {
       verifier_name: 'Huỳnh Lê Kiều Linh',
       approval_status: 'confirmed',
       created_at: '2026-08-14T15:35:00.000Z',
+    },
+  ]
+}
+
+export function getInitialIncidentsSeed(): ServerViolationIncident[] {
+  return [
+    {
+      id: 'inc-bot-156348',
+      store_id: 'store-001',
+      employee_id: 'd4a29e33-7645-4852-8062-824215ee3a52',
+      employee_name: 'Mai Thảo Uyên',
+      occurred_at: '2026-11-07T14:20:00.000Z',
+      source: 'manual',
+      status: 'proposed',
+      violation_code: 'wrong_topping',
+      reason: 'Pha sai món giao khách',
+      description: 'Pha sai món giao khách (OP-02) [Bot Hermes ghi]',
+      penalty_amount: 50000,
+      evidence_refs: [],
+      created_at: '2026-11-07T14:20:00.000Z',
+    },
+    {
+      id: 'inc-bot-156816',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0031',
+      employee_name: 'Cao Văn Thắng',
+      occurred_at: '2026-11-07T11:45:00.000Z',
+      source: 'manual',
+      status: 'proposed',
+      violation_code: 'hygiene_breach',
+      reason: 'Bỏ dở việc vệ sinh ca sáng',
+      description: 'Bỏ dở việc vệ sinh ca sáng (CHK-01) [Bot Hermes ghi]',
+      penalty_amount: 50000,
+      evidence_refs: [],
+      created_at: '2026-11-07T11:45:00.000Z',
+    },
+    {
+      id: 'inc-bot-157275',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0031',
+      employee_name: 'Cao Văn Thắng',
+      occurred_at: '2026-11-06T17:54:00.000Z',
+      source: 'attendance',
+      status: 'proposed',
+      violation_code: 'attendance_late',
+      reason: 'Đi trễ 54 phút ca tối',
+      description: 'Đi trễ 54 phút ca tối (ATT-03) [Bot Hermes ghi]',
+      penalty_amount: 100000,
+      evidence_refs: [],
+      created_at: '2026-11-06T17:54:00.000Z',
+    },
+    {
+      id: 'inc-bot-157733',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0031',
+      employee_name: 'Cao Văn Thắng',
+      occurred_at: '2026-11-05T17:14:00.000Z',
+      source: 'attendance',
+      status: 'proposed',
+      violation_code: 'attendance_late',
+      reason: 'Đi trễ 14 phút ca tối',
+      description: 'Đi trễ 14 phút ca tối (ATT-01) [Bot Hermes ghi]',
+      penalty_amount: 0,
+      evidence_refs: [],
+      created_at: '2026-11-05T17:14:00.000Z',
+    },
+    {
+      id: 'inc-bot-158200',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0031',
+      employee_name: 'Cao Văn Thắng',
+      occurred_at: '2026-11-04T08:30:00.000Z',
+      source: 'attendance',
+      status: 'proposed',
+      violation_code: 'attendance_late',
+      reason: 'Quên chấm công ca sáng',
+      description: 'Quên chấm công ca sáng (ATT-01) [Bot Hermes ghi]',
+      penalty_amount: 50000,
+      evidence_refs: [],
+      created_at: '2026-11-04T08:30:00.000Z',
+    },
+    {
+      id: 'inc-bot-158656',
+      store_id: 'store-002',
+      employee_id: 'emp-nv0027',
+      employee_name: 'Trần Công Huy',
+      occurred_at: '2026-11-07T13:30:00.000Z',
+      source: 'manual',
+      status: 'proposed',
+      violation_code: 'hygiene_breach',
+      reason: 'Bỏ dở vệ sinh trưa không báo',
+      description: 'Bỏ dở vệ sinh trưa không báo (CHK-01) [Bot Hermes ghi]',
+      penalty_amount: 50000,
+      evidence_refs: [],
+      created_at: '2026-11-07T13:30:00.000Z',
+    },
+    {
+      id: 'inc-bot-159266',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0034',
+      employee_name: 'Nguyễn Thị Thu',
+      occurred_at: '2026-11-06T22:15:00.000Z',
+      source: 'manual',
+      status: 'proposed',
+      violation_code: 'cash_shortage',
+      reason: 'Bỏ quên báo cáo doanh thu kết ca',
+      description: 'Bỏ quên báo cáo doanh thu kết ca (HAND-01) [Bot Hermes ghi]',
+      penalty_amount: 50000,
+      evidence_refs: [],
+      created_at: '2026-11-06T22:15:00.000Z',
+    },
+    {
+      id: 'inc-bot-866191',
+      store_id: 'store-001',
+      employee_id: 'emp-nv0031',
+      employee_name: 'Cao Văn Thắng',
+      occurred_at: '2026-11-07T09:38:32.466Z',
+      source: 'manual',
+      status: 'proposed',
+      violation_code: 'hygiene_breach',
+      reason: 'Quên chụp và gửi báo cáo vệ sinh đầu ca sáng',
+      description: 'Quên chụp và gửi báo cáo vệ sinh đầu ca sáng [Bot Hermes ghi từ: zalo / HBP - GIỮ VỆ SINH CHUNG / Nghia Nguyen]',
+      penalty_amount: 50000,
+      evidence_refs: [],
+      created_at: '2026-11-07T18:07:46.191Z',
     },
   ]
 }
@@ -1604,11 +1906,14 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
       if (!inMemoryCache.bsc_targets || inMemoryCache.bsc_targets.length === 0) {
         inMemoryCache.bsc_targets = getInitialBscTargetsSeed()
       }
-      if (!inMemoryCache.bsc_logs) {
+      if (!inMemoryCache.bsc_logs || inMemoryCache.bsc_logs.length === 0) {
         inMemoryCache.bsc_logs = getInitialBscLogsSeed()
       }
       if (!inMemoryCache.bsc_settings) {
         inMemoryCache.bsc_settings = getInitialBscSettingsSeed()
+      }
+      if (!inMemoryCache.incidents || inMemoryCache.incidents.length === 0) {
+        inMemoryCache.incidents = getInitialIncidentsSeed()
       }
       return inMemoryCache
     }
@@ -1624,11 +1929,14 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     if (!inMemoryCache!.bsc_targets || inMemoryCache!.bsc_targets.length === 0) {
       inMemoryCache!.bsc_targets = getInitialBscTargetsSeed()
     }
-    if (!inMemoryCache!.bsc_logs) {
+    if (!inMemoryCache!.bsc_logs || inMemoryCache!.bsc_logs.length === 0) {
       inMemoryCache!.bsc_logs = getInitialBscLogsSeed()
     }
     if (!inMemoryCache!.bsc_settings) {
       inMemoryCache!.bsc_settings = getInitialBscSettingsSeed()
+    }
+    if (!inMemoryCache!.incidents || inMemoryCache!.incidents.length === 0) {
+      inMemoryCache!.incidents = getInitialIncidentsSeed()
     }
 
     // Tự động nâng cấp mật khẩu còn ở dạng thường sang chuẩn mã hóa an toàn PBKDF2
@@ -1648,7 +1956,20 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     if (stat) lastMtime = stat.mtimeMs
     return inMemoryCache!
   } catch {
-    const initial = getInitialSeedData()
+    let initial: ServerDatabaseSchema
+    try {
+      const bundledPath = path.join(process.cwd(), 'data', 'server-db.json')
+      const bundledData = await fs.readFile(bundledPath, 'utf-8')
+      initial = JSON.parse(bundledData) as ServerDatabaseSchema
+      if (!initial.bsc_logs || initial.bsc_logs.length === 0) {
+        initial.bsc_logs = getInitialBscLogsSeed()
+      }
+      if (!initial.incidents || initial.incidents.length === 0) {
+        initial.incidents = getInitialIncidentsSeed()
+      }
+    } catch {
+      initial = getInitialSeedData()
+    }
     try {
       await fs.mkdir(DATA_DIR, { recursive: true })
       await fs.writeFile(DB_FILE, JSON.stringify(initial, null, 2), 'utf-8')
