@@ -1,5 +1,6 @@
 import fs from 'fs/promises'
 import path from 'path'
+import os from 'os'
 import { calculateDistance } from '@/lib/utils'
 import { hashPassword } from '@/lib/security/token-signer'
 import type {
@@ -542,7 +543,9 @@ export interface ServerDatabaseSchema {
   sessions: Record<string, { userId: string; role: string; email: string; createdAt: string }>
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data')
+const DATA_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'homies-data')
+  : path.join(process.cwd(), 'data')
 const DB_FILE = path.join(DATA_DIR, 'server-db.json')
 
 const DEFAULT_SEED_PASSWORD = hashPassword('123456')
@@ -1646,8 +1649,12 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     return inMemoryCache!
   } catch {
     const initial = getInitialSeedData()
-    await fs.mkdir(DATA_DIR, { recursive: true })
-    await fs.writeFile(DB_FILE, JSON.stringify(initial, null, 2), 'utf-8')
+    try {
+      await fs.mkdir(DATA_DIR, { recursive: true })
+      await fs.writeFile(DB_FILE, JSON.stringify(initial, null, 2), 'utf-8')
+    } catch {
+      // Bỏ qua lỗi ghi đĩa trên môi trường serverless
+    }
     inMemoryCache = initial
     return inMemoryCache
   }
@@ -1655,10 +1662,14 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
 
 export async function saveServerDb(db: ServerDatabaseSchema): Promise<void> {
   inMemoryCache = db
-  await fs.mkdir(DATA_DIR, { recursive: true })
-  await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), 'utf-8')
-  const stat = await fs.stat(DB_FILE).catch(() => null)
-  if (stat) lastMtime = stat.mtimeMs
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true })
+    await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), 'utf-8')
+    const stat = await fs.stat(DB_FILE).catch(() => null)
+    if (stat) lastMtime = stat.mtimeMs
+  } catch {
+    // Bỏ qua lỗi ghi đĩa trên môi trường serverless, inMemoryCache vẫn giữ dữ liệu
+  }
 }
 
 export function clearServerDbCache(): void {
