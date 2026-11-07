@@ -15,6 +15,7 @@ import {
   Trophy,
   Lock,
   Sliders,
+  QrCode,
 } from 'lucide-react'
 
 interface BSCTeamTableProps {
@@ -424,18 +425,35 @@ export default function BSCTeamTable({
                   </td>
 
                   <td className="p-3 text-center">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onSelectEmployee?.(emp.employee_id)
-                        onOpenDetailModal?.(emp.employee_id)
-                      }}
-                      className="px-3 py-1.5 min-h-[38px] rounded-xl bg-gray-100 hover:bg-[#2F6FA8] hover:text-white text-gray-700 font-bold text-xs inline-flex items-center gap-1 transition cursor-pointer"
-                    >
-                      <FileSearch size={13} />
-                      <span>Chi tiết</span>
-                    </button>
+                    <div className="flex items-center justify-center gap-1.5">
+                      {isEligible && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onSelectEmployee?.(emp.employee_id)
+                            onOpenDetailModal?.(emp.employee_id)
+                          }}
+                          className="px-2.5 py-1.5 min-h-[38px] rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 font-bold text-xs inline-flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                          title="Quét mã VietQR chuyển tiền thưởng ngay"
+                        >
+                          <QrCode size={13} />
+                          <span className="hidden md:inline">VietQR</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onSelectEmployee?.(emp.employee_id)
+                          onOpenDetailModal?.(emp.employee_id)
+                        }}
+                        className="px-3 py-1.5 min-h-[38px] rounded-xl bg-gray-100 hover:bg-[#2F6FA8] hover:text-white text-gray-700 font-bold text-xs inline-flex items-center gap-1 transition cursor-pointer"
+                      >
+                        <FileSearch size={13} />
+                        <span>Chi tiết</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )

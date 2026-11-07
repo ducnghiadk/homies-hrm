@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth-store'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AppShell from '@/components/layout/AppShell'
+import { useMounted } from '@/hooks/useMounted'
 import { 
   mockPositions, 
   mockStores, 
@@ -18,6 +19,8 @@ import {
 import { EmployeeService } from '@/lib/services/employee-service'
 import { ScheduleService } from '@/lib/services/schedule-service'
 import { ShiftTemplateService } from '@/lib/services/scheduling/shift-template-service'
+import AttendanceQuickDrawer from '@/components/attendance/AttendanceQuickDrawer'
+import { isShiftPast22PM, isTrashShift } from '@/lib/scheduling/strict-shift-validator'
 import { hasPermission } from '@/lib/rbac'
 import { 
   getRememberedShiftMappings,
@@ -58,6 +61,7 @@ import {
   Users,
   UploadCloud,
   Download,
+  Loader2,
   Link as LinkIcon,
   RefreshCw,
   FileCheck2,
@@ -110,6 +114,7 @@ export interface AttendanceSlot {
   isEdited?: boolean
   editReason?: string
   editedBy?: string
+  editedAt?: string
   deviceInfo?: string
   wifiName?: string
   locationNoteIn?: string
@@ -179,9 +184,20 @@ function calculateHours(startTime: string, endTime: string): number {
 export default function AttendanceTimesheetPage() {
   const { user, isAuthenticated } = useAuthStore()
   const router = useRouter()
+  const mounted = useMounted()
+
   const canManageAttendance = user
     ? hasPermission(user.role, 'attendance.view_team') || hasPermission(user.role, 'attendance.view_all')
     : false
+
+  useEffect(() => {
+    if (!mounted) return
+    if (!user || !isAuthenticated) {
+      router.replace('/login?redirect=/attendance')
+    } else if (!canManageAttendance) {
+      router.replace('/?denied=1')
+    }
+  }, [mounted, user, isAuthenticated, canManageAttendance, router])
 
   // Bộ lọc thời gian & chi nhánh
   const [activeStoreId, setActiveStoreId] = useState<string>('store-001')
@@ -299,9 +315,12 @@ export default function AttendanceTimesheetPage() {
     }
   }, [canManageAttendance, isAuthenticated, router, user])
 
-  // Tính ngày Thứ 2 của tuần hiện tại dựa trên weekOffset
+  // Tính ngày Thứ 2 của tuần hiện tại dựa trên weekOffset (Thời gian thực tế - Real-time)
   const { weekDates, weekLabel, weekNumber, yearNumber } = useMemo(() => {
-    const base = new Date(2026, 7, 17) // Mốc Thứ 2: 17/08/2026 (Tuần 34)
+    const now = new Date()
+    const day = now.getDay()
+    const diffToMonday = now.getDate() - (day === 0 ? 6 : day - 1)
+    const base = new Date(now.getFullYear(), now.getMonth(), diffToMonday, 12, 0, 0, 0)
     base.setDate(base.getDate() + weekOffset * 7)
 
     const dates: { dateStr: string; dayLabel: string; shortDate: string; isToday: boolean }[] = []
@@ -323,19 +342,31 @@ export default function AttendanceTimesheetPage() {
       })
     }
 
+    // Tính ISO week number thực tế
+    const target = new Date(base.valueOf())
+    const dayNr = (base.getDay() + 6) % 7
+    target.setDate(target.getDate() - dayNr + 3)
+    const firstThursday = target.valueOf()
+    target.setMonth(0, 1)
+    if (target.getDay() !== 4) {
+      target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7)
+    }
+    const calculatedWeekNumber = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000)
+
     const startStr = dates[0].shortDate
     const endStr = dates[6].shortDate
     return {
       weekDates: dates,
       weekLabel: `${startStr} - ${endStr}/${base.getFullYear()}`,
-      weekNumber: 34 + weekOffset,
+      weekNumber: calculatedWeekNumber,
       yearNumber: base.getFullYear(),
     }
   }, [weekOffset])
 
-  // Tính danh sách toàn bộ ngày trong Tháng (View Tháng) - Mặc định Tháng 07/2026
+  // Tính danh sách toàn bộ ngày trong Tháng (View Tháng) - Tự động theo tháng hiện tại
   const { monthDates, monthTitle, monthNumber, monthYear } = useMemo(() => {
-    const baseDate = new Date(2026, 6 + monthOffset, 1) // 6 = Tháng 7
+    const now = new Date()
+    const baseDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
     const y = baseDate.getFullYear()
     const m = baseDate.getMonth()
     const daysInMonth = new Date(y, m + 1, 0).getDate()
@@ -372,59 +403,204 @@ export default function AttendanceTimesheetPage() {
     }
   }, [monthOffset])
 
-  // Khởi tạo dữ liệu chấm công từ bộ nhớ bền vững (localStorage)
-  const [timesheetData, setTimesheetData] = useState<Record<string, Record<string, AttendanceSlot[]>>>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('homies_timesheet_data')
-        if (saved) {
-          const parsed = JSON.parse(saved)
-          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-            return parsed
-          }
-        }
-      } catch (e) {
-        console.warn('Lỗi đọc homies_timesheet_data từ localStorage:', e)
-      }
-    }
+  // Khởi tạo dữ liệu chấm công từ API máy chủ (/api/attendance) thay thế localStorage
+  const [timesheetData, setTimesheetData] = useState<Record<string, Record<string, AttendanceSlot[]>>>({})
+  const [apiShifts, setApiShifts] = useState<Array<{
+    id: string
+    employee_id: string
+    store_id: string
+    shift_id: string
+    date: string
+    status: string
+    notes?: string
+    shift_name?: string
+    start_time?: string
+    end_time?: string
+    employee_name?: string
+  }>>([])
+  const [apiEmployees, setApiEmployees] = useState<Employee[]>([])
+  const [isFetchingAttendance, setIsFetchingAttendance] = useState<boolean>(false)
 
-    return {}
-  })
-
-  // Tự động lưu trữ timesheetData vào localStorage để duy trì dữ liệu vĩnh viễn khi F5 hoặc chuyển trang
+  // Nạp danh sách nhân viên từ API máy chủ (/api/employees?status=active)
   useEffect(() => {
-    if (typeof window !== 'undefined' && timesheetData && Object.keys(timesheetData).length > 0) {
-      try {
-        localStorage.setItem('homies_timesheet_data', JSON.stringify(timesheetData))
-      } catch (e) {
-        console.warn('Lỗi lưu homies_timesheet_data vào localStorage:', e)
-      }
-    }
-  }, [timesheetData])
+    let active = true
+    fetch('/api/employees?status=active')
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (active && json?.success && Array.isArray(json.data)) {
+          setApiEmployees(json.data as Employee[])
+        }
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [refreshTrigger])
 
   // Danh sách nhân viên chuẩn từ CSDL theo chi nhánh
   const fullEmployeeList = useMemo(() => {
     const rawList = (EmployeeService.getEmployees() as unknown as Employee[]) || []
+    const combined = [...rawList, ...apiEmployees]
     const seen = new Set<string>()
     const deduped: Employee[] = []
 
-    rawList.forEach(emp => {
-      const code = emp.employee_code?.trim()
+    combined.forEach(emp => {
+      const code = emp.employee_code?.trim().toLowerCase()
       const email = emp.email?.trim().toLowerCase()
-      const id = emp.id?.trim()
-      const key = code || email || id
+      const id = emp.id?.trim().toLowerCase()
+      const name = emp.full_name?.trim().toLowerCase()
+      const key = name || code || email || id
 
       if (key && !seen.has(key)) {
         seen.add(key)
         if (id) seen.add(id)
         if (code) seen.add(code)
         if (email) seen.add(email)
+        if (name) seen.add(name)
         deduped.push(emp)
       }
     })
 
     return deduped
-  }, [refreshTrigger])
+  }, [refreshTrigger, apiEmployees])
+
+  // Nạp dữ liệu chấm công từ API máy chủ
+  useEffect(() => {
+    let active = true
+    const fromDate = viewMode === 'week' ? weekDates[0]?.dateStr : monthDates[0]?.dateStr
+    const toDate = viewMode === 'week' ? weekDates[6]?.dateStr : monthDates[monthDates.length - 1]?.dateStr
+    const params = new URLSearchParams()
+    if (activeStoreId) params.set('store_id', activeStoreId)
+    if (fromDate) params.set('from_date', fromDate)
+    if (toDate) params.set('to_date', toDate)
+
+    const url = `/api/attendance?${params.toString()}`
+    setIsFetchingAttendance(true)
+    fetch(url)
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (active && json?.success && Array.isArray(json.data)) {
+          const map: Record<string, Record<string, AttendanceSlot[]>> = {}
+          const addToMap = (k: string, d: string, slot: AttendanceSlot) => {
+            if (!k || !d) return
+            if (!map[k]) map[k] = {}
+            if (!map[k][d]) map[k][d] = []
+            if (!map[k][d].some(s => s.id === slot.id)) {
+              map[k][d].push(slot)
+            }
+          }
+
+          json.data.forEach((item: {
+            id?: string
+            employee_id: string
+            employee_code?: string
+            employee_name?: string
+            date: string
+            shift_id?: string
+            shift_name?: string
+            check_in_time?: string
+            check_out_time?: string
+            time_in?: string
+            time_out?: string
+            is_late?: boolean
+            status?: string
+            is_early?: boolean
+            late_minutes?: number
+            early_minutes?: number
+            total_hours?: number
+          }) => {
+            const date = item.date
+            if (!date) return
+
+            const timePart = (iso?: string) => {
+              if (!iso) return undefined
+              if (iso.includes('T')) return iso.split('T')[1].slice(0, 5)
+              return iso.slice(0, 5)
+            }
+
+            const inTimeStr = item.time_in || timePart(item.check_in_time)
+            const outTimeStr = item.time_out || timePart(item.check_out_time)
+
+            // Chuẩn hóa ngày hôm nay theo giờ địa phương để so sánh chính xác với ngày của ca làm việc
+            const now = new Date()
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+            const isPastDate = date < todayStr
+
+            let slotStatus: AttendanceSlot['status'] = 'on_time'
+            if (item.status === 'missing_checkout') {
+              slotStatus = 'missing_checkout'
+            } else if (!outTimeStr && inTimeStr) {
+              slotStatus = isPastDate ? 'missing_checkout' : 'working'
+            } else if (item.is_late || item.status === 'late') {
+              slotStatus = 'late'
+            } else if (item.is_early || item.status === 'early') {
+              slotStatus = 'early'
+            } else if (item.status === 'check_out' || item.status === 'checked_out') {
+              slotStatus = 'on_time'
+            }
+
+            const slot: AttendanceSlot = {
+              id: item.id || `att-${item.employee_id}-${date}`,
+              shiftName: item.shift_name || (item.shift_id === 'shift-001' ? 'Ca Sáng' : item.shift_id === 'shift-002' ? 'Ca Chiều' : item.shift_id === 'shift-003' ? 'Ca Tối' : 'Ca làm'),
+              scheduledIn: inTimeStr || '08:30',
+              scheduledOut: outTimeStr || '17:00',
+              actualIn: inTimeStr,
+              actualOut: outTimeStr,
+              status: slotStatus,
+              lateMinutes: item.late_minutes || 0,
+              earlyMinutes: item.early_minutes || 0,
+              totalHours: item.total_hours || (outTimeStr ? 4 : 4),
+              sourceType: 'self',
+            }
+
+            // Tìm nhân viên trong fullEmployeeList để liên kết chuẩn ID
+            const cleanItemName = (item.employee_name || '').toLowerCase().replace(/\s+/g, ' ').trim()
+            const cleanItemCode = (item.employee_code || '').toLowerCase().trim()
+            const matchedEmp = fullEmployeeList.find(e => 
+              e.id === item.employee_id ||
+              (cleanItemCode && e.employee_code && e.employee_code.toLowerCase().trim() === cleanItemCode) ||
+              (cleanItemName && e.full_name && e.full_name.toLowerCase().replace(/\s+/g, ' ').trim() === cleanItemName)
+            )
+
+            if (matchedEmp) {
+              addToMap(matchedEmp.id, date, slot)
+            }
+            if (item.employee_id) {
+              addToMap(item.employee_id, date, slot)
+            }
+            if (item.employee_code) {
+              addToMap(item.employee_code, date, slot)
+            }
+          })
+          setTimesheetData(map)
+        }
+      })
+      .catch(e => console.warn('[AttendancePage] fetch attendance error:', e))
+      .finally(() => {
+        if (active) setIsFetchingAttendance(false)
+      })
+    return () => { active = false }
+  }, [activeStoreId, refreshTrigger, viewMode, weekDates, monthDates, fullEmployeeList])
+
+  // Nạp dữ liệu ca phân công từ API máy chủ (Truyền đúng khoảng ngày tuần/tháng thực tế)
+  useEffect(() => {
+    let active = true
+    const fromDate = viewMode === 'week' ? weekDates[0]?.dateStr : monthDates[0]?.dateStr
+    const toDate = viewMode === 'week' ? weekDates[6]?.dateStr : monthDates[monthDates.length - 1]?.dateStr
+    const params = new URLSearchParams()
+    if (activeStoreId) params.set('store_id', activeStoreId)
+    if (fromDate) params.set('from_date', fromDate)
+    if (toDate) params.set('to_date', toDate)
+
+    const url = `/api/shifts?${params.toString()}`
+    fetch(url)
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (active && json?.success && Array.isArray(json.data)) {
+          setApiShifts(json.data)
+        }
+      })
+      .catch(e => console.warn('[AttendancePage] fetch shifts error:', e))
+    return () => { active = false }
+  }, [activeStoreId, refreshTrigger, viewMode, weekDates, monthDates])
 
   // ─── TỰ ĐỘNG ĐỒNG BỘ 2 CHIỀU VỚI BẢNG PHÂN CA LỊCH LÀM VIỆC (DỮ LIỆU THỰC) ───
   const mergedTimesheetData = useMemo(() => {
@@ -443,13 +619,40 @@ export default function AttendanceTimesheetPage() {
       ? ScheduleService.getPublishedSchedulesForStore(user, activeStoreId, currentDates)
       : []
 
+    // Bổ sung các ca APPROVED từ API máy chủ (/api/shifts)
+    const existingSchIds = new Set(storeSchedules.map(s => s.id))
+    const extraApiShifts = apiShifts.filter(s =>
+      (!activeStoreId || s.store_id === activeStoreId) &&
+      currentDates.includes(s.date) &&
+      (s.status === 'APPROVED' || s.status === 'published') &&
+      !existingSchIds.has(s.id)
+    ).map(s => ({
+      id: s.id,
+      org_id: 'org-001',
+      store_id: s.store_id || activeStoreId,
+      employee_id: s.employee_id,
+      employee_name: s.employee_name,
+      shift_id: s.shift_id,
+      date: s.date,
+      notes: s.notes || s.shift_name,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      shift_name: s.shift_name,
+      status: 'published' as const,
+      updated_at: new Date().toISOString(),
+    }))
+
+    const combinedSchedules = [...storeSchedules, ...extraApiShifts]
+
     // 2. Đồng bộ các ca từ Lịch làm việc sang Chấm công
-    storeSchedules.forEach(sch => {
+    combinedSchedules.forEach(sch => {
       // Khớp nhân viên theo ID, mã nhân viên hoặc tên
+      const schEmpName = ((sch as any).employee_name || sch.notes || (sch as any).shift_name || '').toLowerCase().replace(/\s+/g, ' ').trim()
       const emp = fullEmployeeList.find(e => 
         e.id === sch.employee_id || 
-        e.employee_code === sch.employee_id ||
-        (sch.employee_id && e.full_name.toLowerCase().includes(sch.employee_id.toLowerCase()))
+        (e.employee_code && e.employee_code.toLowerCase() === sch.employee_id.toLowerCase()) ||
+        (schEmpName && e.full_name.toLowerCase().replace(/\s+/g, ' ').trim() === schEmpName) ||
+        (schEmpName && e.full_name.toLowerCase().includes(schEmpName))
       )
       const targetEmpId = emp ? emp.id : sch.employee_id
       if (!targetEmpId) return
@@ -458,14 +661,14 @@ export default function AttendanceTimesheetPage() {
         merged[targetEmpId] = {}
       }
 
-      const existingSlots = merged[targetEmpId][sch.date] || []
+      const existingSlots = merged[targetEmpId][sch.date] || (emp && merged[emp.id]?.[sch.date]) || []
 
       // Nếu ngày đó chưa có dữ liệu chấm công thực tế, hiển thị ca theo lịch phân ca
       if (existingSlots.length === 0) {
         const tpl = allTemplates.find(t => t.id === sch.shift_id)
-        let sName = tpl?.name || 'Ca làm'
-        let sIn = tpl?.start_time || '08:30'
-        let sOut = tpl?.end_time || '17:00'
+        let sName = (sch as any).shift_name || tpl?.name || 'Ca làm'
+        let sIn = (sch as any).start_time || tpl?.start_time || '08:30'
+        let sOut = (sch as any).end_time || tpl?.end_time || '17:00'
 
         if (sch.notes) {
           const timeMatch = sch.notes.match(/\[(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\]/) || sch.notes.match(/\((\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\)/)
@@ -477,23 +680,39 @@ export default function AttendanceTimesheetPage() {
           if (cleanName) sName = cleanName
         }
 
-        merged[targetEmpId][sch.date] = [
-          {
-            id: `sched-sync-${sch.id}`,
-            shiftName: sName,
-            scheduledIn: sIn,
-            scheduledOut: sOut,
-            status: 'scheduled',
-            totalHours: 5.0,
-            isFromSchedule: true,
-            sourceType: 'auto_sync',
-          }
-        ]
+        let schHours = 4.0
+        if (sIn && sOut) {
+          const [inH, inM] = sIn.split(':').map(Number)
+          const [outH, outM] = sOut.split(':').map(Number)
+          let diffMin = (outH * 60 + outM) - (inH * 60 + inM)
+          if (diffMin < 0) diffMin += 24 * 60
+          schHours = Math.round((diffMin / 60) * 10) / 10
+        }
+
+        const slotItem: AttendanceSlot = {
+          id: `sched-sync-${sch.id}`,
+          shiftName: sName,
+          scheduledIn: sIn,
+          scheduledOut: sOut,
+          status: 'scheduled',
+          totalHours: schHours,
+          isFromSchedule: true,
+          sourceType: 'auto_sync',
+        }
+
+        if (!merged[targetEmpId][sch.date]) merged[targetEmpId][sch.date] = []
+        merged[targetEmpId][sch.date].push(slotItem)
+
+        if (emp && emp.id !== targetEmpId) {
+          if (!merged[emp.id]) merged[emp.id] = {}
+          if (!merged[emp.id][sch.date]) merged[emp.id][sch.date] = []
+          merged[emp.id][sch.date].push(slotItem)
+        }
       }
     })
 
     return merged
-  }, [timesheetData, activeStoreId, weekDates, monthDates, viewMode, refreshTrigger, fullEmployeeList, user])
+  }, [timesheetData, activeStoreId, weekDates, monthDates, viewMode, refreshTrigger, fullEmployeeList, user, apiShifts])
 
   const activeDatesList = useMemo(() => {
     if (viewMode === 'week') return weekDates
@@ -506,7 +725,11 @@ export default function AttendanceTimesheetPage() {
   const tableRows: EmployeeTimesheetRow[] = useMemo(() => {
     return fullEmployeeList
       .filter(emp => {
-        const matchStore = !activeStoreId || isStoreMatch(emp.store_id, activeStoreId) || (!emp.store_id && isStoreMatch('store-001', activeStoreId))
+        if (emp.status === 'inactive' || (emp.status as string) === 'resigned') return false
+        const matchStore = !activeStoreId || 
+          isStoreMatch(emp.store_id, activeStoreId) || 
+          (Array.isArray(emp.secondary_store_ids) && emp.secondary_store_ids.some(sid => isStoreMatch(sid, activeStoreId))) ||
+          (!emp.store_id && isStoreMatch('store-001', activeStoreId))
         if (!matchStore) return false
         if (selectedPositionId !== 'ALL' && emp.position_id !== selectedPositionId) return false
         if (searchQuery.trim()) {
@@ -528,6 +751,16 @@ export default function AttendanceTimesheetPage() {
         activeDatesList.forEach(({ dateStr }) => {
           const slots = empDays[dateStr] || []
           slots.forEach(slot => {
+            // Strict Validator: Ca rác hoặc ca vượt mốc 22:00 bị loại bỏ khỏi tổng giờ tự động
+            const inTime = slot.actualIn || slot.scheduledIn || ''
+            const outTime = slot.actualOut || slot.scheduledOut || ''
+            const isPast22 = isShiftPast22PM(inTime, outTime)
+            const isTrash = isTrashShift(slot.shiftName || '', slot.scheduledIn || '', slot.scheduledOut || '')
+
+            if (isPast22 || isTrash) {
+              return
+            }
+
             totalHours += slot.totalHours || 0
             totalShifts += 1
             if (slot.status === 'on_time') onTimeCount += 1
@@ -1435,13 +1668,6 @@ export default function AttendanceTimesheetPage() {
     })
 
     setTimesheetData(updatedData)
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('homies_timesheet_data', JSON.stringify(updatedData))
-      } catch (e) {
-        console.warn('Lỗi lưu homies_timesheet_data:', e)
-      }
-    }
     const now = new Date()
     const curY = now.getFullYear()
     const curM = now.getMonth() + 1
@@ -1571,7 +1797,27 @@ export default function AttendanceTimesheetPage() {
     setTimeout(() => setToastMessage(null), 3000)
   }
 
-  if (!user || !isAuthenticated || !canManageAttendance) return null
+  if (!mounted) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FFF8E8] px-6">
+        <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-white px-5 py-4 text-sm font-medium text-amber-900 shadow-sm">
+          <Loader2 size={18} className="animate-spin text-amber-600" />
+          Đang tải dữ liệu chấm công...
+        </div>
+      </div>
+    )
+  }
+
+  if (!user || !isAuthenticated || !canManageAttendance) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FFF8E8] px-6">
+        <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-white px-5 py-4 text-sm font-medium text-amber-900 shadow-sm">
+          <Loader2 size={18} className="animate-spin text-amber-600" />
+          Đang chuyển hướng...
+        </div>
+      </div>
+    )
+  }
 
   return (
     <AppShell showNav>
@@ -1818,7 +2064,7 @@ export default function AttendanceTimesheetPage() {
                 <Timer size={16} />
               </div>
             </div>
-            <div className="mt-2 text-2xl font-bold font-mono tabular-nums text-[#001D3D]">
+            <div className="mt-2 text-2xl font-bold font-sans tabular-nums text-[#001D3D]">
               {macroStats.totalHours}h
             </div>
             <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500 font-medium">
@@ -1834,7 +2080,7 @@ export default function AttendanceTimesheetPage() {
                 <CheckCircle2 size={16} />
               </div>
             </div>
-            <div className="mt-2 text-2xl font-bold font-mono tabular-nums text-emerald-700">
+            <div className="mt-2 text-2xl font-bold font-sans tabular-nums text-emerald-700">
               {macroStats.onTimeRate}%
             </div>
             <div className="mt-1 flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
@@ -1850,7 +2096,7 @@ export default function AttendanceTimesheetPage() {
                 <AlertTriangle size={16} />
               </div>
             </div>
-            <div className="mt-2 text-2xl font-bold font-mono tabular-nums text-rose-700">
+            <div className="mt-2 text-2xl font-bold font-sans tabular-nums text-rose-700">
               {macroStats.issuesCount} ca
             </div>
             <div className="mt-1 flex items-center gap-1 text-[11px] text-rose-600 font-medium">
@@ -1866,7 +2112,7 @@ export default function AttendanceTimesheetPage() {
                 <Users size={16} />
               </div>
             </div>
-            <div className="mt-2 text-2xl font-bold font-mono tabular-nums text-[#2F6FA8]">
+            <div className="mt-2 text-2xl font-bold font-sans tabular-nums text-[#2F6FA8]">
               {macroStats.activeStaff}/{macroStats.totalStaff} NV
             </div>
             <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500 font-medium">
@@ -1942,6 +2188,12 @@ export default function AttendanceTimesheetPage() {
                   <LinkIcon size={11} className="text-[#2F6FA8]" />
                   <span>Từ lịch ca</span>
                 </span>
+                {isFetchingAttendance && (
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-50 text-[#2F6FA8] border border-blue-200/80 font-bold text-[11px] animate-pulse">
+                    <RefreshCw size={11} className="animate-spin" />
+                    <span>Đang nạp dữ liệu...</span>
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -2099,7 +2351,7 @@ export default function AttendanceTimesheetPage() {
                               {row.employee.full_name}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-[10px] font-mono text-gray-500 font-bold">
+                              <span className="text-[10px] font-sans text-gray-500 font-semibold">
                                 {row.employee.employee_code || `NV00${index + 1}`}
                               </span>
                               {row.position && (
@@ -2125,16 +2377,24 @@ export default function AttendanceTimesheetPage() {
                               <div className="space-y-1 min-h-[52px] flex flex-col justify-between">
                                 <div className="space-y-1">
                                   {slots.map(slot => {
-                                    let badgeStyle = 'border-gray-200 bg-gray-50 text-gray-700'
-                                    let timeText = `${slot.actualIn || slot.scheduledIn} - ${slot.actualOut || slot.scheduledOut}`
+                                    const inTime = slot.actualIn || slot.scheduledIn || ''
+                                    const outTime = slot.actualOut || slot.scheduledOut || ''
+                                    const isPast22 = isShiftPast22PM(inTime, outTime)
+                                    const isTrash = isTrashShift(slot.shiftName || '', slot.scheduledIn || '', slot.scheduledOut || '')
 
-                                    if (slot.status === 'on_time') {
+                                    let badgeStyle = 'border-gray-200 bg-gray-50 text-gray-700'
+                                    let timeText = `${inTime} - ${outTime}`
+
+                                    if (isPast22 || isTrash) {
+                                      badgeStyle = 'border-rose-400 bg-rose-50 text-rose-900 ring-1 ring-rose-300 hover:bg-rose-100'
+                                      timeText = `${inTime} - ${outTime}`
+                                    } else if (slot.status === 'on_time') {
                                       badgeStyle = 'border-emerald-300 bg-[#DDF4EC] text-emerald-900 hover:bg-[#c9eee1]'
                                     } else if (slot.status === 'late' || slot.status === 'early') {
                                       badgeStyle = 'border-amber-300 bg-[#FEF3C7] text-amber-900 hover:bg-[#fde68a]'
                                     } else if (slot.status === 'missing_checkout') {
                                       badgeStyle = 'border-rose-300 bg-[#FFE4E6] text-rose-900 hover:bg-[#fecdd3]'
-                                      timeText = `${slot.actualIn || slot.scheduledIn} - QCO`
+                                      timeText = `${inTime} - QCO`
                                     } else if (slot.status === 'working') {
                                       badgeStyle = 'border-amber-300 bg-[#FEF3C7] text-amber-900 animate-pulse'
                                       timeText = 'Đang làm việc'
@@ -2150,23 +2410,32 @@ export default function AttendanceTimesheetPage() {
                                         key={slot.id}
                                         type="button"
                                         onClick={() => handleOpenWorkInfoModal(slot, row.employee, w.dateStr, w.dayLabel)}
-                                        className={`w-full rounded-xl border p-1 text-center text-xs font-mono font-bold tabular-nums shadow-2xs transition cursor-pointer flex flex-col items-center justify-center relative ${badgeStyle}`}
-                                        title={`${slot.shiftName} (${slot.scheduledIn} - ${slot.scheduledOut}) - Bấm để xem chi tiết`}
+                                        className={`w-full rounded-xl border p-1 text-center text-xs font-sans font-semibold tabular-nums shadow-2xs transition cursor-pointer flex flex-col items-center justify-center relative ${badgeStyle}`}
+                                        title={`${slot.shiftName} (${slot.scheduledIn} - ${slot.scheduledOut}) ${isPast22 ? '- CẢNH BÁO: Quá 22h, loại khỏi tính công' : ''} - Bấm để xem chi tiết`}
                                       >
                                         <div className="truncate w-full text-[10px] sm:text-[10.5px] leading-tight flex items-center justify-center gap-1">
-                                          {slot.isOvertime && (
+                                          {(isPast22 || isTrash) ? (
+                                            <span className="text-[10px] text-rose-600 font-bold" title="Ca rác / Quá 22h - Không tính công">
+                                              ⚠️
+                                            </span>
+                                          ) : slot.isOvertime ? (
                                             <span className="inline-flex items-center text-amber-700 text-[9px] font-bold" title="Tăng ca">
                                               ⚡
                                             </span>
-                                          )}
+                                          ) : null}
                                           <span>{timeText}</span>
                                         </div>
+                                        {(isPast22 || isTrash) && (
+                                          <div className="text-[8.5px] font-bold text-rose-600 leading-tight">
+                                            0h (Loại trừ)
+                                          </div>
+                                        )}
                                         {slot.isEdited && (
                                           <div className="absolute top-0.5 right-1 text-gray-500" title="Đã chỉnh sửa">
                                             <Edit3 size={8} />
                                           </div>
                                         )}
-                                        {slot.isFromSchedule && (
+                                        {slot.isFromSchedule && !isPast22 && !isTrash && (
                                           <div className="text-[9px] text-gray-400 font-sans font-medium mt-0.2 truncate w-full">
                                             {slot.shiftName}
                                           </div>
@@ -2193,7 +2462,7 @@ export default function AttendanceTimesheetPage() {
 
                         {/* Cột Tổng công */}
                         <td className="py-3 px-3 text-center bg-gray-50/50 sticky right-0 bg-gray-50/95 z-10 shadow-xs">
-                          <div className="font-mono tabular-nums font-bold text-xs text-[#001D3D]">
+                          <div className="font-sans tabular-nums font-bold text-xs text-[#001D3D]">
                             {row.totalHours}h
                           </div>
                           <div className="text-[10px] text-gray-500 font-medium mt-0.5">
@@ -2209,126 +2478,17 @@ export default function AttendanceTimesheetPage() {
           </div>
         </div>
 
-        {/* ─── MODAL 1: THÔNG TIN CÔNG (CHUẨN 100% THEO ẢNH 2 ĐÍNH KÈM) ─── */}
-        {viewingWorkInfo && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
-            <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col animate-scale-in border border-gray-200">
-              
-              {/* Header Modal */}
-              <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white">
-                <h2 className="text-base font-bold text-gray-900">
-                  Thông tin công
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setViewingWorkInfo(null)}
-                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Bảng danh sách trường thông tin */}
-              <div className="p-6 divide-y divide-gray-100 text-xs">
-                <div className="py-3 flex items-center justify-between">
-                  <span className="font-bold text-gray-700 w-1/3">Ngày tính công</span>
-                  <span className="font-medium text-gray-900 w-2/3">{viewingWorkInfo.dateStr.split('-').reverse().join('/')}</span>
-                </div>
-
-                <div className="py-3 flex items-center justify-between">
-                  <span className="font-bold text-gray-700 w-1/3">Nhân viên</span>
-                  <span className="font-semibold text-[#2F6FA8] w-2/3 hover:underline cursor-pointer">
-                    {viewingWorkInfo.employee.full_name}
-                  </span>
-                </div>
-
-                <div className="py-3 flex items-center justify-between">
-                  <span className="font-bold text-gray-700 w-1/3">Ca làm việc</span>
-                  <span className="font-semibold text-[#2F6FA8] w-2/3">
-                    {viewingWorkInfo.slot.shiftName}
-                  </span>
-                </div>
-
-                <div className="py-3 flex items-center justify-between">
-                  <span className="font-bold text-gray-700 w-1/3">Giờ check-in tính công</span>
-                  <div className="w-2/3 flex items-center justify-between">
-                    <span className="font-mono font-bold text-[#2F6FA8]">
-                      {viewingWorkInfo.slot.actualIn || viewingWorkInfo.slot.scheduledIn}
-                    </span>
-                    <span className="text-emerald-700 font-semibold text-[11px]">
-                      {viewingWorkInfo.slot.locationNoteIn || `Cách chi nhánh ${viewingWorkInfo.slot.distanceInMeters || 19}m`}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="py-3 flex items-center justify-between">
-                  <span className="font-bold text-gray-700 w-1/3">Giờ check-out tính công</span>
-                  <div className="w-2/3 flex items-center justify-between">
-                    <span className="font-mono font-bold text-[#2F6FA8]">
-                      {viewingWorkInfo.slot.actualOut || viewingWorkInfo.slot.scheduledOut || 'Chưa check-out'}
-                    </span>
-                    {viewingWorkInfo.slot.actualOut && (
-                      <span className="text-emerald-700 font-semibold text-[11px]">
-                        {viewingWorkInfo.slot.locationNoteOut || `Cách chi nhánh ${viewingWorkInfo.slot.distanceOutMeters || 14}m`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="py-3 flex items-center justify-between">
-                  <span className="font-bold text-gray-700 w-1/3">Số giờ tính công</span>
-                  <span className="font-mono font-bold text-gray-900 w-2/3">
-                    {viewingWorkInfo.slot.totalHours || 5}
-                  </span>
-                </div>
-
-                <div className="py-3 flex items-center justify-between">
-                  <span className="font-bold text-gray-700 w-1/3">Xin ra ngoài trong ca</span>
-                  <span className="font-medium text-gray-800 w-2/3">Không</span>
-                </div>
-
-                <div className="py-3 flex items-center justify-between">
-                  <span className="font-bold text-gray-700 w-1/3">Trạng thái</span>
-                  <span className={`w-2/3 font-bold ${
-                    viewingWorkInfo.slot.status === 'on_time' 
-                      ? 'text-emerald-700' 
-                      : viewingWorkInfo.slot.status === 'missing_checkout'
-                      ? 'text-rose-700'
-                      : 'text-amber-700'
-                  }`}>
-                    {viewingWorkInfo.slot.status === 'on_time' ? 'Đúng giờ' : viewingWorkInfo.slot.status === 'missing_checkout' ? 'Quên chấm công' : 'Đi trễ / Không đúng giờ'}
-                  </span>
-                </div>
-
-                <div className="py-3 flex items-center justify-between">
-                  <span className="font-bold text-gray-700 w-1/3">Nguồn công</span>
-                  <span className="font-medium text-gray-800 w-2/3">
-                    {viewingWorkInfo.slot.sourceType === 'self' ? 'Nhân viên tự chấm công' : viewingWorkInfo.slot.isFromSchedule ? 'Đồng bộ từ Lịch phân ca' : 'Quản lý bổ sung'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Footer Modal */}
-              <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4 bg-white">
-                <button
-                  type="button"
-                  onClick={handleDeleteWorkInfo}
-                  className="rounded-xl bg-rose-500 hover:bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-2xs transition cursor-pointer"
-                >
-                  Xóa công
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSwitchToEditModal}
-                  className="rounded-xl bg-[#2F6FA8] hover:bg-[#1D3E61] px-5 py-2 text-xs font-bold text-white shadow-2xs transition cursor-pointer"
-                >
-                  Sửa công
-                </button>
-              </div>
-
-            </div>
-          </div>
-        )}
+        {/* ─── DRAWER 1-CHẠM: THÔNG TIN CÔNG (CHUẨN APPLE SAAS SLIDE-OVER) ─── */}
+        <AttendanceQuickDrawer
+          isOpen={!!viewingWorkInfo}
+          onClose={() => setViewingWorkInfo(null)}
+          slot={viewingWorkInfo?.slot || null}
+          employee={viewingWorkInfo?.employee || null}
+          dateStr={viewingWorkInfo?.dateStr || ''}
+          dayLabel={viewingWorkInfo?.dayLabel}
+          onEdit={handleSwitchToEditModal}
+          onDelete={handleDeleteWorkInfo}
+        />
 
         {/* ─── MODAL 2: SỬA CÔNG NGÀY... (CHUẨN 100% THEO ẢNH 1 ĐÍNH KÈM) ─── */}
         {editingWorkInfo && (

@@ -16,7 +16,6 @@ import { settingsSystem } from '@/lib/mock-data-settings'
 import { createNotificationDeduped } from '@/lib/notifications/notification-center'
 import { OnboardingPolicyService } from '@/lib/services/onboarding-policy-service'
 
-const STORAGE_KEY = 'hrm_employees_db'
 const INVITATIONS_KEY = 'hrm_invitations_db'
 const EMPLOYEE_ACTIVITY_LOGS_KEY = 'hrm_employee_activity_logs'
 const DEFAULT_PROBATION_DAYS = 60
@@ -255,125 +254,313 @@ function normalizeEmployeeProfile(user: AuthUser): AuthUser {
 }
 
 function syncSeedAccessFields(storedUser: AuthUser, seedUser: AuthUser): AuthUser {
+  const mergedSecondaryStoreIds = Array.from(new Set([
+    ...(seedUser.secondary_store_ids || []),
+    ...(storedUser.secondary_store_ids || []),
+  ]))
   return normalizeEmployeeProfile({
     ...seedUser,
     ...storedUser,
+    secondary_store_ids: mergedSecondaryStoreIds.length > 0 ? mergedSecondaryStoreIds : undefined,
   })
 }
 
-// Danh sách nhân sự chính thức của hệ thống Homies
+// Danh sách 16 nhân sự chính thức của chuỗi Homies F&B (Data thật từ iPOS & Server DB)
+// Danh sách 14 nhân sự thực tế + CEO Nguyễn Đức Nghĩa chuẩn hợp đồng iPOS
 const INITIAL_EMPLOYEES: AuthUser[] = [
+  // CEO điều hành
   {
     id: 'emp-001',
     full_name: 'Nguyễn Đức Nghĩa',
     email: 'tuan@bobahouse.vn',
     role: 'ceo',
     store_id: 'store-001',
-    position_id: 'pos-005',
-    phone: '0901234567',
+    position_id: 'pos-ceo',
+    phone: '0919246273',
     employee_code: 'BH-001',
     status: 'active',
     account_status: 'dang_hoat_dong',
+    department_name: 'Ban Giám đốc',
     total_points: 5200,
     gamification_level: 'platinum',
-    hire_date: '2023-01-01',
+    official_salary: 25000000,
+    hourly_rate: 100000,
+    hire_date: '2024-01-01',
     kpi_level: 'L5',
   },
+
+  // 2 Nhân sự Full-time: Lương cứng chuẩn 6.600.000đ/tháng (Store chính: Đường 429, Store phụ: Hồ Bá Phấn)
   {
-    id: 'e04b5c70-97e2-4061-8bef-0fae5563a066',
-    full_name: 'Huỳnh Lê Kiều Linh',
-    email: 'huynhlekieulinh6@gmail.com',
-    role: 'employee',
-    store_id: 'store-002',
-    position_id: 'pos-001',
-    phone: '0779554540',
-    employee_code: 'BH-0913',
-    status: 'active',
-    account_status: 'dang_hoat_dong',
-    total_points: 1500,
-    gamification_level: 'silver',
-    hire_date: '2024-03-01',
-    kpi_level: 'L2',
-  },
-  {
-    id: 'f747f06f-9e95-406e-a5b5-0f6571dbfaa4',
-    full_name: 'Phạm Nguyễn Đông Duy',
-    email: 'phamnguyendongduy2020@gmail.com',
-    role: 'employee',
-    store_id: 'store-002',
-    position_id: 'pos-001',
-    phone: '0943749525',
-    employee_code: 'NV0028',
-    status: 'active',
-    account_status: 'dang_hoat_dong',
-    total_points: 1800,
-    gamification_level: 'silver',
-    hire_date: '2026-04-25',
-    kpi_level: 'L2',
-  },
-  {
-    id: '2f3acef5-118f-490b-8530-d86aa164b90a',
-    full_name: 'Lê Minh Lộc',
-    email: 'lloclm0203@gmail.com',
-    role: 'employee',
-    store_id: 'store-002',
-    position_id: 'pos-001',
-    phone: '0945576422',
-    employee_code: 'NV0020',
-    status: 'active',
-    account_status: 'dang_hoat_dong',
-    total_points: 1650,
-    gamification_level: 'silver',
-    hire_date: '2025-11-30',
-    kpi_level: 'L2',
-  },
-  {
-    id: 'd8b8ecd5-1e74-415b-a739-2fa6bbd81284',
-    full_name: 'Nguyễn Thanh Thiện',
-    email: 'nguyenthanhthien2804@gmail.com',
-    role: 'employee',
-    store_id: 'store-002',
-    position_id: 'pos-002',
-    phone: '0775943568',
-    employee_code: 'NV0017',
-    status: 'active',
-    account_status: 'dang_hoat_dong',
-    total_points: 1700,
-    gamification_level: 'silver',
-    hire_date: '2025-10-21',
-    kpi_level: 'L2',
-  },
-  {
-    id: '10a4897f-9936-41a7-804f-8a4556eaaf0c',
-    full_name: 'Nguyễn Thị Kiều Ý',
-    email: 'kieuy4052007@gmail.com',
-    role: 'store_manager',
-    store_id: 'store-002',
-    position_id: 'pos-005',
-    phone: '0378410208',
-    employee_code: 'NV0016',
-    status: 'active',
-    account_status: 'dang_hoat_dong',
-    total_points: 2500,
-    gamification_level: 'gold',
-    hire_date: '2025-10-05',
-    kpi_level: 'L3',
-  },
-  {
-    id: '9392ab72-eacc-4211-a0b3-a183c0db75d5',
+    id: 'emp-nv0027',
     full_name: 'Trần Công Huy',
     email: 'jinn.wooo.02@gmail.com',
     role: 'store_manager',
-    store_id: 'store-001',
-    position_id: 'pos-005',
+    store_id: 'store-002',
+    secondary_store_ids: ['store-001', 'store-002'],
+    position_id: 'pos-sm',
     phone: '0332151527',
     employee_code: 'NV0027',
     status: 'active',
     account_status: 'dang_hoat_dong',
-    total_points: 2200,
+    department_name: 'Quản lý cửa hàng',
+    total_points: 3900,
     gamification_level: 'gold',
-    hire_date: '2026-04-05',
+    official_salary: 6600000,
+    hourly_rate: 31730,
+    hire_date: '2024-04-01',
+    kpi_level: 'L4',
+  },
+  {
+    id: 'emp-nv0028',
+    full_name: 'Phạm Nguyễn Đông Duy',
+    email: 'phamnguyendongduy2020@gmail.com',
+    role: 'employee',
+    store_id: 'store-002',
+    secondary_store_ids: ['store-001', 'store-002'],
+    position_id: 'pos-barista',
+    phone: '0943749525',
+    employee_code: 'NV0028',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Pha chế & Barista',
+    total_points: 1800,
+    gamification_level: 'silver',
+    official_salary: 6600000,
+    hourly_rate: 31730,
+    hire_date: '2025-01-15',
+    kpi_level: 'L2',
+  },
+
+  // 12 Nhân sự Part-time: Hưởng lương theo giờ, KHÔNG có lương cứng (official_salary = 0)
+  {
+    id: 'emp-nv0008',
+    full_name: 'Nguyễn Thị Phương Thảo',
+    email: 'nguyenphuongthao4324@gmail.com',
+    role: 'shift_leader',
+    store_id: 'store-001',
+    position_id: 'pos-004',
+    phone: '0349439071',
+    employee_code: 'NV0008',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Trưởng ca',
+    total_points: 1550,
+    gamification_level: 'silver',
+    official_salary: 0,
+    hourly_rate: 28000,
+    hire_date: '2025-05-01',
     kpi_level: 'L3',
+  },
+  {
+    id: 'emp-bh9852',
+    full_name: 'Huỳnh Lê Kiều Linh',
+    email: 'huynhlekieulinh6@gmail.com',
+    role: 'store_manager',
+    store_id: 'store-001',
+    secondary_store_ids: ['store-001', 'store-002'],
+    position_id: 'pos-sm',
+    phone: '0779554540',
+    employee_code: 'BH-9852',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Quản lý cửa hàng',
+    total_points: 4200,
+    gamification_level: 'platinum',
+    official_salary: 0,
+    hourly_rate: 25000,
+    hire_date: '2024-05-10',
+    kpi_level: 'L4',
+  },
+  {
+    id: 'emp-nv0024',
+    full_name: 'Tấn Hiếu',
+    email: 'tan569619@gmail.com',
+    role: 'employee',
+    store_id: 'store-001',
+    position_id: 'pos-service',
+    phone: '0932835952',
+    employee_code: 'NV0024',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Phục vụ & Phụ bar',
+    total_points: 1400,
+    gamification_level: 'silver',
+    official_salary: 0,
+    hourly_rate: 16000,
+    hire_date: '2025-08-01',
+    kpi_level: 'L2',
+  },
+  {
+    id: 'emp-nv0016',
+    full_name: 'Nguyễn Thị Kiều Ý',
+    email: 'kieuy4052007@gmail.com',
+    role: 'store_manager',
+    store_id: 'store-002',
+    position_id: 'pos-sm',
+    phone: '0378410208',
+    employee_code: 'NV0016',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Quản lý cửa hàng',
+    total_points: 3800,
+    gamification_level: 'gold',
+    official_salary: 0,
+    hourly_rate: 20000,
+    hire_date: '2024-06-15',
+    kpi_level: 'L4',
+  },
+  {
+    id: 'emp-nv0013',
+    full_name: 'Nguyễn Thị Tú Trinh',
+    email: 'ngthtutrinh.0504@gmail.com',
+    role: 'employee',
+    store_id: 'store-001',
+    position_id: 'pos-cashier',
+    phone: '0373056852',
+    employee_code: 'NV0013',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Thu ngân & Phục vụ',
+    total_points: 1600,
+    gamification_level: 'silver',
+    official_salary: 0,
+    hourly_rate: 20000,
+    hire_date: '2025-02-01',
+    kpi_level: 'L2',
+  },
+  {
+    id: 'emp-nv0017',
+    full_name: 'Nguyễn Thanh Thiện',
+    email: 'nguyenthanhthien2804@gmail.com',
+    role: 'employee',
+    store_id: 'store-002',
+    position_id: 'pos-barista',
+    phone: '0775943568',
+    employee_code: 'NV0017',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Pha chế & Barista',
+    total_points: 1700,
+    gamification_level: 'silver',
+    official_salary: 0,
+    hourly_rate: 20000,
+    hire_date: '2025-03-01',
+    kpi_level: 'L2',
+  },
+  {
+    id: 'emp-nv0020',
+    full_name: 'Lê Minh Lộc',
+    email: 'lloclm0203@gmail.com',
+    role: 'shift_leader',
+    store_id: 'store-002',
+    position_id: 'pos-leader',
+    phone: '0945576422',
+    employee_code: 'NV0020',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Vận hành cửa hàng',
+    total_points: 2600,
+    gamification_level: 'gold',
+    official_salary: 0,
+    hourly_rate: 20000,
+    hire_date: '2024-08-20',
+    kpi_level: 'L3',
+  },
+  {
+    id: 'emp-nv0030',
+    full_name: 'Quách Thị Kim Chi',
+    email: 'quachchi0909@gmail.com',
+    role: 'employee',
+    store_id: 'store-001',
+    position_id: 'pos-barista',
+    phone: '0327431568',
+    employee_code: 'NV0030',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Thu ngân & Pha chế',
+    total_points: 1750,
+    gamification_level: 'silver',
+    official_salary: 0,
+    hourly_rate: 20000,
+    hire_date: '2025-04-10',
+    kpi_level: 'L2',
+  },
+  {
+    id: 'emp-nv0031',
+    full_name: 'Cao Văn Thắng',
+    email: 'vanthangdzai008@gmail.com',
+    role: 'employee',
+    store_id: 'store-001',
+    position_id: 'pos-barista',
+    phone: '0336675736',
+    employee_code: 'NV0031',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Pha chế & Barista',
+    total_points: 1600,
+    gamification_level: 'silver',
+    official_salary: 0,
+    hourly_rate: 20000,
+    hire_date: '2025-05-15',
+    kpi_level: 'L2',
+  },
+  {
+    id: 'emp-nv0033',
+    full_name: 'Nguyễn Hoài Ân',
+    email: 'hie.agg21@gmail.com',
+    role: 'employee',
+    store_id: 'store-001',
+    position_id: 'pos-barista',
+    phone: '0364136210',
+    employee_code: 'NV0033',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Pha chế & Barista',
+    total_points: 1650,
+    gamification_level: 'silver',
+    official_salary: 0,
+    hourly_rate: 20000,
+    hire_date: '2025-04-15',
+    kpi_level: 'L2',
+  },
+  {
+    id: 'emp-nv0034',
+    full_name: 'Nguyễn Thị Thu',
+    email: 'ntthu.work1@gmail.com',
+    role: 'employee',
+    store_id: 'store-002',
+    secondary_store_ids: ['store-001', 'store-002'],
+    position_id: 'pos-cashier',
+    phone: '0963593319',
+    employee_code: 'NV0034',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Thu ngân & Phục vụ',
+    total_points: 1500,
+    gamification_level: 'silver',
+    official_salary: 0,
+    hourly_rate: 20000,
+    hire_date: '2025-06-01',
+    kpi_level: 'L2',
+  },
+  {
+    id: 'emp-nv0035',
+    full_name: 'Nguyễn Mạnh Duy',
+    email: 'oppoa5301012021@gmail.com',
+    role: 'employee',
+    store_id: 'store-001',
+    position_id: 'pos-service',
+    phone: '0377249775',
+    employee_code: 'NV0035',
+    status: 'active',
+    account_status: 'dang_hoat_dong',
+    department_name: 'Phục vụ & Phụ bar',
+    total_points: 1400,
+    gamification_level: 'silver',
+    official_salary: 0,
+    hourly_rate: 20000,
+    hire_date: '2025-07-15',
+    kpi_level: 'L2',
   },
 ]
 
@@ -658,37 +845,105 @@ export class EmployeeService {
     return deduped.map(user => normalizeEmployeeProfile(user))
   }
 
-  private static getDb(): AuthUser[] {
-    if (typeof window === 'undefined') return INITIAL_EMPLOYEES
-    
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) {
-      const seeded = INITIAL_EMPLOYEES.map(user => normalizeEmployeeProfile(user))
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
-      return seeded
-    }
-    
-    try {
-      const parsed = JSON.parse(stored) as unknown
-      if (!Array.isArray(parsed)) {
-        throw new Error('Invalid employees payload')
-      }
-      const normalized = this.mergeSeedEmployees(parsed)
-      if (JSON.stringify(normalized) !== stored) {
-        this.saveDb(normalized)
-      }
-      return normalized
-    } catch (error) {
-      console.warn(`[EmployeeService] Failed to parse ${STORAGE_KEY}. Re-seeding employee data from defaults.`, error)
-      const seeded = INITIAL_EMPLOYEES.map(user => normalizeEmployeeProfile(user))
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
-      return seeded
-    }
+  private static hasLegacyMockData(raw: string): boolean {
+    return raw.includes('huynhlekieulinh6@gmail.com') ||
+           raw.includes('lloclm0203@gmail.com') ||
+           raw.includes('thuphuong@homies.vn') ||
+           raw.includes('phamnguyendongduy2020@gmail.com') ||
+           raw.includes('emp-recovered')
   }
 
+  private static getDb(): AuthUser[] {
+    if (this._memoryEmployees && this._memoryEmployees.length > 0) {
+      this.syncFromServerBackground()
+      return this._memoryEmployees
+    }
+
+    const seeded = INITIAL_EMPLOYEES.map(user => normalizeEmployeeProfile(user))
+    this._memoryEmployees = seeded
+    this.syncFromServerBackground()
+    return seeded
+  }
+
+  private static _isSyncing = false
+  private static syncFromServerBackground() {
+    if (typeof window === 'undefined' || this._isSyncing) return
+    this._isSyncing = true
+    fetch('/api/employees')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.success && Array.isArray(data.data) && data.data.length > 0) {
+          const mapped: AuthUser[] = data.data.map((item: Record<string, unknown>) => ({
+            id: String(item.id || ''),
+            full_name: String(item.full_name || ''),
+            email: String(item.email || ''),
+            role: (item.role || 'employee') as AuthUser['role'],
+            store_id: String(item.store_id || 'store-001'),
+            position_id: String(item.position_id || 'pos-001'),
+            phone: String(item.phone || ''),
+            employee_code: String(item.employee_code || ''),
+            status: (item.status || 'active') as AuthUser['status'],
+            account_status: (item.account_status || 'dang_hoat_dong') as AuthUser['account_status'],
+            department_name: String(item.department_name || ''),
+            official_salary: Number(item.base_salary || item.official_salary || 0),
+            hourly_rate: Number(item.hourly_rate || 0),
+            hire_date: String(item.hire_date || ''),
+            secondary_store_ids: Array.isArray(item.secondary_store_ids) ? item.secondary_store_ids as string[] : undefined,
+          }))
+          EmployeeService.syncEmployeesFromAdapter(mapped)
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        this._isSyncing = false
+      })
+  }
+
+  static async fetchFromServerDb(): Promise<AuthUser[]> {
+    try {
+      const res = await fetch('/api/employees')
+      if (res.ok) {
+        const json = await res.json()
+        if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          const mapped: AuthUser[] = json.data.map((item: Record<string, unknown>) => ({
+            id: String(item.id || ''),
+            full_name: String(item.full_name || ''),
+            email: String(item.email || ''),
+            role: (item.role || 'employee') as AuthUser['role'],
+            store_id: String(item.store_id || 'store-001'),
+            position_id: String(item.position_id || 'pos-001'),
+            phone: String(item.phone || ''),
+            employee_code: String(item.employee_code || ''),
+            status: (item.status || 'active') as AuthUser['status'],
+            account_status: (item.account_status || 'dang_hoat_dong') as AuthUser['account_status'],
+            department_name: String(item.department_name || ''),
+            official_salary: Number(item.base_salary || item.official_salary || 0),
+            hourly_rate: Number(item.hourly_rate || 0),
+            hire_date: String(item.hire_date || ''),
+            secondary_store_ids: Array.isArray(item.secondary_store_ids) ? item.secondary_store_ids as string[] : undefined,
+          }))
+          this.syncEmployeesFromAdapter(mapped)
+          return this.getEmployees()
+        }
+      }
+    } catch (e) {
+      console.warn('[EmployeeService] Could not fetch /api/employees directly:', e)
+    }
+    return this.getEmployees()
+  }
+
+  private static _memoryEmployees: AuthUser[] | null = null
+
   private static saveDb(data: AuthUser[]) {
+    this._memoryEmployees = data
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+      fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }).catch(err => {
+        console.warn('[EmployeeService] Lỗi đồng bộ nhân sự lên máy chủ:', err)
+      })
     }
   }
 
@@ -707,10 +962,25 @@ export class EmployeeService {
     this.saveDb(merged)
   }
 
-  // Lấy User dùng cho đăng nhập
+  // Lấy User dùng cho đăng nhập (hỗ trợ Email thật, Số điện thoại hoặc Mã NV)
   static getUserByEmail(email: string): AuthUser | undefined {
+    return this.getUserByIdentifier(email)
+  }
+
+  static getUserByIdentifier(identifier: string): AuthUser | undefined {
     const db = this.getDb()
-    return db.find(e => e.email.toLowerCase() === email.toLowerCase())
+    const clean = identifier.trim().toLowerCase()
+    const cleanDigits = identifier.replace(/[^\d]/g, '')
+    return db.find(e => {
+      const empEmail = (e.email || '').toLowerCase()
+      const empPhone = (e.phone || '').replace(/[^\d]/g, '')
+      const empCode = (e.employee_code || '').toLowerCase()
+      return (
+        empEmail === clean ||
+        (cleanDigits.length >= 9 && empPhone && empPhone === cleanDigits) ||
+        empCode === clean
+      )
+    })
   }
 
   static resolveSessionUser(user?: AuthUser | Pick<AuthUser, 'id' | 'email'> | null): AuthUser | undefined {
@@ -838,6 +1108,16 @@ export class EmployeeService {
 
     db.push(normalizedEmployee)
     this.saveDb(db)
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(normalizedEmployee),
+      }).catch(err => {
+        console.warn('[EmployeeService] Lỗi gửi nhân viên mới lên máy chủ:', err)
+      })
+    }
 
     const sourceLabel = source === 'invitation'
       ? 'Duyet tu loi moi'

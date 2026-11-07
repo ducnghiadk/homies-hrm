@@ -112,10 +112,39 @@ function MySchedulePageContent() {
     ? selectedDate
     : (weekStrs.includes(today) ? today : weekStrs[0]) || today
 
+  const [apiSchedules, setApiSchedules] = useState<Schedule[]>([])
+
+  useEffect(() => {
+    if (!targetUserId) return
+    let active = true
+    fetch(`/api/shifts?employee_id=${targetUserId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (!active) return
+        if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          const list: Schedule[] = json.data.map((s: { id: string; employee_id: string; store_id?: string; shift_id: string; date: string; status?: string; notes?: string; shift_name?: string }) => ({
+            id: s.id,
+            org_id: 'org-001',
+            store_id: s.store_id || user?.store_id || 'store-001',
+            employee_id: s.employee_id,
+            shift_id: s.shift_id,
+            date: s.date,
+            notes: s.notes || s.shift_name,
+            status: s.status === 'APPROVED' ? ('published' as const) : ('draft' as const),
+            updated_at: new Date().toISOString(),
+          }))
+          setApiSchedules(list)
+        }
+      })
+      .catch(e => console.warn('[MySchedulePage] fetch shifts error:', e))
+    return () => { active = false }
+  }, [targetUserId, user])
+
   const allSchedules = useMemo(() => {
     if (!user || !targetUserId) return []
+    if (apiSchedules.length > 0) return apiSchedules
     return ScheduleService.getSchedulesForUser(user, targetUserId)
-  }, [user, targetUserId])
+  }, [user, targetUserId, apiSchedules])
 
   const weekSchedules = useMemo(() => {
     return allSchedules
@@ -209,10 +238,19 @@ function MySchedulePageContent() {
             </p>
           </div>
 
-          {isManagerOrAdmin && (
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Bộ lọc chọn nhân viên dành cho CEO / Quản lý */}
-              <div className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => router.push('/shifts/register')}
+              className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-2 text-xs font-bold text-sky-800 transition-colors hover:bg-sky-100 shadow-2xs cursor-pointer"
+            >
+              <CalendarDays size={14} className="text-sky-600" />
+              Đăng ký ca tuần
+            </button>
+
+            {isManagerOrAdmin && (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Bộ lọc chọn nhân viên dành cho CEO / Quản lý */}
+                <div className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-1.5">
                 <span className="text-xs font-bold text-[#2F6FA8]">Nhân viên:</span>
                 <select
                   value={targetUserId}
@@ -245,6 +283,7 @@ function MySchedulePageContent() {
             </div>
           )}
         </div>
+      </div>
 
         <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-[var(--shadow-card)]">
           <div className="flex items-center justify-between">

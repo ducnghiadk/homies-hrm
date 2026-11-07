@@ -23,8 +23,13 @@ import {
   ChevronDown,
   ChevronRight,
   Sliders,
+  Plus,
+  Share2,
+  Pencil,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { bscAdapter } from '@/lib/adapters/bsc-adapter'
+import StoreOperationIncidentModal from '@/components/kpi/incidents/StoreOperationIncidentModal'
 import type { BSCApprovalStatus, BSCOperationErrorRecord, BSCEmployeePersonalData, BSCPersonalErrorRecord } from '@/lib/bsc-types'
 
 interface BSCLogsTabProps {
@@ -49,30 +54,29 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [viewingProofItem, setViewingProofItem] = useState<CombinedLogItem | null>(null)
   const [expandedEmployees, setExpandedEmployees] = useState<Record<string, boolean>>({})
+  const [isLogEditorOpen, setIsLogEditorOpen] = useState(false)
+  const [editingLogItem, setEditingLogItem] = useState<CombinedLogItem | null>(null)
 
   // Adapter States
   const [opLogsData, setOpLogsData] = useState<BSCOperationErrorRecord[]>([])
   const [empLogsData, setEmpLogsData] = useState<BSCEmployeePersonalData[]>([])
 
-  useEffect(() => {
-    let isMounted = true
-    async function loadLogs() {
-      try {
-        const [opErrs, empData] = await Promise.all([
-          bscAdapter.getOperationErrors(selectedStoreFilter, period),
-          bscAdapter.getEmployeePersonalData(selectedStoreFilter, period),
-        ])
-        if (isMounted) {
-          setOpLogsData(opErrs)
-          setEmpLogsData(empData)
-        }
-      } catch (err) {
-        console.warn('[BSCLogsTab] Error loading logs from adapter:', err)
-      }
+  const loadLogs = React.useCallback(async () => {
+    try {
+      const [opErrs, empData] = await Promise.all([
+        bscAdapter.getOperationErrors(selectedStoreFilter, period),
+        bscAdapter.getEmployeePersonalData(selectedStoreFilter, period),
+      ])
+      setOpLogsData(opErrs)
+      setEmpLogsData(empData)
+    } catch (err) {
+      console.warn('[BSCLogsTab] Error loading logs from adapter:', err)
     }
-    loadLogs()
-    return () => { isMounted = false }
   }, [selectedStoreFilter, period])
+
+  useEffect(() => {
+    void loadLogs()
+  }, [loadLogs])
 
   // Stores catalog
   const storesCatalog = [
@@ -320,6 +324,30 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
 
           {/* Lọc cơ sở & Nút Cài Đặt */}
           <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                const url = `${window.location.origin}/kpi/violations/public`
+                navigator.clipboard.writeText(url)
+                toast.success('Đã sao chép link Form Leader nhập: ' + url)
+              }}
+              className="px-3.5 py-1.5 min-h-[36px] rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+              title="Sao chép link gửi Trưởng ca (Leader) nhập lỗi trên điện thoại tại quán"
+            >
+              <Share2 size={13} className="text-amber-700" />
+              <span>Link Leader Nhập (Public)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsLogEditorOpen(true)}
+              className="px-3.5 py-1.5 min-h-[36px] rounded-xl bg-[#2F6FA8] hover:bg-[#1D3E61] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+              title="Ghi nhận lỗi nhân sự hoặc sự cố ca mới"
+            >
+              <Plus size={14} />
+              <span>Ghi Nhận Sự Cố / Lỗi Mới</span>
+            </button>
+
             <button
               type="button"
               onClick={() => router.push('/settings/bsc?tab=penalties')}
@@ -600,10 +628,11 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                 <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
                   <button
                     type="button"
-                    onClick={() => router.push('/kpi/violations/log')}
-                    className="px-4 py-2 rounded-xl bg-[#2F6FA8] hover:bg-[#1D3E61] text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                    onClick={() => setIsLogEditorOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-[#2F6FA8] hover:bg-[#1D3E61] text-white text-xs font-bold shadow-2xs transition cursor-pointer flex items-center gap-1.5"
                   >
-                    + Ghi Nhận Sự Cố Ca Mới
+                    <Plus size={14} />
+                    <span>+ Ghi Nhận Sự Cố Ca Mới</span>
                   </button>
                   <button
                     type="button"
@@ -716,14 +745,29 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                         {getStatusBadge(item.approval_status)}
                       </td>
                       <td className="py-3.5 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => setViewingProofItem(item)}
-                          className="px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer"
-                        >
-                          <Eye size={13} className="text-[#2F6FA8]" />
-                          <span>Xem</span>
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setViewingProofItem(item)}
+                            className="px-2 py-1 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer"
+                            title="Xem chi tiết & bằng chứng"
+                          >
+                            <Eye size={13} className="text-[#2F6FA8]" />
+                            <span>Xem</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingLogItem(item)
+                              setIsLogEditorOpen(true)
+                            }}
+                            className="px-2 py-1 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                            title="Chỉnh sửa biên bản sự cố này (Admin)"
+                          >
+                            <Pencil size={12} className="text-amber-800" />
+                            <span>Sửa</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -783,18 +827,72 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-2 flex items-center justify-between border-t border-gray-100">
               <button
                 type="button"
-                onClick={() => setViewingProofItem(null)}
-                className="px-4 py-2 rounded-xl bg-[#001D3D] text-white text-xs font-bold hover:bg-[#0a2e5c] transition cursor-pointer"
+                onClick={async () => {
+                  if (!confirm('Bạn có chắc muốn hủy bỏ bản ghi sự cố này không? (Sau khi hủy, điểm trừ sẽ được thu hồi)')) return
+                  try {
+                    const success = await bscAdapter.removeOperationError(viewingProofItem.id)
+                    if (success) {
+                      toast.success('Đã hủy bỏ bản ghi sự cố thành công!')
+                      setViewingProofItem(null)
+                      void loadLogs()
+                    } else {
+                      toast.error('Không thể hủy sự cố. Vui lòng thử lại!')
+                    }
+                  } catch {
+                    toast.error('Có lỗi xảy ra khi hủy sự cố')
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-bold hover:bg-rose-100 transition cursor-pointer"
               >
-                Đóng
+                Hủy Bỏ / Thu Hồi Sự Cố
               </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const itemToEdit = viewingProofItem
+                    setViewingProofItem(null)
+                    setEditingLogItem(itemToEdit)
+                    setIsLogEditorOpen(true)
+                  }}
+                  className="px-3.5 py-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Pencil size={13} className="text-amber-800" />
+                  <span>Sửa Biên Bản</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingProofItem(null)}
+                  className="px-4 py-2 rounded-xl bg-[#001D3D] text-white text-xs font-bold hover:bg-[#0a2e5c] transition cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* ── POPUP NHẬP / CHỈNH SỬA LỖI ĐỒNG BỘ THỐNG NHẤT (BSC & KPI CHUNG) ── */}
+      <StoreOperationIncidentModal
+        isOpen={isLogEditorOpen}
+        onClose={() => {
+          setIsLogEditorOpen(false)
+          setEditingLogItem(null)
+        }}
+        onSuccess={() => {
+          setIsLogEditorOpen(false)
+          setEditingLogItem(null)
+          void loadLogs()
+        }}
+        defaultStoreId={selectedStoreFilter === 'all' ? (storeId || 'store-001') : selectedStoreFilter}
+        defaultPeriod={period}
+        editingIncident={editingLogItem}
+      />
     </div>
   )
 }

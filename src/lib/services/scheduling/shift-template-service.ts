@@ -24,16 +24,15 @@ export interface ShiftTemplate {
 const STORAGE_KEY = 'homies_shift_templates'
 
 function inferDefaultAllowedPositions(shift: Shift): string[] {
-  if (shift.id === 'shift-004') return ['pos-001', 'pos-002', 'pos-003', 'pos-004']
-  if (shift.id === 'shift-001') return ['pos-001', 'pos-002', 'pos-003']
-  if (shift.id === 'shift-002') return ['pos-001', 'pos-002', 'pos-003']
-  return ['pos-001', 'pos-003']
+  if (shift.id === 'shift-004') return ['pos-001', 'pos-002', 'pos-004', 'pos-bep']
+  return ['pos-001', 'pos-002', 'pos-bep']
 }
 
 function inferDefaultCode(shift: Shift): string {
-  if (shift.id === 'shift-004') return 'FLEX'
+  if (shift.id === 'shift-005') return 'NIGHT_CLEAN'
+  if (shift.id === 'shift-004') return 'PEAK_NOON'
   if (shift.id === 'shift-001') return 'MORNING'
-  if (shift.id === 'shift-002') return 'AFTERNOON'
+  if (shift.id === 'shift-002') return 'NOON'
   return 'EVENING'
 }
 
@@ -68,17 +67,58 @@ export class ShiftTemplateService {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
         return seeded
       }
-      const parsed = JSON.parse(raw) as ShiftTemplate[]
+      let parsed = JSON.parse(raw) as ShiftTemplate[]
       if (!Array.isArray(parsed) || parsed.length === 0) {
         const seeded = seedTemplates()
         localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
         return seeded
       }
 
-      // Tự động khử trùng lặp và bổ sung ca mặc định
+      // Tự động chuẩn hóa 3 ca chuẩn Homies nếu cache cũ còn lưu giờ cũ hoặc ID từ Supabase cũ
       const seeded = seedTemplates()
+      parsed = parsed.map(item => {
+        const cleanName = (item.name || '').toLowerCase()
+        const isOldMorning = cleanName.includes('mở quầy') || cleanName.includes('06:30') || item.id === 'd0000000-0000-0000-0000-000000000001'
+        const isOldEvening = cleanName.includes('đóng quầy') || cleanName.includes('22:30') || item.id === 'd0000000-0000-0000-0000-000000000002' || item.id === 'd0000000-0000-0000-0000-000000000004'
+        const isOldNoon = cleanName.includes('parttime cao điểm') || cleanName.includes('ca gãy') || item.id === 'd0000000-0000-0000-0000-000000000003'
+
+        const standard = seeded.find(s => s.id === item.id)
+        const baseAllowed = standard ? standard.allowed_position_ids : item.allowed_position_ids
+        const cleanAllowed = (baseAllowed || []).filter(id => id !== 'pos-003')
+
+        if (isOldMorning) {
+          const std = seeded.find(s => s.id === 'shift-001')!
+          return { ...item, id: 'shift-001', base_shift_id: 'shift-001', name: std.name, code: std.code, start_time: std.start_time, end_time: std.end_time, color: std.color, allowed_position_ids: cleanAllowed }
+        }
+        if (isOldEvening) {
+          const std = seeded.find(s => s.id === 'shift-003')!
+          return { ...item, id: 'shift-003', base_shift_id: 'shift-003', name: std.name, code: std.code, start_time: std.start_time, end_time: std.end_time, color: std.color, allowed_position_ids: cleanAllowed }
+        }
+        if (isOldNoon) {
+          const std = seeded.find(s => s.id === 'shift-002')!
+          return { ...item, id: 'shift-002', base_shift_id: 'shift-002', name: std.name, code: std.code, start_time: std.start_time, end_time: std.end_time, color: std.color, allowed_position_ids: cleanAllowed }
+        }
+
+        if (standard && (standard.id === 'shift-001' || standard.id === 'shift-002' || standard.id === 'shift-003')) {
+          return {
+            ...item,
+            name: standard.name,
+            code: standard.code,
+            start_time: standard.start_time,
+            end_time: standard.end_time,
+            color: standard.color,
+            allowed_position_ids: cleanAllowed,
+          }
+        }
+        return {
+          ...item,
+          allowed_position_ids: cleanAllowed,
+        }
+      })
+
+      // Bổ sung ca mặc định nếu chưa có
       seeded.forEach(st => {
-        if (!parsed.some(p => p.id === st.id || p.code === st.code || (p.name.toLowerCase().trim() === st.name.toLowerCase().trim() && p.start_time === st.start_time))) {
+        if (!parsed.some(p => p.id === st.id || p.code === st.code)) {
           parsed.push(st)
         }
       })
@@ -139,6 +179,41 @@ export class ShiftTemplateService {
     )
   }
 
+  static async syncFromServer(): Promise<ShiftTemplate[]> {
+    if (typeof window === 'undefined') return this.getAll()
+    try {
+      const res = await fetch('/api/shifts')
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success && Array.isArray(json.shift_templates) && json.shift_templates.length > 0) {
+          const mapped: ShiftTemplate[] = json.shift_templates.map((t: Record<string, unknown>) => ({
+            id: String(t.id || ''),
+            base_shift_id: String(t.id || ''),
+            name: String(t.name || ''),
+            code: String(t.code || (t.id === 'shift-001' ? 'MORNING' : t.id === 'shift-002' ? 'NOON' : t.id === 'shift-003' ? 'EVENING' : t.id === 'shift-004' ? 'PEAK_NOON' : t.id === 'shift-005' ? 'NIGHT_CLEAN' : 'FLEX')),
+            start_time: String(t.start || t.start_time || '08:30'),
+            end_time: String(t.end || t.end_time || '12:00'),
+            color: String(t.color || (t.id === 'shift-001' ? '#D97706' : t.id === 'shift-002' ? '#059669' : t.id === 'shift-003' ? '#DC2626' : t.id === 'shift-004' ? '#8B5CF6' : '#4B5563')),
+            store_scope: (t.store_scope as ShiftTemplateScope) || 'global',
+            store_id: typeof t.store_id === 'string' ? t.store_id : undefined,
+            is_active: t.is_active !== false,
+            is_flexible: Boolean(t.is_flexible || t.id === 'shift-004'),
+            allowed_position_ids: Array.isArray(t.allowed_position_ids) ? t.allowed_position_ids : ['pos-001', 'pos-002', 'pos-003', 'pos-bep'],
+            min_headcount: Number(t.min_headcount ?? 1),
+            max_headcount: Number(t.max_headcount ?? 3),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }))
+          this.write(mapped)
+          return mapped
+        }
+      }
+    } catch (err) {
+      console.warn('[ShiftTemplateService] syncFromServer fallback:', err)
+    }
+    return this.getAll()
+  }
+
   static upsert(input: Omit<ShiftTemplate, 'created_at' | 'updated_at'> & Partial<Pick<ShiftTemplate, 'created_at' | 'updated_at'>>) {
     const db = this.read()
     const now = new Date().toISOString()
@@ -162,6 +237,37 @@ export class ShiftTemplateService {
     }
 
     this.write(db)
+
+    // Sync to Server DB via /api/shifts
+    if (typeof window !== 'undefined') {
+      try {
+        fetch('/api/shifts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'template',
+            shift_template: {
+              id: normalized.id,
+              name: normalized.name,
+              code: normalized.code,
+              start: normalized.start_time,
+              end: normalized.end_time,
+              color: normalized.color,
+              store_scope: normalized.store_scope,
+              store_id: normalized.store_id,
+              is_active: normalized.is_active,
+              is_flexible: normalized.is_flexible,
+              allowed_position_ids: normalized.allowed_position_ids,
+              min_headcount: normalized.min_headcount,
+              max_headcount: normalized.max_headcount,
+            },
+          }),
+        }).catch(err => console.warn('[ShiftTemplateService] Server DB sync error:', err))
+      } catch (err) {
+        console.warn('[ShiftTemplateService] API sync error:', err)
+      }
+    }
+
     return normalized
   }
 

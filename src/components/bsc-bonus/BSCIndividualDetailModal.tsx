@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useState } from 'react'
 import {
   X,
   ChevronLeft,
@@ -11,8 +11,38 @@ import {
   Calculator,
   User,
   FileText,
+  QrCode,
+  Copy,
+  Check,
 } from 'lucide-react'
 import type { BSCIndividualResult, BSCEmployeePersonalData } from '@/lib/bsc-types'
+
+const BANK_BIN_BY_NAME: Record<string, string> = {
+  techcombank: '970407',
+  vietcombank: '970436',
+  vietinbank: '970415',
+  bidv: '970418',
+  agribank: '970405',
+  mb: '970422',
+  'mb bank': '970422',
+  acb: '970416',
+  vpbank: '970432',
+  tpbank: '970423',
+  sacombank: '970403',
+  hdbank: '970437',
+  vib: '970441',
+  shb: '970443',
+  ocb: '970448',
+  msb: '970426',
+}
+
+function resolveBankBin(bankName: string): string {
+  if (!bankName) return '970436'
+  if (/^\d{6}$/.test(bankName)) return bankName
+  const normalizedName = bankName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const matchedAlias = Object.keys(BANK_BIN_BY_NAME).find(alias => normalizedName.includes(alias))
+  return matchedAlias ? BANK_BIN_BY_NAME[matchedAlias] : '970436'
+}
 
 interface BSCIndividualDetailModalProps {
   isOpen: boolean
@@ -33,6 +63,8 @@ export default function BSCIndividualDetailModal({
   empDataList = [],
   personalErrors = [],
 }: BSCIndividualDetailModalProps) {
+  const [copiedField, setCopiedField] = useState<'stk' | 'amount' | null>(null)
+
   const formatVnd = (amount: number) =>
     new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount)
 
@@ -66,6 +98,15 @@ export default function BSCIndividualDetailModal({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, handlePrev, handleNext, onClose])
 
+  const handleCopy = (text: string, field: 'stk' | 'amount') => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopiedField(field)
+        setTimeout(() => setCopiedField(null), 2000)
+      }).catch(() => {})
+    }
+  }
+
   if (!isOpen || !currentResult) return null
 
   // Get active personal errors for the current employee
@@ -73,6 +114,16 @@ export default function BSCIndividualDetailModal({
   const activeErrors = currentEmpData?.errors || personalErrors || []
 
   const isEligible = currentResult.bonus_amount > 0
+
+  const bankName = currentEmpData?.bank_name || 'Vietcombank'
+  const accountNumber = currentEmpData?.bank_account_no || ''
+  const accountName = currentEmpData?.bank_account_holder || currentResult.employee_name || ''
+  const bankCode = resolveBankBin(bankName)
+  const empNameUpper = (currentResult.employee_name || '').toUpperCase()
+  const payNote = `HOMIES THUONG BSC T${currentResult.period || ''} CHO ${empNameUpper}`
+  const qrUrl = accountNumber && currentResult.bonus_amount > 0
+    ? `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact2.png?amount=${currentResult.bonus_amount}&addInfo=${encodeURIComponent(payNote)}&accountName=${encodeURIComponent(accountName)}`
+    : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
@@ -157,6 +208,104 @@ export default function BSCIndividualDetailModal({
               </div>
             )}
           </div>
+
+          {/* ── MÃ VIETQR THANH TOÁN THƯỞNG NHANH ── */}
+          {isEligible && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <QrCode size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                      Mã VietQR Thanh Toán Thưởng Nhanh
+                    </h4>
+                    <p className="text-[11px] text-gray-400">
+                      Quét bằng ứng dụng ngân hàng bất kỳ để chuyển tiền thưởng ngay
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-[10px] font-extrabold bg-white/10 px-2.5 py-1 rounded-lg text-sky-300">
+                  <span>napas 247</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center bg-white/5 p-3.5 rounded-xl border border-white/10">
+                {/* QR Image */}
+                <div className="sm:col-span-5 flex flex-col items-center justify-center">
+                  {qrUrl ? (
+                    <div className="bg-white p-2.5 rounded-xl shadow-md">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={qrUrl}
+                        alt="VietQR Thưởng BSC"
+                        width={160}
+                        height={160}
+                        className="w-36 h-36 sm:w-40 sm:h-40 object-contain rounded-lg"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-36 h-36 rounded-xl bg-white/10 flex items-center justify-center text-xs text-gray-400 text-center p-2">
+                      Chưa có STK ngân hàng
+                    </div>
+                  )}
+                  <span className="text-[10px] text-gray-400 mt-1.5 text-center">
+                    Tự động điền đúng STK &amp; số tiền
+                  </span>
+                </div>
+
+                {/* Bank & Payment Info */}
+                <div className="sm:col-span-7 space-y-2 text-xs">
+                  <div>
+                    <span className="text-[10px] text-gray-400 block">Chủ tài khoản thụ hưởng:</span>
+                    <span className="font-extrabold text-white text-sm uppercase tracking-wide">
+                      {accountName}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-black/20 px-3 py-2 rounded-lg border border-white/5">
+                    <div>
+                      <span className="text-[10px] text-gray-400 block">{bankName}</span>
+                      <span className="font-mono font-bold text-white text-sm">{accountNumber || 'Chưa cập nhật'}</span>
+                    </div>
+                    {accountNumber && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(accountNumber, 'stk')}
+                        className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[10px] font-bold text-sky-300 flex items-center gap-1 transition cursor-pointer"
+                      >
+                        {copiedField === 'stk' ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                        <span>{copiedField === 'stk' ? 'Đã sao chép' : 'Sao chép'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between bg-emerald-500/10 px-3 py-2 rounded-lg border border-emerald-500/20">
+                    <div>
+                      <span className="text-[10px] text-emerald-300 block">Số tiền thưởng BSC:</span>
+                      <span className="font-mono font-extrabold text-emerald-400 text-sm">
+                        {formatVnd(currentResult.bonus_amount)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(String(currentResult.bonus_amount), 'amount')}
+                      className="px-2 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-[10px] font-bold text-emerald-300 flex items-center gap-1 transition cursor-pointer"
+                    >
+                      {copiedField === 'amount' ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                      <span>{copiedField === 'amount' ? 'Đã sao chép' : 'Sao chép'}</span>
+                    </button>
+                  </div>
+
+                  <div className="text-[10px] text-gray-400 bg-black/20 px-3 py-1.5 rounded-lg font-mono truncate" title={payNote}>
+                    <span>Nội dung: </span>
+                    <span className="text-gray-300">{payNote}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 4 BƯỚC TOÁN HỌC MINH BẠCH */}
           <div className="space-y-3">

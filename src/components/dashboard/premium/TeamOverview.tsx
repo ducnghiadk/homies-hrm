@@ -22,8 +22,8 @@ export function TeamOverview({ shifts, onFindReplacement }: Props) {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {shift.members.map(m => (
-                <div key={m.id} className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-gray-200">
+              {shift.members.map((m, idx) => (
+                <div key={m.id ? `${m.id}-${idx}` : `mem-${idx}`} className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-gray-200">
                   <div className="relative">
                     <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-xs">{m.avatar || '👤'}</div>
                     {m.status === 'checked_in' && <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border border-white" />}

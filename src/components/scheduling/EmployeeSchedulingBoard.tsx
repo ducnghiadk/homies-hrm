@@ -227,7 +227,7 @@ export default function EmployeeSchedulingBoard({ weekStartQuery, storeIdQuery }
     return list.filter(store => store.id === user.store_id && store.is_active)
   }, [user, refreshKey])
 
-  const anchorWeekStart = useMemo(() => weekStartQuery || plusDays(getWeekStart(), 7), [weekStartQuery])
+  const anchorWeekStart = useMemo(() => weekStartQuery || getWeekStart(), [weekStartQuery])
   const activeWeekStart = useMemo(() => plusDays(anchorWeekStart, weekOffset * 7), [anchorWeekStart, weekOffset])
   const weekDates = useMemo(() => getWeekDates(activeWeekStart), [activeWeekStart])
   const activeStoreId = selectedStoreId || storeIdQuery || stores[0]?.id || user?.store_id || ''
@@ -1508,7 +1508,21 @@ export default function EmployeeSchedulingBoard({ weekStartQuery, storeIdQuery }
                                     className="group relative rounded-xl border border-[#1E9E57]/40 bg-[#DDF4EC] hover:bg-[#c9eee1] px-3 py-2 text-center text-xs font-bold text-[#1E9E57] shadow-2xs transition cursor-pointer"
                                   >
                                     <div className="text-xs font-extrabold truncate" title={shiftName}>{shiftName}</div>
-                                    {posName && <div className="text-[10px] text-[#2F6FA8] font-extrabold mt-0.5 font-sans">({posName})</div>}
+                                    {posName && (
+                                      <div className="mt-1">
+                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[8.5px] font-black border ${
+                                          posName.toLowerCase().includes('thu ngân')
+                                            ? 'bg-blue-100 text-blue-900 border-blue-200'
+                                            : posName.toLowerCase().includes('pha chế')
+                                            ? 'bg-emerald-100 text-emerald-900 border-emerald-200'
+                                            : posName.toLowerCase().includes('bếp') || posName.toLowerCase().includes('chế biến')
+                                            ? 'bg-rose-100 text-rose-900 border-rose-200'
+                                            : 'bg-amber-100 text-amber-900 border-amber-200'
+                                        }`}>
+                                          {posName.toLowerCase().includes('thu ngân') ? '[THU_NGAN]' : posName.toLowerCase().includes('pha chế') ? '[PHA_CHE]' : posName.toLowerCase().includes('bếp') || posName.toLowerCase().includes('chế biến') ? '[BEP]' : posName}
+                                        </span>
+                                      </div>
+                                    )}
                                     {timeStr && <div className="text-[10px] text-[#064E3B] font-semibold mt-0.5">[{timeStr}]</div>}
 
                                     {/* Nút gỡ nhanh ca */}

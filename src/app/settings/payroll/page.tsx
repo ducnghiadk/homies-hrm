@@ -113,10 +113,10 @@ const ALLOWANCE_CATALOG: AllowanceCatalogItem[] = [
     key: 'splitShiftAllowance',
     label: 'Phụ cấp ca gãy (Split Shift)',
     defaultAmount: 25000,
-    unit: '/ ca',
+    unit: '/ ngày',
     category: 'fnb_shift',
     field: 'splitShiftAllowance',
-    note: 'Hỗ trợ chi phí đi lại cho nhân sự làm 2 ca trưa/tối tách biệt',
+    note: 'Hỗ trợ chi phí đi lại khi nhân sự làm 2 ca trưa/tối tách biệt trong ngày',
   },
   {
     key: 'peakHourBonus',
@@ -494,6 +494,53 @@ function SettingsPayrollContent() {
       status: current.status === 'active' ? 'draft' : current.status,
       legal: { ...(current.legal || { personalDeduction: 11000000, dependentDeduction: 4400000, minRegionSalary: 4680000, maxInsuranceSalary: 29800000 }), [field]: value },
     }))
+  }
+
+  const updateNetRoundingMethod = (value: 'none' | 'round_1000' | 'round_5000' | 'round_10000') => {
+    if (!canEdit) return
+    setPolicy(current => ({
+      ...current,
+      status: current.status === 'active' ? 'draft' : current.status,
+      netRoundingMethod: value,
+    }))
+  }
+
+  const updateShiftRule = (field: 'partTimeShiftHours' | 'fullTimeShiftHours' | 'minShiftHours', value: number) => {
+    if (!canEdit) return
+    setPolicy(current => ({
+      ...current,
+      status: current.status === 'active' ? 'draft' : current.status,
+      shiftRules: {
+        ...(current.shiftRules || { partTimeShiftHours: 4, fullTimeShiftHours: 8, minShiftHours: 2 }),
+        [field]: value,
+      },
+    }))
+  }
+
+  const updateLatePolicy = (field: string, value: any) => {
+    if (!canEdit) return
+    setPolicy(current => {
+      const currentLate = current.latePenaltyPolicy || {
+        mode: 'fixed' as const,
+        graceOccurrences: 2,
+        fixedAmount: current.rates?.latePenaltyPerOccurrence ?? 50000,
+        tier1MaxMinutes: 15,
+        tier1Amount: 20000,
+        tier2MaxMinutes: 30,
+        tier2Amount: 50000,
+        tier3Amount: 100000,
+      }
+      const updated = { ...currentLate, [field]: value }
+      return {
+        ...current,
+        status: current.status === 'active' ? 'draft' : current.status,
+        latePenaltyPolicy: updated,
+        rates: {
+          ...current.rates,
+          latePenaltyPerOccurrence: updated.mode === 'fixed' ? updated.fixedAmount : (current.rates?.latePenaltyPerOccurrence ?? 50000),
+        },
+      }
+    })
   }
 
   const handleSaveDraft = () => {
@@ -1099,7 +1146,28 @@ function SettingsPayrollContent() {
 
                       <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
                         <label className="text-xs font-bold text-gray-700 block">
-                          Số giờ làm chuẩn mỗi ngày
+                          Số giờ chuẩn 1 ca quán (Part-time)
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={12}
+                          step={0.5}
+                          disabled={!canEdit}
+                          value={policy.shiftRules?.partTimeShiftHours ?? 5.5}
+                          onChange={(e) => {
+                            if (!canEdit) return
+                            const val = parseFloat(e.target.value) || 5.5
+                            updateShiftRule('partTimeShiftHours', val)
+                          }}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-mono font-bold text-[#001D3D] outline-hidden focus:border-[#2F6FA8] focus:ring-1 focus:ring-[#2F6FA8] disabled:bg-gray-100 disabled:text-gray-400"
+                        />
+                        <p className="text-[11px] text-gray-400">Mặc định: 5.5 giờ / ca</p>
+                      </div>
+
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
+                        <label className="text-xs font-bold text-gray-700 block">
+                          Số giờ chuẩn / ngày (Full-time)
                         </label>
                         <input
                           type="number"
@@ -1119,7 +1187,7 @@ function SettingsPayrollContent() {
                           }}
                           className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-mono font-bold text-[#001D3D] outline-hidden focus:border-[#2F6FA8] focus:ring-1 focus:ring-[#2F6FA8] disabled:bg-gray-100 disabled:text-gray-400"
                         />
-                        <p className="text-[11px] text-gray-400">Mặc định: 8 giờ/ngày</p>
+                        <p className="text-[11px] text-gray-400">Mặc định: 8 giờ / ngày</p>
                       </div>
                     </div>
 
@@ -1221,6 +1289,176 @@ function SettingsPayrollContent() {
                       <p className="text-[11px] text-gray-500 leading-relaxed bg-white/70 p-2.5 rounded-lg border border-gray-100">
                         Ví dụ: ngưỡng 8 giờ, hệ số 1,5 nghĩa là giờ thứ 9 trở đi được trả gấp 1,5 lần đơn giá giờ.
                       </p>
+                    </div>
+
+                    {/* KHỐI 1: BẬC THANG PHẠT ĐI MUỘN / VỀ SỚM */}
+                    <div className="rounded-2xl border border-rose-200/80 bg-rose-50/20 p-5 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-100 pb-3">
+                        <div>
+                          <h3 className="text-sm font-bold text-[#001D3D] flex items-center gap-2">
+                            <Clock size={16} className="text-rose-600" />
+                            <span>Bậc Thang Phạt Đi Muộn / Về Sớm Chuẩn F&B</span>
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Áp dụng bậc thang công bằng thay cho phạt cào bằng cố định
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200 self-start sm:self-auto">
+                          Quy chế Homies 3 Bậc
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                        {/* Bậc 1: < 15 phút */}
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-800">Bậc 1: Dưới 15 phút</span>
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                              Nhắc nhở
+                            </span>
+                          </div>
+                          <div className="text-lg font-mono font-bold text-gray-700">0 đ</div>
+                          <p className="text-[11px] text-gray-500">
+                            Đi trễ dưới 15 phút chỉ nhắc nhở nội bộ, không trừ tiền lương.
+                          </p>
+                        </div>
+
+                        {/* Bậc 2: 15 – 30 phút */}
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-amber-900">Bậc 2: 15 – 30 phút</span>
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200">
+                              Trừ mức cố định
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <MoneyNumberInput
+                              value={policy.latePenaltyPolicy?.tier2Amount ?? 25000}
+                              step={5000}
+                              disabled={!canEdit}
+                              onChange={(val) => updateLatePolicy('tier2Amount', val)}
+                            />
+                            <span className="text-xs text-amber-800 font-medium">/ lần</span>
+                          </div>
+                          <p className="text-[11px] text-amber-800">
+                            Khấu trừ trực tiếp vào tổng các khoản phạt trong kỳ.
+                          </p>
+                        </div>
+
+                        {/* Bậc 3: > 30 phút */}
+                        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-rose-900">Bậc 3: Trên 30 phút</span>
+                            <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md border border-rose-200">
+                              Nghỉ nửa ca
+                            </span>
+                          </div>
+                          <div className="text-sm font-bold text-rose-700">
+                            Trừ 50% tiền lương ca làm
+                          </div>
+                          <p className="text-[11px] text-rose-700">
+                            Đi trễ trên 30 phút tính bằng nửa ca công và trừ 50% tiền lương của ca đó.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* KHỐI 2: HỆ SỐ LÀM THÊM GIỜ (OVERTIME - OT) */}
+                    <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/20 p-5 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100 pb-3">
+                        <div>
+                          <h3 className="text-sm font-bold text-[#001D3D] flex items-center gap-2">
+                            <Sparkles size={16} className="text-indigo-600" />
+                            <span>Hệ Số Tính Lương Làm Thêm Giờ (Overtime - OT)</span>
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Quy định tỷ lệ chi trả lương tăng ca theo Bộ Luật Lao Động &amp; Thực tế F&B
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 self-start sm:self-auto">
+                          Luật Lao Động
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                        {/* OT Ngày thường */}
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+                          <span className="text-xs font-bold text-gray-800 block">OT Ngày Thường</span>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min={1}
+                              max={4}
+                              step={0.1}
+                              disabled={!canEdit}
+                              value={policy.rates.otWeekday ?? 1.5}
+                              onChange={(e) => {
+                                if (!canEdit) return
+                                const val = parseFloat(e.target.value) || 1.5
+                                setPolicy(c => ({
+                                  ...c,
+                                  rates: { ...c.rates, otWeekday: val },
+                                }))
+                              }}
+                              className="w-24 px-2.5 py-1 text-center font-mono font-bold text-indigo-700 border border-indigo-200 rounded-lg bg-indigo-50/40 text-sm focus:ring-1 focus:ring-indigo-600"
+                            />
+                            <span className="text-xs font-bold text-gray-600">x Lương cơ bản ({Math.round((policy.rates.otWeekday ?? 1.5) * 100)}%)</span>
+                          </div>
+                          <p className="text-[11px] text-gray-500">Mặc định: 150% (1.5x) đơn giá giờ thông thường.</p>
+                        </div>
+
+                        {/* OT Cuối tuần */}
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+                          <span className="text-xs font-bold text-gray-800 block">OT Ngày Nghỉ Cuối Tuần</span>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min={1}
+                              max={4}
+                              step={0.1}
+                              disabled={!canEdit}
+                              value={policy.rates.otWeekend ?? 2.0}
+                              onChange={(e) => {
+                                if (!canEdit) return
+                                const val = parseFloat(e.target.value) || 2.0
+                                setPolicy(c => ({
+                                  ...c,
+                                  rates: { ...c.rates, otWeekend: val },
+                                }))
+                              }}
+                              className="w-24 px-2.5 py-1 text-center font-mono font-bold text-indigo-700 border border-indigo-200 rounded-lg bg-indigo-50/40 text-sm focus:ring-1 focus:ring-indigo-600"
+                            />
+                            <span className="text-xs font-bold text-gray-600">x Lương cơ bản ({Math.round((policy.rates.otWeekend ?? 2.0) * 100)}%)</span>
+                          </div>
+                          <p className="text-[11px] text-gray-500">Mặc định: 200% (2.0x) cho ca làm ngày thứ 7 / Chủ nhật.</p>
+                        </div>
+
+                        {/* OT Ngày Lễ / Tết */}
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+                          <span className="text-xs font-bold text-gray-800 block">OT Ngày Lễ / Tết</span>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min={1}
+                              max={5}
+                              step={0.1}
+                              disabled={!canEdit}
+                              value={policy.rates.otHoliday ?? 3.0}
+                              onChange={(e) => {
+                                if (!canEdit) return
+                                const val = parseFloat(e.target.value) || 3.0
+                                setPolicy(c => ({
+                                  ...c,
+                                  rates: { ...c.rates, otHoliday: val },
+                                }))
+                              }}
+                              className="w-24 px-2.5 py-1 text-center font-mono font-bold text-indigo-700 border border-indigo-200 rounded-lg bg-indigo-50/40 text-sm focus:ring-1 focus:ring-indigo-600"
+                            />
+                            <span className="text-xs font-bold text-gray-600">x Lương cơ bản ({Math.round((policy.rates.otHoliday ?? 3.0) * 100)}%)</span>
+                          </div>
+                          <p className="text-[11px] text-gray-500">Mặc định: 300% (3.0x) các ngày nghỉ lễ theo quy định Nhà nước.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1338,6 +1576,46 @@ function SettingsPayrollContent() {
                               </div>
 
                               <p className="text-[11px] text-gray-500 leading-4">{item.note}</p>
+
+                              {/* Cấu hình điều kiện chi tiết cho Ca gãy */}
+                              {item.key === 'splitShiftAllowance' && (
+                                <div className="mt-2 pt-2.5 border-t border-gray-200/70 flex items-center justify-between gap-2 text-xs bg-blue-50/50 -mx-4 -mb-4 p-3 rounded-b-xl">
+                                  <span className="text-gray-700 font-medium">Nghỉ giữa 2 ca tối thiểu:</span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={8}
+                                      step={0.5}
+                                      disabled={!canEdit}
+                                      value={policy.fnb.splitShiftMinBreakHours ?? 2}
+                                      onChange={(e) => updateFnb('splitShiftMinBreakHours', parseFloat(e.target.value) || 2)}
+                                      className="w-16 px-2 py-1 text-center font-mono font-bold text-[#2F6FA8] border border-blue-200 rounded-lg bg-white disabled:bg-gray-100 text-xs focus:ring-1 focus:ring-[#2F6FA8]"
+                                    />
+                                    <span className="text-gray-500 font-medium">giờ</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Cấu hình điều kiện chi tiết cho Ca đêm */}
+                              {item.key === 'nightShiftAllowance' && (
+                                <div className="mt-2 pt-2.5 border-t border-gray-200/70 flex items-center justify-between gap-2 text-xs bg-indigo-50/50 -mx-4 -mb-4 p-3 rounded-b-xl">
+                                  <span className="text-gray-700 font-medium">Khung giờ bắt đầu ca đêm:</span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <input
+                                      type="number"
+                                      min={18}
+                                      max={24}
+                                      step={1}
+                                      disabled={!canEdit}
+                                      value={policy.fnb.nightShiftStartHour ?? 22}
+                                      onChange={(e) => updateFnb('nightShiftStartHour', parseInt(e.target.value, 10) || 22)}
+                                      className="w-16 px-2 py-1 text-center font-mono font-bold text-indigo-700 border border-indigo-200 rounded-lg bg-white disabled:bg-gray-100 text-xs focus:ring-1 focus:ring-indigo-600"
+                                    />
+                                    <span className="text-gray-500 font-medium">h00</span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )
                         })}
@@ -1346,12 +1624,34 @@ function SettingsPayrollContent() {
                   </div>
 
                   {/* Quỹ Tip & Service Charge */}
-                  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs">
-                    <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
-                      <Coins size={16} className="text-amber-600" />
-                      <span>Cơ Chế Phân Bổ Tiền Tip &amp; Phí Dịch Vụ</span>
-                    </h3>
-                    <p className="text-xs text-gray-500 mb-4">Quy tắc chia quỹ minh bạch cho nhân viên phục vụ và pha chế</p>
+                  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
+                          <Coins size={16} className="text-amber-600" />
+                          <span>Cơ Chế Phân Bổ Tiền Tip &amp; Phí Dịch Vụ F&amp;B</span>
+                        </h3>
+                        <p className="text-xs text-gray-500">Tự động chia quỹ Tip theo tỷ lệ giờ công đóng góp của nhân viên</p>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xs font-bold text-gray-700">Tự động chia Tip:</span>
+                        <button
+                          type="button"
+                          disabled={!canEdit}
+                          onClick={() => updateFnb('tipDistributionEnabled', !(policy.fnb.tipDistributionEnabled ?? true))}
+                          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                            (policy.fnb.tipDistributionEnabled ?? true) ? 'bg-amber-600' : 'bg-gray-300'
+                          } ${!canEdit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                          title="Bật/Tắt tự động chia quỹ Tip theo tỷ lệ giờ công"
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              (policy.fnb.tipDistributionEnabled ?? true) ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="rounded-xl border border-amber-200/80 bg-amber-50/40 p-4 space-y-2.5">
@@ -1496,6 +1796,260 @@ function SettingsPayrollContent() {
                         />
                         <span className="text-[11px] text-gray-400 block">Khấu trừ lương đóng BH</span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Quy Tắc Phạt & Khấu Trừ Chấm Công */}
+                  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs mt-4">
+                    <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
+                      <AlertCircle size={16} className="text-rose-600" />
+                      <span>Quy Tắc Phạt Đi Muộn &amp; Miễn Phạt F&amp;B</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mb-4">Cấu hình số lần miễn phạt nhân văn và cơ chế tính phạt linh hoạt theo lần hoặc số phút vi phạm</p>
+
+                    {/* Hàng 1: Chọn Chế độ phạt & Số lần miễn phạt */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mb-4">
+                      <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50/50 p-3.5">
+                        <span className="text-xs font-bold text-gray-700 block mb-2">Chế độ tính phạt đi muộn</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {[
+                            { id: 'fixed', label: 'Phạt cố định mỗi lần', desc: 'Đồng giá cho mọi lần vi phạm (VD: 50.000đ/lần)' },
+                            { id: 'tiered', label: 'Bậc thang số phút', desc: 'Muộn ít phạt nhẹ, muộn nhiều phạt nặng' },
+                          ].map(modeItem => {
+                            const isSelected = (policy.latePenaltyPolicy?.mode ?? 'fixed') === modeItem.id
+                            return (
+                              <button
+                                key={modeItem.id}
+                                type="button"
+                                disabled={!canEdit}
+                                onClick={() => updateLatePolicy('mode', modeItem.id)}
+                                className={`text-left p-2.5 rounded-lg border transition cursor-pointer select-none ${
+                                  isSelected
+                                    ? 'border-rose-500 bg-rose-50/80 ring-1 ring-rose-500 shadow-2xs'
+                                    : 'border-gray-200 bg-white hover:border-gray-300'
+                                } ${!canEdit ? 'opacity-70 cursor-not-allowed' : ''}`}
+                              >
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className={`text-xs font-bold ${isSelected ? 'text-rose-700' : 'text-gray-800'}`}>
+                                    {modeItem.label}
+                                  </span>
+                                  <input type="radio" checked={isSelected} readOnly className="h-3 w-3 text-rose-600" />
+                                </div>
+                                <span className="text-[10px] text-gray-500 block leading-tight">{modeItem.desc}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Số lần miễn phạt */}
+                      <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3.5 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-gray-700">Miễn phạt trong tháng</span>
+                          <span className="font-mono text-sm font-bold text-emerald-800">{policy.latePenaltyPolicy?.graceOccurrences ?? 2} lần</span>
+                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          max={10}
+                          step={1}
+                          disabled={!canEdit}
+                          value={policy.latePenaltyPolicy?.graceOccurrences ?? 2}
+                          onChange={e => updateLatePolicy('graceOccurrences', parseInt(e.target.value, 10) || 0)}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-mono font-bold text-[#001D3D] outline-none focus:border-[#2F6FA8]"
+                        />
+                        <span className="text-[11px] text-gray-500 block">Số lần đi muộn đầu tiên trong tháng được bỏ qua (phạt 0đ)</span>
+                      </div>
+                    </div>
+
+                    {/* Hàng 2: Chi tiết mức phạt tương ứng với chế độ đang chọn */}
+                    {(policy.latePenaltyPolicy?.mode ?? 'fixed') === 'fixed' ? (
+                      <div className="rounded-xl border border-rose-100 bg-rose-50/40 p-4 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-gray-700">Mức phạt cố định mỗi lần vi phạm</span>
+                          <span className="font-mono text-sm font-bold text-rose-700">
+                            {formatVnd(policy.latePenaltyPolicy?.fixedAmount ?? policy.rates?.latePenaltyPerOccurrence ?? 50000)}
+                          </span>
+                        </div>
+                        <MoneyNumberInput
+                          value={policy.latePenaltyPolicy?.fixedAmount ?? policy.rates?.latePenaltyPerOccurrence ?? 50000}
+                          step={10000}
+                          disabled={!canEdit}
+                          onChange={val => {
+                            updateLatePolicy('fixedAmount', val)
+                            updateRate('latePenaltyPerOccurrence', val)
+                          }}
+                        />
+                        <span className="text-[11px] text-gray-500 block">Áp dụng từ lần đi muộn thứ {(policy.latePenaltyPolicy?.graceOccurrences ?? 2) + 1} trở đi</span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                        {/* Bậc 1: Muộn nhẹ */}
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-amber-900">Bậc 1: Muộn nhẹ</span>
+                            <span className="font-mono text-xs font-bold text-amber-800">1 - {policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15} phút</span>
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-gray-600 block mb-1">Mức phạt (VNĐ)</label>
+                            <MoneyNumberInput
+                              value={policy.latePenaltyPolicy?.tier1Amount ?? 20000}
+                              step={5000}
+                              disabled={!canEdit}
+                              onChange={val => updateLatePolicy('tier1Amount', val)}
+                            />
+                          </div>
+                          <span className="text-[10px] text-gray-500 block">Vi phạm dưới {policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15} phút</span>
+                        </div>
+
+                        {/* Bậc 2: Muộn vừa */}
+                        <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-3.5 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-orange-900">Bậc 2: Muộn vừa</span>
+                            <span className="font-mono text-xs font-bold text-orange-800">
+                              {(policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15) + 1} - {policy.latePenaltyPolicy?.tier2MaxMinutes ?? 30} phút
+                            </span>
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-gray-600 block mb-1">Mức phạt (VNĐ)</label>
+                            <MoneyNumberInput
+                              value={policy.latePenaltyPolicy?.tier2Amount ?? 50000}
+                              step={10000}
+                              disabled={!canEdit}
+                              onChange={val => updateLatePolicy('tier2Amount', val)}
+                            />
+                          </div>
+                          <span className="text-[10px] text-gray-500 block">Vi phạm từ {(policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15) + 1} đến {policy.latePenaltyPolicy?.tier2MaxMinutes ?? 30} phút</span>
+                        </div>
+
+                        {/* Bậc 3: Muộn nặng */}
+                        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-3.5 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-rose-900">Bậc 3: Muộn nặng</span>
+                            <span className="font-mono text-xs font-bold text-rose-800">&gt; {policy.latePenaltyPolicy?.tier2MaxMinutes ?? 30} phút</span>
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-gray-600 block mb-1">Mức phạt (VNĐ)</label>
+                            <MoneyNumberInput
+                              value={policy.latePenaltyPolicy?.tier3Amount ?? 100000}
+                              step={10000}
+                              disabled={!canEdit}
+                              onChange={val => updateLatePolicy('tier3Amount', val)}
+                            />
+                          </div>
+                          <span className="text-[10px] text-gray-500 block">Vi phạm nghiêm trọng trên {policy.latePenaltyPolicy?.tier2MaxMinutes ?? 30} phút</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quy Chuẩn Ca Làm Việc F&B */}
+                  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs mt-4">
+                    <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
+                      <Clock size={16} className="text-amber-600" />
+                      <span>Quy Chuẩn Ca Làm Việc F&amp;B</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mb-4">Quy định độ dài tiêu chuẩn của từng loại ca và điều kiện ghi nhận 1 ca làm việc</p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                      <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-4 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-gray-700">Ca ngắn chuẩn (Part-time)</span>
+                          <span className="font-mono text-sm font-bold text-amber-800">{policy.shiftRules?.partTimeShiftHours ?? 4} giờ</span>
+                        </div>
+                        <input
+                          type="number"
+                          step={0.5}
+                          min={1}
+                          max={8}
+                          disabled={!canEdit}
+                          value={policy.shiftRules?.partTimeShiftHours ?? 4}
+                          onChange={e => updateShiftRule('partTimeShiftHours', parseFloat(e.target.value) || 4)}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-mono font-bold text-[#001D3D] outline-none focus:border-[#2F6FA8]"
+                        />
+                        <span className="text-[11px] text-gray-500 block">Số giờ chuẩn của 1 ca bán thời gian thông thường</span>
+                      </div>
+
+                      <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-gray-700">Ca dài chuẩn (Full-time)</span>
+                          <span className="font-mono text-sm font-bold text-blue-800">{policy.shiftRules?.fullTimeShiftHours ?? 8} giờ</span>
+                        </div>
+                        <input
+                          type="number"
+                          step={0.5}
+                          min={4}
+                          max={12}
+                          disabled={!canEdit}
+                          value={policy.shiftRules?.fullTimeShiftHours ?? 8}
+                          onChange={e => updateShiftRule('fullTimeShiftHours', parseFloat(e.target.value) || 8)}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-mono font-bold text-[#001D3D] outline-none focus:border-[#2F6FA8]"
+                        />
+                        <span className="text-[11px] text-gray-500 block">Số giờ chuẩn của 1 ca toàn thời gian trong ngày</span>
+                      </div>
+
+                      <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-gray-700">Giờ tối thiểu để tính 1 ca</span>
+                          <span className="font-mono text-sm font-bold text-emerald-800">{policy.shiftRules?.minShiftHours ?? 2} giờ</span>
+                        </div>
+                        <input
+                          type="number"
+                          step={0.5}
+                          min={0.5}
+                          max={6}
+                          disabled={!canEdit}
+                          value={policy.shiftRules?.minShiftHours ?? 2}
+                          onChange={e => updateShiftRule('minShiftHours', parseFloat(e.target.value) || 2)}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-mono font-bold text-[#001D3D] outline-none focus:border-[#2F6FA8]"
+                        />
+                        <span className="text-[11px] text-gray-500 block">Dưới số giờ này chỉ tính giờ lẻ, không tính là 1 lượt ca</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quy Tắc Làm Tròn Tiền Lương (Net) */}
+                  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs mt-4">
+                    <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
+                      <Coins size={16} className="text-emerald-600" />
+                      <span>Quy Tắc Làm Tròn Lương Thực Nhận (Net)</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mb-4">Phương thức làm tròn số tiền chi trả trên bảng lương và file ủy nhiệm chi ngân hàng</p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {[
+                        { id: 'none', label: 'Không làm tròn', desc: 'Giữ đúng từng đồng (VD: 5.432.650đ)' },
+                        { id: 'round_1000', label: 'Làm tròn 1.000đ (Mặc định)', desc: 'Làm tròn đến nghìn đồng (VD: 5.433.000đ)' },
+                        { id: 'round_5000', label: 'Làm tròn 5.000đ', desc: 'Làm tròn đến 5 nghìn đồng (VD: 5.435.000đ)' },
+                        { id: 'round_10000', label: 'Làm tròn 10.000đ', desc: 'Làm tròn đến chục nghìn (VD: 5.440.000đ)' },
+                      ].map(item => {
+                        const isSelected = (policy.netRoundingMethod ?? 'round_1000') === item.id
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => canEdit && updateNetRoundingMethod(item.id as any)}
+                            className={`rounded-xl border p-3.5 transition cursor-pointer select-none ${
+                              isSelected
+                                ? 'border-[#2F6FA8] bg-sky-50/60 ring-2 ring-[#2F6FA8]/20 shadow-xs'
+                                : 'border-gray-200 bg-white hover:border-gray-300'
+                            } ${!canEdit ? 'opacity-70 cursor-not-allowed' : ''}`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className={`text-xs font-bold ${isSelected ? 'text-[#2F6FA8]' : 'text-gray-800'}`}>
+                                {item.label}
+                              </span>
+                              <input
+                                type="radio"
+                                checked={isSelected}
+                                disabled={!canEdit}
+                                readOnly
+                                className="h-3.5 w-3.5 text-[#2F6FA8]"
+                              />
+                            </div>
+                            <span className="text-[11px] text-gray-500 block leading-tight">{item.desc}</span>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
 

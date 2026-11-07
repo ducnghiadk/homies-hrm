@@ -89,9 +89,9 @@ export const mockHROverview: HROverviewData = {
   new_this_month: 1, resigned_this_month: 0, avg_tenure_months: 14,
   gender_ratio: { male: 7, female: 8 },
   by_store: [
-    { store: 'Homies Milk Tea Q.1', count: 7 },
-    { store: 'Homies Milk Tea Q.3', count: 5 },
-    { store: 'Homies Milk Tea Thủ Đức', count: 3 },
+    { store: 'Homies Milk Tea - Hồ Bá Phấn', count: 8 },
+    { store: 'Homies Milk Tea - Đường 429', count: 5 },
+    { store: 'Homies Milk Tea - Lê Văn Sỹ (Dự kiến)', count: 2 },
   ],
   by_position: [
     { position: 'Pha chế', count: 5 }, { position: 'Thu ngân', count: 3 },

@@ -3,6 +3,7 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import ManagerSchedulingBoard from '@/components/scheduling/ManagerSchedulingBoard'
+import MobileQuickAssignDrawer from '@/components/scheduling/MobileQuickAssignDrawer'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 
 function SchedulePageInner() {
@@ -10,7 +11,12 @@ function SchedulePageInner() {
   const weekStart = searchParams.get('weekStart')
   const storeId = searchParams.get('storeId')
 
-  return <ManagerSchedulingBoard weekStartQuery={weekStart} storeIdQuery={storeId} />
+  return (
+    <>
+      <ManagerSchedulingBoard weekStartQuery={weekStart} storeIdQuery={storeId} />
+      <MobileQuickAssignDrawer storeId={storeId} weekStart={weekStart} />
+    </>
+  )
 }
 
 export default function SchedulePage() {

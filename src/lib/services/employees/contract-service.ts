@@ -70,8 +70,9 @@ export type ContractSignature = {
   actorName: string
   role: 'employee' | 'hr'
   signedAt: string
-  method: 'app_confirm' | 'otp_mock'
+  method: 'app_confirm' | 'otp_mock' | 'e_signature'
   evidence: string
+  signatureImageUrl?: string
 }
 
 export type ContractAuditLog = {
@@ -819,30 +820,76 @@ export class ContractService {
     return updated
   }
 
-  static async signAsEmployee(id: string, currentUser: AuthUser): Promise<EmployeeContract | null> {
-    return this.updateContract(id, currentUser, contract => {
+  static async signAsEmployee(
+    id: string,
+    currentUser: AuthUser,
+    signatureEvidence?: { method?: 'e_signature' | 'app_confirm'; signatureImage?: string; note?: string }
+  ): Promise<EmployeeContract | null> {
+    return this.updateContract(id, currentUser, (contract) => {
       if (contract.employeeId !== currentUser.id || contract.status !== 'pending_employee_sign') return contract
-      const signature = this.makeSignature(currentUser, 'employee', 'Signed in Homies app mock flow')
+      const isTouch = signatureEvidence?.method === 'e_signature' || Boolean(signatureEvidence?.signatureImage)
+      const signature: ContractSignature = {
+        id: makeId('sig'),
+        actorId: currentUser.id,
+        actorName: currentUser.full_name,
+        role: 'employee',
+        signedAt: now(),
+        method: isTouch ? 'e_signature' : 'app_confirm',
+        evidence: isTouch
+          ? (signatureEvidence?.signatureImage ? 'Ký điện tử bằng cảm ứng ngón tay' : 'Ký điện tử trên màn hình')
+          : 'Signed in Homies app',
+        signatureImageUrl: signatureEvidence?.signatureImage,
+      }
       return {
         ...contract,
         status: 'pending_hr_sign',
-        signatures: [...contract.signatures.filter(item => item.role !== 'employee'), signature],
-        auditLogs: [this.makeLog('employee_sign', currentUser, 'Nhan su da ky tren app'), ...contract.auditLogs],
+        signatures: [...contract.signatures.filter((item) => item.role !== 'employee'), signature],
+        auditLogs: [
+          this.makeLog(
+            'employee_sign',
+            currentUser,
+            isTouch ? 'Nhân sự đã ký tay điện tử trên màn hình' : 'Nhân sự đã ký xác nhận trên app'
+          ),
+          ...contract.auditLogs,
+        ],
       }
     })
   }
 
-  static async countersign(id: string, currentUser: AuthUser): Promise<EmployeeContract | null> {
+  static async countersign(
+    id: string,
+    currentUser: AuthUser,
+    signatureEvidence?: { method?: 'e_signature' | 'app_confirm'; signatureImage?: string; note?: string }
+  ): Promise<EmployeeContract | null> {
     if (!HR_ROLES.has(currentUser.role)) return null
-    const updated = await this.updateContract(id, currentUser, contract => {
+    const isTouch = signatureEvidence?.method === 'e_signature' || Boolean(signatureEvidence?.signatureImage)
+    const updated = await this.updateContract(id, currentUser, (contract) => {
       if (!['pending_hr_sign', 'signed_by_employee'].includes(contract.status)) return contract
-      const signature = this.makeSignature(currentUser, 'hr', 'HR countersign in Homies app mock flow')
+      const signature: ContractSignature = {
+        id: makeId('sig'),
+        actorId: currentUser.id,
+        actorName: currentUser.full_name,
+        role: 'hr',
+        signedAt: now(),
+        method: isTouch ? 'e_signature' : 'app_confirm',
+        evidence: isTouch
+          ? (signatureEvidence?.signatureImage ? 'HR ký điện tử bằng cảm ứng tay' : 'HR ký điện tử')
+          : 'HR countersign in Homies app',
+        signatureImageUrl: signatureEvidence?.signatureImage,
+      }
       return {
         ...contract,
         status: 'active',
         activatedAt: now(),
-        signatures: [...contract.signatures.filter(item => item.role !== 'hr'), signature],
-        auditLogs: [this.makeLog('hr_countersign', currentUser, 'HR countersign va kich hoat hop dong'), ...contract.auditLogs],
+        signatures: [...contract.signatures.filter((item) => item.role !== 'hr'), signature],
+        auditLogs: [
+          this.makeLog(
+            'hr_countersign',
+            currentUser,
+            isTouch ? 'HR ký điện tử và kích hoạt hợp đồng' : 'HR countersign và kích hoạt hợp đồng'
+          ),
+          ...contract.auditLogs,
+        ],
       }
     })
 
@@ -858,6 +905,29 @@ export class ContractService {
     }
 
     return updated
+  }
+
+  static async liquidateContract(
+    id: string,
+    reason: string,
+    currentUser: AuthUser
+  ): Promise<EmployeeContract | null> {
+    if (!HR_ROLES.has(currentUser.role)) return null
+    return this.updateContract(id, currentUser, (contract) => {
+      return {
+        ...contract,
+        status: 'void',
+        customFields: {
+          ...contract.customFields,
+          'contract.liquidation_reason': reason,
+          'contract.liquidated_at': now(),
+        },
+        auditLogs: [
+          this.makeLog('liquidate', currentUser, `Thanh lý hợp đồng. Lý do: ${reason}`),
+          ...contract.auditLogs,
+        ],
+      }
+    })
   }
 
   static async getStats(currentUser?: AuthUser) {
@@ -1189,6 +1259,21 @@ export class ContractService {
   }
 
   private static async getContractsDb(): Promise<EmployeeContract[]> {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/contracts', { cache: 'no-store' })
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            this.saveContractsLocal(json.data)
+            return json.data
+          }
+        }
+      } catch (error) {
+        console.warn('[ContractService] GET /api/contracts failed, falling back to local', error)
+      }
+    }
+
     if (this.shouldUseBackend()) {
       try {
         return await this.getContractsBackend()
@@ -1268,6 +1353,47 @@ export class ContractService {
   }
 
   private static async persistContract(contract: EmployeeContract) {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch(`/api/contracts/${encodeURIComponent(contract.id)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(contract),
+        })
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && json.data) {
+            const db = this.getContractsLocal()
+            const index = db.findIndex(item => item.id === contract.id)
+            if (index === -1) db.unshift(json.data)
+            else db[index] = json.data
+            this.saveContractsLocal(db)
+            return
+          }
+        }
+      } catch (error) {
+        console.warn('[ContractService] PUT /api/contracts/[id] failed, fallback to /api/contracts POST', error)
+      }
+
+      try {
+        const res = await fetch('/api/contracts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(contract),
+        })
+        if (res.ok) {
+          const db = this.getContractsLocal()
+          const index = db.findIndex(item => item.id === contract.id)
+          if (index === -1) db.unshift(contract)
+          else db[index] = contract
+          this.saveContractsLocal(db)
+          return
+        }
+      } catch (error) {
+        console.warn('[ContractService] POST /api/contracts failed, fallback to local', error)
+      }
+    }
+
     if (this.shouldUseBackend()) {
       try {
         await this.persistContractBackend(contract)

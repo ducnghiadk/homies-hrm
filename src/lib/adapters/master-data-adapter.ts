@@ -226,9 +226,36 @@ const initialPositions: PositionItem[] = [
   { id: 'pos-005', name: 'Quản lý cửa hàng', department_id: 'dept-004', level: 3, base_salary: 12000000, pay_type: 'monthly' },
 ]
 
+function getCurrentUserRole(): string {
+  if (typeof window === 'undefined') return 'store_manager'
+  try {
+    const raw = localStorage.getItem('hrm-auth')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      return parsed?.state?.user?.role || parsed?.user?.role || 'store_manager'
+    }
+  } catch {}
+  return 'store_manager'
+}
+
 export class MasterDataAdapter {
   // ─── DEPARTMENTS ───
   static async getDepartments(): Promise<DepartmentItem[]> {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/master-data')
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.departments) && json.departments.length > 0) {
+            localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(json.departments))
+            return json.departments
+          }
+        }
+      } catch (err) {
+        console.warn('[MasterDataAdapter] /api/master-data departments fallback:', err)
+      }
+    }
+
     if (typeof window === 'undefined') return initialDepartments
 
     // LocalStorage Check
@@ -255,6 +282,16 @@ export class MasterDataAdapter {
   static async saveDepartments(items: DepartmentItem[]): Promise<void> {
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(items))
+      try {
+        const userRole = getCurrentUserRole()
+        await fetch('/api/master-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': userRole },
+          body: JSON.stringify({ type: 'departments', data: items, user_role: userRole }),
+        })
+      } catch (err) {
+        console.warn('[MasterDataAdapter] saveDepartments server API fallback:', err)
+      }
     }
 
     if (isSupabaseConfigured && isRealDbMode()) {
@@ -273,6 +310,21 @@ export class MasterDataAdapter {
 
   // ─── POSITIONS ───
   static async getPositions(): Promise<PositionItem[]> {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/master-data')
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.positions) && json.positions.length > 0) {
+            localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(json.positions))
+            return json.positions
+          }
+        }
+      } catch (err) {
+        console.warn('[MasterDataAdapter] /api/master-data positions fallback:', err)
+      }
+    }
+
     if (typeof window === 'undefined') return initialPositions
 
     const localData = localStorage.getItem(STORAGE_KEYS.POSITIONS)
@@ -305,6 +357,16 @@ export class MasterDataAdapter {
   static async savePositions(items: PositionItem[]): Promise<void> {
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(items))
+      try {
+        const userRole = getCurrentUserRole()
+        await fetch('/api/master-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': userRole },
+          body: JSON.stringify({ type: 'positions', data: items, user_role: userRole }),
+        })
+      } catch (err) {
+        console.warn('[MasterDataAdapter] savePositions server API fallback:', err)
+      }
     }
 
     if (isSupabaseConfigured && isRealDbMode()) {
@@ -335,6 +397,19 @@ export class MasterDataAdapter {
   }
 
   static async deletePosition(positionId: string): Promise<DeletePositionResult> {
+    if (typeof window !== 'undefined') {
+      try {
+        const userRole = getCurrentUserRole()
+        await fetch('/api/master-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': userRole },
+          body: JSON.stringify({ delete_position_id: positionId, user_role: userRole }),
+        })
+      } catch (err) {
+        console.warn('[MasterDataAdapter] deletePosition server API fallback:', err)
+      }
+    }
+
     if (!isSupabaseConfigured || !isRealDbMode()) {
       return { deleted: true, employee_count: 0 }
     }
@@ -372,6 +447,21 @@ export class MasterDataAdapter {
 
   // ─── LEAVE TYPES ───
   static async getLeaveTypes(): Promise<LeaveTypeItem[]> {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/master-data')
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.leave_types) && json.leave_types.length > 0) {
+            localStorage.setItem(STORAGE_KEYS.LEAVE_TYPES, JSON.stringify(json.leave_types))
+            return json.leave_types
+          }
+        }
+      } catch (err) {
+        console.warn('[MasterDataAdapter] /api/master-data leave_types fallback:', err)
+      }
+    }
+
     if (typeof window === 'undefined') return masterLeaveTypes
 
     const localData = localStorage.getItem(STORAGE_KEYS.LEAVE_TYPES)
@@ -381,6 +471,16 @@ export class MasterDataAdapter {
   static async saveLeaveTypes(items: LeaveTypeItem[]): Promise<void> {
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.LEAVE_TYPES, JSON.stringify(items))
+      try {
+        const userRole = getCurrentUserRole()
+        await fetch('/api/master-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': userRole },
+          body: JSON.stringify({ type: 'leave_types', data: items, user_role: userRole }),
+        })
+      } catch (err) {
+        console.warn('[MasterDataAdapter] saveLeaveTypes server API fallback:', err)
+      }
     }
   }
 

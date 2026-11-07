@@ -4,9 +4,11 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import writeExcelFile from 'write-excel-file/browser'
-import { ArrowLeft, Clock3, Download, FileText, PenLine, RefreshCcw, Send, ShieldCheck, UserRound } from 'lucide-react'
+import { ArrowLeft, Ban, Clock3, Download, FileText, PenLine, Printer, RefreshCcw, Send, ShieldCheck, UserRound } from 'lucide-react'
 import AppShell from '@/components/layout/AppShell'
 import { Avatar } from '@/components/ui/Avatar'
+import SignaturePadModal from '@/components/contracts/SignaturePadModal'
+import ContractPrintA4Modal from '@/components/contracts/ContractPrintA4Modal'
 import { getPositionById, getStoreById } from '@/lib/mock-data'
 import { ContractService, CONTRACT_STATUS_META, type EmployeeContract } from '@/lib/services/contract-service'
 import { EmployeeService } from '@/lib/services/employee-service'
@@ -104,6 +106,11 @@ export default function ContractDetailPage() {
   const [renewNote, setRenewNote] = useState('Tái ký từ hợp đồng đang xem')
   const [renewalTracking, setRenewalTracking] = useState<Awaited<ReturnType<typeof ContractService.getRenewalTracking>>>(null)
   const [onboardingPolicy, setOnboardingPolicy] = useState<EmployeeOnboardingPolicyRecord | null>(null)
+  const [isSignaturePadOpen, setIsSignaturePadOpen] = useState(false)
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
+  const [isLiquidateModalOpen, setIsLiquidateModalOpen] = useState(false)
+  const [liquidationReason, setLiquidationReason] = useState('')
+  const [signerRoleToUse, setSignerRoleToUse] = useState<'employee' | 'hr'>('employee')
 
   useEffect(() => {
     if (!hasHydrated) return
@@ -216,6 +223,52 @@ export default function ContractDetailPage() {
           ? 'Bạn đã ký hợp đồng trên app.'
           : 'HR đã countersign và kích hoạt hợp đồng.'
     )
+    setRefreshKey((current) => current + 1)
+  }
+
+  const handleSignatureConfirm = async (signatureDataUrl: string) => {
+    if (!user || !contract) return
+    setIsLoading(true)
+    const result =
+      signerRoleToUse === 'employee'
+        ? await ContractService.signAsEmployee(contract.id, user, {
+            method: 'e_signature',
+            signatureImage: signatureDataUrl,
+          })
+        : await ContractService.countersign(contract.id, user, {
+            method: 'e_signature',
+            signatureImage: signatureDataUrl,
+          })
+
+    setIsLoading(false)
+    if (!result) {
+      setMessage('Không thực hiện được việc lưu chữ ký. Hãy kiểm tra trạng thái và quyền ký.')
+      return
+    }
+
+    setMessage(
+      signerRoleToUse === 'employee'
+        ? 'Bạn đã hoàn tất ký điện tử bằng nét vẽ tay thành công!'
+        : 'Đại diện HR đã ký điện tử và kích hoạt hợp đồng thành công!'
+    )
+    setRefreshKey((current) => current + 1)
+  }
+
+  const handleLiquidate = async () => {
+    if (!user || !contract) return
+    if (!liquidationReason.trim()) {
+      setMessage('Vui lòng nhập lý do thanh lý hợp đồng.')
+      return
+    }
+    setIsLoading(true)
+    const result = await ContractService.liquidateContract(contract.id, liquidationReason, user)
+    setIsLoading(false)
+    setIsLiquidateModalOpen(false)
+    if (!result) {
+      setMessage('Chưa thể thanh lý hợp đồng này.')
+      return
+    }
+    setMessage('Đã thanh lý hợp đồng thành công.')
     setRefreshKey((current) => current + 1)
   }
 
@@ -335,28 +388,63 @@ export default function ContractDetailPage() {
 
             <div className="flex flex-wrap gap-2">
               {canManage && contract.status === 'draft' ? (
-                <button type="button" onClick={() => void runAction('send')} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-bold text-white">
+                <button type="button" onClick={() => void runAction('send')} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-700 transition">
                   <Send size={15} />
                   Gửi ký
                 </button>
               ) : null}
               {canEmployeeSign ? (
-                <button type="button" onClick={() => void runAction('sign')} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-bold text-white">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSignerRoleToUse('employee')
+                    setIsSignaturePadOpen(true)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#2F6FA8] px-4 py-2 text-sm font-bold text-white hover:bg-[#1D3E61] transition shadow-xs"
+                >
                   <PenLine size={15} />
-                  Tôi đồng ý và ký
+                  Tôi đồng ý và ký tay
                 </button>
               ) : null}
               {canManage && contract.status === 'pending_hr_sign' ? (
-                <button type="button" onClick={() => void runAction('counter')} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSignerRoleToUse('hr')
+                    setIsSignaturePadOpen(true)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition shadow-xs"
+                >
                   <ShieldCheck size={15} />
-                  HR countersign
+                  HR countersign & Ký
                 </button>
               ) : null}
-              <button type="button" onClick={() => { void downloadContract(contract) }} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(true)}
+                className="inline-flex items-center gap-2 rounded-full border border-[#2F6FA8]/30 bg-primary-50 px-4 py-2 text-sm font-bold text-[#2F6FA8] hover:bg-primary-100 transition"
+              >
+                <Printer size={15} />
+                In hợp đồng A4
+              </button>
+              <button type="button" onClick={() => { void downloadContract(contract) }} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition">
                 <Download size={15} />
                 Xuất file
               </button>
-              <Link href={`/employees/${contract.employeeId}`} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">
+              {canManage && ['active', 'signed_by_employee', 'pending_hr_sign'].includes(contract.status) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLiquidationReason('')
+                    setIsLiquidateModalOpen(true)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 transition"
+                >
+                  <Ban size={15} />
+                  Thanh lý
+                </button>
+              ) : null}
+              <Link href={`/employees/${contract.employeeId}`} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition">
                 <UserRound size={15} />
                 Mở hồ sơ
               </Link>
@@ -648,7 +736,19 @@ export default function ContractDetailPage() {
                       </div>
                       <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">{signature.role} · {signature.method}</p>
                       <p className="mt-2 text-xs text-slate-500">{signature.signedAt}</p>
-                      <p className="mt-1 text-xs text-slate-500">{signature.evidence}</p>
+                      {signature.signatureImageUrl || (signature.evidence && signature.evidence.startsWith('data:image')) ? (
+                        <div className="mt-2.5 rounded-xl border border-slate-200 bg-white p-2">
+                          <p className="text-[10px] font-bold text-slate-400 mb-1">Chữ ký tay điện tử:</p>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={signature.signatureImageUrl || signature.evidence}
+                            alt={`Chữ ký của ${signature.actorName}`}
+                            className="h-14 max-w-full object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-xs text-slate-500">{signature.evidence}</p>
+                      )}
                     </div>
                   ))
                 )}
@@ -680,6 +780,70 @@ export default function ContractDetailPage() {
             </SectionCard>
           </aside>
         </section>
+
+        {/* Modal ký điện tử bằng ngón tay */}
+        <SignaturePadModal
+          isOpen={isSignaturePadOpen}
+          onClose={() => setIsSignaturePadOpen(false)}
+          onConfirm={(signatureDataUrl) => void handleSignatureConfirm(signatureDataUrl)}
+          signerName={signerRoleToUse === 'employee' ? (employee?.full_name || user.full_name) : user.full_name}
+          signerRole={signerRoleToUse}
+          contractCode={contract.customFields['contract.code'] || contract.id}
+        />
+
+        {/* Modal in hợp đồng A4 chuẩn pháp lý */}
+        <ContractPrintA4Modal
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          contract={contract}
+          employee={employee}
+          storeName={store?.name}
+          positionName={position?.name}
+        />
+
+        {/* Dialog thanh lý hợp đồng */}
+        {isLiquidateModalOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <div className="flex items-center gap-2 text-rose-600">
+                  <Ban size={20} />
+                  <h3 className="text-base font-bold text-[#001D3D]">Thanh lý hợp đồng lao động</h3>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Hợp đồng {contract.customFields['contract.code'] || contract.id} của {employee?.full_name || contract.employeeId} sẽ được chuyển sang trạng thái đã hủy/thanh lý.
+                </p>
+              </div>
+              <div className="p-5">
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Lý do thanh lý hợp đồng</label>
+                <textarea
+                  value={liquidationReason}
+                  onChange={(e) => setLiquidationReason(e.target.value)}
+                  placeholder="Nhập lý do chấm dứt hoặc thanh lý hợp đồng (ví dụ: Hết hạn thỏa thuận, hai bên đồng ý chấm dứt...)"
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/50 px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => setIsLiquidateModalOpen(false)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleLiquidate()}
+                  disabled={!liquidationReason.trim()}
+                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50"
+                >
+                  Xác nhận thanh lý
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </AppShell>
   )

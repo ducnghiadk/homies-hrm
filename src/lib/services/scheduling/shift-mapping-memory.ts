@@ -3,6 +3,8 @@
  * Bộ nhớ tự học & Nhận diện thông minh cho Mẫu Ca & Nhân Viên khi Xếp Ca / Import Excel
  */
 
+import { parseIposShiftCode, extractTimeRangeFromText } from './schedule-import-batch.ts'
+
 const SHIFT_MAPPING_MEMORY_KEY = 'homies_smart_shift_mapping_memory'
 const EMP_MAPPING_MEMORY_KEY = 'homies_smart_emp_mapping_memory'
 
@@ -168,6 +170,23 @@ export function smartResolveShiftTemplate(
   )
   const flexTplId = flexTpl?.id || 'shift-004'
 
+  const morningTpl = templates.find(t => t.id === 'shift-001' || removeVietnameseTones(t.name).includes('sang'))
+  const eveningTpl = templates.find(t => t.id === 'shift-003' || removeVietnameseTones(t.name).includes('toi') || removeVietnameseTones(t.name).includes('dem'))
+  const afternoonTpl = templates.find(t => t.id === 'shift-002' || removeVietnameseTones(t.name).includes('chieu') || removeVietnameseTones(t.name).includes('trua'))
+
+  // 1.5. Ánh xạ ký hiệu viết tắt chuẩn iPOS HRM ("S", "C", "T", "SANG", "CHIEU", "TOI", "11h30-14h30", "12h-15h"...)
+  const iposParsed = parseIposShiftCode(shiftText)
+  if (iposParsed) {
+    if (iposParsed.isFlexible || iposParsed.shiftId === 'shift-004') {
+      return flexTplId
+    }
+    const matchedTpl = templates.find(t => t.id === iposParsed.shiftId)
+    if (matchedTpl) return matchedTpl.id
+    if (iposParsed.shiftId === 'shift-001') return morningTpl?.id || 'shift-001'
+    if (iposParsed.shiftId === 'shift-002') return afternoonTpl?.id || 'shift-002'
+    if (iposParsed.shiftId === 'shift-003') return eveningTpl?.id || 'shift-003'
+  }
+
   // 2. Nhận diện từ khóa Ca Phát Sinh / Linh Hoạt / Bổ Sung / Lẻ / Tăng ca
   const flexKeywords = [
     'phat sinh',
@@ -206,10 +225,6 @@ export function smartResolveShiftTemplate(
   const startTime = timeMatch ? timeMatch[1] : ''
 
   // 5. Nhận diện theo từ khóa & Khung giờ
-  const morningTpl = templates.find(t => t.id === 'shift-001' || removeVietnameseTones(t.name).includes('sang'))
-  const eveningTpl = templates.find(t => t.id === 'shift-003' || removeVietnameseTones(t.name).includes('toi') || removeVietnameseTones(t.name).includes('dem'))
-  const afternoonTpl = templates.find(t => t.id === 'shift-002' || removeVietnameseTones(t.name).includes('chieu') || removeVietnameseTones(t.name).includes('trua'))
-
   if (cleanText.includes('sang') || cleanText.includes('ca 1') || cleanText.includes('morning') || (startTime && startTime < '12:00')) {
     return morningTpl?.id || 'shift-001'
   }
@@ -260,8 +275,8 @@ export function smartResolvePosition(
   if (cleanText.includes('phuc vu') || cleanText.includes('service') || cleanText.includes('pv') || cleanText.includes('p.vu') || cleanText.includes('p vu') || cleanText.includes('chay ban')) {
     return positions.find(p => p.id === 'pos-003' || removeVietnameseTones(p.name).includes('phuc vu'))?.id || 'pos-003'
   }
-  if (cleanText.includes('bep') || cleanText.includes('kitchen') || cleanText.includes('cook') || cleanText.includes('nau')) {
-    return positions.find(p => p.id === 'pos-004' || removeVietnameseTones(p.name).includes('bep'))?.id || 'pos-004'
+  if (cleanText.includes('bep') || cleanText.includes('kitchen') || cleanText.includes('cook') || cleanText.includes('nau') || cleanText.includes('che bien') || cleanText.includes('so che') || cleanText.includes('tran chau')) {
+    return positions.find(p => p.id === 'pos-bep' || removeVietnameseTones(p.name).includes('bep') || removeVietnameseTones(p.name).includes('che bien'))?.id || 'pos-bep'
   }
   if (cleanText.includes('quan ly') || cleanText.includes('manager') || cleanText.includes('ql') || cleanText.includes('cht')) {
     return positions.find(p => p.id === 'pos-005' || removeVietnameseTones(p.name).includes('quan ly'))?.id || 'pos-005'
@@ -285,6 +300,22 @@ export function smartResolvePosition(
 export function isFlexibleShiftText(text: string): boolean {
   if (!text) return false
   const clean = removeVietnameseTones(text).toLowerCase().trim()
+
+  // 1. Kiểm tra thông qua bộ parser iPOS
+  const iposParsed = parseIposShiftCode(text)
+  if (iposParsed?.isFlexible) {
+    return true
+  }
+
+  // 2. Kiểm tra nếu có khung giờ ca lẻ (không phải khung giờ ca chuẩn 08:30-12:00, 12:00-17:00, 17:00-22:00)
+  const timeRange = extractTimeRangeFromText(text)
+  if (timeRange) {
+    const isStandard =
+      ((timeRange.startTime === '08:30' || timeRange.startTime === '08:00') && timeRange.endTime === '12:00') ||
+      (timeRange.startTime === '12:00' && timeRange.endTime === '17:00') ||
+      (timeRange.startTime === '17:00' && (timeRange.endTime === '22:00' || timeRange.endTime === '22:30'))
+    if (!isStandard) return true
+  }
   
   // Nếu có từ khóa ca chuẩn (sáng, trưa, chiều, tối, đêm, kiểm kho) mà không có từ phát sinh / đột xuất / linh hoạt rõ ràng
   const hasStandardShiftWord = 

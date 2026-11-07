@@ -53,7 +53,7 @@ export default function BSCSettingsPage() {
 
   const [activeTab, setActiveTab] = useState<BSCSettingTab>('criteria')
   const [selectedStoreId, setSelectedStoreId] = useState('store-001')
-  const [selectedPeriod, setSelectedPeriod] = useState('2026-07')
+  const [selectedPeriod, setSelectedPeriod] = useState('2026-08')
   const [savedToast, setSavedToast] = useState('')
 
   // Modals
@@ -98,23 +98,20 @@ export default function BSCSettingsPage() {
   const [manualTargetDaily, setManualTargetDaily] = useState(currentTarget.manual_target_daily || currentTarget.target_daily || 8050000)
   const [minHoursThreshold, setMinHoursThreshold] = useState(currentTarget.min_hours_threshold || 110)
 
+  // ── Kiểm tra đăng nhập và phân quyền: Chỉ CEO / HR Admin mới được vào Cài đặt BSC ──
   useEffect(() => {
-    if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/settings/bsc')
-  }, [hasHydrated, isAuthenticated, router])
+    if (!hasHydrated) return
+    if (!isAuthenticated) {
+      router.replace('/login?redirect=/settings/bsc')
+      return
+    }
+    const isAllowed = Boolean(user && ['ceo', 'area_manager', 'hr_manager', 'hr_admin'].includes(user.role))
+    if (!isAllowed) {
+      router.replace('/bsc-bonus')
+    }
+  }, [hasHydrated, isAuthenticated, user, router])
 
-  if (!hasHydrated) {
-    return (
-      <AppShell title="Cài Đặt Hệ Thống BSC">
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
-        </div>
-      </AppShell>
-    )
-  }
-
-  if (!user || !isAuthenticated) return null
-
-  const isCEOOrHR = ['ceo', 'area_manager', 'hr_manager', 'hr_admin'].includes(user.role)
+  const isCEOOrHR = Boolean(user && ['ceo', 'area_manager', 'hr_manager', 'hr_admin'].includes(user.role))
 
   const handleOpenAddGroupModal = () => {
     setIsAddErrorGroupModalOpen(true)

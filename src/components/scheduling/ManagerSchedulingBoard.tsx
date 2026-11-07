@@ -6,8 +6,10 @@ import AppShell from '@/components/layout/AppShell'
 import { ScheduleService, type ShiftDemand, type ScheduleValidationWarning } from '@/lib/services/schedule-service'
 import { ShiftTemplateService } from '@/lib/services/shift-template-service'
 import { EmployeeService } from '@/lib/services/employees/employee-service'
-import { employeeAdapter } from '@/lib/adapters'
-import { addSchedule, getPositionById, getShiftById, getStoreById, mockPositions, mockStores, getStoresList, isStoreMatch } from '@/lib/mock-data'
+import { ShiftRegistrationService } from '@/lib/services/scheduling/shift-registration-service'
+import { employeeAdapter, scheduleAdapter } from '@/lib/adapters'
+import { exportWeekScheduleToExcel } from '@/lib/services/scheduling/schedule-export-service'
+import { addSchedule, getPositionById, getShiftById, getStoreById, mockPositions, mockStores, getStoresList, isStoreMatch, mockEmployees, getEmployeeById } from '@/lib/mock-data'
 import {
   extractDateFromHeader,
   getMappedImportPreviewDates,
@@ -67,7 +69,65 @@ import {
   AlertTriangle,
   ShieldCheck,
   Info,
+  Layers,
+  Download,
+  CalendarCheck,
+  CreditCard,
+  UtensilsCrossed,
 } from 'lucide-react'
+
+const KNOWN_EMPLOYEE_NAMES: Record<string, string> = {
+  'emp-nv0031': 'Cao Văn Thắng',
+  'emp-nv0033': 'Nguyễn Hoài Ân',
+  'emp-nv-6241': 'Mai Thảo Uyên',
+  'emp-nv6241': 'Mai Thảo Uyên',
+  'emp-nv0040': 'Mai Thảo Uyên',
+  'emp-nv0030': 'Quách Thị Kim Chi',
+  'emp-bh-9852': 'Huỳnh Lê Kiều Linh',
+  'emp-bh9852': 'Huỳnh Lê Kiều Linh',
+  'emp-nv-4741': 'Nguyễn Huỳnh Thiên Ân',
+  'emp-nv4741': 'Nguyễn Huỳnh Thiên Ân',
+  'emp-nv0041': 'Nguyễn Huỳnh Thiên Ân',
+  'emp-nv0034': 'Nguyễn Thị Thu',
+  'emp-nv0035': 'Nguyễn Mạnh Duy',
+  'emp-nv0036': 'Lê Văn Quý Phi',
+  'emp-nv0039': 'Lê Trần Thảo Vy',
+  'emp-nv0027': 'Trần Công Huy',
+  'emp-nv0028': 'Phạm Nguyễn Đông Duy',
+  'emp-nv0016': 'Nguyễn Thị Kiều Ý',
+  'emp-nv0017': 'Nguyễn Thanh Thiện',
+  'emp-nv0020': 'Lê Minh Lộc',
+  'emp-nv0008': 'Nguyễn Thị Phương Thảo',
+  'emp-nv0013': 'Nguyễn Thị Tú Trinh',
+  'emp-nv0024': 'Tấn Hiếu',
+  'emp-001': 'Nguyễn Đức Nghĩa',
+}
+
+function resolveDisplayName(empId: string, rawName?: string, boardEmps?: Array<{ employee: { id: string; full_name: string } }>): string {
+  if (rawName && !rawName.startsWith('emp-') && !rawName.includes('-')) return rawName
+  if (boardEmps) {
+    const found = boardEmps.find(e => e.employee.id === empId)?.employee
+    if (found?.full_name && !found.full_name.startsWith('emp-')) return found.full_name
+  }
+  const clean = empId.toLowerCase().trim()
+  if (KNOWN_EMPLOYEE_NAMES[clean]) return KNOWN_EMPLOYEE_NAMES[clean]
+  const stripped = clean.replace('emp-', '').replace('-', '')
+  for (const [k, v] of Object.entries(KNOWN_EMPLOYEE_NAMES)) {
+    if (k.replace('emp-', '').replace('-', '') === stripped) return v
+  }
+  const m = mockEmployees.find(e => e.id === empId || e.employee_code?.toLowerCase() === stripped)
+  if (m?.full_name) return m.full_name
+  return empId
+}
+
+function getInitials(name: string): string {
+  if (!name) return 'NV'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length >= 2) {
+    return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase()
+  }
+  return name.slice(0, 2).toUpperCase()
+}
 
 type ScheduleImportEmployee = {
   id: string
@@ -98,6 +158,30 @@ function getShiftDurationLabel(start: string, end: string): string {
   if (diff < 0) diff += 24 * 60
   const hours = (diff / 60).toFixed(1)
   return `${hours.endsWith('.0') ? hours.slice(0, -2) : hours} tiếng`
+}
+
+function getShiftTimeBadge(asgNotes?: string, rowStartTime?: string, rowEndTime?: string): {
+  timeStr: string
+  isDifferent: boolean
+  tagLabel?: string
+} | null {
+  if (!asgNotes) return null
+  const match = asgNotes.match(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/)
+  if (!match) return null
+  const [, sTime, eTime] = match
+  const isDiff = Boolean(rowStartTime && rowEndTime && (sTime !== rowStartTime || eTime !== rowEndTime))
+
+  let tagLabel = ''
+  const clean = removeVietnameseTones(asgNotes.toLowerCase())
+  if (clean.includes('le') || clean.includes('parttime')) tagLabel = 'Ca lẻ'
+  else if (clean.includes('che bien') || clean.includes('bep')) tagLabel = 'Bếp'
+  else if (clean.includes('kiem kho')) tagLabel = 'Kiểm kho'
+
+  return {
+    timeStr: `${sTime} - ${eTime}`,
+    isDifferent: isDiff,
+    tagLabel,
+  }
 }
 
 function resolveShiftTemplateForText(shiftText: string, templates: Array<{ id: string; name: string; start_time?: string; end_time?: string; is_flexible?: boolean; code?: string }>): string {
@@ -247,6 +331,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
   // Modal xếp lịch cho Ca (Pop-up iPOS Style)
   const [activeSlotModal, setActiveSlotModal] = useState<SlotModalTarget | null>(null)
   const [modalSearchTerm, setModalSearchTerm] = useState('')
+  const [modalStaffFilter, setModalStaffFilter] = useState<'all' | 'home' | 'cross'>('all')
 
   // Modal chỉnh nhu cầu tuần
   const [showDemandEditor, setShowDemandEditor] = useState(false)
@@ -325,6 +410,17 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     calculationType: 'shift_hours' as 'shift_hours' | 'actual_hours',
   })
 
+  // Quán trà sữa Homies: Mặc định mỗi ca chỉ hiện 2 vị trí đứng quầy (Thu ngân, Pha chế). Quản lý có thể mở thêm dòng Bếp khi cần.
+  const [expandedKitchenShifts, setExpandedKitchenShifts] = useState<Set<string>>(new Set())
+  const handleToggleKitchenForShift = (templateId: string) => {
+    setExpandedKitchenShifts(prev => {
+      const next = new Set(prev)
+      if (next.has(templateId)) next.delete(templateId)
+      else next.add(templateId)
+      return next
+    })
+  }
+
   // Modal Chi tiết kiểm tra & Cảnh báo lịch làm việc
   const [validationModalData, setValidationModalData] = useState<{
     hardWarnings: ScheduleValidationWarning[]
@@ -352,7 +448,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     return list.filter(store => store.id === user.store_id)
   }, [user])
 
-  const anchorWeekStart = useMemo(() => weekStartQuery || plusDays(getWeekStart(), 7), [weekStartQuery])
+  const anchorWeekStart = useMemo(() => weekStartQuery || getWeekStart(), [weekStartQuery])
   const activeWeekStart = useMemo(() => plusDays(anchorWeekStart, weekOffset * 7), [anchorWeekStart, weekOffset])
   const weekDates = useMemo(() => getWeekDates(activeWeekStart), [activeWeekStart])
   const activeStoreId = selectedStoreId || storeIdQuery || stores[0]?.id || user?.store_id || ''
@@ -363,11 +459,40 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     }
   }, [activeStoreId, importSelectedStoreId])
 
+  // Tự động nạp ca từ Supabase DB (public.lich_phan_ca) để hỗ trợ đa thiết bị (máy tính khác, điện thoại)
+  useEffect(() => {
+    if (!activeStoreId || !weekDates[0] || !weekDates[6]) return
+    let isMounted = true
+    scheduleAdapter.getShiftsByStoreAndWeek(activeStoreId, weekDates[0], weekDates[6]).then(dbShifts => {
+      if (isMounted && dbShifts && dbShifts.length > 0) {
+        ScheduleService.syncFromAdapter(dbShifts, activeStoreId, weekDates)
+        setRefreshKey(k => k + 1)
+      }
+    }).catch(err => {
+      console.warn('[ManagerSchedulingBoard] Notice syncing schedules from Supabase:', err)
+    })
+    return () => { isMounted = false }
+  }, [activeStoreId, activeWeekStart, weekDates])
+
   const board = useMemo(() => {
     void refreshKey
     return user && activeStoreId ? ScheduleService.getAssignmentBoardData(user, activeStoreId, activeWeekStart) : null
   }, [activeStoreId, activeWeekStart, refreshKey, user])
   const weekStateMeta = board ? ScheduleService.getWeekStateMeta(board.week) : null
+
+  const pendingRegistrationsCount = useMemo(() => {
+    void refreshKey
+    return activeStoreId ? ShiftRegistrationService.getPendingCount(activeStoreId, activeWeekStart) : 0
+  }, [activeStoreId, activeWeekStart, refreshKey])
+
+  // Tự động đồng bộ ca đăng ký từ Database máy chủ (/api/shifts/register)
+  useEffect(() => {
+    if (activeStoreId && activeWeekStart) {
+      ShiftRegistrationService.syncRegistrationsFromServer(activeStoreId, activeWeekStart).then(() => {
+        setRefreshKey(k => k + 1)
+      })
+    }
+  }, [activeStoreId, activeWeekStart])
 
   // Lọc chỉ lấy các ca cố định (Sáng, Chiều, Đêm), tách Ca phát sinh ra làm phần động riêng & Khử trùng lặp
   const templates = useMemo(() => {
@@ -406,7 +531,10 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
 
   const positions = useMemo(() => {
     const ids = Array.from(new Set(templates.flatMap(template => template.allowed_position_ids || [])))
-    return ids.map(id => getPositionById(id)).filter(Boolean)
+    return ids
+      .filter(id => id !== 'pos-003')
+      .map(id => getPositionById(id))
+      .filter((p): p is NonNullable<typeof p> => p != null && !p.name.toLowerCase().includes('phục vụ'))
   }, [templates])
 
   const uniqueExcelShifts = useMemo(() => {
@@ -1138,6 +1266,18 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
             status: 'draft',
           })
           totalBatchShifts += importResult.count
+
+          // Đấu nối đồng bộ hàng loạt vào CSDL Supabase lich_phan_ca
+          await scheduleAdapter.bulkAssignShifts(
+            fileShifts.map(s => ({
+              employee_id: s.employee_id,
+              store_id: targetStoreId,
+              shift_id: s.shift_id,
+              date: s.date,
+              notes: s.notes,
+              status: 'da_xep' as const,
+            }))
+          )
         }
       }
 
@@ -1153,7 +1293,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
       setManualEmpMapping({})
       setCustomShiftMapping({})
       setImportStep(1)
-      setMessage(`Đã nạp thành công toàn bộ ${selectedFiles.length} file Excel lịch làm việc (${totalBatchShifts} ca)!`)
+      setMessage(`Đã nạp thành công toàn bộ ${selectedFiles.length} file Excel lịch làm việc (${totalBatchShifts} ca) và đồng bộ lên CSDL Supabase!`)
       return
     }
 
@@ -1230,6 +1370,18 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     })
     const addedCount = importResult.count
 
+    // Đấu nối đồng bộ hàng loạt vào CSDL Supabase public.lich_phan_ca
+    await scheduleAdapter.bulkAssignShifts(
+      shiftsToImport.map(s => ({
+        employee_id: s.employee_id,
+        store_id: targetStoreId,
+        shift_id: s.shift_id,
+        date: s.date,
+        notes: s.notes,
+        status: 'da_xep' as const,
+      }))
+    )
+
     // Tự động chuyển bảng xếp lịch sang đúng cơ sở & tuần vừa nhập
     if (importSelectedStoreId) {
       setSelectedStoreId(importSelectedStoreId)
@@ -1259,7 +1411,54 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     const batchNotice = isBatchImport
       ? ` (${batchFileSummaries.length} file, bỏ qua ${batchDuplicates.length} ca trùng)`
       : ''
-    setMessage(`Đã nhập thành công ${addedCount} ca làm việc từ file Excel${batchNotice}${notice}!`)
+    setMessage(`Đã nhập thành công ${addedCount} ca làm việc từ file Excel và đồng bộ lên CSDL Supabase${batchNotice}${notice}!`)
+  }
+
+  // Xử lý xuất file Excel lịch tuần dạng lưới matrix
+  const handleExportWeekScheduleExcel = async () => {
+    if (!board || !board.assignments) {
+      setMessage('Chưa có dữ liệu lịch làm việc để xuất!')
+      return
+    }
+
+    try {
+      const currentStoreObj = stores.find(s => s.id === activeStoreId)
+      const storeName = currentStoreObj?.name || 'Homies Milk Tea'
+
+      await exportWeekScheduleToExcel({
+        storeName,
+        weekStart: activeWeekStart,
+        weekDates,
+        employees: board.employees.map(e => ({
+          id: e.employee.id,
+          full_name: e.employee.full_name,
+          employee_code: (e.employee as unknown as { employee_code?: string }).employee_code,
+          position_id: e.employee.position_id,
+        })),
+        assignments: board.assignments.map(a => ({
+          employee_id: a.employee_id,
+          shift_id: a.shift_id,
+          date: a.date,
+          notes: a.notes,
+          assigned_position_id: a.assigned_position_id,
+        })),
+        templates: allTemplates.map(t => ({
+          id: t.id,
+          name: t.name,
+          start_time: t.start_time,
+          end_time: t.end_time,
+        })),
+        positions: mockPositions.map(p => ({
+          id: p.id,
+          name: p.name,
+        })),
+      })
+
+      setMessage('Đã xuất file Excel lịch tuần thành công!')
+    } catch (err) {
+      console.error('[ManagerSchedulingBoard] Lỗi khi xuất Excel lịch tuần:', err)
+      setMessage('Có lỗi xảy ra khi tạo file Excel lịch tuần.')
+    }
   }
 
   const handleMoveShift = (
@@ -1349,30 +1548,55 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
 
   const boardDemands = useMemo(() => board?.demands || [], [board])
 
-  // Danh sách các hàng được phân nhóm theo Ca làm (Mẫu ca -> Danh sách Vị trí)
+  // Danh sách các hàng được phân nhóm theo Ca làm (Mô hình F&B Quán trà sữa Homies: Thu ngân & Pha chế đứng quầy chính)
   const groupedShiftRows = useMemo(() => {
     return templates.map(tpl => {
-      const basePosIds = tpl.allowed_position_ids?.length ? tpl.allowed_position_ids : ['pos-001', 'pos-002']
-      const allowedPosIds = Array.from(new Set([...basePosIds, 'pos-001', 'pos-002']))
-      const positionObjs = allowedPosIds
+      // 1. Quán trà sữa Homies: 2 vị trí luôn luôn đứng quầy là Thu ngân và Pha chế
+      const activePosIds = ['pos-002', 'pos-001']
+
+      // 2. Vị trí Bếp / Chế biến (pos-bep):
+      // Chỉ hiển thị khi ca này thực tế có người trực Bếp, hoặc có cấu hình nhu cầu Bếp > 0, hoặc Quản lý bấm mở thêm dòng Bếp
+      const hasKitchenAssignment = (board?.assignments || []).some(a => {
+        if (a.shift_id !== tpl.id) return false
+        const pId = a.assigned_position_id || board?.employees.find(e => e.employee.id === a.employee_id)?.employee.position_id
+        const pName = mockPositions.find(p => p.id === pId)?.name.toLowerCase() || ''
+        const notes = (a.notes || '').toLowerCase()
+        return pId === 'pos-bep' || pName.includes('bếp') || notes.includes('bếp') || notes.includes('chế biến')
+      })
+      const hasKitchenDemand = (board?.demands || []).some(
+        d => d.shift_template_id === tpl.id && d.position_id === 'pos-bep' && d.required_count > 0
+      )
+      const isKitchenExpanded = expandedKitchenShifts.has(tpl.id)
+
+      if (hasKitchenAssignment || hasKitchenDemand || isKitchenExpanded) {
+        activePosIds.push('pos-bep')
+      }
+
+      const roleOrder: Record<string, number> = { 'pos-002': 1, 'pos-001': 2, 'pos-bep': 3 }
+      const positionObjs = activePosIds
+        .filter(id => id !== 'pos-003') // Tuyệt đối không có vị trí Phục vụ
         .map(id => getPositionById(id))
-        .filter((p): p is NonNullable<typeof p> => Boolean(p))
+        .filter((p): p is NonNullable<typeof p> => p != null && !p.name.toLowerCase().includes('phục vụ'))
         .filter(p => selectedPositionFilter === 'ALL' || p.id === selectedPositionFilter)
+        .sort((a, b) => (roleOrder[a.id] || 99) - (roleOrder[b.id] || 99))
 
       return {
         template: tpl,
         positions: positionObjs,
+        isKitchenShown: activePosIds.includes('pos-bep'),
+        hasKitchenData: hasKitchenAssignment || hasKitchenDemand,
       }
     }).filter(group => group.positions.length > 0)
-  }, [templates, selectedPositionFilter])
+  }, [templates, selectedPositionFilter, board?.assignments, board?.demands, expandedKitchenShifts])
 
   const demandForm = useMemo(() => {
     const nextState: DemandFormState = {}
     weekDates.forEach(date => {
       templates.forEach(template => {
-        const allowedPosIds = template.allowed_position_ids?.length
+        const allowedPosIds = (template.allowed_position_ids?.length
           ? template.allowed_position_ids
           : positions.map(position => position!.id)
+        ).filter(id => id !== 'pos-003')
         allowedPosIds.forEach(positionId => {
           const slot = boardDemands.find(item =>
             item.date === date &&
@@ -1430,9 +1654,18 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     }
   }, [activeSlotModal, board, templates, activeStoreId, activeWeekStart])
 
-  const activeModalRecommendations = useMemo(() => {
+  const rawModalRecommendations = useMemo(() => {
     if (!activeModalSlotData || !board) return []
-    return ScheduleService.getSlotRecommendations(board, activeModalSlotData).filter(rec => {
+    return ScheduleService.getSlotRecommendations(board, activeModalSlotData)
+  }, [activeModalSlotData, board])
+
+  const modalHomeCount = useMemo(() => rawModalRecommendations.filter(r => !r.is_cross_store).length, [rawModalRecommendations])
+  const modalCrossCount = useMemo(() => rawModalRecommendations.filter(r => r.is_cross_store).length, [rawModalRecommendations])
+
+  const activeModalRecommendations = useMemo(() => {
+    return rawModalRecommendations.filter(rec => {
+      if (modalStaffFilter === 'home' && rec.is_cross_store) return false
+      if (modalStaffFilter === 'cross' && !rec.is_cross_store) return false
       if (!modalSearchTerm.trim()) return true
       const term = modalSearchTerm.toLowerCase()
       return (
@@ -1441,17 +1674,84 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
         rec.employee_id.toLowerCase().includes(term)
       )
     })
-  }, [activeModalSlotData, board, modalSearchTerm])
+  }, [rawModalRecommendations, modalStaffFilter, modalSearchTerm])
 
   if (!user || !board) return null
 
   const validate = ScheduleService.validateWeekForPublish(user, activeStoreId, activeWeekStart)
   const selectedStore = getStoreById(activeStoreId)
   const totalDemand = board.demands.reduce((sum, slot) => sum + slot.required_count, 0)
-  const totalAssigned = board.demands.reduce((sum, slot) => sum + slot.filled_count, 0)
+  const totalAssigned = board.assignments.length
   const isPublished = board.week.status === 'published' || board.week.cycle_status === 'published'
   const weekNum = getWeekNumber(activeWeekStart)
   const yearNum = parseDateKey(activeWeekStart).getFullYear()
+
+  const activeStaffCount = useMemo(() => {
+    if (!board?.assignments) return 0
+    const uniqueIds = new Set(board.assignments.map(a => a.employee_id))
+    return uniqueIds.size
+  }, [board?.assignments])
+
+  const radarReport = useMemo(() => {
+    if (!board || !templates.length) return null
+    const assignments = board.assignments
+
+    const openingGaps: { date: string; template: (typeof templates)[0] }[] = []
+    const noonGaps: { date: string; template: (typeof templates)[0] }[] = []
+    const goldenHourAlerts: { date: string; staffCount: number }[] = []
+
+    weekDates.forEach(date => {
+      const daySchedules = assignments.filter(s => s.date === date)
+      if (daySchedules.length === 0) return
+
+      // Ca sáng mở quầy
+      const morningTpl = templates.find(t => t.start_time <= '09:00' && t.end_time >= '11:00') || templates[0]
+      if (morningTpl) {
+        const hasMorning = daySchedules.some(s => {
+          if (s.shift_id === morningTpl.id || s.shift_id === 'shift-001') return true
+          const n = (s.notes || '').toLowerCase()
+          return n.includes('sáng') || n.includes('sang') || n.includes('mở quầy') || n.includes('08:30') || n.includes('06:30')
+        })
+        if (!hasMorning) {
+          openingGaps.push({ date, template: morningTpl })
+        }
+      }
+
+      // Ca trưa
+      const noonTpl = templates.find(t => t.start_time <= '12:30' && t.end_time >= '16:00') || templates[1]
+      if (noonTpl) {
+        const hasNoon = daySchedules.some(s => {
+          if (s.shift_id === noonTpl.id || s.shift_id === 'shift-002') return true
+          const n = (s.notes || '').toLowerCase()
+          return n.includes('trưa') || n.includes('chiều') || n.includes('12:00')
+        })
+        if (!hasNoon) {
+          noonGaps.push({ date, template: noonTpl })
+        }
+      }
+
+      // Khiên Giờ Vàng (11:30 - 14:30)
+      const goldenStaff = daySchedules.filter(s => {
+        if (s.shift_id === 'shift-002' || s.shift_id === 'shift-004') return true
+        const tpl = templates.find(t => t.id === s.shift_id)
+        if (tpl && tpl.start_time < '14:30' && tpl.end_time > '11:30') return true
+        const n = (s.notes || '').toLowerCase()
+        return n.includes('trưa') || n.includes('giờ vàng') || n.includes('cao điểm') || n.includes('chiều')
+      })
+
+      if (goldenStaff.length < 2 && daySchedules.length > 0) {
+        goldenHourAlerts.push({ date, staffCount: goldenStaff.length })
+      }
+    })
+
+    const hasIssue = openingGaps.length > 0 || noonGaps.length > 0 || goldenHourAlerts.length > 0
+    return {
+      openingGaps,
+      noonGaps,
+      goldenHourAlerts,
+      hasIssue,
+    }
+  }, [board, templates, weekDates])
 
   const saveDemandState = (nextForm: DemandFormState, messageText: string) => {
     const nextDemands: ShiftDemand[] = Object.entries(nextForm).map(([key, requiredCount]) => {
@@ -1593,6 +1893,19 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     setValidationModalData(null)
     setRefreshKey(prev => prev + 1)
     setMessage('🎉 Đã chốt & phát hành lịch làm việc tuần thành công! Hệ thống đã gửi thông báo đến toàn bộ nhân sự.')
+  }
+
+  const handleApproveAllPendingRegistrations = () => {
+    if (!activeStoreId) return
+    const res = ShiftRegistrationService.approveAllPendingForWeek(activeStoreId, activeWeekStart)
+    if (res.approvedCount > 0) {
+      setMessage(`⚡ Đã tự động chấp thuận và xếp ${res.approvedCount} ca đăng ký hợp lệ vào bảng tuần!`)
+      setMessageTone('info')
+      setRefreshKey(prev => prev + 1)
+    } else {
+      setMessage('Không có ca đăng ký ca rảnh nào đang chờ duyệt cho chi nhánh và tuần này.')
+      setMessageTone('warning')
+    }
   }
 
   const openAssignModal = (
@@ -1756,6 +2069,14 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                 Nhập Excel
               </button>
               <button
+                onClick={handleExportWeekScheduleExcel}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-white px-3.5 py-1.5 text-xs font-bold text-emerald-700 shadow-2xs hover:bg-emerald-50 transition cursor-pointer"
+                title="Xuất file Excel lịch tuần dạng lưới (Nhân viên x Thứ 2 - CN) để in ấn hoặc gửi Zalo nhóm"
+              >
+                <Download size={14} />
+                <span>Xuất Excel</span>
+              </button>
+              <button
                 onClick={handleClearWeekSchedules}
                 className="inline-flex items-center rounded-xl border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 shadow-2xs hover:bg-red-100 transition cursor-pointer"
                 title="Xóa toàn bộ ca trong tuần này để làm sạch bảng"
@@ -1768,6 +2089,24 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
               >
                 Xem theo nhân viên
               </button>
+              <Link
+                href="/schedule/registrations"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-100 transition cursor-pointer"
+                title="Xem bản đồ thời gian rảnh của nhân viên tuần tới và tỷ lệ nộp lịch"
+              >
+                <Layers size={14} className="text-amber-600" />
+                <span>Bản đồ trống {pendingRegistrationsCount > 0 ? `(${pendingRegistrationsCount})` : ''}</span>
+              </Link>
+              {!isPublished && pendingRegistrationsCount > 0 && (
+                <button
+                  onClick={handleApproveAllPendingRegistrations}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-1.5 text-xs font-bold text-sky-900 shadow-2xs hover:bg-sky-100 transition cursor-pointer"
+                  title="Chấp thuận toàn bộ các đăng ký ca rảnh của nhân viên cho tuần này"
+                >
+                  <Zap size={14} className="text-amber-500" />
+                  <span>Duyệt đăng ký ca ({pendingRegistrationsCount})</span>
+                </button>
+              )}
               <button
                 onClick={handleSaveDraftWeek}
                 className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs"
@@ -1800,6 +2139,133 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
           </div>
         </div>
 
+        {/* TẦNG 2: DẢI 4 THẺ CHỈ SỐ VĨ MÔ (HOMIES EXECUTIVE KPI CARDS) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Card 1: Tổng ca phân bổ */}
+          <div className="rounded-2xl border border-gray-200/90 bg-white p-3.5 shadow-2xs hover:shadow-xs transition">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Ca đã xếp</span>
+              <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#2F6FA8] flex items-center justify-center">
+                <CalendarCheck size={15} />
+              </div>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1.5">
+              <span className="text-xl font-bold text-gray-900 tabular-nums">{totalAssigned}</span>
+              <span className="text-xs text-gray-500">/ {totalDemand || 0} ca</span>
+            </div>
+            <div className="mt-2 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-[#2F6FA8] h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(100, Math.round((totalAssigned / (totalDemand || 1)) * 100))}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Card 2: Nhân sự tham gia */}
+          <div className="rounded-2xl border border-gray-200/90 bg-white p-3.5 shadow-2xs hover:shadow-xs transition">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Nhân sự trực</span>
+              <div className="w-7 h-7 rounded-lg bg-emerald-50 text-[#1E9E57] flex items-center justify-center">
+                <Users size={15} />
+              </div>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1.5">
+              <span className="text-xl font-bold text-gray-900 tabular-nums">{activeStaffCount}</span>
+              <span className="text-xs text-gray-500">nhân viên tuần này</span>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-500 truncate">
+              {board?.employees?.length || 0} nhân sự sẵn sàng làm việc
+            </p>
+          </div>
+
+          {/* Card 3: An toàn Mở quầy & Giờ Vàng */}
+          <div className="rounded-2xl border border-gray-200/90 bg-white p-3.5 shadow-2xs hover:shadow-xs transition">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Độ phủ mở quầy</span>
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                radarReport && (radarReport.openingGaps.length > 0 || radarReport.goldenHourAlerts.length > 0)
+                  ? 'bg-amber-50 text-amber-700'
+                  : 'bg-emerald-50 text-[#1E9E57]'
+              }`}>
+                {radarReport && (radarReport.openingGaps.length > 0 || radarReport.goldenHourAlerts.length > 0) ? (
+                  <AlertTriangle size={15} />
+                ) : (
+                  <ShieldCheck size={15} />
+                )}
+              </div>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1.5">
+              <span className="text-xl font-bold text-gray-900">
+                {radarReport && radarReport.openingGaps.length === 0 && radarReport.goldenHourAlerts.length === 0
+                  ? '100%'
+                  : `${radarReport ? radarReport.openingGaps.length + radarReport.goldenHourAlerts.length : 0} lưu ý`}
+              </span>
+              <span className="text-xs text-gray-500">
+                {radarReport && radarReport.openingGaps.length === 0 ? 'an toàn' : 'cần xếp'}
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-500 truncate">
+              Bảo vệ khung 08:30 & 11:30–14:30
+            </p>
+          </div>
+
+          {/* Card 4: Trạng thái lịch */}
+          <div className="rounded-2xl border border-gray-200/90 bg-white p-3.5 shadow-2xs hover:shadow-xs transition">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Trạng thái</span>
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                isPublished ? 'bg-emerald-50 text-[#1E9E57]' : 'bg-blue-50 text-[#2F6FA8]'
+              }`}>
+                {isPublished ? <CheckCircle2 size={15} /> : <FileSpreadsheet size={15} />}
+              </div>
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-1.5">
+              <span className="text-xl font-bold text-gray-900">
+                {isPublished ? 'Đã công bố' : 'Bản nháp'}
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-500 truncate">
+              {isPublished ? 'Nhân sự đã xem được lịch' : 'Đang trong quá trình chỉnh sửa'}
+            </p>
+          </div>
+        </div>
+
+        {/* Banner đăng ký ca tuần chờ duyệt (1-chạm) - chỉ hiện khi tuần chưa chốt */}
+        {!isPublished && pendingRegistrationsCount > 0 && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50/70 p-3.5 shadow-xs animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-[#2F6FA8] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <Sparkles size={16} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[#001D3D]">
+                  Có {pendingRegistrationsCount} ca đăng ký tuần từ nhân sự đang chờ duyệt
+                </p>
+                <p className="text-[11px] text-gray-600">
+                  Nhân viên part-time đã gửi lịch rảnh qua app di động cho tuần làm việc này.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link
+                href="/schedule/registrations"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-xs font-bold text-sky-800 shadow-xs hover:bg-sky-50 transition cursor-pointer"
+              >
+                <Layers size={14} className="text-sky-600" />
+                <span>Xem Bản Đồ Trống</span>
+              </Link>
+              <button
+                type="button"
+                onClick={handleApproveAllPendingRegistrations}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2F6FA8] to-[#1D3E61] px-4 py-2 text-xs font-bold text-white shadow-xs hover:from-[#1D3E61] hover:to-[#001D3D] transition cursor-pointer shrink-0 active:scale-98"
+              >
+                <Zap size={14} className="text-amber-300" />
+                <span>Chấp thuận toàn bộ</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Thông báo hệ thống */}
         {message && (
           <div className={`flex items-center justify-between rounded-xl border px-4 py-2 text-xs shadow-2xs ${
@@ -1829,6 +2295,91 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
           </div>
         )}
 
+        {/* RADAR QUÉT LỦNG CA & KHIÊN GIỜ VÀNG (HOMIES DEFENSE SHIELD - ZERO EMOJI) */}
+        {radarReport && (
+          <div className="rounded-2xl border border-gray-200/90 bg-white p-4 shadow-xs">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl shrink-0 ${
+                  radarReport.openingGaps.length > 0
+                    ? 'bg-red-50 text-red-700 ring-1 ring-red-200'
+                    : radarReport.goldenHourAlerts.length > 0
+                      ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-200'
+                      : 'bg-emerald-50 text-[#1E9E57]'
+                }`}>
+                  <ShieldCheck size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-900">
+                      Radar Quét Lủng Ca &amp; Khiên Giờ Vàng
+                    </span>
+                    {radarReport.openingGaps.length > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-700 border border-red-200">
+                        <AlertCircle size={12} className="text-red-600 shrink-0" />
+                        Phát hiện {radarReport.openingGaps.length} ngày lủng ca mở quầy
+                      </span>
+                    ) : radarReport.goldenHourAlerts.length > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 border border-amber-200">
+                        <AlertTriangle size={12} className="text-amber-600 shrink-0" />
+                        {radarReport.goldenHourAlerts.length} ngày thiếu người Giờ Vàng (11:30–14:30)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-[#1E9E57] border border-emerald-200">
+                        <CheckCircle2 size={12} className="text-[#1E9E57] shrink-0" />
+                        Khiên Giờ Vàng bảo vệ: 7/7 ngày an toàn, đủ nhân sự quầy
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Tự động rà soát ca mở cửa 08:30 và duy trì từ 2 nhân sự đứng quầy trong khung Giờ Vàng 11:30 - 14:30.
+                  </p>
+                </div>
+              </div>
+
+              {/* Chi tiết các ngày cảnh báo */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {radarReport.openingGaps.map(gap => (
+                  <button
+                    key={`opening-${gap.date}`}
+                    type="button"
+                    onClick={() => {
+                      const pos = positions[0]
+                      if (pos) openAssignModal(gap.date, gap.template, pos)
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-800 transition cursor-pointer shadow-2xs"
+                    title="Bấm để xếp người mở quầy ngay"
+                  >
+                    <AlertCircle size={13} className="text-red-600 shrink-0" />
+                    <span>Mở quầy {formatShortDate(gap.date)}: 0 người</span>
+                    <Plus size={12} strokeWidth={2.5} />
+                  </button>
+                ))}
+
+                {radarReport.goldenHourAlerts.map(gh => {
+                  const noonTpl = templates.find(t => t.id === 'shift-noon' || (t.start_time <= '12:30' && t.end_time >= '16:00')) || templates[0]
+                  return (
+                    <button
+                      key={`gh-${gh.date}`}
+                      type="button"
+                      onClick={() => {
+                        const pos = positions[0]
+                        if (pos && noonTpl) openAssignModal(gh.date, noonTpl, pos)
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 transition cursor-pointer shadow-2xs"
+                      title="Bấm để xếp thêm người vào ca trưa / giờ vàng"
+                    >
+                      <ShieldCheck size={13} className="text-amber-700 shrink-0" />
+                      <span>Giờ Vàng {formatShortDate(gh.date)} ({gh.staffCount}/2)</span>
+                      <Plus size={12} strokeWidth={2.5} />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Bảng Lịch làm việc SaaS iPOS Style (Hàng: Ca x Vị trí, Cột: 7 Ngày) */}
         <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
@@ -1836,7 +2387,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
               {/* Header Cột: Ca/Ngày & Các ngày trong tuần */}
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-bold text-gray-700">
-                  <th className="w-56 p-3 text-left bg-gray-100/80 border-r border-gray-200">Ca / Vị trí</th>
+                  <th className="w-60 p-3 text-left bg-gray-100/80 border-r border-gray-200">Ca làm việc</th>
                   {weekDates.map(date => (
                     <th key={date} className="p-3 text-center border-r border-gray-200 last:border-r-0 min-w-[140px]">
                       <div className="text-xs font-bold text-gray-800 uppercase">{formatShortDate(date)}</div>
@@ -1845,185 +2396,273 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                 </tr>
               </thead>
 
-              {/* Body Bảng: Phân nhóm theo Ca làm chuẩn Homies Theme (Shift Header Row + Position Rows) */}
+              {/* Body Bảng: Gom gọn theo Ca làm việc (Apple SaaS Homies Theme - Bỏ dòng con lặp lại) */}
               <tbody className="divide-y divide-gray-200 text-xs">
-                {groupedShiftRows.map(({ template, positions: groupPositions }) => {
+                {groupedShiftRows.map(({ template, positions: groupPositions, isKitchenShown }) => {
                   const tName = template.name.toLowerCase()
-                  const isMorning = tName.includes('sáng') || template.code?.includes('AM')
-                  const isAfternoon = tName.includes('chiều') || template.code?.includes('PM')
+                  const isMorning = tName.includes('sáng') || template.code?.includes('AM') || template.id === 'shift-001'
+                  const isAfternoon = tName.includes('chiều') || template.code?.includes('PM') || template.id === 'shift-003'
                   const isFlex = tName.includes('phát sinh') || tName.includes('linh hoạt') || template.code?.includes('FLEX')
 
-                  const headerBgClass = isFlex
-                    ? 'bg-blue-50/90 text-[#2F6FA8] border-2 border-dashed border-[#2F6FA8]/40'
+                  const shiftTheme = isFlex
+                    ? { border: 'border-l-4 border-l-purple-500', bg: 'bg-purple-50/40', badge: 'bg-purple-100/80 text-purple-900 border-purple-200', dot: '#A855F7', subText: 'Ca linh hoạt' }
                     : isMorning
-                    ? 'bg-amber-100/90 text-amber-950 border-amber-300'
+                    ? { border: 'border-l-4 border-l-amber-500', bg: 'bg-amber-50/40', badge: 'bg-amber-100/80 text-amber-900 border-amber-200', dot: '#F59E0B', subText: 'Ca sáng mở quầy' }
                     : isAfternoon
-                    ? 'bg-[#DDF4EC] text-[#064E3B] border-[#1E9E57]/30'
-                    : 'bg-[#001D3D] text-white border-[#001D3D]'
-
-                  const timeBadgeClass = isFlex
-                    ? 'bg-[#2F6FA8]/15 text-[#2F6FA8] border-[#2F6FA8]/30 font-bold'
-                    : isMorning
-                    ? 'bg-amber-200/80 text-amber-900 border-amber-300'
-                    : isAfternoon
-                    ? 'bg-[#1E9E57]/15 text-[#064E3B] border-[#1E9E57]/30'
-                    : 'bg-white/15 text-blue-100 border-white/20'
-
-                  const subTextClass = isFlex
-                    ? 'text-[#2F6FA8] font-bold'
-                    : isMorning
-                    ? 'text-amber-800'
-                    : isAfternoon
-                    ? 'text-[#064E3B]/80'
-                    : 'text-blue-200'
-
-                  const subLabel = isFlex
-                    ? 'Ca linh hoạt / Giờ cao điểm'
-                    : 'Khung giờ cố định'
+                    ? { border: 'border-l-4 border-l-emerald-600', bg: 'bg-emerald-50/40', badge: 'bg-emerald-100 text-emerald-900 border-emerald-200', dot: '#10B981', subText: 'Ca chiều đóng quầy' }
+                    : { border: 'border-l-4 border-l-[#2F6FA8]', bg: 'bg-slate-50/70', badge: 'bg-blue-100/80 text-[#1D3E61] border-blue-200', dot: '#2F6FA8', subText: 'Ca gãy cao điểm' }
 
                   return (
-                    <Fragment key={template.id}>
-                      {/* Dòng Tiêu đề Ca làm (Chuẩn Mục 11.2 DESIGN_RULE_HOMIES_FINAL.md) */}
-                      <tr className={`font-bold border-t-2 ${headerBgClass}`}>
-                        <td colSpan={8} className="px-4 py-2.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="h-3 w-3 rounded-full shadow-2xs" style={{ backgroundColor: template.color || (isFlex ? '#8B5CF6' : isMorning ? '#F59E0B' : isAfternoon ? '#1E9E57' : '#2F6FA8') }} />
-                              <span className="text-sm font-extrabold uppercase tracking-wide">{template.name}</span>
-                              <span className={`rounded-lg px-2.5 py-0.5 text-xs font-semibold border ${timeBadgeClass}`}>
-                                {template.start_time} - {template.end_time}
-                              </span>
-                            </div>
-                            <span className={`text-xs font-medium hidden sm:inline ${subTextClass}`}>{subLabel}</span>
+                    <tr key={template.id} className="hover:bg-gray-50/30 transition">
+                      {/* Cột Trái: Thông tin Ca làm việc */}
+                      <td className={`p-3.5 align-top bg-white border-r border-gray-200 ${shiftTheme.border}`}>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full shadow-2xs shrink-0" style={{ backgroundColor: template.color || shiftTheme.dot }} />
+                            <span className="text-xs font-bold uppercase tracking-wide text-gray-900 truncate" title={template.name}>
+                              {template.name}
+                            </span>
                           </div>
-                        </td>
-                      </tr>
 
-                    {/* Các dòng Vị trí chuyên môn thuộc Ca làm này */}
-                    {groupPositions.map(position => {
-                      const rowKey = `${template.id}__${position.id}`
-                      const isCashier = position.name.toLowerCase().includes('thu ngân')
-                      const isBarista = position.name.toLowerCase().includes('pha chế')
-                      const isService = position.name.toLowerCase().includes('phục vụ')
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-semibold border ${shiftTheme.badge}`}>
+                              {template.start_time} - {template.end_time}
+                            </span>
+                            <span className="text-[10.5px] text-gray-500 font-medium">
+                              {getShiftDurationLabel(template.start_time, template.end_time)}
+                            </span>
+                          </div>
 
-                      return (
-                        <tr key={rowKey} className="hover:bg-[#2F6FA8]/5 transition">
-                          {/* Cột Vị trí chuyên môn với Badge màu chuẩn palette Homies */}
-                          <td className="p-3 align-top bg-gray-50/50 border-r border-gray-200">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`inline-block rounded-xl border px-3 py-1.5 text-xs font-extrabold shadow-2xs ${
-                                  isCashier
-                                    ? 'border-blue-200 bg-blue-50 text-[#2F6FA8]'
-                                    : isBarista
-                                    ? 'border-[#1E9E57]/30 bg-[#DDF4EC] text-[#1E9E57]'
-                                    : isService
-                                    ? 'border-[#F6C85F]/50 bg-[#FFF8E8] text-[#B45309]'
-                                    : 'border-emerald-200 bg-emerald-100 text-emerald-950'
-                                }`}
-                              >
-                                {position.name}
-                              </span>
-                            </div>
-                          </td>
+                          <div className="mt-1 flex items-center justify-between gap-1 pt-1.5 border-t border-gray-100">
+                            <span className="text-[10px] text-gray-500 font-medium">
+                              {isKitchenShown ? 'Thu ngân • Pha chế • Bếp' : 'Thu ngân • Pha chế'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleKitchenForShift(template.id)}
+                              className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition cursor-pointer border ${
+                                isKitchenShown
+                                  ? 'border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                  : 'border-gray-200 bg-white/80 text-gray-500 hover:text-[#2F6FA8] hover:border-[#2F6FA8]/40'
+                              }`}
+                              title={isKitchenShown ? 'Bấm để ẩn bớt vị trí Bếp' : 'Bấm để mở thêm vị trí Bếp cho ca này'}
+                            >
+                              <Plus size={10} className={isKitchenShown ? 'rotate-45 transition-transform' : 'transition-transform'} />
+                              <span>{isKitchenShown ? 'Đang mở Bếp' : '+ Bếp'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </td>
 
-                          {/* 7 Ô ngày trong tuần */}
-                          {weekDates.map(date => {
-                            // Tìm các assignment thuộc ca và vị trí này trong ngày
-                            const assignedInCell = board.assignments.filter(a => {
-                              if (a.date !== date) return false
-                              if (isFlexibleAssignment(a, regularTemplateIds, templates)) return false
+                      {/* 7 Cột ngày: Toàn bộ nhân sự trực ca trong ngày */}
+                      {weekDates.map(date => {
+                        // Lọc các ca khớp chuẩn với mẫu ca này trong ngày
+                        const rawAssignedInShift = board.assignments.filter(a => {
+                          if (a.date !== date) return false
+                          if (isFlexibleAssignment(a, regularTemplateIds, templates)) return false
 
-                              // 1. Khớp Mẫu ca (theo ID, theo khung giờ hoặc theo từ khóa tên ca Sáng/Gãy/Trưa/Chiều/Tối/Đêm)
-                              let shiftMatched = false
-                              if (a.shift_id === template.id) {
-                                shiftMatched = true
-                              } else {
-                                const notesLower = (a.notes || '').toLowerCase()
-                                const notesClean = removeVietnameseTones(notesLower)
-                                const tplNameLower = template.name.toLowerCase()
-                                const tplClean = removeVietnameseTones(tplNameLower)
+                          // 1. Khớp chính xác ID ca
+                          if (a.shift_id === template.id) return true
 
-                                if (tplClean.includes('sang') && (notesClean.includes('sang') || notesClean.includes('08:30') || notesClean.includes('08:00') || notesClean.includes('09:00') || notesClean.includes('10:00') || notesClean.includes('06:30') || a.shift_id === 'shift-001')) {
-                                  shiftMatched = true
-                                } else if ((tplClean.includes('gay') || tplClean.includes('parttime') || tplClean.includes('trua')) && (notesClean.includes('gay') || notesClean.includes('trua') || notesClean.includes('11:00') || notesClean.includes('12:00') || notesClean.includes('13:00') || notesClean.includes('14:00') || notesClean.includes('15:00') || notesClean.includes('16:00'))) {
-                                  shiftMatched = true
-                                } else if ((tplClean.includes('chieu') || tplClean.includes('toi') || tplClean.includes('dem') || tplClean.includes('dong quay')) && (notesClean.includes('chieu') || notesClean.includes('toi') || notesClean.includes('dem') || notesClean.includes('kiem kho') || notesClean.includes('14:30') || notesClean.includes('17:00') || notesClean.includes('18:00') || notesClean.includes('19:00') || notesClean.includes('20:00') || notesClean.includes('21:00') || notesClean.includes('22:00') || a.shift_id === 'shift-002' || a.shift_id === 'shift-003')) {
-                                  shiftMatched = true
-                                }
+                          const notesClean = removeVietnameseTones((a.notes || '').toLowerCase())
+                          const tplClean = removeVietnameseTones(template.name.toLowerCase())
+
+                          // 2. Ca Sáng: Chỉ nhận ca sáng (shift-001 hoặc ghi chú sáng / mở quầy / 08:30)
+                          if (tplClean.includes('sang') || template.id === 'shift-001') {
+                            if (a.shift_id === 'shift-001') return true
+                            return notesClean.includes('sang') || notesClean.includes('08:30') || notesClean.includes('08:00') || notesClean.includes('09:00') || notesClean.includes('10:00') || notesClean.includes('06:30')
+                          }
+
+                          // 3. Ca Trưa: Chỉ nhận ca trưa / ca gãy (shift-002 hoặc ghi chú trưa / gãy / 12:00)
+                          if (tplClean.includes('trua') || tplClean.includes('gay') || tplClean.includes('parttime') || template.id === 'shift-002') {
+                            if (a.shift_id === 'shift-002') return true
+                            return notesClean.includes('gay') || notesClean.includes('trua') || notesClean.includes('11:00') || notesClean.includes('12:00') || notesClean.includes('13:00') || notesClean.includes('14:00') || notesClean.includes('15:00') || notesClean.includes('16:00')
+                          }
+
+                          // 4. Ca Tối: Chỉ nhận ca tối / ca chiều (shift-003 hoặc ghi chú chiều / tối / 17:00, tuyệt đối không nhận ca trưa shift-002)
+                          if (tplClean.includes('chieu') || tplClean.includes('toi') || tplClean.includes('dem') || tplClean.includes('dong quay') || template.id === 'shift-003') {
+                            if (a.shift_id === 'shift-003') return true
+                            return notesClean.includes('chieu') || notesClean.includes('toi') || notesClean.includes('dem') || notesClean.includes('kiem kho') || notesClean.includes('17:00') || notesClean.includes('18:00') || notesClean.includes('19:00') || notesClean.includes('20:00') || notesClean.includes('21:00') || notesClean.includes('22:00')
+                          }
+
+                          return false
+                        })
+
+                        // Khử trùng lặp: Đảm bảo 1 nhân sự không bao giờ xuất hiện 2 lần trong cùng một ca làm việc
+                        const seenEmpIds = new Set<string>()
+                        const assignedInShift = rawAssignedInShift.filter(asg => {
+                          if (seenEmpIds.has(asg.employee_id)) return false
+                          seenEmpIds.add(asg.employee_id)
+                          return true
+                        })
+
+                        const cellKey = `${date}__${template.id}`
+                        const isDropTarget = dropTargetKey === cellKey
+                        const isDragActive = Boolean(draggedAssignment)
+
+                        // Phân bổ vai trò trong ca: Ca quầy Homies luôn cần 1 Thu ngân (order, POS) + Pha chế
+                        const assignedRoles = new Map<string, 'pos-002' | 'pos-001' | 'pos-bep'>()
+
+                        // Bước 1: Nhận diện Thu ngân & Bếp theo thuộc tính và nhân sự nòng cốt
+                        assignedInShift.forEach(asg => {
+                          const emp = board.employees.find(e => e.employee.id === asg.employee_id)?.employee
+                          const empPosId = emp?.position_id
+                          const effectivePosId = asg.assigned_position_id || empPosId
+                          const notesClean = removeVietnameseTones((asg.notes || '').toLowerCase())
+                          const empNameClean = removeVietnameseTones((emp?.full_name || asg.employee_name || '').toLowerCase())
+
+                          if (effectivePosId === 'pos-bep' || notesClean.includes('bep') || notesClean.includes('kitchen') || notesClean.includes('che bien')) {
+                            assignedRoles.set(asg.id || asg.employee_id, 'pos-bep')
+                            return
+                          }
+
+                          const isExplicitCashier =
+                            effectivePosId === 'pos-002' ||
+                            effectivePosId === 'pos-cashier' ||
+                            effectivePosId === 'b0000000-0000-0000-0000-000000000002' ||
+                            notesClean.includes('thu ngan') ||
+                            notesClean.includes('cashier') ||
+                            notesClean.includes('order') ||
+                            notesClean.includes('tn') ||
+                            asg.employee_id === 'emp-nv0030' || // Quách Thị Kim Chi
+                            asg.employee_id === 'emp-nv0034' || // Nguyễn Thị Thu
+                            asg.employee_id === 'emp-nv0013' || // Nguyễn Thị Tú Trinh
+                            asg.employee_id === 'emp-nv0009' || // Nguyễn Thị Kiều Trang
+                            asg.employee_id === 'emp-nv0008' || // Nguyễn Thị Phương Thảo
+                            empNameClean.includes('kim chi') ||
+                            empNameClean.includes('tu trinh') ||
+                            empNameClean.includes('kieu trang')
+
+                          if (isExplicitCashier) {
+                            assignedRoles.set(asg.id || asg.employee_id, 'pos-002')
+                          }
+                        })
+
+                        // Bước 2: Cân bằng nghiệp vụ Homies (Nếu ca có từ 2 nhân sự trở lên mà chưa có Thu ngân, phân bổ 1 bạn kiêm nhiệm Thu ngân)
+                        const hasCashier = Array.from(assignedRoles.values()).some(role => role === 'pos-002')
+                        if (!hasCashier && assignedInShift.length >= 2) {
+                          const managerIndex = assignedInShift.findIndex(a => a.employee_id.includes('bh') || a.employee_id === 'emp-nv0020')
+                          const cashierIdx = managerIndex >= 0 ? managerIndex : 1
+                          const cashierAsg = assignedInShift[cashierIdx] || assignedInShift[0]
+                          assignedRoles.set(cashierAsg.id || cashierAsg.employee_id, 'pos-002')
+                        }
+
+                        // Bước 3: Tất cả nhân sự còn lại làm Pha chế (pos-001)
+                        assignedInShift.forEach(asg => {
+                          const key = asg.id || asg.employee_id
+                          if (!assignedRoles.has(key)) {
+                            assignedRoles.set(key, 'pos-001')
+                          }
+                        })
+
+                        let cashierCount = 0
+                        let baristaCount = 0
+                        let kitchenCount = 0
+                        assignedInShift.forEach(asg => {
+                          const role = assignedRoles.get(asg.id || asg.employee_id) || 'pos-001'
+                          if (role === 'pos-002') cashierCount++
+                          else if (role === 'pos-bep') kitchenCount++
+                          else baristaCount++
+                        })
+
+                        const requiredTotal = groupPositions.reduce((acc, pos) => {
+                          const demandSlot = boardDemands.find(d => d.date === date && d.shift_template_id === template.id && d.position_id === pos.id)
+                          return acc + (demandSlot?.required_count ?? 1)
+                        }, 0) || template.min_headcount || 2
+
+                        const missingPos = groupPositions.find(p => {
+                          const assignedCount = p.id === 'pos-002' ? cashierCount : p.id === 'pos-bep' ? kitchenCount : baristaCount
+                          const demandSlot = boardDemands.find(d => d.date === date && d.shift_template_id === template.id && d.position_id === p.id)
+                          const reqCount = demandSlot?.required_count ?? 1
+                          return assignedCount < reqCount
+                        }) || groupPositions[0]
+
+                        return (
+                          <td
+                            key={`${template.id}-${date}`}
+                            onDragOver={e => {
+                              e.preventDefault()
+                              if (draggedAssignment) setDropTargetKey(cellKey)
+                            }}
+                            onDragLeave={() => {
+                              if (dropTargetKey === cellKey) setDropTargetKey(null)
+                            }}
+                            onDrop={e => {
+                              e.preventDefault()
+                              if (draggedAssignment) {
+                                handleMoveShift(
+                                  draggedAssignment.employeeId,
+                                  draggedAssignment.fromDate,
+                                  draggedAssignment.fromShiftId,
+                                  date,
+                                  template.id,
+                                  draggedAssignment.fromPositionId,
+                                  draggedAssignment.notes
+                                )
+                                setDraggedAssignment(null)
+                                setDropTargetKey(null)
                               }
+                            }}
+                            className={`p-2 align-top border-r border-gray-200 last:border-r-0 transition-all ${
+                              isDropTarget
+                                ? 'bg-blue-50/80 border-2 border-dashed border-[#2F6FA8] shadow-inner scale-[1.01]'
+                                : isDragActive
+                                ? 'bg-gray-50/60 border border-dashed border-gray-300'
+                                : 'hover:bg-blue-50/20'
+                            }`}
+                          >
+                            <div className="space-y-1.5 min-h-[56px] flex flex-col justify-start">
+                              <div>
+                                {/* Header Mini của ô: Định biên quân số trong ca ngày đó + Nút icon (+) Thêm ở đầu ca */}
+                                <div className="mb-1.5 flex items-center justify-between gap-1 pb-1 border-b border-gray-100">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold border shrink-0 ${
+                                      assignedInShift.length >= requiredTotal
+                                        ? 'bg-emerald-50 text-[#1E9E57] border-emerald-200/80'
+                                        : assignedInShift.length > 0
+                                        ? 'bg-blue-50 text-[#2F6FA8] border-blue-200/80'
+                                        : 'bg-gray-100/70 text-gray-400 border-gray-200/60'
+                                    }`}>
+                                      {assignedInShift.length >= requiredTotal && <CheckCircle2 size={10} className="shrink-0" />}
+                                      <span>{assignedInShift.length}/{requiredTotal} NV</span>
+                                    </span>
 
-                              if (!shiftMatched) return false
+                                    {/* Tóm tắt nhanh TN / PC / Bếp */}
+                                    {assignedInShift.length > 0 && (
+                                      <span className="text-[9px] font-medium text-gray-400 truncate">
+                                        {cashierCount > 0 ? `${cashierCount} TN` : ''}
+                                        {cashierCount > 0 && baristaCount > 0 ? ' • ' : ''}
+                                        {baristaCount > 0 ? `${baristaCount} PC` : ''}
+                                        {kitchenCount > 0 ? ` • ${kitchenCount} Bếp` : ''}
+                                      </span>
+                                    )}
+                                  </div>
 
-                              // 2. Khớp Vị trí chuyên môn (Pha chế, Thu ngân, Phục vụ hoặc điều chuyển)
-                              const empPosId = board.employees.find(e => e.employee.id === a.employee_id)?.employee.position_id
-                              let effectivePosId = a.assigned_position_id || empPosId
-                              
-                              const notesLower = (a.notes || '').toLowerCase()
-                              const notesClean = removeVietnameseTones(notesLower)
-                              if (notesClean.includes('thu ngan') || notesClean.includes('cashier')) {
-                                effectivePosId = 'pos-002'
-                              } else if (notesClean.includes('pha che') || notesClean.includes('barista')) {
-                                effectivePosId = 'pos-001'
-                              } else if (notesClean.includes('phuc vu') || notesClean.includes('server')) {
-                                effectivePosId = 'pos-003'
-                              }
+                                  {/* Icon (+) thêm nhân sự ở đầu ca - nhỏ gọn, tiết kiệm diện tích */}
+                                  <button
+                                    type="button"
+                                    onClick={() => openAssignModal(date, template, missingPos)}
+                                    className="flex h-5 w-5 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 hover:text-[#2F6FA8] hover:border-[#2F6FA8]/50 hover:bg-blue-50/60 transition cursor-pointer shadow-2xs shrink-0"
+                                    title={`Thêm nhân sự vào ca ${template.name}`}
+                                  >
+                                    <Plus size={11} strokeWidth={2.5} />
+                                  </button>
+                                </div>
 
-                              if (effectivePosId === position.id) return true
-
-                              // Nếu vị trí của nhân sự không nằm trong các hàng hiện có (vd Quản lý), hiển thị ở hàng vị trí đầu tiên để không bị mất ca
-                              const isPosInGroup = groupPositions.some(p => p.id === effectivePosId)
-                              if (!isPosInGroup && groupPositions[0]?.id === position.id) return true
-
-                              return false
-                            })
-
-                            const cellKey = `${date}__${template.id}__${position.id}`
-                            const isDropTarget = dropTargetKey === cellKey
-                            const isDragActive = Boolean(draggedAssignment)
-
-                            return (
-                              <td
-                                key={`${rowKey}-${date}`}
-                                onDragOver={e => {
-                                  e.preventDefault()
-                                  if (draggedAssignment) {
-                                    setDropTargetKey(cellKey)
-                                  }
-                                }}
-                                onDragLeave={() => {
-                                  if (dropTargetKey === cellKey) setDropTargetKey(null)
-                                }}
-                                onDrop={e => {
-                                  e.preventDefault()
-                                  if (draggedAssignment) {
-                                    handleMoveShift(
-                                      draggedAssignment.employeeId,
-                                      draggedAssignment.fromDate,
-                                      draggedAssignment.fromShiftId,
-                                      date,
-                                      template.id,
-                                      position.id,
-                                      draggedAssignment.notes
-                                    )
-                                    setDraggedAssignment(null)
-                                    setDropTargetKey(null)
-                                  }
-                                }}
-                                className={`p-2 align-top border-r border-gray-200 last:border-r-0 transition-all ${
-                                  isDropTarget
-                                    ? 'bg-emerald-100/90 border-2 border-dashed border-emerald-600 shadow-inner scale-[1.01]'
-                                    : isDragActive
-                                    ? 'bg-emerald-50/30 border border-dashed border-emerald-300/80 hover:bg-emerald-100/50'
-                                    : 'hover:bg-[#2F6FA8]/5'
-                                }`}
-                              >
-                                <div className="space-y-1.5 min-h-[70px]">
-                                  {/* Thẻ nhân viên đã gán (Kéo - thả trực quan hoặc Dời ca nhanh) */}
-                                  {assignedInCell.map(asg => {
+                                {/* Danh sách thẻ nhân sự trong ca */}
+                                <div className="space-y-1.5">
+                                  {assignedInShift.map(asg => {
+                                    const empName = resolveDisplayName(asg.employee_id, asg.employee_name, board.employees)
+                                    const initials = getInitials(empName)
                                     const emp = board.employees.find(e => e.employee.id === asg.employee_id)?.employee
-                                    const empName = emp?.full_name || asg.employee_id
-                                    const isSecondaryRole = asg.assigned_position_id && emp && asg.assigned_position_id !== emp.position_id
+
+                                    const rolePosId = assignedRoles.get(asg.id || asg.employee_id) || 'pos-001'
+                                    const effectivePosId = rolePosId
+                                    const isCashier = rolePosId === 'pos-002'
+                                    const isKitchen = rolePosId === 'pos-bep'
+                                    const isBarista = rolePosId === 'pos-001'
+                                    const rolePos = groupPositions.find(p => p.id === rolePosId) || groupPositions[0]
+                                    const isSecondaryRole = emp && rolePosId !== emp.position_id
 
                                     return (
                                       <div
@@ -2036,7 +2675,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                                             employeeName: empName,
                                             fromDate: date,
                                             fromShiftId: template.id,
-                                            fromPositionId: position.id,
+                                            fromPositionId: effectivePosId || 'pos-001',
                                             notes: asg.notes,
                                           })
                                         }}
@@ -2044,25 +2683,98 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                                           setDraggedAssignment(null)
                                           setDropTargetKey(null)
                                         }}
-                                        onClick={() => openAssignModal(date, template, position, asg.employee_id)}
-                                        className={`group relative rounded-xl border border-[#1E9E57]/40 bg-[#DDF4EC] hover:bg-[#c9eee1] px-3 py-2 text-center text-xs font-bold text-[#1E9E57] shadow-2xs transition cursor-grab active:cursor-grabbing hover:scale-[1.02] ${
+                                        onClick={() => openAssignModal(date, template, rolePos, asg.employee_id)}
+                                        className={`group relative rounded-xl border border-gray-200/90 bg-white hover:border-[#2F6FA8] p-2 text-left shadow-2xs hover:shadow-xs transition cursor-grab active:cursor-grabbing ${
                                           draggedAssignment?.employeeId === asg.employee_id && draggedAssignment?.fromDate === date && draggedAssignment?.fromShiftId === template.id
-                                            ? 'opacity-40 scale-95 border-dashed border-emerald-600'
+                                            ? 'opacity-40 scale-95 border-dashed border-[#2F6FA8]'
                                             : ''
                                         }`}
-                                        title="Giữ chuột kéo & thả sang ca khác hoặc bấm nút dời ca"
+                                        title="Kéo & thả sang ngày/ca khác hoặc bấm để đổi nhân sự"
                                       >
-                                        <div className="flex items-center justify-between gap-1">
-                                          <GripVertical size={11} className="text-[#1E9E57]/50 group-hover:text-[#1E9E57] shrink-0" />
-                                          <span className="block truncate text-xs flex-1">{empName}</span>
+                                        {/* Hàng 1: Monogram Avatar + Tên Thật Tiếng Việt */}
+                                        <div className="flex items-center gap-1.5">
+                                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                                            isCashier
+                                              ? 'bg-blue-100 text-[#2F6FA8]'
+                                              : isBarista
+                                              ? 'bg-emerald-100 text-[#1E9E57]'
+                                              : 'bg-rose-100 text-rose-700'
+                                          }`}>
+                                            {initials}
+                                          </div>
+                                          <span className="block truncate text-xs font-semibold text-gray-900 flex-1 leading-snug" title={empName}>
+                                            {empName}
+                                          </span>
+                                          <GripVertical size={11} className="text-gray-300 group-hover:text-gray-500 shrink-0" />
                                         </div>
+
+                                        {/* Hàng 2: Badge Chức Danh Gọn Gàng */}
+                                        <div className="mt-1 flex items-center gap-1 flex-wrap">
+                                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium border ${
+                                            isCashier
+                                              ? 'bg-blue-50 text-[#2F6FA8] border-blue-200/80'
+                                              : isBarista
+                                              ? 'bg-emerald-50 text-[#1E9E57] border-emerald-200/80'
+                                              : 'bg-rose-50 text-rose-700 border-rose-200/80'
+                                          }`}>
+                                            {isCashier ? (
+                                              <CreditCard size={10} className="shrink-0" />
+                                            ) : isBarista ? (
+                                              <Coffee size={10} className="shrink-0" />
+                                            ) : (
+                                              <UtensilsCrossed size={10} className="shrink-0" />
+                                            )}
+                                            <span>{isCashier ? 'Thu ngân' : isBarista ? 'Pha chế' : 'Bếp'}</span>
+                                          </span>
+
+                                          {/* Badge chi nhánh hỗ trợ chéo */}
+                                          {(() => {
+                                            const empItem = board?.employees.find(e => e.employee.id === asg.employee_id)?.employee
+                                            const isCross = empItem && !isStoreMatch(empItem.store_id, activeStoreId)
+                                            if (!isCross) return null
+                                            const homeName = getStoreById(empItem.store_id)?.name.replace('Homies Milk Tea - ', '').trim() || 'Khác'
+                                            return (
+                                              <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8.5px] font-medium bg-amber-50 text-amber-800 border border-amber-200" title={`Hỗ trợ từ ${homeName}`}>
+                                                <Building2 size={9} />
+                                                {homeName}
+                                              </span>
+                                            )
+                                          })()}
+                                        </div>
+
+                                        {/* Badge Khung Giờ Làm Việc Thực Tế (nổi bật nếu là ca lẻ / khác giờ chuẩn hàng) */}
+                                        {(() => {
+                                          const timeBadge = getShiftTimeBadge(asg.notes, template.start_time, template.end_time)
+                                          if (!timeBadge) return null
+                                          return (
+                                            <div className="mt-1 flex items-center">
+                                              <span
+                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-semibold border ${
+                                                  timeBadge.isDifferent
+                                                    ? 'bg-amber-50 text-amber-900 border-amber-300 font-bold shadow-2xs'
+                                                    : 'bg-gray-50 text-gray-600 border-gray-200'
+                                                }`}
+                                                title={`Khung giờ làm việc thực tế: ${timeBadge.timeStr}${timeBadge.tagLabel ? ` (${timeBadge.tagLabel})` : ''}`}
+                                              >
+                                                <Clock size={8.5} className={timeBadge.isDifferent ? 'text-amber-700 shrink-0' : 'text-gray-400 shrink-0'} />
+                                                <span>{timeBadge.timeStr}</span>
+                                                {timeBadge.tagLabel && (
+                                                  <span className={timeBadge.isDifferent ? 'text-amber-800 font-bold' : 'text-gray-500'}>
+                                                    ({timeBadge.tagLabel})
+                                                  </span>
+                                                )}
+                                              </span>
+                                            </div>
+                                          )
+                                        })()}
+
                                         {isSecondaryRole && (
-                                          <span className="block text-[9px] font-semibold text-[#001D3D]/60 mt-0.5">
+                                          <span className="block text-[8.5px] font-medium text-gray-400 mt-0.5">
                                             (Kiêm nhiệm)
                                           </span>
                                         )}
 
-                                        {/* Thanh nút thao tác nhanh (Dời ca + Gỡ ca) */}
+                                        {/* Nút thao tác nhanh khi hover: Dời ca + Gỡ ca */}
                                         <div className="absolute right-1 top-1 hidden group-hover:flex items-center gap-1 z-10">
                                           <button
                                             type="button"
@@ -2073,14 +2785,14 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                                                 employeeName: empName,
                                                 fromDate: date,
                                                 fromShiftId: template.id,
-                                                fromPositionId: position.id,
+                                                fromPositionId: effectivePosId || 'pos-001',
                                                 notes: asg.notes,
                                               })
                                               setTargetMoveDate(date)
                                               setTargetMoveShiftId(template.id)
-                                              setTargetMovePosId(position.id)
+                                              setTargetMovePosId(effectivePosId || 'pos-001')
                                             }}
-                                            className="flex h-4 w-4 items-center justify-center rounded-full bg-[#2F6FA8] text-white hover:bg-[#1D3E61] transition"
+                                            className="flex h-4 w-4 items-center justify-center rounded-full bg-[#2F6FA8] text-white hover:bg-[#1D3E61] transition cursor-pointer shadow-2xs"
                                             title="Dời ca sang ngày/ca khác"
                                           >
                                             <ArrowRightLeft size={9} />
@@ -2096,13 +2808,13 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                                                   employeeName: empName,
                                                   date,
                                                   shiftTemplateId: template.id,
-                                                  positionId: position.id,
+                                                  positionId: effectivePosId || 'pos-001',
                                                 })
                                               } else {
                                                 handleRemove(asg.employee_id, date)
                                               }
                                             }}
-                                            className="flex h-4 w-4 items-center justify-center rounded-full bg-[#D9381E] text-white hover:bg-red-700 transition"
+                                            className="flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition cursor-pointer shadow-2xs"
                                             title="Gỡ nhân sự"
                                           >
                                             <X size={9} />
@@ -2111,108 +2823,100 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                                       </div>
                                     )
                                   })}
-
-                                  {/* Phương án C: Nút (+) mỏng đơn giản bên dưới (Ẩn nút khi đã đạt số người nhu cầu) */}
-                                  {(() => {
-                                    const demandSlot = boardDemands.find(
-                                      d => d.date === date && d.shift_template_id === template.id && d.position_id === position.id
-                                    )
-                                    const reqCount = demandSlot?.required_count ?? template.min_headcount ?? 1
-                                    const maxHeadcount = template.max_headcount || 999
-                                    const targetQuota = Math.min(reqCount, maxHeadcount)
-
-                                    // Ẩn hoàn toàn nút (+) khi số người đã gán đạt hoặc vượt nhu cầu
-                                    if (assignedInCell.length >= targetQuota) return null
-
-                                    return (
-                                      <div
-                                        onClick={() => openAssignModal(date, template, position)}
-                                        className="w-full rounded-xl border border-dashed border-gray-300 bg-white/80 opacity-65 hover:opacity-100 hover:border-[#2F6FA8] hover:bg-[#2F6FA8]/5 py-1.5 text-center text-gray-400 hover:text-[#2F6FA8] cursor-pointer transition flex items-center justify-center shadow-2xs"
-                                        title={`Thêm nhân sự (${assignedInCell.length}/${targetQuota})`}
-                                      >
-                                        <Plus size={15} strokeWidth={2.2} />
-                                      </div>
-                                    )
-                                  })()}
                                 </div>
-                              </td>
-                            )
-                          })}
-                        </tr>
-                      )
-                    })}
-                  </Fragment>
-                )
-              })}
+                                {/* Hiển thị gợi ý trống ca nhẹ nhàng khi chưa có ai */}
+                                {assignedInShift.length === 0 && (
+                                  <div
+                                    onClick={() => openAssignModal(date, template, missingPos)}
+                                    className="h-8 rounded-lg border border-dashed border-gray-200/80 hover:border-[#2F6FA8]/40 hover:bg-blue-50/20 flex items-center justify-center cursor-pointer transition text-[10px] text-gray-300 hover:text-[#2F6FA8] font-medium"
+                                    title={`Bấm để xếp ca ${template.name}`}
+                                  >
+                                    Trống ca
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
 
                 {/* Dòng Tiêu đề Ca phát sinh (Linh hoạt / Tăng cường) */}
-                <tr className="bg-blue-50/80 font-bold border-t-2 border-dashed border-[#2F6FA8]/40">
+                <tr className="bg-purple-50/40 font-bold border-t border-l-4 border-l-purple-500 border-gray-200">
                   <td colSpan={8} className="px-4 py-2.5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="h-3 w-3 rounded-full bg-[#2F6FA8] shadow-2xs" />
-                        <span className="text-sm font-extrabold uppercase tracking-wide text-[#2F6FA8]">Ca phát sinh (Linh hoạt)</span>
+                        <span className="h-2.5 w-2.5 rounded-full bg-purple-500 shadow-2xs" />
+                        <span className="text-xs font-bold uppercase tracking-wide text-purple-950">Ca phát sinh (Linh hoạt)</span>
                       </div>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2F6FA8] hidden sm:inline">
-                        <Zap size={14} /> Bấm (+) ở các ô ngày để thêm ca đột xuất
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 hidden sm:inline">
+                        <Zap size={13} className="text-amber-500" /> Bấm (+) ở các ô ngày để thêm ca đột xuất
                       </span>
                     </div>
                   </td>
                 </tr>
 
                 {/* Hàng chứa các ô (+) Thêm ca phát sinh cho từng ngày */}
-                <tr className="hover:bg-blue-50/20 transition">
-                  <td className="p-3 align-top bg-gray-50/50 border-r border-gray-200">
+                <tr className="hover:bg-gray-50/40 transition">
+                  <td className="p-3 align-top bg-white border-r border-gray-200">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-extrabold text-[#2F6FA8] shadow-2xs">
-                        <Zap size={13} /> Ca đột xuất / OT
+                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/70 px-2.5 py-1 text-xs font-semibold text-purple-900 shadow-2xs">
+                        <Zap size={12} className="text-amber-500" /> Ca đột xuất / OT
                       </span>
                     </div>
                   </td>
 
                   {weekDates.map(date => {
-                    // Lọc các ca phát sinh đã gán trong ngày này
                     const flexAssignments = board?.assignments.filter(
                       a => a.date === date && isFlexibleAssignment(a, regularTemplateIds, templates)
                     ) || []
 
-                    const allCompanyEmps: Array<{ id: string; full_name: string }> = EmployeeService.getEmployees(user ?? undefined)
-
                     return (
                       <td
                         key={`flex-col-${date}`}
-                        className="p-2 align-top border-r border-gray-200 last:border-r-0 hover:bg-[#2F6FA8]/5 transition"
+                        className="p-2 align-top border-r border-gray-200 last:border-r-0 hover:bg-blue-50/20 transition"
                       >
                         <div className="space-y-1.5 min-h-[70px]">
                           {/* Các thẻ Ca phát sinh đã thêm */}
                           {flexAssignments.map(asg => {
-                            const emp = allCompanyEmps.find(e => e.id === asg.employee_id)
-                              || board?.employees.find(e => e.employee.id === asg.employee_id)?.employee
-                            const empName = emp?.full_name || asg.employee_id
+                            const empName = resolveDisplayName(asg.employee_id, asg.employee_name, board?.employees)
+                            const initials = getInitials(empName)
 
                             return (
                               <div
                                 key={asg.id}
-                                className="group relative rounded-xl border border-blue-300 bg-blue-50 hover:bg-blue-100 px-3 py-2 text-center text-xs font-bold text-[#2F6FA8] shadow-2xs transition"
+                                className="group relative rounded-xl border border-gray-200/90 bg-white hover:border-[#2F6FA8] p-2 text-left text-xs shadow-2xs hover:shadow-xs transition"
                               >
-                                <div className="text-[10px] text-blue-800 font-extrabold leading-tight mb-0.5 truncate">{asg.notes || 'Ca phát sinh'}</div>
-                                <span className="block truncate text-xs text-blue-950 font-bold">{empName}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[9px] font-bold shrink-0">
+                                    {initials}
+                                  </div>
+                                  <span className="block truncate text-xs font-semibold text-gray-900 flex-1 leading-snug">{empName}</span>
+                                </div>
+                                <div className="mt-1">
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-50 text-purple-800 border border-purple-200/80 truncate max-w-full">
+                                    {asg.notes || 'Ca phát sinh'}
+                                  </span>
+                                </div>
 
                                 <button
+                                  type="button"
                                   onClick={e => {
                                     e.stopPropagation()
                                     handleRemove(asg.employee_id, date)
                                   }}
-                                  className="absolute right-1 top-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-[#D9381E] text-white hover:bg-red-700 transition"
+                                  className="absolute right-1 top-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition cursor-pointer shadow-2xs"
                                   title="Gỡ ca phát sinh"
                                 >
-                                  <X size={10} />
+                                  <X size={9} />
                                 </button>
                               </div>
                             )
                           })}
 
-                          {/* Nút (+) mở Popup Modal Thêm ca phát sinh đúng theo mẫu người dùng gửi */}
+                          {/* Nút (+) mở Popup Modal Thêm ca phát sinh */}
                           <div
                             onClick={() => {
                               setFlexShiftForm({
@@ -2226,10 +2930,10 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                               })
                               setFlexShiftModalDate(date)
                             }}
-                            className="w-full rounded-xl border-2 border-dashed border-blue-300 bg-white hover:border-[#2F6FA8] hover:bg-blue-50/50 py-2.5 text-center text-blue-500 hover:text-[#2F6FA8] cursor-pointer transition flex items-center justify-center font-bold"
+                            className="w-full rounded-xl border border-dashed border-gray-300 bg-white/70 hover:border-purple-400 hover:bg-purple-50/20 py-2 text-center text-gray-400 hover:text-purple-600 cursor-pointer transition flex items-center justify-center shadow-2xs"
                             title="Thêm ca phát sinh cho ngày này"
                           >
-                            <Plus size={16} strokeWidth={2.5} />
+                            <Plus size={14} strokeWidth={2.2} />
                           </div>
                         </div>
                       </td>
@@ -2277,6 +2981,43 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                   <X size={18} />
                 </button>
               </div>
+            </div>
+
+            {/* Tabs chọn nguồn nhân sự: Tất cả, Cơ sở chính, Hỗ trợ chéo */}
+            <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-2 bg-gray-50/80">
+              <button
+                type="button"
+                onClick={() => setModalStaffFilter('all')}
+                className={`rounded-lg px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                  modalStaffFilter === 'all'
+                    ? 'bg-purple-600 text-white shadow-2xs'
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                Tất cả ({rawModalRecommendations.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalStaffFilter('home')}
+                className={`rounded-lg px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                  modalStaffFilter === 'home'
+                    ? 'bg-purple-600 text-white shadow-2xs'
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                Cơ sở chính ({modalHomeCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalStaffFilter('cross')}
+                className={`inline-flex items-center gap-1 rounded-lg px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                  modalStaffFilter === 'cross'
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300'
+                }`}
+              >
+                ⚡ Hỗ trợ chéo ({modalCrossCount})
+              </button>
             </div>
 
             {/* Thông báo chặn khi ca đã đạt Max Headcount */}
@@ -2382,6 +3123,13 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                               {empObj?.employee_code || 'NV'} - {rec.employee_name}
                             </span>
 
+                            {/* Badge Hỗ trợ chéo nếu nhân sự thuộc chi nhánh khác */}
+                            {rec.is_cross_store && (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10.5px] font-extrabold text-amber-800">
+                                ⚡ Hỗ trợ chéo ({rec.home_store_name || 'Khác'})
+                              </span>
+                            )}
+
                             {/* Dropdown Vị trí */}
                             <span className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700">
                               {activeSlotModal.positionName} ▾
@@ -2392,7 +3140,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                           <div className="mt-1 text-[11px] text-gray-400 font-medium truncate flex items-center gap-1.5">
                             <span>{empObj?.email || 'nhanvien@homies.com'}</span>
                             <span>|</span>
-                            <span>{selectedStore?.name || 'HBP - Trà sữa phô mai tươi HOMIES'}</span>
+                            <span>{getStoreById(empObj?.store_id)?.name.replace('Homies Milk Tea - ', '') || selectedStore?.name}</span>
                             <span>|</span>
                             <span>Nhân viên</span>
                             <span>|</span>
@@ -2626,6 +3374,29 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                   onChange={e => setFlexShiftForm(prev => ({ ...prev, name: e.target.value }))}
                   className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#001D3D] placeholder-gray-400 focus:outline-hidden focus:border-[#2F6FA8] focus:ring-2 focus:ring-[#2F6FA8]/15"
                 />
+                {/* Gợi ý ca linh động / phát sinh thường gặp */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[
+                    { name: 'Ca Trưa Lẻ', start: '12:00', end: '15:00' },
+                    { name: 'Ca Bếp', start: '13:00', end: '20:00' },
+                    { name: 'Ca Kiểm Kho', start: '17:00', end: '22:00' },
+                    { name: 'Ca Dọn Quầy', start: '22:00', end: '01:30' },
+                  ].map(preset => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => setFlexShiftForm(prev => ({
+                        ...prev,
+                        name: preset.name,
+                        startTime: preset.start,
+                        endTime: preset.end,
+                      }))}
+                      className="rounded-lg border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-800 hover:bg-purple-100 transition cursor-pointer"
+                    >
+                      + {preset.name} ({preset.start}-{preset.end})
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Khung giờ bắt đầu & kết thúc */}

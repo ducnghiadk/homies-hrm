@@ -61,12 +61,21 @@ export default function KpiDashboardPage() {
   const [selectedEvaluation, setSelectedEvaluation] = useState<KpiEvaluation | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  // Redirect if unauthenticated
+  // Redirect if unauthenticated (sau 1.5 giây nếu chưa xác thực)
   useEffect(() => {
-    if (hasHydrated && !isAuthenticated) {
-      router.push('/login?redirect=/kpi')
+    const timeout = setTimeout(() => {
+      const state = useAuthStore.getState()
+      if (!state.isAuthenticated || !state.user) {
+        router.replace('/login?redirect=/kpi')
+      }
+    }, 1500)
+
+    if (hasHydrated && (!isAuthenticated || !user)) {
+      router.replace('/login?redirect=/kpi')
     }
-  }, [hasHydrated, isAuthenticated, router])
+
+    return () => clearTimeout(timeout)
+  }, [hasHydrated, isAuthenticated, user, router])
 
   const refreshData = useCallback(async () => {
     try {

@@ -17,19 +17,15 @@ import {
   CreditCard,
   FileText,
   HelpCircle,
-  ListChecks,
   LogOut,
   MessageCircle,
   Settings,
-  Shield,
   SlidersHorizontal,
-  Store,
   Target,
   Wifi,
-  WifiOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { mockViolationRecords, mockEvaluations, mockPromotionReviews, getCurrentPeriod } from '@/lib/mock-data-kpi'
+import { mockViolationRecords, mockEvaluations, getCurrentPeriod } from '@/lib/mock-data-kpi'
 
 const managementItems = [
   { icon: BarChart3, label: 'Báo cáo & Phân tích', description: 'Xem báo cáo giờ công, nhân sự, chi phí', href: '/reports', iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
@@ -98,7 +94,6 @@ export default function MorePage() {
   const myViolations = mockViolationRecords.filter(v => v.employee_id === user?.id && v.status === 'pending').length
   const pendingReviews = mockEvaluations.filter(e => e.period === period && e.status === 'self_submitted').length
   const pendingAppeals = mockViolationRecords.filter(v => v.status === 'appealed').length
-  const pendingPromos = mockPromotionReviews.filter(p => p.status === 'pending').length
 
   const kpiEmployeeItems: MenuItem[] = [
     { icon: Target, label: 'KPI của tôi', href: '/kpi', iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
@@ -107,13 +102,15 @@ export default function MorePage() {
     { icon: Award, label: 'Bảng xếp hạng', href: '/kpi/leaderboard', iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
   ]
 
+  const isCEO = ['ceo', 'area_manager', 'hr_manager', 'hr_admin'].includes(user?.role || '')
+
   const kpiManagerItems: MenuItem[] = [
     { icon: Target, label: 'Thưởng BSC Cửa hàng', href: '/bsc-bonus', iconBg: 'bg-amber-100', iconColor: 'text-amber-700' },
     { icon: ClipboardCheck, label: 'Review KPI', href: '/kpi/review', iconBg: 'bg-primary-100', iconColor: 'text-primary-600', badge: pendingReviews > 0 ? `${pendingReviews} chờ` : undefined },
     { icon: AlertTriangle, label: 'Nhật ký ghi lỗi ca', href: '/kpi/violations/log', iconBg: 'bg-error-100', iconColor: 'text-error-600' },
     { icon: AlertTriangle, label: 'Xét khiếu nại vi phạm', href: '/kpi/violations/appeals', iconBg: 'bg-warning-100', iconColor: 'text-warning-600', badge: pendingAppeals > 0 ? `${pendingAppeals} chờ` : undefined },
     { icon: BarChart3, label: 'Báo cáo KPI', href: '/kpi/reports', iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
-    { icon: Settings, label: 'Cài đặt BSC & Khung lỗi', href: '/settings/bsc', iconBg: 'bg-primary-50', iconColor: 'text-gray-600' },
+    ...(isCEO ? [{ icon: Settings, label: 'Cài đặt BSC & Khung lỗi', href: '/settings/bsc', iconBg: 'bg-primary-50', iconColor: 'text-gray-600' }] : []),
   ]
 
   const scheduleManagerItems: MenuItem[] = [

@@ -35,9 +35,13 @@ export function formatHour(hour: number): string {
 
 /** Calculate hours between two "HH:mm" strings */
 export function calculateShiftHours(start: string, end: string): number {
+  if (!start || !end) return 0
   const [sh, sm] = start.split(':').map(Number)
   const [eh, em] = end.split(':').map(Number)
-  return (eh + em / 60) - (sh + sm / 60)
+  if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return 0
+  let diffMinutes = (eh * 60 + em) - (sh * 60 + sm)
+  if (diffMinutes < 0) diffMinutes += 24 * 60 // Xử lý ca vắt qua nửa đêm (cross-midnight)
+  return Math.round((diffMinutes / 60) * 100) / 100
 }
 
 /** Get staffing levels per hour for a specific date */
@@ -55,6 +59,11 @@ export function getStaffingByHour(
     const count = dayShifts.filter(s => {
       const start = parseHour(s.startTime)
       const end = parseHour(s.endTime)
+      if (isNaN(start) || isNaN(end)) return false
+      if (end < start) {
+        // Ca vắt qua nửa đêm
+        return hour >= start || hour < end
+      }
       return start <= hour && end > hour
     }).length
 

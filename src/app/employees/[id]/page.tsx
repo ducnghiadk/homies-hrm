@@ -812,7 +812,7 @@ export default function EmployeeDetailPage() {
           </section>
         </div>
 
-        {/* MODAL CHỈNH SỬA HỒ SƠ NHÂN SỰ THEO TỪNG THẺ */}
+        {/* Modal chỉnh sửa hồ sơ nhân sự theo từng thẻ */}
         {(shouldShowEditPanel || isEditing) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-6 backdrop-blur-sm animate-fade-in">
             <div className="relative max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-6">
@@ -861,7 +861,7 @@ export default function EmployeeDetailPage() {
               )}
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {/* 1. KHỐI THÔNG TIN CƠ BẢN & NGÂN HÀNG */}
+                {/* 1. Khối thông tin cơ bản & ngân hàng */}
                 {(editSection === 'all' || editSection === 'basic') && (
                   <>
                     <div className="space-y-1 md:col-span-2">
@@ -1024,7 +1024,7 @@ export default function EmployeeDetailPage() {
                   </>
                 )}
 
-                {/* 2. KHỐI CĂN CƯỚC CÔNG DÂN */}
+                {/* 2. Khối căn cước công dân */}
                 {(editSection === 'all' || editSection === 'cccd') && (
                   <>
                     <div className="space-y-1 md:col-span-2 pt-2 border-t border-gray-100">
@@ -1093,7 +1093,7 @@ export default function EmployeeDetailPage() {
                   </>
                 )}
 
-                {/* 4. KHỐI CÔNG VIỆC, LƯƠNG & PHÂN QUYỀN */}
+                {/* 4. Khối công việc, lương & phân quyền */}
                 {(editSection === 'all' || editSection === 'job' || editSection === 'salary' || editSection === 'attendance') && (
                   <>
                     <div className="space-y-1 md:col-span-2 pt-2 border-t border-gray-100">
@@ -1338,7 +1338,7 @@ export default function EmployeeDetailPage() {
             </div>
           </div>
         )}
-        {/* MODAL ĐẶT LẠI MẬT KHẨU NHÂN SỰ */}
+        {/* Modal đặt lại mật khẩu nhân sự */}
         {isResettingPassword && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
             <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white p-6 shadow-2xl space-y-5">

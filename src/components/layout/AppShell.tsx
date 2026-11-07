@@ -7,6 +7,7 @@ import { ChevronDown, ChevronLeft } from 'lucide-react'
 import { getDesktopSidebarEntries } from '@/lib/navigation/sidebar-config'
 import { OnboardingPolicyService } from '@/lib/services/onboarding-policy-service'
 import { useAuthStore } from '@/store/auth-store'
+import { useMounted } from '@/hooks/useMounted'
 import BottomNav from './BottomNav'
 import Header from './Header'
 
@@ -20,12 +21,7 @@ type AppShellProps = {
 
 export default function AppShell({ children, showNav = true, className = '', backHref }: AppShellProps) {
   const { isAuthenticated, user } = useAuthStore()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setMounted(true), 0)
-    return () => window.clearTimeout(timer)
-  }, [])
+  const mounted = useMounted()
 
   const pathname = usePathname()
   const sidebarEntries = useMemo(() => getDesktopSidebarEntries(user?.role), [user?.role])
@@ -33,6 +29,7 @@ export default function AppShell({ children, showNav = true, className = '', bac
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
   const showManagerSidebar = Boolean(
+    mounted &&
     isAuthenticated &&
     user &&
     sidebarEntries.length > 0
@@ -88,10 +85,14 @@ export default function AppShell({ children, showNav = true, className = '', bac
     OnboardingPolicyService.syncDueAutomation(user)
   }, [mounted, user])
 
-  if (!mounted) return null
-
-  const isLargeLayout = user?.role === 'ceo' || user?.role === 'hr_admin'
-  const maxWidthClass = isLargeLayout ? 'w-full' : 'max-w-[1200px]'
+  const isLargeLayout = mounted && (
+    user?.role === 'ceo' ||
+    user?.role === 'hr_admin' ||
+    user?.role === 'store_manager' ||
+    user?.role === 'area_manager'
+  )
+  const isFullWidthRequested = className?.includes('max-w-none') || className?.includes('w-full')
+  const maxWidthClass = isLargeLayout || showManagerSidebar || isFullWidthRequested ? 'w-full max-w-none' : 'max-w-[1200px]'
   const shellPaddingClass = showNav
     ? isLargeLayout
       ? 'pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-0'
@@ -173,10 +174,13 @@ export default function AppShell({ children, showNav = true, className = '', bac
   )
 
   return (
-    <div className={`min-h-screen bg-bg-page font-['Inter'] text-dark-700 ${shellPaddingClass}`}>
+    <div
+      suppressHydrationWarning
+      className={`min-h-screen bg-bg-page font-['Inter'] text-dark-700 ${shellPaddingClass}`}
+    >
       <div className="z-50 h-[env(safe-area-inset-top,0px)] w-full bg-bg-subtle" />
 
-      {isAuthenticated && <Header />}
+      {mounted && isAuthenticated && <Header />}
 
       {/* Mobile Drawer Left Sidebar */}
       {showManagerSidebar && isMobileSidebarOpen && (
@@ -202,7 +206,10 @@ export default function AppShell({ children, showNav = true, className = '', bac
         </div>
       )}
 
-      <main className={`mx-auto px-4 pt-6 md:px-6 md:pt-8 lg:px-8 xl:px-10 ${maxWidthClass} ${className}`}>
+      <main
+        suppressHydrationWarning
+        className={`mx-auto px-4 pt-6 md:px-6 md:pt-8 lg:px-8 xl:px-10 ${maxWidthClass} ${className}`}
+      >
         <div className={showManagerSidebar ? `app-shell-desktop-frame lg:items-start ${layoutGapClass}` : ''}>
           {showManagerSidebar && (
             <aside className={`app-shell-desktop-sidebar hidden lg:block ${sidebarWidthClass}`}>
@@ -231,7 +238,7 @@ export default function AppShell({ children, showNav = true, className = '', bac
         </div>
       </main>
 
-      {showNav && (
+      {mounted && showNav && (
         <div className={showManagerSidebar || isLargeLayout ? 'lg:hidden' : ''}>
           <BottomNav />
         </div>

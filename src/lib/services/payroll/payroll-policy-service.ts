@@ -52,6 +52,9 @@ export type PayrollFnbPolicy = {
   cashShortageAutoDeductionLimit: number
   requireCashShortageApproval: boolean
   requireInventoryBreakageApproval: boolean
+  splitShiftMinBreakHours?: number
+  nightShiftStartHour?: number
+  tipDistributionEnabled?: boolean
 }
 
 export type PayrollPolicy = {
@@ -79,8 +82,27 @@ export type PayrollPolicy = {
     bhtnEmployee: number
     taxBracket1: number
     otWeekday: number
+    otWeekend?: number
     otNight: number
     otHoliday: number
+    latePenaltyPerOccurrence?: number
+  }
+  latePenaltyPolicy?: {
+    mode: 'fixed' | 'tiered'
+    graceOccurrences: number
+    fixedAmount: number
+    tier1MaxMinutes: number
+    tier1Amount: number
+    tier2MaxMinutes: number
+    tier2Amount: number
+    tier3Amount: number
+    tier3HalfShiftDeduction?: boolean
+  }
+  netRoundingMethod?: 'none' | 'round_1000' | 'round_5000' | 'round_10000'
+  shiftRules?: {
+    partTimeShiftHours?: number
+    fullTimeShiftHours?: number
+    minShiftHours?: number
   }
   legal: {
     personalDeduction: number
@@ -133,6 +155,8 @@ const defaultFnbPolicy: PayrollFnbPolicy = {
   cashShortageAutoDeductionLimit: 200000,
   requireCashShortageApproval: true,
   requireInventoryBreakageApproval: true,
+  splitShiftMinBreakHours: 2,
+  nightShiftStartHour: 22,
 }
 
 export function buildDefaultPayrollPolicy(): PayrollPolicy {
@@ -170,9 +194,9 @@ export function buildDefaultPayrollPolicy(): PayrollPolicy {
     partTimeOvertimeMultiplier: 1.5,
     grades,
     allowances: [
-      { name: 'Phụ cấp cơm ca', type: 'Theo ca', amount: 650000, taxable: 'Theo chính sách nội bộ', appliesTo: 'Nhân viên full-time' },
-      { name: 'Phụ cấp điện thoại', type: 'Cố định', amount: 250000, taxable: 'Tính PIT nếu vượt định mức', appliesTo: 'Trưởng ca, quản lý' },
-      { name: 'Phụ cấp trách nhiệm', type: 'Theo vai trò', amount: 1200000, taxable: 'Tính PIT', appliesTo: 'Trưởng ca trở lên' },
+      { name: 'Phụ cấp cơm ca', type: 'Theo ca', amount: 650000, taxable: 'Miễn thuế TNCN', appliesTo: 'Nhân viên full-time' },
+      { name: 'Phụ cấp trách nhiệm Trưởng ca', type: 'Theo vai trò', amount: 1200000, taxable: 'Tính PIT', appliesTo: 'Trưởng ca' },
+      { name: 'Phụ cấp điện thoại Quản lý', type: 'Cố định', amount: 250000, taxable: 'Miễn thuế định mức', appliesTo: 'Quản lý cửa hàng' },
       { name: 'Thưởng chuyên cần', type: 'Điều kiện', amount: 500000, taxable: 'Tính PIT', appliesTo: 'Không đi trễ, không vắng' },
     ],
     legal: {
@@ -181,16 +205,39 @@ export function buildDefaultPayrollPolicy(): PayrollPolicy {
       maxInsuranceSalary: 29800000,
       minRegionSalary: 20000,
     },
-    fnb: defaultFnbPolicy,
+    fnb: {
+      ...defaultFnbPolicy,
+      tipDistributionEnabled: true,
+      mealAllowancePerShift: 25000,
+    },
     rates: {
       probation: settingsPayroll.salary_coefficients.probation_rate,
       bhxhEmployee: settingsPayroll.salary_coefficients.bhxh_employee,
       bhytEmployee: settingsPayroll.salary_coefficients.bhyt_employee,
       bhtnEmployee: settingsPayroll.salary_coefficients.bhtn_employee,
       taxBracket1: settingsPayroll.salary_coefficients.tax_bracket_1,
-      otWeekday: settingsPayroll.standard_work_days.ot_coefficient,
+      otWeekday: 1.5,
+      otWeekend: 2.0,
+      otHoliday: 3.0,
       otNight: settingsPayroll.standard_work_days.night_coefficient,
-      otHoliday: settingsPayroll.standard_work_days.holiday_coefficient,
+      latePenaltyPerOccurrence: 25000,
+    },
+    latePenaltyPolicy: {
+      mode: 'tiered',
+      graceOccurrences: 0,
+      fixedAmount: 25000,
+      tier1MaxMinutes: 15,
+      tier1Amount: 0, // < 15p: Nhắc nhở (0đ)
+      tier2MaxMinutes: 30,
+      tier2Amount: 25000, // 15 - 30p: Trừ 25.000đ
+      tier3Amount: 60000, // > 30p: Trừ 50% tiền ca
+      tier3HalfShiftDeduction: true,
+    },
+    netRoundingMethod: 'round_1000',
+    shiftRules: {
+      partTimeShiftHours: 5.5,
+      fullTimeShiftHours: 8,
+      minShiftHours: 2,
     },
   }
 }

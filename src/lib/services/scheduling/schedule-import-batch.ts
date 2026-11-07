@@ -416,3 +416,175 @@ export function consolidateScheduleRows(
     return resultRow
   })
 }
+
+export type IposParsedShift = {
+  shiftId: string
+  shiftName: string
+  startTime: string
+  endTime: string
+  isFlexible: boolean
+  rawText: string
+}
+
+/**
+ * Bóc tách khung giờ làm việc từ chuỗi văn bản:
+ * Hỗ trợ các định dạng: "11h30-14h30", "11h30 - 14h30", "12h-15h", "12h - 15h", "11:30-14:30", "12:00-15:00", "12h30-15h"
+ */
+export function extractTimeRangeFromText(text: string): { startTime: string; endTime: string } | null {
+  if (!text) return null
+  const cleaned = text.trim()
+
+  const timeRegex = /(\d{1,2})(?:h|:)?(\d{2})?\s*[-–—]\s*(\d{1,2})(?:h|:)?(\d{2})?/i
+  const match = cleaned.match(timeRegex)
+  if (!match) return null
+
+  const startHour = Number(match[1])
+  const startMinute = match[2] ? Number(match[2]) : 0
+  const endHour = Number(match[3])
+  const endMinute = match[4] ? Number(match[4]) : 0
+
+  if (startHour < 0 || startHour > 24 || endHour < 0 || endHour > 24) return null
+  if (startMinute < 0 || startMinute >= 60 || endMinute < 0 || endMinute >= 60) return null
+
+  const startTime = `${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}`
+  const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`
+
+  return { startTime, endTime }
+}
+
+/**
+ * Ánh xạ ký hiệu ca viết tắt chuẩn iPOS HRM và nhận diện ca lẻ:
+ * - "S", "SANG", "CA SANG", "MORNING" -> shift-001 (Ca Sáng: 08:30 - 12:00)
+ * - "C", "CHIEU", "T", "TRUA", "AFTERNOON" -> shift-002 (Ca Trưa: 12:00 - 17:00)
+ * - "TOI", "CA TOI", "NIGHT" -> shift-003 (Ca Tối: 17:00 - 22:00)
+ * - "11h30-14h30", "12h-15h" -> Tự động nhận diện giờ bắt đầu - kết thúc để tạo ca linh động (shift-004)
+ */
+export function parseIposShiftCode(rawText: string): IposParsedShift | null {
+  if (!rawText) return null
+  const trimmed = rawText.trim()
+  if (!trimmed || isNonWorkingScheduleCell(trimmed)) return null
+
+  const normalized = removeVietnameseTones(trimmed)
+    .toLowerCase()
+    .replace(/[\[\]\(\)]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // 1. Kiểm tra các ca lẻ hoặc ca theo khung giờ
+  const timeRange = extractTimeRangeFromText(trimmed)
+  if (timeRange) {
+    const { startTime, endTime } = timeRange
+
+    // Ca Sáng chuẩn (08:00 - 12:00 hoặc 08:30 - 12:00)
+    if ((startTime === '08:30' || startTime === '08:00') && endTime === '12:00') {
+      return {
+        shiftId: 'shift-001',
+        shiftName: 'Ca Sáng',
+        startTime: '08:30',
+        endTime: '12:00',
+        isFlexible: false,
+        rawText: trimmed,
+      }
+    }
+
+    // Ca Trưa chuẩn (12:00 - 17:00)
+    if (startTime === '12:00' && endTime === '17:00') {
+      return {
+        shiftId: 'shift-002',
+        shiftName: 'Ca Trưa',
+        startTime: '12:00',
+        endTime: '17:00',
+        isFlexible: false,
+        rawText: trimmed,
+      }
+    }
+
+    // Ca Tối chuẩn (17:00 - 22:00)
+    if (startTime === '17:00' && (endTime === '22:00' || endTime === '22:30' || endTime === '23:00')) {
+      return {
+        shiftId: 'shift-003',
+        shiftName: 'Ca Tối',
+        startTime: '17:00',
+        endTime: '22:00',
+        isFlexible: false,
+        rawText: trimmed,
+      }
+    }
+
+    // Ca lẻ linh động phát sinh (vd: 11h30-14h30, 12h-15h)
+    return {
+      shiftId: 'shift-004',
+      shiftName: `Ca Linh động (${startTime} - ${endTime})`,
+      startTime,
+      endTime,
+      isFlexible: true,
+      rawText: trimmed,
+    }
+  }
+
+  // 2. Khớp theo ký hiệu viết tắt iPOS HRM
+
+  // 2.1 Ca Sáng: "S", "SANG", "CA SANG", "MORNING", "CA 1", "C1"
+  const morningTokens = ['s', 'sang', 'ca sang', 'morning', 'ca 1', 'c1']
+  if (
+    morningTokens.includes(normalized) ||
+    morningTokens.some(t => normalized === t || normalized.startsWith(t + ' ') || normalized.endsWith(' ' + t))
+  ) {
+    return {
+      shiftId: 'shift-001',
+      shiftName: 'Ca Sáng',
+      startTime: '08:30',
+      endTime: '12:00',
+      isFlexible: false,
+      rawText: trimmed,
+    }
+  }
+
+  // 2.2 Ca Trưa / Ca Chiều: "C", "CHIEU", "T", "TRUA", "AFTERNOON", "CA TRUA", "CA CHIEU", "CA 2", "C2"
+  const afternoonTokens = ['c', 'chieu', 't', 'trua', 'afternoon', 'ca trua', 'ca chieu', 'ca 2', 'c2']
+  if (
+    afternoonTokens.includes(normalized) ||
+    afternoonTokens.some(t => normalized === t || normalized.startsWith(t + ' ') || normalized.endsWith(' ' + t))
+  ) {
+    return {
+      shiftId: 'shift-002',
+      shiftName: 'Ca Trưa',
+      startTime: '12:00',
+      endTime: '17:00',
+      isFlexible: false,
+      rawText: trimmed,
+    }
+  }
+
+  // 2.3 Ca Tối: "TOI", "CA TOI", "NIGHT", "EVENING", "CA 3", "C3", "DEM", "CA DEM"
+  const eveningTokens = ['toi', 'ca toi', 'night', 'evening', 'ca 3', 'c3', 'dem', 'ca dem']
+  if (
+    eveningTokens.includes(normalized) ||
+    eveningTokens.some(t => normalized === t || normalized.startsWith(t + ' ') || normalized.endsWith(' ' + t))
+  ) {
+    return {
+      shiftId: 'shift-003',
+      shiftName: 'Ca Tối',
+      startTime: '17:00',
+      endTime: '22:00',
+      isFlexible: false,
+      rawText: trimmed,
+    }
+  }
+
+  // 2.4 Ca linh động / phát sinh / tăng ca / ca lẻ
+  const flexKeywords = ['linh dong', 'linh hoat', 'phat sinh', 'ca le', 'tang ca', 'ot', 'overtime', 'parttime', 'part-time', 'bo sung', 'tang cuong']
+  if (flexKeywords.some(k => normalized.includes(k))) {
+    return {
+      shiftId: 'shift-004',
+      shiftName: 'Ca Linh động (Phát sinh)',
+      startTime: '11:30',
+      endTime: '14:30',
+      isFlexible: true,
+      rawText: trimmed,
+    }
+  }
+
+  return null
+}
+

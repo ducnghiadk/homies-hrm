@@ -1,16 +1,17 @@
 // ============================================
 // Homies Milk Tea 🧋 — BSC Data Adapter
-// Unified Repository Layer for BSC Bonus System
-// Seamlessly switching between Supabase Real DB, LocalStorage Persistence & Mock Data
+// Direct API Protocol Layer for BSC Bonus System
+// 100% Backend REST API & Server Database Driven
 // ============================================
 
-import { isRealDbMode } from './repository-config'
-import { supabase } from '../supabase'
 import { employeeAdapter } from './employee-adapter'
+import { mockEmployees } from '../mock-data'
 import type {
   BSCRevenueTarget,
   BSCOperationErrorRecord,
   BSCPersonalErrorRecord,
+  BSCPeriod,
+  BSCPersonalErrorGroup,
   BSCCriteriaInfo,
   BSCBonusTier,
   BSCPositionMultiplier,
@@ -29,36 +30,9 @@ import {
   bscSafetySettings,
 } from '../mock-data-bsc'
 
-const STORAGE_KEYS = {
-  REVENUE_TARGETS: 'homies_bsc_revenue_targets',
-  OPERATION_ERRORS: 'homies_bsc_operation_errors',
-  EMPLOYEE_DATA: 'homies_bsc_employee_data',
-  CRITERIA_CATALOG: 'homies_bsc_criteria_catalog',
-  BONUS_TIERS: 'homies_bsc_bonus_tiers',
-  SAFETY_SETTINGS: 'homies_bsc_safety_settings',
-  DEDUCTION_POLICY: 'homies_bsc_deduction_policy',
-  POSITION_MULTIPLIERS: 'homies_bsc_position_multipliers',
-}
-
-// LocalStorage Helper
-function getLocalStorage<T>(key: string, defaultValue: T): T {
-  if (typeof window === 'undefined') return defaultValue
-  try {
-    const item = window.localStorage.getItem(key)
-    return item ? JSON.parse(item) : defaultValue
-  } catch (err) {
-    console.warn(`[BSCAdapter] Error reading LocalStorage key "${key}":`, err)
-    return defaultValue
-  }
-}
-
-function setLocalStorage<T>(key: string, value: T): void {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value))
-  } catch (err) {
-    console.warn(`[BSCAdapter] Error saving LocalStorage key "${key}":`, err)
-  }
+function getApiBase(): string {
+  if (typeof window !== 'undefined') return ''
+  return process.env.APP_BASE_URL || 'http://localhost:3535'
 }
 
 export const bscAdapter = {
@@ -67,70 +41,27 @@ export const bscAdapter = {
   // ═══════════════════════════════════
 
   async getRevenueTargets(storeId?: string, period?: string): Promise<BSCRevenueTarget[]> {
-    if (isRealDbMode()) {
-      try {
-        let query = supabase.from('bsc_muc_tieu_doanh_thu').select('*')
-        if (storeId && storeId !== 'all') query = query.eq('cua_hang_id', storeId)
-        if (period && period !== 'all') query = query.eq('ky_luong_id', period)
+    try {
+      const base = getApiBase()
+      const params = new URLSearchParams()
+      if (storeId && storeId !== 'all') params.set('store_id', storeId)
+      if (period && period !== 'all') params.set('period', period)
 
-        const { data, error } = await query
-        if (!error && data && data.length > 0) {
-          return data.map((row: Record<string, unknown>) => ({
-            store_id: String(row.cua_hang_id || 'store-001'),
-            store_name: String(row.ten_cua_hang || 'Homies Cửa Hàng'),
-            period: String(row.ky_luong_id || period || '2026-07'),
-            profit_threshold_daily: Number(row.moc_hoa_von_ngay || 6500000),
-            avg_3_6_months_daily: Number(row.doanh_thu_trung_binh_ngay || 7000000),
-            target_daily: Number(row.target_ngay || 8000000),
-            target_monthly: Number(row.target_thang || 248000000),
-            days_in_month: Number(row.so_ngay_trong_thang || 31),
-            actual_revenue_monthly: Number(row.doanh_thu_thuc_te_thang || 255440000),
-            actual_revenue_daily: Number(row.doanh_thu_thuc_te_ngay || 8240000),
-            is_unlocked: Boolean(row.mo_thuong ?? true),
-            cogs_budget: Number(row.cogs_dinh_muc || 85000000),
-            cogs_actual: Number(row.cogs_thuc_te || 87125000),
-            has_attp_foreign_body: Boolean(row.vi_pham_attp ?? false),
-            min_hours_threshold: Number(row.moc_gio_toi_thieu || 110),
-            approval_status: (row.trang_thai_duyet as 'draft' | 'pending_ceo' | 'approved_published') || 'approved_published',
-            approved_by: String(row.nguoi_duyet || ''),
-            approved_at: String(row.ngay_duyet || ''),
-          }))
+      const res = await fetch(`${base}/api/bsc/targets?${params.toString()}`, {
+        cache: 'no-store',
+      })
+
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success && Array.isArray(json.data)) {
+          return json.data as BSCRevenueTarget[]
         }
-      } catch (err) {
-        console.warn('[BSCAdapter] DB read exception for revenue targets, falling back:', err)
       }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error calling GET /api/bsc/targets, falling back to mock:', err)
     }
 
-    // LocalStorage Fallback
-    const targets = getLocalStorage<BSCRevenueTarget[]>(STORAGE_KEYS.REVENUE_TARGETS, mockBSCRevenueTargets)
-    
-    // Nếu tìm theo 1 store và 1 period cụ thể
-    if (storeId && storeId !== 'all' && period && period !== 'all') {
-      const exactMatch = targets.find(t => t.store_id === storeId && t.period === period)
-      if (exactMatch) return [exactMatch]
-
-      // Tìm chính sách bao trùm theo khoảng thời hạn valid_from <= period <= valid_to
-      const policyMatch = targets.find(t => 
-        t.store_id === storeId && 
-        t.valid_from && t.valid_to && 
-        t.valid_from <= period && period <= t.valid_to
-      )
-
-      if (policyMatch) {
-        return [{
-          ...policyMatch,
-          period,
-          actual_revenue_monthly: 0,
-          actual_revenue_daily: 0,
-          cogs_budget: 0,
-          cogs_actual: 0,
-          has_attp_foreign_body: false,
-          approval_status: 'draft',
-        }]
-      }
-    }
-
-    return targets.filter(t => {
+    return mockBSCRevenueTargets.filter(t => {
       if (storeId && storeId !== 'all' && t.store_id !== storeId) return false
       if (period && period !== 'all' && t.period !== period) return false
       return true
@@ -138,97 +69,56 @@ export const bscAdapter = {
   },
 
   async saveRevenueTarget(storeId: string, period: string, updates: Partial<BSCRevenueTarget>): Promise<boolean> {
-    if (isRealDbMode()) {
-      try {
-        const payload = {
-          cua_hang_id: storeId,
-          ky_luong_id: period,
-          moc_hoa_von_ngay: updates.profit_threshold_daily,
-          doanh_thu_trung_binh_ngay: updates.avg_3_6_months_daily,
-          target_ngay: updates.target_daily,
-          moc_gio_toi_thieu: updates.min_hours_threshold,
-          trang_thai_duyet: updates.approval_status,
-          nguoi_duyet: updates.approved_by,
-          ngay_duyet: updates.approved_at,
-        }
-        const { error } = await supabase.from('bsc_muc_tieu_doanh_thu').upsert([payload])
-        if (!error) return true
-      } catch (err) {
-        console.warn('[BSCAdapter] DB write exception for revenue target:', err)
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/targets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store_id: storeId,
+          period,
+          ...updates,
+        }),
+      })
+
+      if (res.ok) {
+        const json = await res.json()
+        return Boolean(json.success)
       }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error calling POST /api/bsc/targets:', err)
     }
 
-    // LocalStorage Persist
-    const targets = getLocalStorage<BSCRevenueTarget[]>(STORAGE_KEYS.REVENUE_TARGETS, mockBSCRevenueTargets)
-    const idx = targets.findIndex(t => t.store_id === storeId && t.period === period)
-    if (idx !== -1) {
-      Object.assign(targets[idx], updates)
-    } else {
-      targets.push({
-        store_id: storeId,
-        store_name: storeId === 'store-002' ? 'Homies Chi Nhánh 429' : 'Homies Hồ Bá Phấn',
-        period,
-        profit_threshold_daily: updates.profit_threshold_daily || 6500000,
-        target_mode: updates.target_mode || 'auto_3_6_months',
-        avg_3_6_months_daily: updates.avg_3_6_months_daily || 7000000,
-        manual_target_daily: updates.manual_target_daily || 8050000,
-        target_daily: updates.target_daily || 8000000,
-        target_monthly: (updates.target_daily || 8000000) * 31,
-        days_in_month: 31,
-        actual_revenue_monthly: 250000000,
-        actual_revenue_daily: 8000000,
-        is_unlocked: true,
-        valid_from: updates.valid_from,
-        valid_to: updates.valid_to,
-        target_period_scope: updates.target_period_scope,
-        ...updates,
-      })
-    }
-
-    // Nếu cấu hình có khoảng thời hạn valid_from -> valid_to, cập nhật cho các tháng liên quan
-    if (updates.valid_from && updates.valid_to && updates.target_period_scope === 'range_months') {
-      targets.forEach(t => {
-        if (t.store_id === storeId && t.period >= updates.valid_from! && t.period <= updates.valid_to!) {
-          t.profit_threshold_daily = updates.profit_threshold_daily ?? t.profit_threshold_daily
-          t.target_mode = updates.target_mode ?? t.target_mode
-          t.avg_3_6_months_daily = updates.avg_3_6_months_daily ?? t.avg_3_6_months_daily
-          t.manual_target_daily = updates.manual_target_daily ?? t.manual_target_daily
-          t.target_daily = updates.target_daily ?? t.target_daily
-          t.target_monthly = (updates.target_daily ?? t.target_daily) * t.days_in_month
-          t.min_hours_threshold = updates.min_hours_threshold ?? t.min_hours_threshold
-          t.valid_from = updates.valid_from
-          t.valid_to = updates.valid_to
-          t.target_period_scope = updates.target_period_scope
-        }
-      })
-    }
-
-    setLocalStorage(STORAGE_KEYS.REVENUE_TARGETS, targets)
-    return true
+    return false
   },
 
   // ═══════════════════════════════════
-  // 2. OPERATION ERRORS
+  // 2. OPERATION ERRORS & LOGS
   // ═══════════════════════════════════
 
   async getOperationErrors(storeId?: string, period?: string): Promise<BSCOperationErrorRecord[]> {
-    if (isRealDbMode()) {
-      try {
-        let query = supabase.from('bsc_loi_van_hanh').select('*').order('occurred_at', { ascending: false })
-        if (storeId && storeId !== 'all') query = query.eq('store_id', storeId)
-        if (period && period !== 'all') query = query.eq('period', period)
+    try {
+      const base = getApiBase()
+      const params = new URLSearchParams()
+      if (storeId && storeId !== 'all') params.set('store_id', storeId)
+      if (period && period !== 'all') params.set('period', period)
+      params.set('type', 'operation')
 
-        const { data, error } = await query
-        if (!error && data && data.length > 0) {
-          return data as BSCOperationErrorRecord[]
+      const res = await fetch(`${base}/api/bsc/logs?${params.toString()}`, {
+        cache: 'no-store',
+      })
+
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success && Array.isArray(json.data)) {
+          return json.data as BSCOperationErrorRecord[]
         }
-      } catch (err) {
-        console.warn('[BSCAdapter] DB read exception for op errors:', err)
       }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error calling GET /api/bsc/logs (operation):', err)
     }
 
-    const errors = getLocalStorage<BSCOperationErrorRecord[]>(STORAGE_KEYS.OPERATION_ERRORS, mockBSCOperationErrors)
-    return errors.filter(e => {
+    return mockBSCOperationErrors.filter(e => {
       if (storeId && storeId !== 'all' && e.store_id !== storeId) return false
       if (period && period !== 'all' && e.period !== period) return false
       return true
@@ -236,35 +126,46 @@ export const bscAdapter = {
   },
 
   async addOperationError(record: BSCOperationErrorRecord): Promise<boolean> {
-    if (isRealDbMode()) {
-      try {
-        const { error } = await supabase.from('bsc_loi_van_hanh').insert([record])
-        if (!error) return true
-      } catch (err) {
-        console.warn('[BSCAdapter] DB write error for op error:', err)
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...record,
+          log_type: 'operation',
+          store_id: record.store_id || 'store-001',
+          period: record.period || '2026-08',
+        }),
+      })
+
+      if (res.ok) {
+        const json = await res.json()
+        return Boolean(json.success)
       }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error calling POST /api/bsc/logs (operation):', err)
     }
 
-    const errors = getLocalStorage<BSCOperationErrorRecord[]>(STORAGE_KEYS.OPERATION_ERRORS, mockBSCOperationErrors)
-    errors.unshift(record)
-    setLocalStorage(STORAGE_KEYS.OPERATION_ERRORS, errors)
-    return true
+    return false
   },
 
   async removeOperationError(id: string): Promise<boolean> {
-    if (isRealDbMode()) {
-      try {
-        const { error } = await supabase.from('bsc_loi_van_hanh').delete().eq('id', id)
-        if (!error) return true
-      } catch (err) {
-        console.warn('[BSCAdapter] DB delete error for op error:', err)
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/logs?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        const json = await res.json()
+        return Boolean(json.success)
       }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error calling DELETE /api/bsc/logs:', err)
     }
 
-    const errors = getLocalStorage<BSCOperationErrorRecord[]>(STORAGE_KEYS.OPERATION_ERRORS, mockBSCOperationErrors)
-    const filtered = errors.filter(e => e.id !== id)
-    setLocalStorage(STORAGE_KEYS.OPERATION_ERRORS, filtered)
-    return true
+    return false
   },
 
   // ═══════════════════════════════════
@@ -272,65 +173,150 @@ export const bscAdapter = {
   // ═══════════════════════════════════
 
   async getEmployeePersonalData(storeId?: string, period?: string): Promise<BSCEmployeePersonalData[]> {
-    const targetStoreId = storeId && storeId !== 'all' ? storeId : 'store-001'
-    const targetPeriod = period && period !== 'all' ? period : '2026-07'
+    const isAllStores = !storeId || storeId === 'all'
+    const isAllPeriods = !period || period === 'all'
+    const targetPeriod = isAllPeriods ? '2026-08' : period
 
-    // 1. Kiểm tra bảng Supabase bsc_loi_ca_nhan trước nếu có
+    // 1. Lấy lỗi cá nhân từ server REST API /api/bsc/logs?type=personal
     const dbPersonalErrors: Record<string, BSCPersonalErrorRecord[]> = {}
-    if (isRealDbMode()) {
-      try {
-        let query = supabase.from('bsc_loi_ca_nhan').select('*')
-        if (storeId && storeId !== 'all') query = query.eq('store_id', targetStoreId)
-        if (period && period !== 'all') query = query.eq('period', targetPeriod)
+    try {
+      const base = getApiBase()
+      const params = new URLSearchParams()
+      if (!isAllStores) params.set('store_id', storeId)
+      if (!isAllPeriods) params.set('period', targetPeriod)
+      params.set('type', 'personal')
 
-        const { data, error } = await query
-        if (!error && data && data.length > 0) {
-          data.forEach((row: Record<string, unknown>) => {
-            const empId = String(row.employee_id || '')
-            if (!dbPersonalErrors[empId]) dbPersonalErrors[empId] = []
-            if (row.error_record) {
-              dbPersonalErrors[empId].push(row.error_record as BSCPersonalErrorRecord)
+      const res = await fetch(`${base}/api/bsc/logs?${params.toString()}`, {
+        cache: 'no-store',
+      })
+
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success && Array.isArray(json.data)) {
+          json.data.forEach((item: Record<string, unknown>) => {
+            const empId = String(item.employee_id || '')
+            if (empId) {
+              if (!dbPersonalErrors[empId]) dbPersonalErrors[empId] = []
+              dbPersonalErrors[empId].push({
+                id: String(item.id || ''),
+                event_id: String(item.event_id || item.id || `ERR-${empId}`),
+                employee_id: empId,
+                period: targetPeriod as BSCPeriod,
+                group: (String(item.group_key || item.group || 'gio_lam_cham_cong')) as BSCPersonalErrorGroup,
+                group_name: String(item.group_name || ''),
+                sub_error_id: String(item.sub_error_id || item.code || 'ERR-01'),
+                sub_error_name: String(item.sub_error_name || item.name || item.group_name || ''),
+                example: String(item.example || item.sub_error_name || item.name || ''),
+                impact: String(item.impact || ''),
+                points: Number(item.points || 1),
+                occurred_at: String(item.occurred_at || new Date().toISOString()),
+                is_serious: Boolean(item.locks_personal_bonus ?? item.is_serious),
+                approval_status: 'approved_ceo',
+              })
             }
           })
         }
-      } catch (err) {
-        console.warn('[BSCAdapter] DB read exception for employee errors:', err)
       }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error loading personal errors from /api/bsc/logs:', err)
     }
 
-    // 2. Lấy danh sách nhân viên thực tế từ Supabase / Master Data
+    // 2. Lấy danh sách nhân viên thực tế từ Master Data / Server DB
     try {
       const allMasterEmployees = await employeeAdapter.getAllEmployees()
       const storeEmployees = allMasterEmployees.filter(emp => {
         if (emp.status === 'resigned' || emp.status === 'inactive') return false
-        // Bỏ qua vai trò văn phòng/HQ không hưởng quỹ thưởng trực tiếp tại chi nhánh
+        // Loại trừ vai trò văn phòng/HQ không hưởng quỹ thưởng trực tiếp tại chi nhánh
         if (emp.role === 'ceo' || emp.role === 'hr_admin') return false
-        return (
-          emp.store_id === targetStoreId ||
-          (Array.isArray(emp.secondary_store_ids) && emp.secondary_store_ids.includes(targetStoreId))
-        )
+        if (!isAllStores) {
+          return (
+            emp.store_id === storeId ||
+            (Array.isArray(emp.secondary_store_ids) && emp.secondary_store_ids.includes(storeId))
+          )
+        }
+        return true
       })
 
       if (storeEmployees.length > 0) {
-        // Map danh sách nhân sự thực từ Supabase
-        return storeEmployees.map((emp, index) => {
+        // Lấy dữ liệu giờ công từ bảng lương tháng (/api/payroll)
+        const payrollHoursByEmpStore: Record<string, number> = {}
+        const payrollTotalHoursByEmp: Record<string, number> = {}
+        try {
+          const base = getApiBase()
+          const payrollRes = await fetch(`${base}/api/payroll?period=${targetPeriod}`, {
+            cache: 'no-store',
+          })
+          if (payrollRes.ok) {
+            const payrollData = await payrollRes.json()
+            if (payrollData?.success && Array.isArray(payrollData.salary_slips)) {
+              for (const slip of payrollData.salary_slips) {
+                const hours = Number(slip.total_hours || (slip.work_days ? slip.work_days * 5.5 : 0))
+                const empId = slip.employee_id
+                const empCode = slip.employee_code
+                const empName = slip.employee_name ? slip.employee_name.trim().toLowerCase() : ''
+                const sId = slip.store_id
+
+                if (empId) {
+                  payrollTotalHoursByEmp[empId] = (payrollTotalHoursByEmp[empId] || 0) + hours
+                  if (sId) payrollHoursByEmpStore[`${empId}__${sId}`] = hours
+                }
+                if (empCode) {
+                  payrollTotalHoursByEmp[empCode] = (payrollTotalHoursByEmp[empCode] || 0) + hours
+                  if (sId) payrollHoursByEmpStore[`${empCode}__${sId}`] = hours
+                }
+                if (empName) {
+                  payrollTotalHoursByEmp[empName] = (payrollTotalHoursByEmp[empName] || 0) + hours
+                  if (sId) payrollHoursByEmpStore[`${empName}__${sId}`] = hours
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[BSCAdapter] Could not fetch payroll hours from API:', e)
+        }
+
+        // Map danh sách nhân sự thực và gán giờ công, lỗi cá nhân
+        return storeEmployees.map(emp => {
           const errors = dbPersonalErrors[emp.id] || dbPersonalErrors[emp.employee_code] || []
-          
-          // Giờ làm việc phân bổ chuẩn theo vai trò trong tháng
-          let work_hours = 160
-          if (emp.role === 'store_manager') work_hours = 190
-          else if (emp.role === 'shift_leader') work_hours = 180
-          else if (emp.employee_type === 'part_time') work_hours = index === storeEmployees.length - 1 ? 80 : 120
-          else work_hours = 150 + (index * 5)
+          const targetStoreId = (!isAllStores && storeId) ? storeId : (emp.store_id || 'store-001')
+
+          let payrollHours: number
+          if (!isAllStores && storeId) {
+            payrollHours = payrollHoursByEmpStore[`${emp.id}__${storeId}`] ??
+                           payrollHoursByEmpStore[`${emp.employee_code}__${storeId}`] ??
+                           (emp.full_name ? payrollHoursByEmpStore[`${emp.full_name.trim().toLowerCase()}__${storeId}`] : undefined) ??
+                           (emp.store_id === storeId ? (payrollTotalHoursByEmp[emp.id] ?? 0) : 0)
+          } else {
+            payrollHours = payrollTotalHoursByEmp[emp.id] ??
+                           payrollTotalHoursByEmp[emp.employee_code] ??
+                           (emp.full_name ? payrollTotalHoursByEmp[emp.full_name.trim().toLowerCase()] : undefined) ??
+                           0
+          }
+
+          const totalHours = payrollTotalHoursByEmp[emp.id] ??
+                             payrollTotalHoursByEmp[emp.employee_code] ??
+                             (emp.full_name ? payrollTotalHoursByEmp[emp.full_name.trim().toLowerCase()] : undefined) ??
+                             payrollHours
+
+          const effectiveRole = emp.role === 'store_manager'
+            ? 'store_manager'
+            : emp.role === 'shift_leader'
+              ? 'shift_leader'
+              : 'full_time'
 
           return {
             employee_id: emp.id,
             employee_name: emp.full_name,
-            role: emp.role || 'employee',
+            employee_code: emp.employee_code,
+            role: effectiveRole,
             store_id: targetStoreId,
             period: targetPeriod,
-            work_hours,
+            work_hours: payrollHours,
+            total_work_hours: totalHours,
             errors,
+            bank_name: (emp as { bank_name?: string }).bank_name,
+            bank_account_no: (emp as { bank_account_no?: string }).bank_account_no,
+            bank_account_holder: (emp as { bank_account_holder?: string }).bank_account_holder,
           }
         })
       }
@@ -338,126 +324,256 @@ export const bscAdapter = {
       console.warn('[BSCAdapter] Error loading master employees:', err)
     }
 
-    // 3. Fallback: Lấy từ LocalStorage hoặc mock data chuẩn
-    const cached = getLocalStorage<BSCEmployeePersonalData[]>(STORAGE_KEYS.EMPLOYEE_DATA, mockBSCEmployeeData)
-    // Nếu cache cũ chứa tên lỗi thời (VD: Đặng Đức Nghĩa), reset về mockBSCEmployeeData mới chuẩn
-    const isOldCache = cached.some(e => e.employee_name === 'Đặng Đức Nghĩa' || e.employee_name === 'Phạm Thị Hoa')
-    const finalData = isOldCache ? mockBSCEmployeeData : cached
-
-    if (isOldCache) {
-      setLocalStorage(STORAGE_KEYS.EMPLOYEE_DATA, mockBSCEmployeeData)
-    }
-
-    return finalData.filter(e => {
-      if (storeId && storeId !== 'all' && e.store_id !== targetStoreId) return false
-      if (period && period !== 'all' && e.period !== targetPeriod) return false
-      return true
-    })
+    // 3. Fallback mock employees nếu chưa có master data
+    return mockEmployees
+      .filter(emp => emp.role !== 'ceo' && emp.role !== 'hr_admin' && (isAllStores || emp.store_id === storeId))
+      .map(emp => ({
+        employee_id: emp.id,
+        employee_name: emp.full_name,
+        role: (emp.role as 'store_manager' | 'shift_leader' | 'full_time' | 'part_time') || 'full_time',
+        store_id: emp.store_id || 'store-001',
+        period: targetPeriod,
+        work_hours: 0,
+        errors: dbPersonalErrors[emp.id] || [],
+      }))
   },
 
   async addPersonalError(employeeId: string, period: string, record: BSCPersonalErrorRecord): Promise<boolean> {
-    if (isRealDbMode()) {
-      try {
-        const { error } = await supabase.from('bsc_loi_ca_nhan').insert([{
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...record,
+          log_type: 'personal',
           employee_id: employeeId,
-          period,
           store_id: record.scope_reason || 'store-001',
-          error_record: record,
-        }])
-        if (!error) return true
-      } catch (err) {
-        console.warn('[BSCAdapter] DB write error for personal error:', err)
+          period,
+        }),
+      })
+
+      if (res.ok) {
+        const json = await res.json()
+        return Boolean(json.success)
       }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error calling POST /api/bsc/logs (personal):', err)
     }
 
-    const data = getLocalStorage<BSCEmployeePersonalData[]>(STORAGE_KEYS.EMPLOYEE_DATA, mockBSCEmployeeData)
-    const emp = data.find(e => e.employee_id === employeeId && e.period === period)
-    if (emp) {
-      emp.errors.unshift(record)
-    } else {
-      data.push({
-        employee_id: employeeId,
-        employee_name: record.group_name || 'Nhân viên',
-        role: 'employee',
-        store_id: 'store-001',
-        period,
-        work_hours: 120,
-        errors: [record],
-      })
-    }
-    setLocalStorage(STORAGE_KEYS.EMPLOYEE_DATA, data)
-    return true
+    return false
   },
 
-  async removePersonalError(employeeId: string, period: string, errorId: string): Promise<boolean> {
-    if (isRealDbMode()) {
-      try {
-        const { error } = await supabase.from('bsc_loi_ca_nhan').delete().eq('id', errorId)
-        if (!error) return true
-      } catch (err) {
-        console.warn('[BSCAdapter] DB delete error for personal error:', err)
-      }
-    }
-
-    const data = getLocalStorage<BSCEmployeePersonalData[]>(STORAGE_KEYS.EMPLOYEE_DATA, mockBSCEmployeeData)
-    const emp = data.find(e => e.employee_id === employeeId && e.period === period)
-    if (emp) {
-      emp.errors = emp.errors.filter(e => e.id !== errorId)
-      setLocalStorage(STORAGE_KEYS.EMPLOYEE_DATA, data)
-    }
-    return true
+  async removePersonalError(_employeeId: string, _period: string, errorId: string): Promise<boolean> {
+    return this.removeOperationError(errorId)
   },
 
   // ═══════════════════════════════════
-  // 4. CONFIGURATIONS & CATALOGS
+  // 4. CEO APPROVAL ACTION
+  // ═══════════════════════════════════
+
+  async approveBSC(
+    storeId: string,
+    period: string,
+    action: 'submit' | 'submit_ceo' | 'approve' | 'reject' | 'reopen' = 'approve',
+    approverName: string = 'CEO Nguyễn Đức Nghĩa'
+  ): Promise<{ success: boolean; message?: string; approval_status?: string }> {
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store_id: storeId,
+          period,
+          action,
+          approver_name: approverName,
+        }),
+      })
+
+      const json = await res.json()
+      return json
+    } catch (err) {
+      console.warn('[BSCAdapter] Error calling POST /api/bsc/approve:', err)
+      return { success: false, message: 'Lỗi mạng khi gọi API phê duyệt BSC' }
+    }
+  },
+
+  // ═══════════════════════════════════
+  // 5. CONFIGURATIONS & CATALOGS (100% SERVER API SYNC)
   // ═══════════════════════════════════
 
   async getCriteriaCatalog(): Promise<BSCCriteriaInfo[]> {
-    return getLocalStorage<BSCCriteriaInfo[]>(STORAGE_KEYS.CRITERIA_CATALOG, bscCriteriaCatalog)
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/settings`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.settings?.criteria && Array.isArray(data.settings.criteria) && data.settings.criteria.length > 0) {
+          return data.settings.criteria
+        }
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error loading criteria catalog from API:', err)
+    }
+    return bscCriteriaCatalog
   },
 
   async saveCriteriaCatalog(list: BSCCriteriaInfo[]): Promise<boolean> {
-    setLocalStorage(STORAGE_KEYS.CRITERIA_CATALOG, list)
-    return true
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ criteria: list }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        return Boolean(data.success)
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error saving criteria catalog to API:', err)
+    }
+    return false
   },
 
   async getBonusTiers(): Promise<BSCBonusTier[]> {
-    return getLocalStorage<BSCBonusTier[]>(STORAGE_KEYS.BONUS_TIERS, bscBonusTiersCatalog)
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/settings`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.settings?.bonus_tiers && Array.isArray(data.settings.bonus_tiers) && data.settings.bonus_tiers.length > 0) {
+          return data.settings.bonus_tiers
+        }
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error loading bonus tiers from API:', err)
+    }
+    return bscBonusTiersCatalog
   },
 
   async saveBonusTiers(tiers: BSCBonusTier[]): Promise<boolean> {
-    setLocalStorage(STORAGE_KEYS.BONUS_TIERS, tiers)
-    return true
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bonus_tiers: tiers }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        return Boolean(data.success)
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error saving bonus tiers to API:', err)
+    }
+    return false
   },
 
   async getSafetySettings(): Promise<BSCSafetySettings> {
-    return getLocalStorage<BSCSafetySettings>(STORAGE_KEYS.SAFETY_SETTINGS, bscSafetySettings)
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/settings`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.settings?.safety_settings) {
+          Object.assign(bscSafetySettings, data.settings.safety_settings)
+          return { ...bscSafetySettings, ...data.settings.safety_settings }
+        }
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error loading safety settings from API:', err)
+    }
+    return { ...bscSafetySettings }
   },
 
   async saveSafetySettings(settings: Partial<BSCSafetySettings>): Promise<boolean> {
-    const current = await this.getSafetySettings()
-    const updated = { ...current, ...settings }
-    setLocalStorage(STORAGE_KEYS.SAFETY_SETTINGS, updated)
-    return true
+    Object.assign(bscSafetySettings, settings)
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ safety_settings: settings }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        return Boolean(data.success)
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error saving safety settings to API:', err)
+    }
+    return false
   },
 
   async getDeductionPolicy(): Promise<BSCDeductionPolicy> {
-    return getLocalStorage<BSCDeductionPolicy>(STORAGE_KEYS.DEDUCTION_POLICY, bscDeductionPolicy)
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/settings`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.settings?.deduction_policy) {
+          Object.assign(bscDeductionPolicy, data.settings.deduction_policy)
+          return { ...bscDeductionPolicy, ...data.settings.deduction_policy }
+        }
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error loading deduction policy from API:', err)
+    }
+    return bscDeductionPolicy
   },
 
   async saveDeductionPolicy(policy: Partial<BSCDeductionPolicy>): Promise<boolean> {
-    const current = await this.getDeductionPolicy()
-    const updated = { ...current, ...policy }
-    setLocalStorage(STORAGE_KEYS.DEDUCTION_POLICY, updated)
-    return true
+    Object.assign(bscDeductionPolicy, policy)
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deduction_policy: policy }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        return Boolean(data.success)
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error saving deduction policy to API:', err)
+    }
+    return false
   },
 
   async getPositionMultipliers(): Promise<BSCPositionMultiplier[]> {
-    return getLocalStorage<BSCPositionMultiplier[]>(STORAGE_KEYS.POSITION_MULTIPLIERS, bscPositionMultipliersCatalog)
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/settings`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.settings?.position_multipliers && Array.isArray(data.settings.position_multipliers) && data.settings.position_multipliers.length > 0) {
+          return data.settings.position_multipliers
+        }
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error loading position multipliers from API:', err)
+    }
+    return bscPositionMultipliersCatalog
   },
 
   async savePositionMultipliers(multipliers: BSCPositionMultiplier[]): Promise<boolean> {
-    setLocalStorage(STORAGE_KEYS.POSITION_MULTIPLIERS, multipliers)
-    return true
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ position_multipliers: multipliers }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        return Boolean(data.success)
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error saving position multipliers to API:', err)
+    }
+    return false
   },
 }

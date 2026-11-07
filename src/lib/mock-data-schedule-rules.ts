@@ -71,7 +71,7 @@ const DEFAULT_SCHEDULE_RULES: ScheduleRule[] = [
   { id: 'rule-001', rule_key: 'clopening', label: 'Clopening (Đóng–Mở)', description: 'NV làm ca tối rồi ca sáng hôm sau, nghỉ không đủ giờ', warning_value: 8, block_value: 6, warning_level: 'warning', is_active: true },
   { id: 'rule-002', rule_key: 'max_weekly_hours_warn', label: 'Overtime tuần (cảnh báo)', description: 'Tổng giờ/tuần vượt ngưỡng cảnh báo', warning_value: 40, block_value: 40, warning_level: 'warning', is_active: true },
   { id: 'rule-003', rule_key: 'max_weekly_hours_block', label: 'Overtime tuần (chặn)', description: 'Tổng giờ/tuần vượt ngưỡng tối đa', warning_value: 48, block_value: 48, warning_level: 'block', is_active: true },
-  { id: 'rule-004', rule_key: 'max_daily_hours', label: 'Overtime ngày', description: 'Tổng giờ/ngày vượt ngưỡng', warning_value: 10, block_value: 12, warning_level: 'warning', is_active: true },
+  { id: 'rule-004', rule_key: 'max_daily_hours', label: 'Định mức làm việc ngày (8.5h)', description: 'Tổng giờ làm trong ngày vượt định mức 8.5 tiếng', warning_value: 8.5, block_value: 8.5, warning_level: 'warning', is_active: true },
   { id: 'rule-005', rule_key: 'max_consecutive_days', label: 'Ngày làm liên tục', description: 'Làm quá nhiều ngày liên tiếp không nghỉ', warning_value: 5, block_value: 6, warning_level: 'warning', is_active: true },
   { id: 'rule-006', rule_key: 'max_shifts_per_day', label: 'Ca liên tiếp trong ngày', description: 'Chỉ làm max số ca 1 ngày', warning_value: 2, block_value: 3, warning_level: 'info', is_active: false },
   { id: 'rule-007', rule_key: 'night_shift_restriction', label: 'Ca đêm cho NV đặc biệt', description: 'NV dưới 18 tuổi không được làm ca đêm', warning_value: 0, block_value: 0, warning_level: 'block', is_active: true },
@@ -89,7 +89,16 @@ function loadPersistedRules(): ScheduleRule[] {
     const raw = localStorage.getItem('homies_schedule_rules')
     if (raw) {
       const parsed: ScheduleRule[] = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return DEFAULT_SCHEDULE_RULES.map(defaultRule => {
+          const found = parsed.find(p => p.rule_key === defaultRule.rule_key || p.id === defaultRule.id)
+          if (!found) return { ...defaultRule }
+          if (found.rule_key === 'max_daily_hours' && (found.warning_value === 10 || !found.warning_value)) {
+            return { ...found, label: defaultRule.label, description: defaultRule.description, warning_value: 8.5, block_value: 8.5 }
+          }
+          return { ...defaultRule, ...found }
+        })
+      }
     }
   } catch (e) {
     console.error('Error loading schedule rules:', e)
@@ -144,11 +153,13 @@ let warningCounter = 100
 
 function getShiftHours(shift: Shift): number {
   if (shift.hours) return shift.hours
+  if (!shift.start_time || !shift.end_time) return 0
   const [sh, sm] = shift.start_time.split(':').map(Number)
   const [eh, em] = shift.end_time.split(':').map(Number)
+  if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return 0
   let h = eh - sh + (em - sm) / 60
   if (h < 0) h += 24
-  return h
+  return Math.round(h * 100) / 100
 }
 
 function parseTime(t: string): number {
@@ -285,7 +296,7 @@ export function checkScheduleWarnings(
     }
   }
 
-  // 3. OVERTIME DAY
+  // 3. OVERTIME DAY (Định mức 8.5h/ngày)
   if (isRuleActive('max_daily_hours')) {
     const dayHours = getShiftHours(shift) + sumScheduledHours(
       schedules,
@@ -293,14 +304,15 @@ export function checkScheduleWarnings(
       [date],
       currentScheduleRef
     )
+    const ruleLevel = getRuleLevel('max_daily_hours')
     const maxDaily = getEffectiveValue('max_daily_hours', posId, 'warning')
     const blockDaily = getEffectiveValue('max_daily_hours', posId, 'block')
-    if (dayHours > blockDaily) {
+    if (ruleLevel === 'block' && dayHours > blockDaily) {
       result.push(createWarningObj(emp, 'max_daily_hours', 'block', date, shiftId,
-        `${emp.full_name} sẽ làm ${dayHours.toFixed(0)}h ngày này (tối đa ${blockDaily}h)`))
+        `${emp.full_name} làm ${dayHours.toFixed(1)}h/ngày vượt định mức ${blockDaily}h (Chặn xếp ca)`))
     } else if (dayHours > maxDaily) {
-      result.push(createWarningObj(emp, 'max_daily_hours', 'warning', date, shiftId,
-        `${emp.full_name} sẽ làm ${dayHours.toFixed(0)}h ngày này (ngưỡng ${maxDaily}h)`))
+      result.push(createWarningObj(emp, 'max_daily_hours', ruleLevel === 'block' ? 'block' : 'warning', date, shiftId,
+        `${emp.full_name} làm ${dayHours.toFixed(1)}h/ngày (vượt định mức ${maxDaily}h)`))
     }
   }
 

@@ -233,20 +233,20 @@ Nếu cần file ngoài danh sách, dừng và báo AI Plan.
 
 ## DONE CRITERIA
 
-- [ ] Task 1-14 và Task 9B hoàn thành.
-- [ ] C1-PC/C1-TN cùng position, hội tụ C2.
-- [ ] C2-C3 same-position transition hợp lệ.
-- [ ] C5 là target thật.
-- [ ] Không trộn probation/PT-FT với grade.
-- [ ] Không tự tăng bậc/lương.
-- [ ] Migration preview/checksum hoạt động.
-- [ ] RLS fail-closed và Postgres local idempotent.
-- [ ] Một click tạo toàn bộ map/profile/rule.
-- [ ] Promotion Hub và Master Data dùng mô hình mới.
-- [ ] KPI tests, ESLint scope, TypeScript, build pass.
-- [ ] ai:ready pass hoặc blocker ngoài scope được ghi rõ.
-- [ ] CODEMAP và KNOWN_ISSUES cập nhật.
-- [ ] Không có thay đổi ngoài scope trong commit.
+- [x] Task 1-14 và Task 9B hoàn thành.
+- [x] C1-PC/C1-TN cùng position, hội tụ C2.
+- [x] C2-C3 same-position transition hợp lệ.
+- [x] C5 là target thật.
+- [x] Không trộn probation/PT-FT với grade.
+- [x] Không tự tăng bậc/lương.
+- [x] Migration preview/checksum hoạt động.
+- [x] RLS fail-closed và Postgres local idempotent.
+- [x] Một click tạo toàn bộ map/profile/rule.
+- [x] Promotion Hub và Master Data dùng mô hình mới.
+- [x] KPI tests, ESLint scope, TypeScript, build pass.
+- [x] ai:ready pass hoặc blocker ngoài scope được ghi rõ.
+- [x] CODEMAP và KNOWN_ISSUES cập nhật.
+- [x] Không có thay đổi ngoài scope trong commit.
 
 ---
 

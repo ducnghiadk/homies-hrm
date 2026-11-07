@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Homies iPOS Bridge</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-box">
+        <span class="logo-icon">🧋</span>
+        <div>
+          <h1 class="title">Homies iPOS Bridge</h1>
+          <p class="subtitle">Đồng bộ tự động iPOS HRM sang Homies</p>
+        </div>
+      </div>
+      <div id="status-pill" class="status-pill status-checking">
+        <span class="dot"></span>
+        <span id="status-text">Đang kết nối...</span>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="content">
+      <!-- Cấu hình máy chủ -->
+      <section class="card">
+        <label for="server-url-input" class="label">Địa chỉ máy chủ Homies HRM</label>
+        <div class="input-group">
+          <input type="text" id="server-url-input" placeholder="http://localhost:3535" value="http://localhost:3535">
+        </div>
+        <div class="button-row">
+          <button id="btn-save-server" class="btn btn-primary">Lưu cài đặt</button>
+          <button id="btn-ping-server" class="btn btn-secondary">Kiểm tra kết nối</button>
+        </div>
+        <p id="msg-save" class="feedback-msg"></p>
+      </section>
+
+      <!-- Hướng dẫn sử dụng nhanh -->
+      <section class="card guide-card">
+        <h2 class="guide-title">💡 Cách sử dụng:</h2>
+        <ol class="guide-steps">
+          <li>Mở trang web <strong>hrm.ipos.vn</strong> hoặc <strong>fabi.ipos.vn</strong>.</li>
+          <li>Đăng nhập và vào trang <em>Bảng chấm công</em>, <em>Bảng lương</em> hoặc <em>Nhân sự</em>.</li>
+          <li>Một thanh thông báo nhỏ màu vàng sẽ tự động hiện ở góc trên: bấm <strong>"Đồng bộ ngay"</strong>.</li>
+        </ol>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>Homies Milk Tea HRM • Manifest V3</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

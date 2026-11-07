@@ -1,16 +1,24 @@
 import { supabase } from '@/lib/supabase'
 import { PAYROLL_PERIOD_STATUS } from '@/lib/payroll/payroll-status'
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const DEFAULT_ORG_ID = 'a0000000-0000-0000-0000-000000000001'
+
+function resolveOrgId(customOrgId?: string): string {
+  if (customOrgId && UUID_PATTERN.test(customOrgId)) return customOrgId
+  return DEFAULT_ORG_ID
+}
+
 export const payrollPeriodAdapter = {
-  async fetchPayrollPeriod(thang: number, nam: number) {
+  async fetchPayrollPeriod(thang: number, nam: number, orgId?: string) {
     try {
+      const activeOrgId = resolveOrgId(orgId)
       const { data, error } = await supabase
         .from('ky_luong')
         .select('*')
         .eq('thang', thang)
         .eq('nam', nam)
-        // Hardcoded to_chuc_id for now as in master-data-adapter
-        .eq('to_chuc_id', 'a0000000-0000-0000-0000-000000000001')
+        .eq('to_chuc_id', activeOrgId)
         .maybeSingle()
 
       if (error) {
@@ -24,11 +32,12 @@ export const payrollPeriodAdapter = {
     }
   },
 
-  async savePayrollPeriod(thang: number, nam: number, results: any[], policySnapshot: any) {
+  async savePayrollPeriod(thang: number, nam: number, results: any[], policySnapshot: any, orgId?: string) {
     try {
+      const activeOrgId = resolveOrgId(orgId)
       // 1. Upsert ky_luong
       const kyLuongPayload = {
-        to_chuc_id: 'a0000000-0000-0000-0000-000000000001',
+        to_chuc_id: activeOrgId,
         thang,
         nam,
         trang_thai: PAYROLL_PERIOD_STATUS.CONFIRMED,
@@ -112,5 +121,27 @@ export const payrollPeriodAdapter = {
       console.error('[payrollPeriodAdapter] Exception fetching payroll slips:', err)
       return []
     }
+  },
+
+  async unlockPayrollPeriod(thang: number, nam: number, orgId?: string) {
+    try {
+      const activeOrgId = resolveOrgId(orgId)
+      const { error } = await supabase
+        .from('ky_luong')
+        .update({ trang_thai: PAYROLL_PERIOD_STATUS.DRAFT })
+        .eq('thang', thang)
+        .eq('nam', nam)
+        .eq('to_chuc_id', activeOrgId)
+
+      if (error) {
+        console.error('[payrollPeriodAdapter] Error unlocking ky_luong:', error)
+        return { success: false, error: error.message }
+      }
+      return { success: true }
+    } catch (err) {
+      console.error('[payrollPeriodAdapter] Exception unlocking payroll period:', err)
+      return { success: false, error: String(err) }
+    }
   }
 }
+

@@ -61,7 +61,7 @@ export default function Header() {
   }
 
   const showMobileMenuBtn = user && user.role !== 'employee' && user.role !== 'shift_leader'
-  const isLargeLayout = user.role === 'ceo' || user.role === 'hr_admin'
+  const isLargeLayout = user.role === 'ceo' || user.role === 'hr_admin' || user.role === 'store_manager' || user.role === 'area_manager'
   const headerMaxWidthClass = isLargeLayout ? 'w-full' : 'max-w-[1440px]'
 
   return (

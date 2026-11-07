@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth-store'
+import { useAuthStore, getStoredAuthUser } from '@/store/auth-store'
 import { usePermissions } from '@/hooks/usePermissions'
 import { type Permission, ROLE_LABELS } from '@/lib/rbac'
 import { Card } from '@/components/ui/Card'
@@ -73,7 +73,7 @@ function AccessDenied({
     }
     return {
       title: '🚫 Truy cập bị từ chối',
-      message: 'Bạn không có quyền truy cập trang này.',
+      message: 'Bạn không có quyền truy cập trang này. Vui lòng liên hệ Quản lý nếu cần hỗ trợ!',
       icon: ShieldX,
     }
   }
@@ -157,19 +157,24 @@ export function ProtectedRoute({
   const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore()
   const { role, can, canAll, canAny, isRole } = usePermissions()
 
+  const fallbackUser = typeof window !== 'undefined' ? getStoredAuthUser() : null
+  const effectiveUser = user || fallbackUser
+  const hasAuthCookie = typeof document !== 'undefined' && document.cookie.includes('hrm-auth=1')
+  const effectiveAuth = isAuthenticated || Boolean(fallbackUser) || hasAuthCookie
+
   useEffect(() => {
-    if (hasHydrated && !isLoading && (!isAuthenticated || !user)) {
+    if (hasHydrated && !isLoading && !effectiveAuth && !effectiveUser) {
       router.push('/login')
     }
-  }, [hasHydrated, isAuthenticated, isLoading, router, user])
+  }, [hasHydrated, isLoading, effectiveAuth, effectiveUser, router])
 
-  // Show loading while checking auth
-  if (!hasHydrated || isLoading) {
+  // Show loading while checking auth ONLY if really no session found
+  if ((!hasHydrated && !effectiveUser && !hasAuthCookie) || isLoading) {
     return <RouteLoading />
   }
 
   // Not authenticated - redirect to login
-  if (!isAuthenticated || !user) {
+  if (!effectiveAuth && !effectiveUser) {
     return <RouteLoading />
   }
 
@@ -206,7 +211,7 @@ export function ProtectedRoute({
   }
 
   // Log access attempt
-  console.log(`[RBAC] Route access: ${hasAccess ? '✅' : '❌'} ${deniedReason || '(OK)'} | User: ${user.full_name} (${role})`)
+  console.log(`[RBAC] Route access: ${hasAccess ? '✅' : '❌'} ${deniedReason || '(OK)'} | User: ${effectiveUser?.full_name || 'Người dùng'} (${role})`)
 
   // Show fallback if provided
   if (!hasAccess && fallback) {

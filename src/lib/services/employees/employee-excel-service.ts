@@ -20,8 +20,11 @@ export const EMPLOYEE_EXCEL_HEADERS = [
   'Chức vụ',
   'Bộ phận',
   'Loại nhân viên',
+  'Loại hình làm việc',
   'Loại hợp đồng',
   'Mức lương',
+  'Lương theo giờ (VNĐ/giờ)',
+  'Lương cơ bản tháng (VNĐ/tháng)',
   'Ngân hàng',
   'Số tài khoản ngân hàng',
   'Địa chỉ thường trú',
@@ -218,11 +221,21 @@ const HEADER_SYNONYMS: Record<string, EmployeeExcelHeader> = {
   'bo phan': 'Bộ phận',
   'phong ban': 'Bộ phận',
   'loai nhan vien': 'Loại nhân viên',
-  'hinh thuc lam viec': 'Loại nhân viên',
+  'loai hinh lam viec': 'Loại hình làm việc',
+  'hinh thuc lam viec': 'Loại hình làm việc',
   'loai hop dong': 'Loại hợp đồng',
   'muc luong': 'Mức lương',
   'luong': 'Mức lương',
-  'luong co ban': 'Mức lương',
+  'luong theo gio': 'Lương theo giờ (VNĐ/giờ)',
+  'luong theo gio (vnd/gio)': 'Lương theo giờ (VNĐ/giờ)',
+  'luong gio': 'Lương theo giờ (VNĐ/giờ)',
+  'hourly rate': 'Lương theo giờ (VNĐ/giờ)',
+  'luong co ban': 'Lương cơ bản tháng (VNĐ/tháng)',
+  'luong co ban thang': 'Lương cơ bản tháng (VNĐ/tháng)',
+  'luong co ban thang (vnd/thang)': 'Lương cơ bản tháng (VNĐ/tháng)',
+  'luong thang': 'Lương cơ bản tháng (VNĐ/tháng)',
+  'luong cung': 'Lương cơ bản tháng (VNĐ/tháng)',
+  'base salary': 'Lương cơ bản tháng (VNĐ/tháng)',
   'ngan hang': 'Ngân hàng',
   'so tai khoan ngan hang': 'Số tài khoản ngân hàng',
   'stk': 'Số tài khoản ngân hàng',
@@ -584,11 +597,22 @@ export function buildEmployeeImportPreview(
     const positionResolution = resolvePosition(row['Chức vụ'])
     const { positionId, role } = positionResolution
     const resignationDateRaw = trimValue(row['Ngày nghỉ việc'])
-    const status = resignationDateRaw && resignationDateRaw !== '-' ? 'resigned' : 'active'
-    const salary = parseCurrency(row['Mức lương'])
-    const rawSalary = trimValue(row['Mức lương'])
-    const rawEmploymentType = trimValue(row['Loại nhân viên'])
-    const employmentType = parseEmploymentType(row['Loại nhân viên'])
+    const status: AuthUser['status'] = resignationDateRaw ? 'resigned' : 'active'
+    const rawHourlyRate = trimValue(row['Lương theo giờ (VNĐ/giờ)'])
+    const rawMonthlySalary = trimValue(row['Lương cơ bản tháng (VNĐ/tháng)']) || trimValue(row['Mức lương'])
+    const hourlyRate = parseCurrency(row['Lương theo giờ (VNĐ/giờ)'])
+    const monthlySalary = parseCurrency(row['Lương cơ bản tháng (VNĐ/tháng)'] || row['Mức lương'])
+    const rawEmploymentType = trimValue(row['Loại hình làm việc']) || trimValue(row['Loại nhân viên'])
+    const employmentType = parseEmploymentType(rawEmploymentType)
+
+    // Xác định chế độ lương F&B: Part-time tính theo giờ, Full-time tính theo tháng
+    const isPartTime = employmentType === 'part_time' || ((hourlyRate ?? 0) > 0 && (!monthlySalary || monthlySalary < 100000))
+    const finalBaseSalary = isPartTime ? 0 : (monthlySalary || 6600000)
+    const finalHourlyRate = isPartTime
+      ? (hourlyRate || ((monthlySalary ?? 0) > 0 && (monthlySalary ?? 0) < 100000 ? monthlySalary! : 20000))
+      : Math.round(finalBaseSalary / 26 / 8)
+    const finalEmploymentType = isPartTime ? 'part_time' : 'full_time'
+
     const errors: string[] = []
     const warnings: string[] = []
 
@@ -610,9 +634,8 @@ export function buildEmployeeImportPreview(
     else if (storeResolution.usedDefault) warnings.push(`Chi nhánh "${storeResolution.rawValue}" không nhận ra, đã gán tạm "${storeResolution.fallbackName || 'Hồ Bá Phấn'}" — cần kiểm tra`)
     if (positionResolution.blankDefault) warnings.push('Chưa có chức vụ, tạm gán Nhân viên (lương 5.000.000)')
     else if (positionResolution.usedDefault) warnings.push(`Chức vụ "${positionResolution.rawValue}" không nhận ra, đã gán tạm "${positionResolution.fallbackName || 'Nhân viên'}" — cần kiểm tra`)
-    if (!rawSalary) warnings.push('Chưa có mức lương, sẽ lưu 0 đồng và bảng lương sẽ ra 0')
-    if (!rawEmploymentType) warnings.push('Chưa khai loại nhân viên, hệ thống tự chọn mặc định — ảnh hưởng cách tính lương')
-    else if (!employmentType) warnings.push(`Loại nhân viên "${rawEmploymentType}" không nhận ra, hệ thống tự chọn mặc định — ảnh hưởng cách tính lương`)
+    if (!rawHourlyRate && !rawMonthlySalary) warnings.push('Chưa có mức lương (giờ/tháng), cần kiểm tra')
+    if (!rawEmploymentType) warnings.push('Chưa khai loại nhân viên, hệ thống tự chọn mặc định theo mức lương')
 
     if (phone && seenPhones.has(phone)) errors.push('Số điện thoại bị trùng lặp trong cùng file Excel')
     if (email && seenEmails.has(email.toLowerCase())) errors.push('Email bị trùng lặp trong cùng file Excel')
@@ -634,8 +657,10 @@ export function buildEmployeeImportPreview(
       status,
       account_status: status === 'resigned' ? 'bi_khoa' : 'dang_hoat_dong',
       department_name: trimValue(row['Bộ phận']) || undefined,
-      employee_type: employmentType || (rawEmploymentType ? ('unknown' as EmploymentType) : undefined),
-      official_salary: rawSalary ? salary : undefined,
+      employee_type: finalEmploymentType as EmploymentType,
+      base_salary: finalBaseSalary,
+      hourly_rate: finalHourlyRate,
+      official_salary: isPartTime ? finalHourlyRate : finalBaseSalary,
       address: trimValue(row['Địa chỉ hiện tại']) || trimValue(row['Địa chỉ thường trú']) || undefined,
       emergency_contact: normalizePhone(row['Số điện thoại khẩn cấp']) || undefined,
       cccd: trimValue(row['Căn cước công dân']) || undefined,
@@ -691,8 +716,11 @@ export function buildEmployeeExportRows(employees: AuthUser[]) {
       'Chức vụ': position?.name || employee.position_id || '',
       'Bộ phận': employee.department_name || 'Nhân sự cửa hàng',
       'Loại nhân viên': mapEmploymentTypeLabel(employee.employee_type),
+      'Loại hình làm việc': mapEmploymentTypeLabel(employee.employee_type),
       'Loại hợp đồng': employee.status === 'probation' ? 'Thử việc' : 'Chính thức',
       'Mức lương': employee.official_salary ? String(employee.official_salary) : '',
+      'Lương theo giờ (VNĐ/giờ)': employee.hourly_rate ? String(employee.hourly_rate) : '',
+      'Lương cơ bản tháng (VNĐ/tháng)': employee.base_salary ? String(employee.base_salary) : '',
       'Ngân hàng': '',
       'Số tài khoản ngân hàng': '',
       'Địa chỉ thường trú': employee.address || '',
@@ -720,24 +748,27 @@ export async function downloadEmployeeWorkbook(rows: EmployeeExcelRow[], fileNam
 }
 
 export async function exportEmployeeTemplateSpreadsheet() {
-  const sampleRow: EmployeeExcelRow = {
+  const sampleFullTime: EmployeeExcelRow = {
     STT: '1',
-    'Mã nhân viên': 'BH-020',
-    'Nhân viên': 'Nguyễn Văn Mẫu',
+    'Mã nhân viên': 'NV0027',
+    'Nhân viên': 'Trần Công Huy',
     'Ngày sinh': '15/05/2000',
     'Giới tính': 'Nam',
-    Email: 'nguyenvanmau@gmail.com',
-    Level: 'Nhân viên',
+    Email: 'huy@bobahouse.vn',
+    Level: 'Quản lý',
     'Số điện thoại': '0901234888',
     'Ngày gia nhập công ty': '01/01/2026',
     'Ngày gia nhập chi nhánh': '01/01/2026',
     'Ngày gia nhập chi nhánh chính thức': '01/01/2026',
-    'Chi nhánh': 'Hồ Bá Phấn',
-    'Chức vụ': 'Nhân viên',
+    'Chi nhánh': 'Đường 429',
+    'Chức vụ': 'Quản lý',
     'Bộ phận': 'Vận hành cửa hàng',
     'Loại nhân viên': 'Toàn thời gian',
+    'Loại hình làm việc': 'Toàn thời gian',
     'Loại hợp đồng': 'Chính thức',
-    'Mức lương': '6000000',
+    'Mức lương': '6600000',
+    'Lương theo giờ (VNĐ/giờ)': '',
+    'Lương cơ bản tháng (VNĐ/tháng)': '6600000',
     'Ngân hàng': 'Vietcombank',
     'Số tài khoản ngân hàng': '1234567890',
     'Địa chỉ thường trú': 'TP.HCM',
@@ -752,7 +783,44 @@ export async function exportEmployeeTemplateSpreadsheet() {
     'Ngày nghỉ việc': '',
     'Lý do nghỉ việc': '',
   }
-  await downloadEmployeeWorkbook([sampleRow], 'Mau_nhap_nhan_su_Homies.xlsx')
+
+  const samplePartTime: EmployeeExcelRow = {
+    STT: '2',
+    'Mã nhân viên': 'BH-9852',
+    'Nhân viên': 'Huỳnh Lê Kiều Linh',
+    'Ngày sinh': '20/08/2002',
+    'Giới tính': 'Nữ',
+    Email: 'linh@bobahouse.vn',
+    Level: 'Quản lý',
+    'Số điện thoại': '0779554540',
+    'Ngày gia nhập công ty': '10/05/2024',
+    'Ngày gia nhập chi nhánh': '10/05/2024',
+    'Ngày gia nhập chi nhánh chính thức': '10/05/2024',
+    'Chi nhánh': 'Hồ Bá Phấn',
+    'Chức vụ': 'Quản lý',
+    'Bộ phận': 'Quản lý cửa hàng',
+    'Loại nhân viên': 'Bán thời gian',
+    'Loại hình làm việc': 'Bán thời gian',
+    'Loại hợp đồng': 'Thời vụ',
+    'Mức lương': '25000',
+    'Lương theo giờ (VNĐ/giờ)': '25000',
+    'Lương cơ bản tháng (VNĐ/tháng)': '0',
+    'Ngân hàng': 'MB Bank',
+    'Số tài khoản ngân hàng': '9876543210',
+    'Địa chỉ thường trú': 'TP.HCM',
+    'Địa chỉ hiện tại': 'TP.HCM',
+    'Số điện thoại khẩn cấp': '0908888777',
+    'Tình trạng hôn nhân': 'Độc thân',
+    'Dân tộc': 'Kinh',
+    'Tôn giáo': 'Không',
+    'Căn cước công dân': '079987654321',
+    'Ngày cấp CCCD': '15/06/2021',
+    'Mã số thuế': '',
+    'Ngày nghỉ việc': '',
+    'Lý do nghỉ việc': '',
+  }
+
+  await downloadEmployeeWorkbook([sampleFullTime, samplePartTime], 'Mau_nhap_nhan_su_Homies.xlsx')
 }
 
 function mapEmploymentTypeLabel(value?: EmploymentType) {

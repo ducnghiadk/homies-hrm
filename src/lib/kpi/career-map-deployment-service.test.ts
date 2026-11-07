@@ -115,14 +115,14 @@ describe('career map deployment service', () => {
     assert.equal(submitted.status, 'pending_approval')
 
     assert.throws(
-      () => publishCareerMap(submitted, { id: 'hr_01', role: 'hr_admin' }, '2026-09-01', fixture.profiles, validationContext(fixture)),
+      () => publishCareerMap(submitted, { id: 'hr_01', role: 'hr_admin' }, '2026-10-01', fixture.profiles, validationContext(fixture)),
       /Chỉ CEO mới có quyền ban hành/
     )
 
-    const published = publishCareerMap(submitted, { id: 'ceo_01', role: 'ceo' }, '2026-09-01', fixture.profiles, validationContext(fixture))
+    const published = publishCareerMap(submitted, { id: 'ceo_01', role: 'ceo' }, '2026-10-01', fixture.profiles, validationContext(fixture))
     assert.equal(published.status, 'published')
     assert.equal(published.approved_by, 'ceo_01')
-    assert.equal(published.effective_from, '2026-09-01')
+    assert.equal(published.effective_from, '2026-10-01')
   })
 
   it('allows CEO to return draft with a clear reason', () => {
@@ -140,7 +140,7 @@ describe('career map deployment service', () => {
   it('keeps an immutable published snapshot when master position changes', () => {
     const fixture = createSampleMap()
     const submitted = submitCareerMapForApproval(fixture.map, { id: 'hr_01', role: 'hr_admin' }, fixture.profiles, validationContext(fixture))
-    const published = publishCareerMap(submitted, { id: 'ceo_01', role: 'ceo' }, '2026-09-01', fixture.profiles, validationContext(fixture))
+    const published = publishCareerMap(submitted, { id: 'ceo_01', role: 'ceo' }, '2026-10-01', fixture.profiles, validationContext(fixture))
 
     fixture.positions[0].name = 'Tên vị trí đã đổi'
     assert.equal(published.nodes[0].position_name_snapshot, 'Pha chế C1')
@@ -150,7 +150,7 @@ describe('career map deployment service', () => {
   it('clones a published map as a next draft version', () => {
     const fixture = createSampleMap()
     const submitted = submitCareerMapForApproval(fixture.map, { id: 'hr_01', role: 'hr_admin' }, fixture.profiles, validationContext(fixture))
-    const published = publishCareerMap(submitted, { id: 'ceo_01', role: 'ceo' }, '2026-09-01', fixture.profiles, validationContext(fixture))
+    const published = publishCareerMap(submitted, { id: 'ceo_01', role: 'ceo' }, '2026-10-01', fixture.profiles, validationContext(fixture))
 
     const nextDraft = clonePublishedCareerMapAsDraft(published, 'hr_02')
     assert.equal(nextDraft.status, 'draft')

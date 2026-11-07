@@ -24,7 +24,7 @@ export default function BottomNav() {
         { href: '/', icon: Home, label: 'Trang chủ' },
         { href: '/my-schedule', icon: Calendar, label: 'Lịch làm' },
         { href: '/leave', icon: CalendarOff, label: 'Nghỉ phép' },
-        { href: '/payroll', icon: Wallet, label: 'Lương' },
+        { href: '/payroll/salary-slip', icon: Wallet, label: 'Phiếu lương' },
         { href: '/profile', icon: User, label: 'Tôi' },
       ]
     : role === 'shift_leader'

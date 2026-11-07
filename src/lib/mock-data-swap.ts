@@ -7,7 +7,8 @@ import {
   type Schedule, type Employee,
   saveSchedulesToStorage,
 } from './mock-data'
-import { ShiftTemplateService } from '@/lib/services/shift-template-service'
+import { ShiftTemplateService } from '@/lib/services/scheduling/shift-template-service'
+import { EmployeeService } from '@/lib/services/employees/employee-service'
 
 export interface SwapEvent {
   event: 'created' | 'target_accepted' | 'target_rejected' | 'requester_cancelled' | 'manager_approved' | 'manager_rejected'
@@ -40,8 +41,6 @@ export type SwapRequestStateMeta = {
   detail: string
   tone: string
 }
-
-let swapCounter = 100
 
 export function getSwapRequestStateMeta(request: ShiftSwapRequest): SwapRequestStateMeta {
   if (request.status === 'pending') {
@@ -109,16 +108,16 @@ export function getInitialSwapRequests(): ShiftSwapRequest[] {
 
 // ─── CRUD ───
 
-export function createSwapRequest(
+export async function createSwapRequest(
   requesterId: string,
   requesterScheduleId: string,
   targetUserId: string,
   targetScheduleId: string | undefined,
   type: 'swap' | 'cover',
   reason: string,
-): ShiftSwapRequest {
-  const reqUser = mockEmployees.find(e => e.id === requesterId)
-  const targetUser = mockEmployees.find(e => e.id === targetUserId)
+): Promise<ShiftSwapRequest> {
+  const reqUser = EmployeeService.getEmployeeById(requesterId) || mockEmployees.find(e => e.id === requesterId)
+  const targetUser = EmployeeService.getEmployeeById(targetUserId) || mockEmployees.find(e => e.id === targetUserId)
   const requesterSchedule = mockSchedules.find(schedule => schedule.id === requesterScheduleId)
   const targetSchedule = targetScheduleId
     ? mockSchedules.find(schedule => schedule.id === targetScheduleId)
@@ -145,9 +144,10 @@ export function createSwapRequest(
   }
 
   const reqUserName = reqUser ? reqUser.full_name : 'Requester'
+  const newId = `swap-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
 
   const req: ShiftSwapRequest = {
-    id: `swap-${swapCounter++}`,
+    id: newId,
     requester_id: requesterId,
     requester_schedule_id: requesterScheduleId,
     target_user_id: targetUserId,
@@ -166,7 +166,43 @@ export function createSwapRequest(
       }
     ]
   }
-  
+
+  // 1. Gọi trực tiếp POST /api/requests lên máy chủ với type "shift_swap"
+  if (typeof window !== 'undefined') {
+    const shiftDesc = type === 'swap' 
+      ? `Đổi ca ngày ${requesterSchedule.date} với ${targetUser.full_name}`
+      : `Nhờ ${targetUser.full_name} gánh ca ngày ${requesterSchedule.date}`
+
+    const res = await fetch('/api/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: newId,
+        employee_id: requesterId,
+        employee_name: reqUserName,
+        store_id: reqUser.store_id,
+        type: 'shift_swap',
+        title: shiftDesc,
+        reason: reason,
+        date: requesterSchedule.date,
+        status: 'PENDING',
+        notes: JSON.stringify({
+          requesterScheduleId,
+          targetUserId,
+          targetScheduleId,
+          swapType: type,
+          targetUserName: targetUser.full_name,
+        }),
+      }),
+    })
+
+    const resJson = await res.json()
+    if (!res.ok || !resJson?.success) {
+      throw new Error(resJson?.error || 'Không thể tạo đơn đổi ca trên máy chủ.')
+    }
+  }
+
+  // 2. Lưu đồng thời vào bộ nhớ cục bộ để tương thích tức thời
   const current = getInitialSwapRequests()
   current.push(req)
   saveSwapRequests(current)

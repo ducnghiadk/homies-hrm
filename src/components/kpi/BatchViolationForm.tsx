@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { mockEmployees } from '@/lib/mock-data'
 import { getViolationTypes } from '@/lib/mock-data-kpi'
-import { logViolation } from '@/lib/violation-service'
+import { kpiBscSyncService } from '@/lib/services/kpi-bsc-sync-service'
 import { toast } from 'sonner'
 import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ViolationSeverity } from '@/lib/kpi-types'
@@ -43,6 +43,7 @@ export default function BatchViolationForm({ storeId, loggedBy }: Props) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [addingFor, setAddingFor] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const violationTypes = useMemo(() => getViolationTypes(), [])
   const storeEmployees = useMemo(() =>
@@ -81,25 +82,42 @@ export default function BatchViolationForm({ storeId, loggedBy }: Props) {
     ))
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    setIsSubmitting(true)
     let count = 0
-    entries.forEach(entry => {
-      entry.violations.forEach(v => {
-        logViolation({
-          employee_id: entry.employee_id,
-          store_id: storeId,
-          violation_type_id: v.violation_type_id,
-          logged_by: loggedBy,
-          logged_by_role: 'manager',
-          log_mode: 'end_of_month',
-          occurred_at: `${date}T${shift === 'morning' ? '08' : shift === 'afternoon' ? '16' : '20'}:00:00Z`,
-          description: v.description || violationTypes.find(vt => vt.id === v.violation_type_id)?.name || '',
-        })
-        count++
-      })
-    })
-    toast.success(`✅ Đã ghi nhận ${count} lỗi cho ${affectedCount} nhân viên`)
-    setSubmitted(true)
+    try {
+      for (const entry of entries) {
+        for (const v of entry.violations) {
+          const vType = violationTypes.find((vt) => vt.id === v.violation_type_id)
+          await kpiBscSyncService.logIncident({
+            employee_id: entry.employee_id,
+            employee_name: entry.name,
+            store_id: storeId,
+            period: date.slice(0, 7),
+            occurred_at: `${date}T${shift === 'morning' ? '08' : shift === 'afternoon' ? '16' : '20'}:00:00Z`,
+            shift_name:
+              shift === 'morning'
+                ? 'Ca sáng (6:00-14:00)'
+                : shift === 'afternoon'
+                ? 'Ca chiều (14:00-22:00)'
+                : 'Ca tối (18:00-23:00)',
+            violation_code: v.violation_type_id,
+            description: v.description || vType?.name || 'Ghi nhận sự cố vi phạm ca',
+            penalty_points: vType?.penalty_points ?? 5,
+            severity: vType?.severity || 'minor',
+            logged_by: loggedBy,
+            logged_by_role: 'manager',
+          })
+          count++
+        }
+      }
+      toast.success(`✅ Đã ghi nhận ${count} lỗi cho ${affectedCount} nhân viên (đồng bộ KPI & BSC)`)
+      setSubmitted(true)
+    } catch (err) {
+      toast.error('Không thể lưu hồ sơ lỗi: ' + (err instanceof Error ? err.message : 'Vui lòng thử lại'))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (submitted) {
@@ -212,10 +230,10 @@ export default function BatchViolationForm({ storeId, loggedBy }: Props) {
           onClick={() => setEntries(prev => prev.map(e => ({ ...e, violations: [] })))}>
           Hủy
         </button>
-        <button disabled={totalViolations === 0} onClick={handleSubmit}
-          className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
+        <button disabled={totalViolations === 0 || isSubmitting} onClick={handleSubmit}
+          className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 cursor-pointer"
           style={{ background: 'var(--primary)' }}>
-          Xác nhận & Gửi tất cả
+          {isSubmitting ? 'Đang lưu vào KPI & BSC...' : 'Xác nhận & Gửi tất cả'}
         </button>
       </div>
     </div>

@@ -81,11 +81,11 @@ const RULE_METADATA: Record<RuleKey, {
     category: 'overtime',
   },
   max_daily_hours: {
-    label: 'Số giờ làm tối đa trong 1 ngày',
-    description: 'Giới hạn số giờ nhân viên làm việc trong cùng 1 ngày (tránh xếp làm 2 ca liên tiếp quá dài).',
+    label: 'Định mức làm việc ngày (8.5h)',
+    description: 'Kiểm soát tổng giờ nhân viên làm việc trong ngày theo định mức 8.5h của chuỗi Homies.',
     warnUnit: 'giờ / ngày (cảnh báo)',
     blockUnit: 'giờ / ngày (chặn)',
-    hint: 'Đảm bảo nhân viên không bị kiệt sức trong ca làm việc.',
+    hint: 'Mặc định cảnh báo vàng khi > 8.5h. Có thể bật chế độ chặn đỏ để cấm xếp vượt định mức.',
     category: 'overtime',
   },
   max_consecutive_days: {
@@ -333,6 +333,122 @@ function ScheduleRulesContent() {
         {activeTab === 'rules' && (
           <div className="space-y-4">
             
+            {/* Quick Admin Control: Định mức 8.5h/ngày (Bộ 3 nút Tắt / Cảnh báo Vàng / Khóa cứng Đỏ) */}
+            {(() => {
+              const dailyRule = scheduleRules.find(r => r.rule_key === 'max_daily_hours')
+              if (!dailyRule) return null
+
+              const mode: 'off' | 'warning' | 'block' = !dailyRule.is_active
+                ? 'off'
+                : dailyRule.warning_level === 'block'
+                  ? 'block'
+                  : 'warning'
+
+              const handleSetMode = async (newMode: 'off' | 'warning' | 'block') => {
+                if (newMode === 'off') {
+                  await scheduleRulesAdapter.updateRule('max_daily_hours', {
+                    is_active: false,
+                  })
+                  showToast('Đã tắt kiểm tra định mức 8.5h/ngày')
+                } else if (newMode === 'warning') {
+                  await scheduleRulesAdapter.updateRule('max_daily_hours', {
+                    is_active: true,
+                    warning_level: 'warning',
+                    warning_value: 8.5,
+                    block_value: 8.5,
+                  })
+                  showToast('Đã bật Cảnh báo Vàng (> 8.5h/ngày) - Mặc định')
+                } else {
+                  await scheduleRulesAdapter.updateRule('max_daily_hours', {
+                    is_active: true,
+                    warning_level: 'block',
+                    warning_value: 8.5,
+                    block_value: 8.5,
+                  })
+                  showToast('Đã bật Khóa cứng Đỏ - Cấm xếp ca vượt 8.5h/ngày')
+                }
+                setRefreshKey(k => k + 1)
+              }
+
+              return (
+                <div className="rounded-2xl border border-amber-200/90 bg-gradient-to-r from-amber-50/90 via-orange-50/40 to-white p-4.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className={`p-3 rounded-2xl shrink-0 ${
+                      mode === 'block'
+                        ? 'bg-red-100 text-red-700 ring-2 ring-red-200'
+                        : mode === 'warning'
+                          ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-200'
+                          : 'bg-gray-100 text-gray-600 ring-2 ring-gray-200'
+                    }`}>
+                      {mode === 'block' ? <AlertOctagon size={22} /> : mode === 'warning' ? <Clock size={22} /> : <AlertTriangle size={22} />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="text-sm font-extrabold text-gray-900">
+                          Định mức làm việc tối đa 8.5h / ngày
+                        </span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
+                          mode === 'block'
+                            ? 'bg-red-100 text-red-800 border border-red-200'
+                            : mode === 'warning'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-gray-100 text-gray-700 border border-gray-200'
+                        }`}>
+                          {mode === 'block'
+                            ? '🛑 Đang KHÓA CỨNG ĐỎ (> 8.5h)'
+                            : mode === 'warning'
+                              ? '⚠️ Đang CẢNH BÁO VÀNG (> 8.5h - Mặc định)'
+                              : '⚪ Đang TẮT (Không kiểm tra)'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1 max-w-2xl leading-relaxed">
+                        Thực tế chuỗi Homies có các ca kép lên tới 8.5h. Mặc định hệ thống bật <strong>Cảnh báo Vàng</strong> để Quản lý linh động xử lý tình huống thiếu người. Chọn <strong>Khóa cứng Đỏ</strong> để cấm tuyệt đối không cho xếp vượt 8.5h, hoặc <strong>Tắt</strong> nếu không cần kiểm tra.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Bộ 3 nút chọn linh hoạt */}
+                  <div className="flex items-center gap-1.5 shrink-0 self-end md:self-center bg-white/90 p-1.5 rounded-2xl border border-gray-200/90 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => handleSetMode('off')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        mode === 'off'
+                          ? 'bg-gray-700 text-white shadow-xs'
+                          : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                      }`}
+                    >
+                      Tắt (Off)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetMode('warning')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                        mode === 'warning'
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-amber-700 hover:bg-amber-50'
+                      }`}
+                    >
+                      <Clock size={12} />
+                      <span>Cảnh báo Vàng</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetMode('block')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                        mode === 'block'
+                          ? 'bg-red-600 text-white shadow-xs'
+                          : 'text-red-700 hover:bg-red-50'
+                      }`}
+                    >
+                      <AlertOctagon size={12} />
+                      <span>Khóa cứng Đỏ</span>
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Top Toolbar: Search, Filter, Stats & View Switcher */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs">
               <div className="flex flex-wrap items-center gap-3">

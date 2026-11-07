@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import { mockStores, mockEmployees, mockPositions, type Employee } from '@/lib/mock-data'
 import { mockPayrollPeriods, formatVND } from '@/lib/mock-data-p4'
-import { calculatePayrollBatchAsync, getPayrollPeriodBounds } from '@/lib/payroll-engine'
+import { calculatePayrollBatchAsync, getPayrollPeriodBounds, parseTimeToHours, type LateIncident } from '@/lib/payroll-engine'
 import { AttendanceService, type PayrollAttendanceRecord } from '@/lib/services/attendance/attendance-service'
 import { getInitials } from '@/lib/utils'
 import { payrollAdapter, storeAdapter, employeeAdapter, MasterDataAdapter } from '@/lib/adapters'
@@ -22,13 +22,29 @@ import {
 } from '@/lib/payroll/payroll-status'
 import { PayrollPaymentModal, type PayrollPaymentBankAccount } from '@/components/payroll/PayrollPaymentModal'
 import type { PayrollPaymentMethod } from '@/lib/payroll-payment-ledger'
-import { fetchRemotePayrollPolicy, saveStoredPayrollPolicy, getStoredPayrollPolicy } from '@/lib/services/payroll-policy-service'
+import { fetchRemotePayrollPolicy, saveStoredPayrollPolicy, getStoredPayrollPolicy, getActivePayrollPolicy } from '@/lib/services/payroll-policy-service'
+import PayrollHourlyRateDrawer, { type HourlyRateDrawerTarget } from '@/components/payroll/PayrollHourlyRateDrawer'
 import {
-  DollarSign, TrendingUp, ChevronDown, ChevronUp, FileText,
+  DollarSign, TrendingUp, ChevronDown, FileText,
   Search, RefreshCw, Download, Building2, Store, PlusCircle, MinusCircle,
   Eye, Send, Plus, MoreHorizontal, X, Calendar, Image as ImageIcon,
-  SlidersHorizontal, CheckSquare, Square, RotateCcw, CreditCard, Lock, Info, AlertTriangle
+  SlidersHorizontal, CheckSquare, Square, RotateCcw, CreditCard, Lock, Unlock, ShieldCheck, Info, AlertTriangle, Clock, Sparkles, ArrowRight, Coins,
+  Printer, ExternalLink, Edit3
 } from 'lucide-react'
+
+function applyNetRounding(net: number, method?: string): number {
+  switch (method) {
+    case 'none':
+      return net
+    case 'round_5000':
+      return Math.round(net / 5000) * 5000
+    case 'round_10000':
+      return Math.round(net / 10000) * 10000
+    case 'round_1000':
+    default:
+      return Math.round(net / 1000) * 1000
+  }
+}
 
 // Column configuration definition for Step 3: Column Visibility Settings
 const DEFAULT_COLUMN_VISIBILITY: Record<string, { label: string; visible: boolean; category: string }> = {
@@ -46,14 +62,16 @@ const DEFAULT_COLUMN_VISIBILITY: Record<string, { label: string; visible: boolea
   regularDays: { label: 'Số công thường', visible: true, category: 'Công & Giờ' },
   otDays: { label: 'Số công tăng ca', visible: true, category: 'Công & Giờ' },
   otSalary: { label: 'Lương tăng ca', visible: true, category: 'Lương & Phụ cấp' },
-  workedSalary: { label: 'Lương theo giờ làm việc', visible: true, category: 'Lương & Phụ cấp' },
+  workedSalary: { label: 'Lương chính (Công/Giờ)', visible: true, category: 'Lương & Phụ cấp' },
   allowances: { label: 'Tổng phụ cấp', visible: true, category: 'Lương & Phụ cấp' },
   bonusTickets: { label: 'Tổng phiếu cộng tiền', visible: true, category: 'Thưởng & Phạt' },
   totalPenalties: { label: 'Tổng phạt', visible: true, category: 'Thưởng & Phạt' },
   deductionTickets: { label: 'Tổng phiếu trừ tiền', visible: true, category: 'Thưởng & Phạt' },
   kpiSalary: { label: 'Lương KPI', visible: true, category: 'Thưởng & Phạt' },
-  unionFee: { label: 'Tiền công đoàn', visible: true, category: 'Khấu trừ khác' },
   grossSalary: { label: 'Tổng lương (GROSS)', visible: true, category: 'Thực nhận' },
+  insurance: { label: 'Bảo hiểm (BHXH, BHYT, BHTN)', visible: true, category: 'Khấu trừ khác' },
+  tax: { label: 'Thuế TNCN', visible: true, category: 'Khấu trừ khác' },
+  unionFee: { label: 'Tiền công đoàn', visible: true, category: 'Khấu trừ khác' },
   returnHoldSalary: { label: 'Hoàn giữ lương', visible: true, category: 'Khấu trừ khác' },
   holdSalary: { label: 'Giữ lương', visible: true, category: 'Khấu trừ khác' },
   advanceSalary: { label: 'Ứng lương', visible: true, category: 'Khấu trừ khác' },
@@ -104,6 +122,8 @@ type PayrollTableRow = {
   baseSalaryFormatted: string
   storeId: string
   storeName: string
+  secondaryStoreIds: string[]
+  secondaryStoreNames: string[]
   totalShifts: number
   totalHours: number
   regularHours: number
@@ -132,6 +152,8 @@ type PayrollTableRow = {
   isResigned: boolean
   pendingShifts: number
   anomalies: { type: string; date?: string; message: string }[]
+  lateCount: number
+  lateIncidents: LateIncident[]
 }
 
 type PayrollRowBankAccount = Omit<PayrollPaymentBankAccount, 'bankCode'> & {
@@ -142,6 +164,60 @@ type PayrollEmployee = Employee & {
   bank_name?: string
   bank_account_no?: string
   bank_account_holder?: string
+  hourly_rate?: number
+}
+
+type ApiSalarySlip = {
+  id: string
+  employee_id: string
+  employee_name?: string
+  employee_code?: string
+  position?: string
+  store_id?: string
+  period: string
+  work_days?: number
+  standard_days?: number
+  base_salary?: number
+  allowances?: number
+  bonus?: number
+  deductions?: number
+  late_deduction?: number
+  net_salary?: number
+  total_hours?: number
+  status?: string
+}
+
+type LegacyPayrollSlip = {
+  nhan_vien_id: string
+  ma_nhan_vien?: string
+  ho_ten?: string
+  loai_nhan_vien?: string
+  bo_phan?: string
+  so_ngay_cong_chuan?: number
+  so_ngay_cong_thuc_te?: number
+  gio_cong_thuc_te?: number
+  so_ca?: number
+  tong_so_gio?: number
+  luong_theo_gio?: number
+  so_gio_tang_ca?: number
+  tien_tang_ca?: number
+  tong_phu_cap?: number
+  tong_phieu_cong?: number
+  tong_phat?: number
+  ung_luong?: number
+  tong_phieu_tru?: number
+  luong_co_ban?: number
+  phu_cap?: number
+  thuong?: number
+  phat?: number
+  khau_tru_di_muon?: number
+  bao_hiem?: number
+  tong_luong?: number
+  luong_thuc_nhan?: number
+  luong_kpi?: number
+  tien_cong_doan?: number
+  giu_luong?: number
+  hoan_giu_luong?: number
 }
 
 // ISSUE-06: Cấu hình hiển thị anomaly theo loại (module-level, không render lại)
@@ -155,9 +231,9 @@ const ANOMALY_CONFIG: Record<string, { label: string; severity: 'error' | 'warni
 
 export default function PayrollPage() {
   const { user, isAuthenticated, hasHydrated } = useAuthStore()
+  const isCeo = Boolean(user && (user.id === 'emp-001' || user.role === 'ceo'))
   const router = useRouter()
-  const [selectedPeriod, setSelectedPeriod] = useState('2026-02')
-  const [expandedSlip, setExpandedSlip] = useState<string|null>(null)
+  const [selectedPeriod, setSelectedPeriod] = useState('2026-08')
   const [tab, setTab] = useState<'table'|'overview'|'payslips'|'my'>('table')
 
   // Table filters
@@ -170,6 +246,7 @@ export default function PayrollPage() {
   const [activeModal, setActiveModal] = useState<'add_bonus' | 'add_deduction' | 'view_slip' | 'view_daily_salary' | 'column_settings' | 'pay_salary' | null>(null)
   const [modalTargetEmp, setModalTargetEmp] = useState<Record<string, unknown> | null>(null)
   const [rowActionMenuEmpId, setRowActionMenuEmpId] = useState<string | null>(null)
+  const [rateDrawerTarget, setRateDrawerTarget] = useState<HourlyRateDrawerTarget | null>(null)
 
   // File Upload Reference for Modal
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -274,9 +351,13 @@ export default function PayrollPage() {
     if (!hasHydrated || !isAuthenticated) return
     let isMounted = true
 
+    const saved = payrollAdapter.getSavedPeriodOverrides(selectedPeriod)
+    setBonusOverrides(saved.bonusOverrides)
+    setDeductionOverrides(saved.deductionOverrides)
+
     payrollAdapter.getPaymentStatuses(selectedPeriod).then(statuses => {
       if (isMounted) {
-        setStatusOverrides(statuses)
+        setStatusOverrides({ ...saved.statusOverrides, ...statuses })
         setStatusPeriod(selectedPeriod)
       }
     })
@@ -296,134 +377,255 @@ export default function PayrollPage() {
     setPayrollError(null)
     setPayrollResults([])
 
-    payrollPeriodAdapter.fetchPayrollPeriod(thang, nam).then(period => {
-      if (!isMounted) return
+    const loadPayrollData = async () => {
+      try {
+        // 1. Ưu tiên đọc trực tiếp phiếu lương đã chốt/tính từ Database máy chủ (/api/payroll)
+        const apiRes = await fetch(`/api/payroll?period=${selectedPeriod}`)
+        if (apiRes.ok) {
+          const apiData = await apiRes.json()
+          if (apiData?.success && Array.isArray(apiData.salary_slips) && apiData.salary_slips.length > 0) {
+            if (!isMounted) return
+            const sourceEmployees: PayrollEmployee[] = employees.length > 0 ? employees : (mockEmployees as PayrollEmployee[])
+            const sourcePositions = positions.length > 0 ? positions : mockPositions
+            const sourceStores = stores.length > 0 ? stores : mockStores
 
-      if (period && !canEditPeriod(period.trang_thai)) {
-        setPayrollPeriodStatus(period.trang_thai as PayrollPeriodStatus)
-        setPolicySource('system')
-        setPolicyInfo({ days: 26, hours: 8 })
-        
-        payrollPeriodAdapter.fetchPayrollSlips(period.id).then(slips => {
-          if (!isMounted) return
-          const mappedResults = slips.map((s: any) => ({
-            employee_id: s.nhan_vien_id,
-            employee_code: '',
-            employee_name: '',
-            is_resigned_employee: false,
-            is_part_time: false,             // slip đã chốt: không phân loại lại
-            position: '',
-            store: '',
-            period: selectedPeriod,
-            standard_days: 26,
-            work_days: s.so_ca || 0,
-            leave_days_paid: 0,
-            leave_days_unpaid: 0,
-            absent_days: 0,
-            late_count: 0,
-            soCaChoDuyet: 0,
-            soCaChuaCheckOut: 0,
-            total_hours: s.tong_so_gio || 0,
-            base_salary: s.luong_co_ban || 0,
-            base_earned: s.luong_theo_gio || 0,
-            overtime_hours: s.so_gio_tang_ca || 0,
-            overtime_amount: s.tien_tang_ca || 0,
-            allowances: [],
-            total_allowances: s.tong_phu_cap || 0,
-            bonuses: [],
-            total_bonuses: s.tong_phieu_cong || 0,
-            fnb_service_charge_pool: 0,
-            fnb_tip_pool: 0,
-            fnb_fnb_share: 0,
-            fnb_allocation_points: 0,
-            fnb_allocation_breakdown: [],
-            total_earnings: s.tong_luong || 0,
-            late_deduction: s.tong_phat || 0,
-            absent_deduction: 0,
-            advance_deduction: s.ung_luong || 0,
-            other_deductions: [],
-            total_other_deductions: s.tong_phieu_tru || 0,
-            total_deductions: (s.tong_phat || 0) + (s.tong_phieu_tru || 0),
-            bhxh: 0,
-            bhyt: 0,
-            bhtn: 0,
-            total_insurance: 0,
-            taxable_income: 0,
-            tax: 0,
-            gross_salary: s.tong_luong || 0,
-            net_salary: s.luong_thuc_nhan || 0,
-            kpi_salary: s.luong_kpi || 0,
-            union_fee: s.tien_cong_doan || 0,
-            hold_salary: s.giu_luong || 0,
-            return_hold_salary: s.hoan_giu_luong || 0,
-          }))
-          setPayrollResults(mappedResults as any)
-          setIsPayrollLoading(false)
-        })
-      } else {
-        setPayrollPeriodStatus(PAYROLL_PERIOD_STATUS.DRAFT)
-        fetchRemotePayrollPolicy().then(dbPolicy => {
-          if (dbPolicy) {
-            saveStoredPayrollPolicy(dbPolicy)
-            if (isMounted) {
-              setPolicyUnavailable(false)
-              setPolicySource('system')
-              setPolicyInfo({ days: dbPolicy.standardDaysPerMonth || 26, hours: dbPolicy.standardHoursPerDay || 8 })
-            }
-            return calculatePayrollBatchAsync(periodStart, periodEnd)
-          } else {
-            if (isMounted) {
-              setPolicyUnavailable(true)
-              setPayrollError('Chưa tải được cấu hình lương, vui lòng thử lại.')
-              setPayrollResults([])
-              setIsPayrollLoading(false)
-            }
-            return null
+            const mappedResults = apiData.salary_slips.map((s: ApiSalarySlip) => {
+              const emp = sourceEmployees.find(e => e.id === s.employee_id) || (mockEmployees.find(e => e.id === s.employee_id) as PayrollEmployee | undefined)
+              const pos = sourcePositions.find(p => p.id === emp?.position_id)
+              const slipStoreId = s.store_id || emp?.store_id || 'store-001'
+              const store = sourceStores.find(st => st.id === slipStoreId)
+              const isPartTime = (s.base_salary === 0 && ((s.total_hours || 0) > 0 || (s.net_salary || 0) > 0)) || emp?.contract_type === 'ban_thoi_gian' || s.position?.includes('pha chế') || s.position?.includes('phục vụ') || false
+              const hourlyRate = (emp as PayrollEmployee)?.hourly_rate || (isPartTime && (s.total_hours || 0) > 0 ? Math.round(((s.net_salary || 0) - (s.bonus || 0)) / (s.total_hours || 1)) : (isPartTime ? 20000 : 0))
+
+              return {
+                employee_id: s.employee_id,
+                employee_code: emp?.employee_code || s.employee_code || '',
+                employee_name: emp?.full_name || s.employee_name || 'Nhân viên',
+                is_resigned_employee: emp?.status === 'inactive',
+                is_part_time: isPartTime,
+                position: s.position || pos?.name || '',
+                store_id: slipStoreId,
+                store: store?.name || '',
+                period: selectedPeriod,
+                standard_days: s.standard_days || 26,
+                work_days: s.work_days || 0,
+                leave_days_paid: 0,
+                leave_days_unpaid: 0,
+                absent_days: 0,
+                late_count: 0,
+                soCaChoDuyet: 0,
+                soCaChuaCheckOut: 0,
+                total_hours: s.total_hours || 0,
+                base_salary: isPartTime ? hourlyRate : (s.base_salary || 0),
+                base_earned: isPartTime ? Math.round((s.total_hours || 0) * hourlyRate) : (s.base_salary || 0),
+                overtime_hours: 0,
+                overtime_amount: 0,
+                allowances: [],
+                total_allowances: s.allowances || 0,
+                bonuses: [],
+                total_bonuses: s.bonus || 0,
+                fnb_service_charge_pool: 0,
+                fnb_tip_pool: 0,
+                fnb_fnb_share: 0,
+                fnb_allocation_points: 0,
+                fnb_allocation_breakdown: [],
+                total_earnings: s.net_salary || 0,
+                late_deduction: 0,
+                absent_deduction: 0,
+                advance_deduction: 0,
+                other_deductions: [],
+                total_other_deductions: s.deductions || 0,
+                total_deductions: s.deductions || 0,
+                bhxh: 0,
+                bhyt: 0,
+                bhtn: 0,
+                total_insurance: 0,
+                taxable_income: 0,
+                tax: 0,
+                gross_salary: s.net_salary || 0,
+                net_salary: s.net_salary || 0,
+                kpi_salary: 0,
+                union_fee: 0,
+                hold_salary: 0,
+                return_hold_salary: 0,
+              }
+            })
+
+            setPayrollPeriodStatus(PAYROLL_PERIOD_STATUS.CONFIRMED)
+            setPolicySource('system')
+            setPolicyInfo({ days: 26, hours: 8 })
+            setPayrollResults(mappedResults as unknown as Awaited<ReturnType<typeof calculatePayrollBatchAsync>>)
+            setIsPayrollLoading(false)
+            return
           }
-        })
-          .then(results => {
-            if (isMounted && results) setPayrollResults(results)
+        }
+      } catch (apiErr) {
+        console.warn('[Payroll] /api/payroll fetch error, falling back to adapter:', apiErr)
+      }
+
+      payrollPeriodAdapter.fetchPayrollPeriod(thang, nam).then(period => {
+        if (!isMounted) return
+
+        if (period && !canEditPeriod(period.trang_thai)) {
+          setPayrollPeriodStatus(period.trang_thai as PayrollPeriodStatus)
+          setPolicySource('system')
+          setPolicyInfo({ days: 26, hours: 8 })
+          
+          payrollPeriodAdapter.fetchPayrollSlips(period.id).then(slips => {
+            const sourceEmployees: PayrollEmployee[] = employees.length > 0 ? employees : (mockEmployees as PayrollEmployee[])
+            const sourcePositions = positions.length > 0 ? positions : mockPositions
+            const sourceStores = stores.length > 0 ? stores : mockStores
+
+            const mappedResults = slips.map((s: LegacyPayrollSlip) => {
+              const emp = sourceEmployees.find(e => e.id === s.nhan_vien_id) || (mockEmployees.find(e => e.id === s.nhan_vien_id) as PayrollEmployee | undefined)
+              const pos = sourcePositions.find(p => p.id === emp?.position_id)
+              const store = sourceStores.find(st => st.id === emp?.store_id)
+              const isPartTime = s.loai_nhan_vien?.includes('Bán thời gian') || emp?.contract_type === 'ban_thoi_gian' || false
+
+              return {
+                employee_id: s.nhan_vien_id,
+                employee_code: emp?.employee_code || s.ma_nhan_vien || '',
+                employee_name: emp?.full_name || s.ho_ten || 'Nhân viên',
+                is_resigned_employee: emp?.status === 'inactive',
+                is_part_time: isPartTime,
+                position: s.bo_phan || pos?.name || '',
+                store: store?.name || '',
+                period: selectedPeriod,
+                standard_days: 26,
+                work_days: s.so_ca || 0,
+                leave_days_paid: 0,
+                leave_days_unpaid: 0,
+                absent_days: 0,
+                late_count: 0,
+                soCaChoDuyet: 0,
+                soCaChuaCheckOut: 0,
+                total_hours: s.tong_so_gio || 0,
+                base_salary: s.luong_co_ban || 0,
+                base_earned: s.luong_theo_gio || 0,
+                overtime_hours: s.so_gio_tang_ca || 0,
+                overtime_amount: s.tien_tang_ca || 0,
+                allowances: [],
+                total_allowances: s.tong_phu_cap || 0,
+                bonuses: [],
+                total_bonuses: s.tong_phieu_cong || 0,
+                fnb_service_charge_pool: 0,
+                fnb_tip_pool: 0,
+                fnb_fnb_share: 0,
+                fnb_allocation_points: 0,
+                fnb_allocation_breakdown: [],
+                total_earnings: s.tong_luong || 0,
+                late_deduction: s.tong_phat || 0,
+                absent_deduction: 0,
+                advance_deduction: s.ung_luong || 0,
+                other_deductions: [],
+                total_other_deductions: s.tong_phieu_tru || 0,
+                total_deductions: (s.tong_phat || 0) + (s.tong_phieu_tru || 0),
+                bhxh: 0,
+                bhyt: 0,
+                bhtn: 0,
+                total_insurance: 0,
+                taxable_income: 0,
+                tax: 0,
+                gross_salary: s.tong_luong || 0,
+                net_salary: s.luong_thuc_nhan || 0,
+                kpi_salary: s.luong_kpi || 0,
+                union_fee: s.tien_cong_doan || 0,
+                hold_salary: s.giu_luong || 0,
+                return_hold_salary: s.hoan_giu_luong || 0,
+              }
+            })
+            setPayrollResults(mappedResults as unknown as Awaited<ReturnType<typeof calculatePayrollBatchAsync>>)
+            setIsPayrollLoading(false)
           })
-          .catch(error => {
-            if (isMounted) {
-              setPayrollError(error instanceof Error ? error.message : 'Không tính được bảng lương.')
-              setPayrollResults([])
+        } else {
+          setPayrollPeriodStatus(PAYROLL_PERIOD_STATUS.DRAFT)
+          fetchRemotePayrollPolicy().then(dbPolicy => {
+            if (dbPolicy) {
+              saveStoredPayrollPolicy(dbPolicy)
+              if (isMounted) {
+                setPolicyUnavailable(false)
+                setPolicySource('system')
+                setPolicyInfo({ days: dbPolicy.standardDaysPerMonth || 26, hours: dbPolicy.standardHoursPerDay || 8 })
+              }
+              return calculatePayrollBatchAsync(periodStart, periodEnd)
+            } else {
+              if (isMounted) {
+                setPolicyUnavailable(true)
+                setPayrollError('Chưa tải được cấu hình lương, vui lòng thử lại.')
+                setPayrollResults([])
+                setIsPayrollLoading(false)
+              }
+              return null
             }
           })
-          .finally(() => {
-            if (isMounted) setIsPayrollLoading(false)
-          })
-      }
-    }).catch(err => {
-      console.error(err)
-      if (isMounted) setIsPayrollLoading(false)
-    })
+            .then(results => {
+              if (isMounted && results) setPayrollResults(results)
+            })
+            .catch(error => {
+              if (isMounted) {
+                setPayrollError(error instanceof Error ? error.message : 'Không tính được bảng lương.')
+                setPayrollResults([])
+              }
+            })
+            .finally(() => {
+              if (isMounted) setIsPayrollLoading(false)
+            })
+        }
+      }).catch(err => {
+        console.error(err)
+        if (isMounted) setIsPayrollLoading(false)
+      })
+    }
+
+    loadPayrollData()
 
     return () => { isMounted = false }
   }, [hasHydrated, isAuthenticated, selectedPeriod, payrollReloadKey])
 
-  // Calculate every displayed payroll value from the same engine result.
+  // Calculate every displayed payroll value from the same engine result with strict role scoping.
   const tableData = useMemo<PayrollTableRow[]>(() => {
-    const results = payrollResults
+    const isGlobalAdmin = Boolean(user && (user.role === 'ceo' || user.role === 'hr_admin'))
+    const isStoreScoped = Boolean(user && (user.role === 'store_manager' || user.role === 'shift_leader'))
 
     const sourceEmployees: PayrollEmployee[] = employees.length > 0 ? employees : (mockEmployees as PayrollEmployee[])
     const sourcePositions = positions.length > 0 ? positions : mockPositions
     const sourceStores = stores.length > 0 ? stores : mockStores
+
+    let results = payrollResults
+    if (isStoreScoped) {
+      // Store managers and shift leaders are strictly scoped to their assigned store(s)
+      // and cannot view executive/CEO or HR Admin payroll data
+      const myStoreId = user?.store_id
+      const allowedStores = new Set([myStoreId, ...(user?.secondary_store_ids || [])].filter(Boolean))
+      results = results.filter(r => {
+        const emp = sourceEmployees.find(e => e.id === r.employee_id) || (mockEmployees.find(e => e.id === r.employee_id) as PayrollEmployee | undefined)
+        if (!emp) return false
+        if (emp.role === 'ceo' || emp.role === 'hr_admin') return false
+        return allowedStores.has(emp.store_id)
+      })
+    } else if (!isGlobalAdmin) {
+      // Regular employee can only view their own payroll entry
+      results = results.filter(r => r.employee_id === user?.id)
+    }
 
     return results.map((res, index) => {
       const emp = sourceEmployees.find(e => e.id === res.employee_id) || (mockEmployees.find(e => e.id === res.employee_id) as PayrollEmployee | undefined)
       if (!emp) return null
 
       const pos = sourcePositions.find(p => p.id === emp.position_id)
-      const store = sourceStores.find(s => s.id === emp.store_id)
+      const rowStoreId = (res as { store_id?: string }).store_id || emp.store_id || 'store-001'
+      const store = sourceStores.find(s => s.id === rowStoreId)
 
       const isHourly = res.is_part_time   // BUG-02 fix: dùng flag từ engine, không dùng magic < 100k
-      const hourlyRate = isHourly ? res.base_salary : Math.round(res.base_salary / 26 / 8)
+      // Guardrail: nếu đơn giá giờ >= 100k (do nhập nhầm lương tháng) thì tự động quy đổi / 26 / 8
+      const hourlyRate = isHourly
+        ? (res.base_salary >= 100000 ? Math.round(res.base_salary / 26 / 8) : res.base_salary)
+        : Math.round(res.base_salary / 26 / 8)
       const baseSalaryFormatted = isHourly
-        ? `${res.base_salary.toLocaleString('vi-VN')}đ/giờ`
+        ? `${hourlyRate.toLocaleString('vi-VN')}đ/giờ`
         : `${res.base_salary.toLocaleString('vi-VN')}đ/tháng`
 
-      const totalShifts = res.work_days
+      const totalShifts = res.total_shifts ?? res.work_days
       const totalHours = Math.round(res.total_hours * 100) / 100
       const otHours = Math.round(res.overtime_hours * 100) / 100
       const regularHours = Math.max(0, Math.round((totalHours - otHours) * 100) / 100)
@@ -438,19 +640,23 @@ export default function PayrollPage() {
 
       const bonusTickets = bonusOverrides[emp.id] !== undefined ? bonusOverrides[emp.id] : res.total_bonuses
 
-      const totalPenalties = res.late_deduction + res.absent_deduction
+      // BUG FIX: Only penalize late check-ins. Absent days are already unpaid in workedSalary (prevents double penalty).
+      const totalPenalties = res.late_deduction
       const deductionTickets = deductionOverrides[emp.id] !== undefined ? deductionOverrides[emp.id] : res.total_other_deductions
 
-      // KPI and union fees have no connected source in the payroll engine yet.
-      const kpiSalary = 0
-      const unionFee = 0
-      const grossSalary = res.gross_salary + (bonusTickets - res.total_bonuses) - (deductionTickets - res.total_other_deductions)
-      const returnHoldSalary = 0
-      const holdSalary = 0
+      const kpiSalary = res.kpi_salary || 0
+      const unionFee = res.union_fee || 0
+      const fnbShare = res.fnb_fnb_share || 0
+      // Standard Gross Salary = Total earnings before statutory & disciplinary deductions
+      const grossSalary = workedSalary + otSalary + allowances + bonusTickets + fnbShare + kpiSalary
+      const returnHoldSalary = res.return_hold_salary || 0
+      const holdSalary = res.hold_salary || 0
       const advanceSalary = res.advance_deduction
 
-      const netSalary = res.net_salary + (bonusTickets - res.total_bonuses) - (deductionTickets - res.total_other_deductions)
-      const roundedNet = Math.round(netSalary / 1000) * 1000
+      // Net Salary = Gross - Insurance - Tax - Penalties - Deduction Tickets - Advance - Hold + ReturnHold - UnionFee
+      const netSalary = grossSalary - res.total_insurance - res.tax - totalPenalties - deductionTickets - advanceSalary - holdSalary + returnHoldSalary - unionFee
+      const netRoundingRule = getActivePayrollPolicy().netRoundingMethod ?? 'round_1000'
+      const roundedNet = applyNetRounding(netSalary, netRoundingRule)
 
       const empType = isHourly ? 'Bán thời gian' : 'Toàn thời gian'
       const statusType = emp.status === 'probation' ? 'Thử việc' : 'Chính thức'
@@ -472,6 +678,11 @@ export default function PayrollPage() {
           }
         : null
 
+      const secondaryStoreIds = emp.secondary_store_ids || []
+      const secondaryStoreNames = secondaryStoreIds
+        .map(id => stores.find(s => s.id === id)?.name)
+        .filter(Boolean) as string[]
+
       return {
         stt: index + 1,
         id: emp.id,
@@ -481,12 +692,14 @@ export default function PayrollPage() {
         department: res.position || pos?.name || 'Nhân viên',
         level: emp.role === 'store_manager' ? 'Store Manager' : emp.role === 'shift_leader' ? 'Shift Leader' : 'Senior Employee',
         empTypeLabel: `${empType} ${statusType}`,
-         isHourly,
-         hourlyRate,
-         baseSalary: res.base_salary,
-         baseSalaryFormatted,
-        storeId: emp.store_id,
+        isHourly,
+        hourlyRate,
+        baseSalary: res.base_salary,
+        baseSalaryFormatted,
+        storeId: rowStoreId,
         storeName: store?.name || 'Chi nhánh',
+        secondaryStoreIds,
+        secondaryStoreNames,
         totalShifts: Math.round(totalShifts),
         totalHours,
         regularHours,
@@ -515,9 +728,11 @@ export default function PayrollPage() {
          isResigned: res.is_resigned_employee,
          pendingShifts: res.soCaChoDuyet,
          anomalies: res.anomalies || [],
+         lateCount: res.late_count,
+         lateIncidents: res.late_incidents || [],
        }
     }).filter((row): row is PayrollTableRow => row !== null)
-  }, [selectedPeriod, payrollResults, employees, positions, stores, bonusOverrides, deductionOverrides, statusOverrides, statusPeriod])
+  }, [selectedPeriod, payrollResults, employees, positions, stores, bonusOverrides, deductionOverrides, statusOverrides, statusPeriod, user])
 
   const pendingSummary = useMemo(() => {
     const pendingRows = tableData.filter(r => r.pendingShifts > 0)
@@ -618,14 +833,81 @@ export default function PayrollPage() {
     })
 
     const totalOtHours = workRecords.reduce((sum, record) => sum + (record.overtime_hours || 0), 0)
-    const basePerWorkedShift = workRecords.length > 0 ? sourceRow.workedSalary / workRecords.length : 0
+    const stdDays = policyInfo?.days || 26
+
+    const currentPolicy = getActivePayrollPolicy()
+    const splitAllowance = currentPolicy.fnb?.splitShiftAllowance || 0
+    const minBreakHours = currentPolicy.fnb?.splitShiftMinBreakHours || 2
+    const nightAllowance = currentPolicy.fnb?.nightShiftAllowance || 0
+    const nightStartHour = currentPolicy.fnb?.nightShiftStartHour || 22
 
     return Array.from(groupedByDate.entries()).sort(([dateA], [dateB]) => dateA.localeCompare(dateB)).map(([date, records], index) => {
       const actualHours = records.reduce((sum, record) => sum + (record.total_hours || 0), 0)
       const otHours = records.reduce((sum, record) => sum + (record.overtime_hours || 0), 0)
       const regularHours = Math.max(0, actualHours - otHours)
-      const overtimeSalary = totalOtHours > 0 ? sourceRow.otSalary * (otHours / totalOtHours) : 0
-      const dailySalary = Math.round(basePerWorkedShift * records.length + overtimeSalary)
+      const overtimeSalary = totalOtHours > 0 ? Math.round(sourceRow.otSalary * (otHours / totalOtHours)) : 0
+      
+      let dailySalary = 0
+      let coeffSalary = sourceRow.hourlyRate
+      if (sourceRow.isHourly) {
+        dailySalary = Math.round(regularHours * sourceRow.hourlyRate + overtimeSalary)
+        coeffSalary = sourceRow.hourlyRate
+      } else {
+        const dailyRate = Math.round(sourceRow.baseSalary / stdDays)
+        dailySalary = Math.round(dailyRate + overtimeSalary)
+        coeffSalary = dailyRate
+      }
+
+      // ── Tính phụ cấp Ca gãy trong ngày
+      let isSplitShiftDay = false
+      if (records.length >= 2 && splitAllowance > 0) {
+        const sortedShifts = [...records].sort((a, b) => {
+          const timeA = parseTimeToHours(a.check_in_time) ?? 0
+          const timeB = parseTimeToHours(b.check_in_time) ?? 0
+          return timeA - timeB
+        })
+        for (let i = 0; i < sortedShifts.length - 1; i++) {
+          const outPrev = parseTimeToHours(sortedShifts[i].check_out_time)
+          const inNext = parseTimeToHours(sortedShifts[i + 1].check_in_time)
+          if (outPrev !== null && inNext !== null) {
+            if ((inNext - outPrev) >= minBreakHours) {
+              isSplitShiftDay = true
+              break
+            }
+          } else {
+            isSplitShiftDay = true
+            break
+          }
+        }
+      }
+      const daySplitShiftAmount = isSplitShiftDay ? splitAllowance : 0
+
+      // ── Tính phụ cấp Ca đêm trong ngày
+      let dayNightShiftCount = 0
+      if (nightAllowance > 0) {
+        records.forEach(r => {
+          const outH = parseTimeToHours(r.check_out_time)
+          const inH = parseTimeToHours(r.check_in_time)
+          if (outH !== null) {
+            if (outH >= nightStartHour || outH < 6) dayNightShiftCount++
+          } else if (inH !== null && inH >= nightStartHour) {
+            dayNightShiftCount++
+          }
+        })
+      }
+      const dayNightShiftAmount = dayNightShiftCount * nightAllowance
+      const dayAllowance = daySplitShiftAmount + dayNightShiftAmount
+
+      const allowanceLabels: string[] = []
+      if (daySplitShiftAmount > 0) allowanceLabels.push(`Ca gãy (+${Math.round(daySplitShiftAmount / 1000)}k)`)
+      if (dayNightShiftAmount > 0) allowanceLabels.push(`Ca đêm (+${Math.round(dayNightShiftAmount / 1000)}k)`)
+      const allowanceLabel = allowanceLabels.join(', ')
+
+      const dayLateIncident = sourceRow.lateIncidents?.find(inc => inc.date === date)
+      const dayPenalty = dayLateIncident ? dayLateIncident.penalty : 0
+      const isLateExempt = dayLateIncident ? dayLateIncident.isExempt : false
+      const lateMinutes = dayLateIncident?.minutes || records.find(r => r.status === 'late')?.late_minutes || 0
+      const lateLabel = dayLateIncident?.tierLabel || ''
       const [year, month, day] = date.split('-')
 
       return {
@@ -636,16 +918,20 @@ export default function PayrollPage() {
         regularHours: Math.round(regularHours * 100) / 100,
         otHours: Math.round(otHours * 100) / 100,
         calcHours: Math.round(actualHours * 100) / 100,
-        coeffSalary: sourceRow.hourlyRate,
+        coeffSalary,
         dailySalary,
-        allowance: 0,
+        allowance: dayAllowance,
+        allowanceLabel,
         bonus: 0,
-        penalty: 0,
+        penalty: dayPenalty,
+        isLateExempt,
+        lateMinutes,
+        lateLabel,
         deduction: 0,
-        netDaily: dailySalary,
+        netDaily: Math.max(0, dailySalary + dayAllowance - dayPenalty),
       }
     })
-  }, [modalTargetEmp, dailyAttendanceRecords, tableData])
+  }, [modalTargetEmp, dailyAttendanceRecords, tableData, policyInfo])
 
   // Open Modal for adding Bonus or Deduction
   const openAddTicketModal = (emp: Record<string, unknown>, type: 'add_bonus' | 'add_deduction') => {
@@ -755,9 +1041,10 @@ export default function PayrollPage() {
       'STT', 'Mã NV', 'Họ và tên', 'Bộ phận', 'Level', 'Loại nhân viên',
       'Lương cơ bản', 'Số ca', 'Tổng số giờ', 'Số giờ thường', 'Số giờ tăng ca',
       'Tổng số công', 'Số công thường', 'Số công tăng ca', 'Lương tăng ca',
-      'Lương theo giờ làm việc', 'Tổng phụ cấp', 'Tổng phiếu cộng tiền',
-      'Tổng phạt', 'Tổng phiếu trừ tiền', 'Lương KPI', 'Tiền công đoàn',
-      'Tổng lương', 'Hoàn giữ lương', 'Giữ lương', 'Ứng lương', 'Thực nhận (NET)',
+      'Lương chính (Công/Giờ)', 'Tổng phụ cấp', 'Tổng phiếu cộng tiền',
+      'Tổng phạt', 'Tổng phiếu trừ tiền', 'Lương KPI',
+      'Tổng lương (GROSS)', 'Bảo hiểm', 'Thuế TNCN', 'Tiền công đoàn',
+      'Hoàn giữ lương', 'Giữ lương', 'Ứng lương', 'Thực nhận (NET)',
       'Làm tròn', 'Trạng thái'
     ]
 
@@ -771,7 +1058,7 @@ export default function PayrollPage() {
         `"${r.department}"`,
         `"${r.level}"`,
         `"${r.empTypeLabel}"`,
-        `"${r.baseSalaryFormatted}"`,
+        r.isHourly ? r.hourlyRate : r.baseSalary,
         r.totalShifts,
         r.totalHours,
         r.regularHours,
@@ -786,8 +1073,10 @@ export default function PayrollPage() {
         r.totalPenalties,
         r.deductionTickets,
         r.kpiSalary,
-        r.unionFee,
         r.grossSalary,
+        r.insurance,
+        r.tax,
+        r.unionFee,
         r.returnHoldSalary,
         r.holdSalary,
         r.advanceSalary,
@@ -804,6 +1093,52 @@ export default function PayrollPage() {
     const link = document.createElement('a')
     link.setAttribute('href', url)
     link.setAttribute('download', `Bang_Luong_Homies_${selectedPeriod}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  // XUẤT BẢNG ĐỐI SOÁT CƠ SỞ HBP (HỒ BÁ PHẤN) THÁNG 8/2026 - 7 CỘT CHUẨN F&B
+  const handleExportHbpAuditCsv = () => {
+    const headers = [
+      'STT',
+      'Họ và Tên',
+      'Mã NV',
+      'Chức Vụ',
+      'Số Ca Chuẩn',
+      'Tổng Giờ Công Thực',
+      'Đơn Giá (VNĐ/h)',
+      'Thành Tiền (VNĐ)',
+    ]
+
+    const csvRows = [headers.join(',')]
+
+    // Lọc các bản ghi thuộc cơ sở Hồ Bá Phấn (store-001)
+    const hbpRows = tableData.filter(r => r.storeId === 'store-001' || r.storeName.includes('Hồ Bá Phấn') || r.storeName.includes('HBP'))
+
+    hbpRows.forEach((r, idx) => {
+      const rate = r.isHourly ? r.hourlyRate : (r.baseSalary >= 100000 ? Math.round(r.baseSalary / 26 / 8) : r.baseSalary)
+      const earned = Math.round(r.totalHours * rate)
+      const rowData = [
+        idx + 1,
+        `"${r.name.replace(/"/g, '""')}"`,
+        `"${r.code}"`,
+        `"${r.department}"`,
+        r.totalShifts,
+        r.totalHours,
+        rate,
+        earned,
+      ]
+      csvRows.push(rowData.join(','))
+    })
+
+    const csvContent = '\uFEFF' + csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `Bang_Doi_Soat_HBP_T8_Homies_HRM.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -896,6 +1231,75 @@ export default function PayrollPage() {
     return Object.values(columnVisibility).filter(Boolean).length
   }, [columnVisibility])
 
+  const overviewMetrics = useMemo(() => {
+    let totalGross = 0
+    let totalNet = 0
+    let totalWorked = 0
+    let totalOtSalary = 0
+    let totalOtHours = 0
+    let totalAllowances = 0
+    let totalBonuses = 0
+    let totalDeductions = 0
+    let totalInsurance = 0
+    let totalTax = 0
+
+    const storeMap = new Map<string, {
+      storeId: string
+      storeName: string
+      employeeCount: number
+      totalHours: number
+      gross: number
+      otSalary: number
+      net: number
+    }>()
+
+    tableData.forEach(row => {
+      totalGross += row.grossSalary
+      totalNet += row.netSalary
+      totalWorked += row.workedSalary
+      totalOtSalary += row.otSalary
+      totalOtHours += row.otHours
+      totalAllowances += row.allowances
+      totalBonuses += row.bonusTickets + row.kpiSalary
+      totalDeductions += row.totalPenalties + row.deductionTickets
+      totalInsurance += row.insurance
+      totalTax += row.tax
+
+      const sId = row.storeId || 'other'
+      const existing = storeMap.get(sId) || {
+        storeId: sId,
+        storeName: row.storeName || 'Chi nhánh',
+        employeeCount: 0,
+        totalHours: 0,
+        gross: 0,
+        otSalary: 0,
+        net: 0,
+      }
+      existing.employeeCount += 1
+      existing.totalHours += row.totalHours
+      existing.gross += row.grossSalary
+      existing.otSalary += row.otSalary
+      existing.net += row.netSalary
+      storeMap.set(sId, existing)
+    })
+
+    const storeList = Array.from(storeMap.values()).sort((a, b) => b.gross - a.gross)
+
+    return {
+      totalGross,
+      totalNet,
+      totalWorked,
+      totalOtSalary,
+      totalOtHours: Math.round(totalOtHours * 10) / 10,
+      totalAllowances,
+      totalBonuses,
+      totalDeductions,
+      totalInsurance,
+      totalTax,
+      storeList,
+    }
+  }, [tableData])
+
   if (!hasHydrated) {
     return (
       <AppShell title="Bảng lương 💰">
@@ -912,7 +1316,7 @@ export default function PayrollPage() {
   const period = mockPayrollPeriods.find(p => p.period === selectedPeriod)
   const [periodYear, periodMonth] = selectedPeriod.split('-')
   const periodLabel = `${periodYear}/${periodMonth} (01/${periodMonth}/${periodYear} - ${getPayrollPeriodBounds(selectedPeriod).endDay}/${periodMonth}/${periodYear})`
-  const slips = tableData
+  const slips = filteredTableRows
   const mySlip = tableData.find(s => s.id === user.id)
   const periodTotals = tableData.reduce((totals, row) => ({
     gross: totals.gross + row.grossSalary,
@@ -920,7 +1324,7 @@ export default function PayrollPage() {
   }), { gross: 0, net: 0 })
 
   return (
-    <AppShell title="Bảng tính lương chuỗi">
+    <AppShell title={isManager ? "Bảng tính lương chuỗi" : "Phiếu lương cá nhân"}>
       {/* Hidden File Input for Image Upload */}
       <input
         type="file"
@@ -947,33 +1351,132 @@ export default function PayrollPage() {
                 {PERIOD_STATUS_LABEL_VI[payrollPeriodStatus] || 'Bản nháp'}
               </span>
             )}
+            {!canEditPeriod(payrollPeriodStatus) && (
+              <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                <Lock size={12} className="text-amber-700" />
+                <span>Đã khóa kỳ lương</span>
+              </span>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push('/settings/payroll')}
-              className="btn bg-slate-900 hover:bg-slate-800 text-white text-xs py-2 px-3 gap-1.5 shadow-sm cursor-pointer font-bold border border-slate-700"
-              title="Mở cài đặt công thức & quy tắc lương chi tiết"
-            >
-              <SlidersHorizontal size={13} className="text-amber-400" /> Cấu hình quy tắc lương
-            </button>
-            <button
-              onClick={() => setPayrollReloadKey(key => key + 1)}
-              disabled={isPayrollLoading}
-              className="btn btn-primary text-xs py-2 px-3 gap-1.5 shadow-sm cursor-pointer font-bold"
-            >
-              <RefreshCw size={13} /> {isPayrollLoading ? 'Đang tính lương...' : 'Tính lại lương'}
-            </button>
-          </div>
+          {isManager && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push('/settings/payroll')}
+                className="btn bg-slate-900 hover:bg-slate-800 text-white text-xs py-2 px-3 gap-1.5 shadow-sm cursor-pointer font-bold border border-slate-700"
+                title="Mở cài đặt chính sách & tham số bảng lương chi tiết"
+              >
+                <span>⚙️</span> Cài đặt chính sách
+              </button>
+              <button
+                onClick={() => setPayrollReloadKey(key => key + 1)}
+                disabled={isPayrollLoading}
+                className="btn btn-primary text-xs py-2 px-3 gap-1.5 shadow-sm cursor-pointer font-bold"
+              >
+                <RefreshCw size={13} /> {isPayrollLoading ? 'Đang tính lương...' : 'Tính lại lương'}
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Alert khi chưa có dữ liệu chấm công cho kỳ lương */}
+        {tableData.length > 0 && tableData.every(r => r.workedSalary === 0 && r.netSalary === 0) && (
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 animate-fade-in shadow-2xs">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
+              <div>
+                <div className="text-xs font-bold">Kỳ {selectedPeriod.split('-')[1]}/{selectedPeriod.split('-')[0]} chưa có dữ liệu chấm công hoặc số công = 0</div>
+                <div className="text-[11px] text-amber-700 mt-0.5">
+                  Tất cả nhân viên đang ghi nhận 0 ngày công, nên lương thực nhận hiển thị 0đ. Vui lòng kiểm tra Bảng chấm công trước khi chốt bảng lương.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => router.push('/attendance')}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer shadow-2xs flex items-center gap-1.5"
+              >
+                <Clock size={13} /> Xem chấm công
+              </button>
+              <button
+                onClick={() => setPayrollReloadKey(k => k + 1)}
+                className="px-2.5 py-1.5 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 font-semibold rounded-lg text-xs transition-colors cursor-pointer"
+                title="Tính lại lương"
+              >
+                <RefreshCw size={13} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TẦNG 2: 4 THẺ CHỈ SỐ VĨ MÔ (Macro KPI Cards) - Hiển thị cố định cho Cấp Quản Lý */}
+        {isManager && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-fade-in">
+            {/* 1. Tổng quỹ lương Gross */}
+            <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-xs">
+              <div className="flex items-center justify-between text-xs text-gray-500 font-medium mb-1.5">
+                <span>Tổng quỹ lương (Gross)</span>
+                <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-[#001D3D]">
+                  <DollarSign size={16} />
+                </div>
+              </div>
+              <div className="text-xl font-bold font-mono tabular-nums text-[#001D3D]">{formatVND(overviewMetrics.totalGross)}</div>
+              <div className="text-[11px] text-gray-500 mt-1 font-medium">
+                {tableData.length} nhân sự toàn chuỗi
+              </div>
+            </div>
+
+            {/* 2. Thực nhận Net */}
+            <div className="p-4 bg-white rounded-2xl border border-emerald-100 shadow-xs">
+              <div className="flex items-center justify-between text-xs text-emerald-800 font-medium mb-1.5">
+                <span>Thực nhận chi trả (Net)</span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <TrendingUp size={16} />
+                </div>
+              </div>
+              <div className="text-xl font-bold font-mono tabular-nums text-emerald-700">{formatVND(overviewMetrics.totalNet)}</div>
+              <div className="text-[11px] text-emerald-600 mt-1 font-medium">
+                Tỷ lệ chi trả ròng: {overviewMetrics.totalGross > 0 ? Math.round((overviewMetrics.totalNet / overviewMetrics.totalGross) * 100) : 100}%
+              </div>
+            </div>
+
+            {/* 3. Tăng ca & Phụ cấp */}
+            <div className="p-4 bg-white rounded-2xl border border-amber-100 shadow-xs">
+              <div className="flex items-center justify-between text-xs text-amber-800 font-medium mb-1.5">
+                <span>Tăng ca &amp; Phụ cấp</span>
+                <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                  <Clock size={16} />
+                </div>
+              </div>
+              <div className="text-xl font-bold font-mono tabular-nums text-amber-800">{formatVND(overviewMetrics.totalOtSalary + overviewMetrics.totalAllowances)}</div>
+              <div className="text-[11px] text-amber-700 mt-1 font-medium">
+                {overviewMetrics.totalOtHours}h tăng ca • {formatVND(overviewMetrics.totalAllowances)} phụ cấp
+              </div>
+            </div>
+
+            {/* 4. Quỹ thưởng & Tip */}
+            <div className="p-4 bg-white rounded-2xl border border-sky-100 shadow-xs">
+              <div className="flex items-center justify-between text-xs text-sky-800 font-medium mb-1.5">
+                <span>Quỹ thưởng &amp; Tip F&B</span>
+                <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center text-[#2F6FA8]">
+                  <Sparkles size={16} />
+                </div>
+              </div>
+              <div className="text-xl font-bold font-mono tabular-nums text-[#2F6FA8]">{formatVND(overviewMetrics.totalBonuses)}</div>
+              <div className="text-[11px] text-[#2F6FA8] mt-1 font-medium">
+                Thưởng doanh thu, tip &amp; KPI
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         {isManager && (
           <div className="flex gap-1.5 animate-fade-in bg-primary-50 p-1 rounded-xl">
             {[
               { k: 'table' as const, l: 'Bảng lương chi tiết (Full)' },
-              { k: 'overview' as const, l: 'Tổng quan chi phí' },
               { k: 'payslips' as const, l: 'Phiếu lương NV' },
+              { k: 'overview' as const, l: 'Phân bổ chi nhánh' },
               { k: 'my' as const, l: 'Lương của tôi' },
             ].map(({ k, l }) => (
               <button key={k} className="flex-1 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
@@ -988,74 +1491,70 @@ export default function PayrollPage() {
 
         {/* Quick Menu Shortcuts */}
         {isManager && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 animate-fade-in">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 animate-fade-in">
             <button
-              onClick={() => { setTab('table'); setSelectedStore('all') }}
-              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                tab === 'table' && selectedStore === 'all'
-                  ? 'bg-primary-50 border-primary-500 font-bold text-primary shadow-xs'
-                  : 'bg-white border-gray-200 hover:bg-vanilla-50'
+              onClick={() => setSelectedStore('all')}
+              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                selectedStore === 'all'
+                  ? 'bg-primary-50/80 border-[#2F6FA8] font-bold text-[#2F6FA8] shadow-xs'
+                  : 'bg-white border-gray-200/80 hover:bg-gray-50/80 hover:border-gray-300'
               }`}
             >
-              <div className="text-xs font-semibold flex items-center gap-1.5">
-                <Building2 size={15} className="text-primary" /> Bảng lương công ty
+              <div className="text-xs font-bold flex items-center gap-1.5 text-[#001D3D]">
+                <Building2 size={15} className="text-[#2F6FA8]" /> Bảng lương công ty
               </div>
-              <div className="text-[10px] text-gray-500 mt-0.5">Toàn bộ nhân viên hệ thống</div>
+              <div className="text-[11px] text-gray-500 mt-0.5">Toàn bộ nhân viên hệ thống</div>
             </button>
 
             <div
-              className={`p-2.5 rounded-xl border text-left transition-all ${
-                tab === 'table' && selectedStore !== 'all'
-                  ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-800 shadow-sm'
-                  : 'bg-white border-gray-200 hover:bg-vanilla-50'
+              className={`p-3 rounded-2xl border text-left transition-all ${
+                selectedStore !== 'all'
+                  ? 'bg-emerald-50/80 border-emerald-500 font-bold text-emerald-800 shadow-xs'
+                  : 'bg-white border-gray-200/80 hover:bg-gray-50/80 hover:border-gray-300'
               }`}
             >
               <button
                 type="button"
                 onClick={() => {
-                  setTab('table')
                   if (selectedStore === 'all') {
-                    setSelectedStore(mockStores[0]?.id || 'store-001')
+                    setSelectedStore(stores[0]?.id || 'store-001')
                   }
                 }}
-                className="w-full text-left font-semibold text-xs flex items-center gap-1.5 text-emerald-800 cursor-pointer"
+                className="w-full text-left font-bold text-xs flex items-center gap-1.5 text-emerald-800 cursor-pointer"
               >
                 <Store size={15} className="text-emerald-600 flex-shrink-0" /> Bảng lương chi nhánh
               </button>
 
               <select
                 value={selectedStore}
-                onChange={e => {
-                  setTab('table')
-                  setSelectedStore(e.target.value)
-                }}
-                className="mt-1.5 w-full text-xs bg-emerald-50/70 border border-emerald-200 text-emerald-900 rounded-lg px-2 py-1 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                onChange={e => setSelectedStore(e.target.value)}
+                className="mt-1.5 w-full text-xs bg-emerald-50/70 border border-emerald-200 text-emerald-900 rounded-xl px-2.5 py-1 font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
               >
                 <option value="all">-- Chọn cửa hàng / chi nhánh --</option>
                 {stores.map(s => (
-                  <option key={s.id} value={s.id}>📍 {s.name}</option>
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
             </div>
 
             <button
-              onClick={() => router.push('/payroll/bonus')}
-              className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 text-emerald-800 text-left hover:bg-emerald-50 cursor-pointer"
+              onClick={() => router.push(`/payroll/bonus?period=${selectedPeriod}`)}
+              className="p-3 rounded-2xl border border-emerald-200/80 bg-white hover:bg-emerald-50/40 text-left transition-all cursor-pointer group shadow-2xs hover:shadow-xs"
             >
-              <div className="text-xs font-semibold flex items-center gap-1.5">
+              <div className="text-xs font-bold flex items-center gap-1.5 text-emerald-800 group-hover:text-emerald-900">
                 <PlusCircle size={15} className="text-emerald-600" /> Phiếu cộng (Thưởng)
               </div>
-              <div className="text-[10px] text-emerald-600 mt-0.5">Quản lý thưởng & Tip doanh thu</div>
+              <div className="text-[11px] text-emerald-600 mt-0.5">Quản lý thưởng &amp; Tip doanh thu</div>
             </button>
 
             <button
-              onClick={() => router.push('/payroll/deductions')}
-              className="p-2.5 rounded-xl border border-rose-200 bg-rose-50/40 text-rose-800 text-left hover:bg-rose-50 cursor-pointer"
+              onClick={() => router.push(`/payroll/deductions?period=${selectedPeriod}`)}
+              className="p-3 rounded-2xl border border-rose-200/80 bg-white hover:bg-rose-50/40 text-left transition-all cursor-pointer group shadow-2xs hover:shadow-xs"
             >
-              <div className="text-xs font-semibold flex items-center gap-1.5">
-                <MinusCircle size={15} className="text-rose-600" /> Phiếu trừ & Tạm ứng
+              <div className="text-xs font-bold flex items-center gap-1.5 text-rose-800 group-hover:text-rose-900">
+                <MinusCircle size={15} className="text-rose-600" /> Phiếu trừ &amp; Tạm ứng
               </div>
-              <div className="text-[10px] text-rose-600 mt-0.5">Đi trễ, vi phạm & tạm ứng</div>
+              <div className="text-[11px] text-rose-600 mt-0.5">Đi trễ, vi phạm &amp; tạm ứng</div>
             </button>
           </div>
         )}
@@ -1109,30 +1608,70 @@ export default function PayrollPage() {
 
               {/* Action Buttons & Thao Tác Dropdown */}
               <div className="flex items-center gap-2 relative">
-                <button
-                  onClick={async () => {
-                    if (pendingSummary.totalShifts > 0 || anomalySummary.length > 0) {
-                      alert('Không thể chốt lương khi còn ca chưa duyệt hoặc có cảnh báo dữ liệu. Vui lòng xử lý dứt điểm các lỗi trước.')
-                      return
-                    }
-                    if (!window.confirm('Bạn có chắc chắn muốn chốt bảng lương này? Sau khi chốt sẽ không thể tính lại!')) return
-                    
-                    const [yearStr, monthStr] = selectedPeriod.split('-')
-                    const res = await payrollPeriodAdapter.savePayrollPeriod(parseInt(monthStr, 10), parseInt(yearStr, 10), payrollResults, policyInfo)
-                    if (res.success) {
-                      alert('Đã chốt kỳ lương thành công!')
-                      setPayrollReloadKey(k => k + 1)
-                    } else {
-                      alert(`Chốt thất bại: ${res.error}`)
-                    }
-                  }}
-                  disabled={!canClosePeriod(payrollPeriodStatus) || pendingSummary.totalShifts > 0 || anomalySummary.length > 0 || isPayrollLoading || policyUnavailable}
-                  className={`btn text-xs py-1.5 px-3 border-0 gap-1 font-semibold flex items-center shadow-xs cursor-pointer ${
-                    !canClosePeriod(payrollPeriodStatus) ? 'bg-slate-600 text-slate-300' : 'bg-rose-600 hover:bg-rose-500 text-white'
-                  }`}
-                >
-                  <Lock size={13} /> {!canClosePeriod(payrollPeriodStatus) ? 'ĐÃ CHỐT' : 'Chốt kỳ lương'}
-                </button>
+                {isCeo ? (
+                  !canEditPeriod(payrollPeriodStatus) ? (
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm('CẢNH BÁO (CEO): Mở khóa kỳ lương sẽ cho phép tính toán lại và chỉnh sửa số liệu. Bạn có chắc chắn muốn mở khóa?')) return
+                        const [yearStr, monthStr] = selectedPeriod.split('-')
+                        const res = await payrollPeriodAdapter.unlockPayrollPeriod(parseInt(monthStr, 10), parseInt(yearStr, 10))
+                        if (res.success) {
+                          alert('Đã mở khóa kỳ lương thành công. Bây giờ bạn có thể tính toán lại hoặc điều chỉnh phiếu thưởng/phạt.')
+                          setPayrollReloadKey(k => k + 1)
+                        } else {
+                          alert(`Mở khóa thất bại: ${res.error}`)
+                        }
+                      }}
+                      className="btn text-xs py-1.5 px-3 border-0 gap-1.5 font-semibold flex items-center shadow-xs cursor-pointer bg-amber-600 hover:bg-amber-500 text-white"
+                      title="Quyền CEO: Mở khóa kỳ lương để chỉnh sửa"
+                    >
+                      <Unlock size={13} /> Mở khóa kỳ lương
+                    </button>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        if (pendingSummary.totalShifts > 0 || anomalySummary.length > 0) {
+                          alert('Không thể khóa sổ lương khi còn ca chưa duyệt hoặc có cảnh báo dữ liệu. Vui lòng xử lý dứt điểm các lỗi trước.')
+                          return
+                        }
+                        if (!window.confirm('XÁC NHẬN CEO: Bạn có chắc chắn muốn khóa sổ lương tháng này? Sau khi khóa sổ sẽ đóng băng toàn bộ số liệu tính lương!')) return
+                        
+                        const [yearStr, monthStr] = selectedPeriod.split('-')
+                        const res = await payrollPeriodAdapter.savePayrollPeriod(parseInt(monthStr, 10), parseInt(yearStr, 10), payrollResults, policyInfo)
+                        if (res.success) {
+                          alert('Đã khóa sổ lương tháng thành công!')
+                          setPayrollReloadKey(k => k + 1)
+                        } else {
+                          alert(`Khóa sổ thất bại: ${res.error}`)
+                        }
+                      }}
+                      disabled={!canClosePeriod(payrollPeriodStatus) || pendingSummary.totalShifts > 0 || anomalySummary.length > 0 || isPayrollLoading || policyUnavailable}
+                      className={`btn text-xs py-1.5 px-3 border-0 gap-1.5 font-semibold flex items-center shadow-xs cursor-pointer ${
+                        !canClosePeriod(payrollPeriodStatus) ? 'bg-slate-600 text-slate-300' : 'bg-rose-600 hover:bg-rose-500 text-white'
+                      }`}
+                      title="Quyền CEO (emp-001): Khóa sổ lương tháng và đóng băng số liệu"
+                    >
+                      <Lock size={13} /> Khóa Sổ Lương Tháng
+                    </button>
+                  )
+                ) : (
+                  // Dành cho Quản lý / Admin khác: Chỉ xem trạng thái Read-Only
+                  !canEditPeriod(payrollPeriodStatus) ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg font-bold bg-rose-950/80 border border-rose-800 text-rose-300 shadow-xs"
+                      title="Sổ lương tháng đã được CEO khóa số liệu (Chế độ chỉ đọc)"
+                    >
+                      <Lock size={13} /> Đã khóa sổ (Chỉ đọc)
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-lg font-medium bg-slate-800 border border-slate-700 text-slate-400 shadow-xs"
+                      title="Chỉ tài khoản CEO (anh Nguyễn Đức Nghĩa - emp-001) mới có quyền Khóa Sổ Lương Tháng. Các tài khoản khác chỉ xem ở chế độ Read-Only."
+                    >
+                      <ShieldCheck size={13} className="text-amber-400" /> Khóa sổ lương: Chỉ CEO
+                    </span>
+                  )
+                )}
 
                 <button
                   onClick={() => setPayrollReloadKey(key => key + 1)}
@@ -1149,6 +1688,15 @@ export default function PayrollPage() {
                   title="Xuất file Excel CSV"
                 >
                   <Download size={13} /> Xuất Excel
+                </button>
+
+                {/* Nút Xuất Bảng Đối Soát HBP T8 */}
+                <button
+                  onClick={handleExportHbpAuditCsv}
+                  className="btn bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-1.5 px-3 border-0 gap-1.5 font-bold flex items-center shadow-xs cursor-pointer"
+                  title="Xuất bảng đối soát dữ liệu công và lương chuẩn cơ sở Hồ Bá Phấn Tháng 8/2026"
+                >
+                  <FileText size={13} /> Đối Soát HBP T8
                 </button>
 
                 {/* Thao Tác Menu Dropdown */}
@@ -1208,7 +1756,7 @@ export default function PayrollPage() {
                         className="w-full px-3.5 py-2 text-left hover:bg-sky-800/80 flex items-center gap-2.5 border-t border-sky-800/60 transition-colors cursor-pointer"
                       >
                         <SlidersHorizontal size={14} className="text-amber-300" />
-                        <span>Cài đặt hiển thị ({visibleColumnCount}/29)</span>
+                        <span>Cài đặt hiển thị ({visibleColumnCount}/{Object.keys(DEFAULT_COLUMN_VISIBILITY).length})</span>
                       </button>
                     </div>
                   )}
@@ -1283,15 +1831,17 @@ export default function PayrollPage() {
                     {columnVisibility.regularDays && <th className="p-2.5 border-r border-slate-200 text-right min-w-[85px]">Số công thường</th>}
                     {columnVisibility.otDays && <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px]">Số công tăng ca</th>}
                     {columnVisibility.otSalary && <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px]">Lương tăng ca</th>}
-                    {columnVisibility.workedSalary && <th className="p-2.5 border-r border-slate-200 text-right min-w-[120px]">Lương theo giờ làm việc</th>}
+                    {columnVisibility.workedSalary && <th className="p-2.5 border-r border-slate-200 text-right min-w-[130px]">Lương chính (Công/Giờ)</th>}
                     {columnVisibility.allowances && <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px]">Tổng phụ cấp</th>}
 
                     {columnVisibility.bonusTickets && <th className="p-2.5 border-r border-slate-200 text-right min-w-[140px] bg-emerald-50/50">Tổng phiếu cộng tiền</th>}
                     {columnVisibility.totalPenalties && <th className="p-2.5 border-r border-slate-200 text-right min-w-[80px] text-rose-600">Tổng phạt</th>}
                     {columnVisibility.deductionTickets && <th className="p-2.5 border-r border-slate-200 text-right min-w-[140px] bg-rose-50/50">Tổng phiếu trừ tiền</th>}
                     {columnVisibility.kpiSalary && <th className="p-2.5 border-r border-slate-200 text-right min-w-[85px]">Lương KPI</th>}
-                    {columnVisibility.unionFee && <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px]">Tiền công đoàn</th>}
                     {columnVisibility.grossSalary && <th className="p-2.5 border-r border-slate-200 text-right min-w-[100px] font-extrabold">Tổng lương</th>}
+                    {columnVisibility.insurance && <th className="p-2.5 border-r border-slate-200 text-right min-w-[105px] text-amber-700 font-bold">Bảo hiểm</th>}
+                    {columnVisibility.tax && <th className="p-2.5 border-r border-slate-200 text-right min-w-[95px] text-amber-700 font-bold">Thuế TNCN</th>}
+                    {columnVisibility.unionFee && <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px]">Tiền công đoàn</th>}
                     {columnVisibility.returnHoldSalary && <th className="p-2.5 border-r border-slate-200 text-right min-w-[85px]">Hoàn giữ lương</th>}
                     {columnVisibility.holdSalary && <th className="p-2.5 border-r border-slate-200 text-right min-w-[75px]">Giữ lương</th>}
                     {columnVisibility.advanceSalary && <th className="p-2.5 border-r border-slate-200 text-right min-w-[75px]">Ứng lương</th>}
@@ -1350,16 +1900,58 @@ export default function PayrollPage() {
                             </span>
                           </td>
                         )}
-                        {columnVisibility.baseSalary && <td className="p-2.5 border-r border-slate-100 text-right font-medium text-slate-800">{row.baseSalaryFormatted}</td>}
-                        {columnVisibility.totalShifts && <td className="p-2.5 border-r border-slate-100 text-center font-semibold text-slate-700">{row.totalShifts}</td>}
+                        {columnVisibility.baseSalary && (
+                          <td
+                            onClick={() => {
+                              setRateDrawerTarget({
+                                employeeId: row.id,
+                                employeeCode: row.code,
+                                employeeName: row.name,
+                                position: row.department,
+                                storeName: row.storeName,
+                                period: selectedPeriod,
+                                currentHourlyRate: row.hourlyRate || (row.isHourly ? (row.baseSalary || 20000) : Math.round(row.baseSalary / 26 / 8)),
+                                totalHours: row.totalHours,
+                                isPartTime: row.isHourly,
+                              })
+                            }}
+                            className="p-2.5 border-r border-slate-100 text-right font-medium text-slate-800 hover:bg-blue-50/60 hover:text-[#2F6FA8] cursor-pointer group transition"
+                            title="Bấm để điều chỉnh nhanh đơn giá lương theo giờ"
+                          >
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span>{row.baseSalaryFormatted}</span>
+                              <Edit3 size={11} className="opacity-0 group-hover:opacity-100 text-[#2F6FA8] transition shrink-0" />
+                            </div>
+                          </td>
+                        )}
+                        {columnVisibility.totalShifts && (
+                          <td className="p-2.5 border-r border-slate-100 text-center font-semibold text-slate-700">
+                            <span>{row.totalShifts}</span>
+                            <span className="text-[10px] text-slate-400 block font-normal">ca</span>
+                          </td>
+                        )}
                         {columnVisibility.totalHours && <td className="p-2.5 border-r border-slate-100 text-right text-slate-700 font-mono">{row.totalHours}</td>}
                         {columnVisibility.regularHours && <td className="p-2.5 border-r border-slate-100 text-right text-slate-600 font-mono">{row.regularHours}</td>}
                         {columnVisibility.otHours && <td className="p-2.5 border-r border-slate-100 text-right text-amber-600 font-mono font-medium">{row.otHours > 0 ? row.otHours : 0}</td>}
-                        {columnVisibility.totalDays && <td className="p-2.5 border-r border-slate-100 text-right text-slate-800 font-semibold">{row.totalDays}</td>}
+                        {columnVisibility.totalDays && (
+                          <td className="p-2.5 border-r border-slate-100 text-right text-slate-800 font-semibold">
+                            <span>{row.totalDays}</span>
+                            <span className="text-[10px] text-slate-400 block font-normal">công</span>
+                          </td>
+                        )}
                         {columnVisibility.regularDays && <td className="p-2.5 border-r border-slate-100 text-right text-slate-600 font-mono">{row.regularDays}</td>}
                         {columnVisibility.otDays && <td className="p-2.5 border-r border-slate-100 text-right text-amber-600 font-mono">{row.otDays > 0 ? row.otDays : 0}</td>}
                         {columnVisibility.otSalary && <td className="p-2.5 border-r border-slate-100 text-right text-amber-600 font-mono">{row.otSalary > 0 ? formatVND(row.otSalary) : '0'}</td>}
-                        {columnVisibility.workedSalary && <td className="p-2.5 border-r border-slate-100 text-right text-slate-800 font-mono font-medium">{formatVND(row.workedSalary)}</td>}
+                        {columnVisibility.workedSalary && (
+                          <td className="p-2.5 border-r border-slate-100 text-right font-mono">
+                            <div className="font-semibold text-slate-800">{formatVND(row.workedSalary)}</div>
+                            <div className="text-[10px] text-slate-400 font-sans">
+                              {row.isHourly
+                                ? `${row.regularHours}h × ${row.hourlyRate.toLocaleString('vi-VN')}đ`
+                                : `${row.regularDays} công`}
+                            </div>
+                          </td>
+                        )}
                         {columnVisibility.allowances && <td className="p-2.5 border-r border-slate-100 text-right text-slate-600 font-mono">{row.allowances > 0 ? formatVND(row.allowances) : '0'}</td>}
 
                         {columnVisibility.bonusTickets && (
@@ -1383,8 +1975,19 @@ export default function PayrollPage() {
                         )}
 
                         {columnVisibility.totalPenalties && (
-                          <td className="p-2.5 border-r border-slate-100 text-right font-mono text-rose-600 font-medium">
-                            {row.totalPenalties > 0 ? formatVND(row.totalPenalties) : '0'}
+                          <td className="p-2.5 border-r border-slate-100 text-right font-mono">
+                            {row.totalPenalties > 0 ? (
+                              <div>
+                                <span className="text-rose-600 font-bold">-{formatVND(row.totalPenalties)}</span>
+                                {row.lateCount && row.lateCount > 0 ? (
+                                  <span className="text-[10px] text-slate-400 block font-sans">
+                                    {row.lateCount} lần muộn
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">0</span>
+                            )}
                           </td>
                         )}
 
@@ -1409,8 +2012,26 @@ export default function PayrollPage() {
                         )}
 
                         {columnVisibility.kpiSalary && <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-700">{row.kpiSalary > 0 ? formatVND(row.kpiSalary) : '0'}</td>}
-                        {columnVisibility.unionFee && <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-500">{row.unionFee > 0 ? formatVND(row.unionFee) : '0'}</td>}
                         {columnVisibility.grossSalary && <td className="p-2.5 border-r border-slate-100 text-right font-mono font-bold text-slate-900">{formatVND(row.grossSalary)}</td>}
+                        {columnVisibility.insurance && (
+                          <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-700">
+                            {row.insurance > 0 ? (
+                              <span className="text-amber-800 font-medium">-{formatVND(row.insurance)}</span>
+                            ) : (
+                              <span className="text-slate-400">0</span>
+                            )}
+                          </td>
+                        )}
+                        {columnVisibility.tax && (
+                          <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-700">
+                            {row.tax > 0 ? (
+                              <span className="text-amber-800 font-medium">-{formatVND(row.tax)}</span>
+                            ) : (
+                              <span className="text-slate-400">0</span>
+                            )}
+                          </td>
+                        )}
+                        {columnVisibility.unionFee && <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-500">{row.unionFee > 0 ? formatVND(row.unionFee) : '0'}</td>}
                         {columnVisibility.returnHoldSalary && <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-500">{row.returnHoldSalary > 0 ? formatVND(row.returnHoldSalary) : '0'}</td>}
                         {columnVisibility.holdSalary && <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-500">{row.holdSalary > 0 ? formatVND(row.holdSalary) : '0'}</td>}
                         {columnVisibility.advanceSalary && <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-500">{row.advanceSalary > 0 ? formatVND(row.advanceSalary) : '0'}</td>}
@@ -1489,20 +2110,30 @@ export default function PayrollPage() {
                                       <CreditCard size={13} className="text-emerald-400" />
                                       <span>Thanh toán VietQR</span>
                                     </button>
-                                    <button
-                                      onClick={() => { openAddTicketModal(row, 'add_bonus'); setRowActionMenuEmpId(null) }}
-                                      className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center gap-2 border-t border-slate-800"
-                                    >
-                                      <PlusCircle size={13} className="text-emerald-400" />
-                                      <span>Thêm phiếu thưởng</span>
-                                    </button>
-                                    <button
-                                      onClick={() => { openAddTicketModal(row, 'add_deduction'); setRowActionMenuEmpId(null) }}
-                                      className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center gap-2 border-t border-slate-800 text-rose-300"
-                                    >
-                                      <MinusCircle size={13} className="text-rose-400" />
-                                      <span>Thêm phiếu trừ</span>
-                                    </button>
+
+                                    {!canEditPeriod(payrollPeriodStatus) ? (
+                                      <div className="px-3 py-2 border-t border-slate-800 text-[10px] text-amber-400/90 flex items-center gap-1.5 italic bg-slate-800/40">
+                                        <Lock size={12} className="text-amber-400 shrink-0" />
+                                        <span>Kỳ lương đã khóa - không thể thêm thưởng/phạt</span>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <button
+                                          onClick={() => { openAddTicketModal(row, 'add_bonus'); setRowActionMenuEmpId(null) }}
+                                          className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center gap-2 border-t border-slate-800"
+                                        >
+                                          <PlusCircle size={13} className="text-emerald-400" />
+                                          <span>Thêm phiếu thưởng</span>
+                                        </button>
+                                        <button
+                                          onClick={() => { openAddTicketModal(row, 'add_deduction'); setRowActionMenuEmpId(null) }}
+                                          className="w-full px-3 py-1.5 hover:bg-slate-800 flex items-center gap-2 border-t border-slate-800 text-rose-300"
+                                        >
+                                          <MinusCircle size={13} className="text-rose-400" />
+                                          <span>Thêm phiếu trừ</span>
+                                        </button>
+                                      </>
+                                    )}
                                     <button
                                       onClick={() => {
                                         void updateSinglePayslipStatus(row, 'Đã khóa lương', `Đã khóa phiếu lương của ${row.name}`)
@@ -1528,7 +2159,7 @@ export default function PayrollPage() {
 
             {/* Table Footer Summary */}
             <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600 font-medium">
-              <div>Hiển thị <strong>{filteredTableRows.length}</strong> / {tableData.length} nhân viên ({visibleColumnCount}/29 cột)</div>
+              <div>Hiển thị <strong>{filteredTableRows.length}</strong> / {tableData.length} nhân viên ({visibleColumnCount}/{Object.keys(DEFAULT_COLUMN_VISIBILITY).length} cột)</div>
               <div className="flex items-center gap-4">
                 <span>Tổng thực nhận: <strong className="text-emerald-700 text-sm">{formatVND(filteredTableRows.reduce((s, r) => s + r.netSalary, 0))}</strong></span>
               </div>
@@ -1537,62 +2168,416 @@ export default function PayrollPage() {
           </div>
         )}
 
-        {/* OVERVIEW (Manager) */}
-        {(tab === 'overview' && isManager) && period && (
-          <div className="space-y-3 animate-slide-up">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="card-elevated p-4 text-center">
-                <DollarSign size={20} className="mx-auto mb-1" style={{ color: 'var(--success)' }} />
-                <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Tổng chi</div>
-                <div className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>{formatVND(periodTotals.gross)}</div>
+        {/* OVERVIEW (Manager) - EXECUTIVE F&B COST BREAKDOWN & STORE DISTRIBUTION */}
+        {(tab === 'overview' && isManager) && (
+          <div className="space-y-4 animate-slide-up">
+            {/* Chi tiết cơ cấu chi phí */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Cột trái: Cơ cấu thu nhập */}
+              <div className="card p-4 bg-white border border-slate-200 rounded-2xl">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Coins size={15} className="text-primary" /> Cơ cấu Quỹ Lương F&B
+                </h4>
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Lương công nhật thực tế</span>
+                    <span className="font-bold text-slate-900">{formatVND(overviewMetrics.totalWorked)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Tiền làm thêm / Tăng ca (OT)</span>
+                    <span className="font-bold text-amber-700">+{formatVND(overviewMetrics.totalOtSalary)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Phụ cấp ca làm (Cơm ca, đóng/mở quán)</span>
+                    <span className="font-bold text-slate-900">+{formatVND(overviewMetrics.totalAllowances)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Thưởng doanh thu & KPI chi nhánh</span>
+                    <span className="font-bold text-emerald-700">+{formatVND(overviewMetrics.totalBonuses)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 font-black text-sm">
+                    <span className="text-slate-900">Tổng thu nhập (Gross)</span>
+                    <span className="text-slate-900">{formatVND(overviewMetrics.totalGross)}</span>
+                  </div>
+                </div>
               </div>
-              <div className="card-elevated p-4 text-center">
-                <TrendingUp size={20} className="mx-auto mb-1" style={{ color: 'var(--primary)' }} />
-                <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Thực nhận</div>
-                <div className="text-lg font-black" style={{ color: 'var(--primary)' }}>{formatVND(periodTotals.net)}</div>
+
+              {/* Cột phải: Khấu trừ & Nghĩa vụ pháp lý */}
+              <div className="card p-4 bg-white border border-slate-200 rounded-2xl">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <MinusCircle size={15} className="text-rose-500" /> Các khoản khấu trừ & Nghĩa vụ
+                </h4>
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Bảo hiểm bắt buộc (BHXH, BHYT, BHTN)</span>
+                    <span className="font-bold text-rose-600">-{formatVND(overviewMetrics.totalInsurance)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Thuế thu nhập cá nhân (TNCN)</span>
+                    <span className="font-bold text-rose-600">-{formatVND(overviewMetrics.totalTax)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Phạt vi phạm, đi trễ & phiếu trừ tiền</span>
+                    <span className="font-bold text-rose-600">-{formatVND(overviewMetrics.totalDeductions)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">Tỷ lệ chi trả ròng (Net/Gross)</span>
+                    <span className="font-bold text-primary">
+                      {overviewMetrics.totalGross > 0 ? Math.round((overviewMetrics.totalNet / overviewMetrics.totalGross) * 100) : 100}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 font-black text-sm">
+                    <span className="text-primary">Thực nhận cuối cùng (Net)</span>
+                    <span className="text-primary">{formatVND(overviewMetrics.totalNet)}</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="text-xs text-slate-500 text-center">
-              {tableData.length} nhân viên đang có kết quả tính lương trong kỳ
+
+            {/* Bảng phân bổ chi phí theo chi nhánh */}
+            <div className="card p-0 overflow-hidden bg-white border border-slate-200 rounded-2xl shadow-xs">
+              <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold flex items-center gap-2">
+                    <Store size={16} className="text-emerald-400" /> Phân bổ Chi phí Lương theo Chi nhánh
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">So sánh quy mô nhân sự và chi phí thực nhận giữa các cửa hàng</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="p-3">Chi nhánh</th>
+                      <th className="p-3 text-center">Số NV</th>
+                      <th className="p-3 text-right">Tổng giờ công</th>
+                      <th className="p-3 text-right">Quỹ lương (Gross)</th>
+                      <th className="p-3 text-right">Tiền tăng ca (OT)</th>
+                      <th className="p-3 text-right">Thực nhận (Net)</th>
+                      <th className="p-3 text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {overviewMetrics.storeList.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-6 text-center text-slate-400">
+                          Chưa có dữ liệu chi nhánh trong kỳ lương này
+                        </td>
+                      </tr>
+                    ) : (
+                      overviewMetrics.storeList.map(item => (
+                        <tr key={item.storeId} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="p-3 font-semibold text-slate-900 flex items-center gap-1.5">
+                            <Store size={14} className="text-emerald-600 shrink-0" /> {item.storeName}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className="px-2 py-0.5 bg-slate-100 rounded-full font-bold text-slate-700">
+                              {item.employeeCount} NV
+                            </span>
+                          </td>
+                          <td className="p-3 text-right font-medium text-slate-700">{Math.round(item.totalHours)}h</td>
+                          <td className="p-3 text-right font-bold text-slate-900">{formatVND(item.gross)}</td>
+                          <td className="p-3 text-right font-medium text-amber-700">{formatVND(item.otSalary)}</td>
+                          <td className="p-3 text-right font-black text-emerald-700">{formatVND(item.net)}</td>
+                          <td className="p-3 text-center">
+                            <button
+                              onClick={() => {
+                                setSelectedStore(item.storeId)
+                                setTab('table')
+                              }}
+                              className="text-xs text-primary hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              Xem bảng lương <ArrowRight size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
 
-        {/* PAYSLIPS LIST (Manager) */}
+        {/* PAYSLIPS DATA TABLE (Manager) - Quy Chuẩn Section 5.2 */}
         {(tab === 'payslips' && isManager) && (
-          <div className="space-y-2 animate-slide-up">
-            {slips.map(slip => {
-              const expanded = expandedSlip === slip.id
-              return (
-                <div key={slip.id} className="card overflow-hidden">
-                  <button className="w-full p-3 flex items-center gap-3 text-left" onClick={() => setExpandedSlip(expanded ? null : slip.id)}>
-                    <div className="avatar" style={{ width: 36, height: 36, fontSize: 12 }}>{getInitials(slip.name)}</div>
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold">{slip.name}</div>
-                      <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>{slip.department}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold" style={{ color: 'var(--success)' }}>{formatVND(slip.netSalary)}</div>
-                      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>thực nhận</div>
-                    </div>
-                    {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-                  {expanded && <PayslipDetail slip={slip} />}
+          <div className="space-y-3 animate-slide-up">
+            {/* Thanh công cụ lọc & tìm kiếm */}
+            <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+                {/* Search */}
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                  <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo tên, mã NV, bộ phận..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2F6FA8] focus:border-[#2F6FA8] transition-all"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
                 </div>
-              )
-            })}
+
+                {/* Filter Store */}
+                <select
+                  value={selectedStore}
+                  onChange={e => setSelectedStore(e.target.value)}
+                  className="text-xs bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2F6FA8] cursor-pointer"
+                >
+                  <option value="all">Toàn bộ chi nhánh ({stores.length})</option>
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+
+                {/* Filter Employee Type */}
+                <select
+                  value={employeeTypeFilter}
+                  onChange={e => setEmployeeTypeFilter(e.target.value)}
+                  className="text-xs bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#2F6FA8] cursor-pointer"
+                >
+                  <option value="all">Tất cả loại hình</option>
+                  <option value="hourly">Bán thời gian (Theo giờ)</option>
+                  <option value="fulltime">Toàn thời gian (Cố định)</option>
+                </select>
+
+                {/* Toggle Hide Resigned */}
+                <label className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 px-2.5 py-1.5 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={hideResigned}
+                    onChange={e => setHideResigned(e.target.checked)}
+                    className="rounded border-gray-300 text-[#2F6FA8] focus:ring-[#2F6FA8] cursor-pointer"
+                  />
+                  <span>Ẩn NV đã nghỉ</span>
+                </label>
+              </div>
+
+              {/* Counter badge */}
+              <div className="text-xs text-gray-500 font-medium">
+                Hiển thị <span className="font-bold text-[#001D3D]">{slips.length}</span> phiếu lương
+              </div>
+            </div>
+
+            {/* Interactive Data Table */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50/90 text-gray-600 font-bold border-b border-gray-100 select-none">
+                      <th className="py-3 px-3.5 text-center text-gray-400 w-12">#</th>
+                      <th className="py-3 px-4 text-[#001D3D]">Nhân Viên</th>
+                      <th className="py-3 px-3">Vị Trí / Cơ Sở</th>
+                      <th className="py-3 px-3 text-center">Công &amp; Giờ</th>
+                      <th className="py-3 px-3 text-right">Lương Cơ Bản</th>
+                      <th className="py-3 px-3 text-right">Lương Công</th>
+                      <th className="py-3 px-3 text-right text-emerald-700">Thưởng &amp; Phụ Cấp</th>
+                      <th className="py-3 px-3 text-right text-rose-600">Giảm Trừ</th>
+                      <th className="py-3 px-4 text-right text-[#001D3D]">Thực Nhận (NET)</th>
+                      <th className="py-3 px-3 text-center">Trạng Thái</th>
+                      <th className="py-3 px-3 text-center">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {slips.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="py-12 text-center text-gray-400">
+                          <FileText size={36} className="mx-auto mb-2 text-gray-300" />
+                          <p className="font-medium text-gray-500">Không tìm thấy phiếu lương phù hợp bộ lọc</p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">Thử đổi từ khóa tìm kiếm hoặc chọn chi nhánh khác</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      slips.map((slip, idx) => {
+                        const totalBonusAndAllowance = (slip.bonusTickets || 0) + (slip.kpiSalary || 0) + (slip.allowances || 0)
+                        const totalDeductions = (slip.totalPenalties || 0) + (slip.deductionTickets || 0) + (slip.insurance || 0) + (slip.tax || 0) + (slip.advanceSalary || 0) + (slip.holdSalary || 0) - (slip.returnHoldSalary || 0)
+
+                        const statusStyle = slip.status === 'Đã thanh toán'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : slip.status === 'Đã gửi phiếu lương'
+                          ? 'bg-sky-50 text-sky-700 border-sky-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
+
+                        return (
+                          <tr
+                            key={slip.id}
+                            onClick={() => {
+                              setModalTargetEmp(slip)
+                              setActiveModal('view_slip')
+                            }}
+                            className="hover:bg-primary-50/40 transition-all cursor-pointer group"
+                          >
+                            <td className="py-3.5 px-3.5 text-center font-mono text-gray-400 text-[11px]">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-primary-100 text-[#2F6FA8] flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                  {getInitials(slip.name)}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-gray-900 group-hover:text-[#2F6FA8] transition-colors truncate">
+                                    {slip.name}
+                                  </div>
+                                  <div className="text-[11px] font-mono text-gray-400">
+                                    {slip.code}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-3">
+                              <div className="font-bold text-gray-800">{slip.department}</div>
+                              <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                <Store size={11} className="text-gray-400 shrink-0" />
+                                <span className="truncate max-w-[130px]" title={slip.storeName}>{slip.storeName}</span>
+                              </div>
+                              {slip.secondaryStoreNames && slip.secondaryStoreNames.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {slip.secondaryStoreNames.map((secName, i) => (
+                                    <span
+                                      key={i}
+                                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200"
+                                      title={`Hỗ trợ ca tại: ${secName}`}
+                                    >
+                                      +{secName.replace('Homies Milk Tea - ', '').trim()}
+                                    </span>
+                                  ))}
+                                  {selectedStore !== 'all' && slip.storeId !== selectedStore && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                                      Hỗ trợ ca
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-3 text-center">
+                              <div className="font-mono font-bold text-gray-800 tabular-nums">
+                                {slip.totalDays} công
+                              </div>
+                              <div className="text-[11px] font-mono text-gray-500 tabular-nums">
+                                {slip.totalHours}h {slip.otHours > 0 && <span className="text-amber-600">(+{slip.otHours}h OT)</span>}
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-3 text-right font-mono tabular-nums text-gray-600">
+                              {slip.baseSalaryFormatted}
+                            </td>
+                            <td className="py-3.5 px-3 text-right font-mono font-medium tabular-nums text-gray-800">
+                              {formatVND(slip.workedSalary)}
+                            </td>
+                            <td className="py-3.5 px-3 text-right font-mono font-bold tabular-nums text-emerald-700">
+                              {totalBonusAndAllowance > 0 ? `+${formatVND(totalBonusAndAllowance)}` : '0 đ'}
+                            </td>
+                            <td className="py-3.5 px-3 text-right font-mono font-bold tabular-nums text-rose-600">
+                              {totalDeductions > 0 ? `-${formatVND(totalDeductions)}` : '0 đ'}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <span className="font-mono font-bold tabular-nums text-sm text-emerald-700">
+                                {formatVND(slip.netSalary)}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${statusStyle}`}>
+                                {slip.status || 'Chờ duyệt'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-3 text-center" onClick={e => e.stopPropagation()}>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setModalTargetEmp(slip)
+                                    setActiveModal('view_slip')
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-[#2F6FA8] text-gray-700 hover:text-white font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Mở bóc tách chi tiết phiếu lương"
+                                >
+                                  <FileText size={12} />
+                                  <span>Chi tiết</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => router.push(`/payroll/salary-slip?period=${selectedPeriod}&employee=${slip.id}`)}
+                                  className="p-1.5 rounded-lg text-gray-400 hover:text-[#2F6FA8] hover:bg-primary-50 transition cursor-pointer"
+                                  title="Mở liên kết phiếu lương riêng"
+                                >
+                                  <ExternalLink size={13} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Chân bảng Footer tóm tắt chuẩn Section 5.2 */}
+              <div className="p-3.5 bg-gray-50/90 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-600 gap-2">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">
+                    Đội ngũ: <strong className="text-[#001D3D]">{slips.length}</strong> nhân sự
+                  </span>
+                  <span>•</span>
+                  <span className="font-medium">
+                    Tổng giờ: <strong className="font-mono tabular-nums text-gray-800">{slips.reduce((acc, s) => acc + s.totalHours, 0).toFixed(1)}h</strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-600">Tổng thực nhận (NET):</span>
+                  <span className="text-sm font-bold font-mono tabular-nums text-emerald-700">
+                    {formatVND(slips.reduce((acc, s) => acc + s.netSalary, 0))}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         {/* MY PAYSLIP */}
-        {(tab === 'my' || !isManager) && mySlip && (
-          <div className="animate-slide-up">
-            <div className="card-elevated p-5 text-center mb-4" style={{ background: 'linear-gradient(135deg, #48C07910, #2F6FA810)' }}>
-              <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Thực nhận tháng {selectedPeriod.split('-')[1]}</div>
-              <div className="text-3xl font-black mt-1" style={{ color: 'var(--success)' }}>{formatVND(mySlip.netSalary)}</div>
+        {(tab === 'my' || !isManager) && (
+          mySlip ? (
+            <div className="animate-slide-up">
+              <div className="card-elevated p-5 text-center mb-4" style={{ background: 'linear-gradient(135deg, #48C07910, #2F6FA810)' }}>
+                <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Thực nhận tháng {selectedPeriod.split('-')[1]}</div>
+                <div className="text-3xl font-black mt-1" style={{ color: 'var(--success)' }}>{formatVND(mySlip.netSalary)}</div>
+              </div>
+              <div className="card"><PayslipDetail slip={mySlip} /></div>
             </div>
-            <div className="card"><PayslipDetail slip={mySlip} /></div>
-          </div>
+          ) : user?.role === 'ceo' ? (
+            <div className="card p-8 text-center bg-white border border-amber-200 rounded-2xl animate-slide-up shadow-2xs">
+              <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3 text-xl font-bold">
+                👑
+              </div>
+              <h4 className="text-base font-bold text-slate-800">Tài khoản Ban giám đốc (CEO)</h4>
+              <p className="text-xs text-slate-600 mt-1.5 max-w-md mx-auto leading-relaxed">
+                Theo quy chế nội bộ chuỗi Homies, thành viên Ban giám đốc nhận thu nhập quản trị điều hành riêng, không tính theo bảng chấm công nhật tại cửa hàng.
+              </p>
+              <div className="mt-4 flex justify-center gap-2">
+                <button
+                  onClick={() => setTab('overview')}
+                  className="btn btn-primary text-xs py-2 px-4 font-bold cursor-pointer"
+                >
+                  Xem tổng quan chi phí chuỗi
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="card p-8 text-center bg-white border border-gray-100 rounded-2xl animate-slide-up">
+              <FileText className="mx-auto text-slate-300 mb-2" size={40} />
+              <h4 className="text-sm font-bold text-slate-800">Chưa có dữ liệu phiếu lương kỳ này</h4>
+              <p className="text-xs text-slate-500 mt-1">Phiếu lương của bạn cho tháng {selectedPeriod.split('-')[1]}/{selectedPeriod.split('-')[0]} chưa được tạo hoặc đang trong quá trình tính toán.</p>
+            </div>
+          )
         )}
       </div>
 
@@ -1972,7 +2957,7 @@ export default function PayrollPage() {
             <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
               <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                 <div className="text-slate-600 font-semibold">
-                  Đã chọn: <span className="text-sky-600 font-extrabold">{visibleColumnCount}</span> / 29 cột
+                  Đã chọn: <span className="text-sky-600 font-extrabold">{visibleColumnCount}</span> / {Object.keys(DEFAULT_COLUMN_VISIBILITY).length} cột
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -2120,10 +3105,50 @@ export default function PayrollPage() {
                       <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-800 font-semibold">{d.calcHours}</td>
                       <td className="p-2.5 border-r border-slate-100 text-right font-mono text-sky-600 font-medium">{formatVND(d.coeffSalary)}</td>
                       <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-800">{formatVND(d.dailySalary)}</td>
-                      <td className="p-2.5 border-r border-slate-100 text-right font-mono text-slate-500">{d.allowance}</td>
-                      <td className="p-2.5 border-r border-slate-100 text-right font-mono text-emerald-600">{d.bonus}</td>
-                      <td className="p-2.5 border-r border-slate-100 text-right font-mono text-rose-600">{d.penalty > 0 ? formatVND(d.penalty) : '0'}</td>
-                      <td className="p-2.5 border-r border-slate-100 text-right font-mono text-rose-600">{d.deduction}</td>
+                      {/* Cột 10: Phụ cấp (Ca gãy, ca đêm...) */}
+                      <td className="p-2.5 border-r border-slate-100 text-right font-mono">
+                        {d.allowance > 0 ? (
+                          <div className="flex flex-col items-end">
+                            <span className="text-emerald-700 font-bold">+{formatVND(d.allowance)}</span>
+                            {d.allowanceLabel && (
+                              <span className="text-[10px] text-emerald-600 font-sans font-medium bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                {d.allowanceLabel}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">0</span>
+                        )}
+                      </td>
+                      {/* Cột 11: Phiếu cộng tiền */}
+                      <td className="p-2.5 border-r border-slate-100 text-right font-mono text-emerald-600">
+                        {d.bonus > 0 ? `+${formatVND(d.bonus)}` : <span className="text-slate-400">0</span>}
+                      </td>
+                      {/* Cột 12: Phạt đi muộn */}
+                      <td className="p-2.5 border-r border-slate-100 text-right font-mono">
+                        {d.penalty > 0 ? (
+                          <div className="flex flex-col items-end">
+                            <span className="text-rose-600 font-bold">-{formatVND(d.penalty)}</span>
+                            <span className="text-[10px] text-rose-500 font-sans font-normal">
+                              {d.lateMinutes > 0 ? `Muộn ${d.lateMinutes}p` : ''} {d.lateLabel ? `(${d.lateLabel})` : ''}
+                            </span>
+                          </div>
+                        ) : d.isLateExempt ? (
+                          <div className="flex flex-col items-end">
+                            <span className="text-emerald-600 font-bold">0</span>
+                            <span className="text-[10px] text-emerald-600 font-sans font-medium bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              {d.lateLabel || 'Được miễn'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">0</span>
+                        )}
+                      </td>
+                      {/* Cột 13: Phiếu trừ tiền */}
+                      <td className="p-2.5 border-r border-slate-100 text-right font-mono text-rose-600">
+                        {d.deduction > 0 ? `-${formatVND(d.deduction)}` : <span className="text-slate-400">0</span>}
+                      </td>
+                      {/* Cột 14: Lương thực nhận ngày */}
                       <td className="p-2.5 text-right font-bold text-slate-900 font-mono bg-sky-50/40">{formatVND(d.netDaily)}</td>
                     </tr>
                   ))}
@@ -2144,97 +3169,258 @@ export default function PayrollPage() {
         </div>
       )}
 
-      {/* MODAL VIEW PAYSLIP DETAIL */}
-      {activeModal === 'view_slip' && modalTargetEmp && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-primary-900 text-white">
-              <div>
-                <div className="text-xs opacity-80">Phiếu lương chi tiết</div>
-                <h3 className="text-base font-bold">{String(modalTargetEmp.name || '')}</h3>
+      {/* MODAL VIEW PAYSLIP DETAIL - Bóc tách chi tiết cá nhân chuẩn Section 5.3 */}
+      {activeModal === 'view_slip' && modalTargetEmp && (() => {
+        const emp = modalTargetEmp as unknown as (PayrollTableRow & Record<string, unknown>)
+        const totalBonus = (emp.bonusTickets || 0) + (emp.kpiSalary || 0)
+        const totalDeductionsCalc = (emp.totalPenalties || 0) + (emp.deductionTickets || 0) + (emp.insurance || 0) + (emp.tax || 0) + (emp.advanceSalary || 0) + (emp.holdSalary || 0) - (emp.returnHoldSalary || 0)
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]">
+              {/* Header: Executive Gradient */}
+              <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-[#001D3D] via-[#1D3E61] to-[#2F6FA8] text-white">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs text-sky-200 font-medium">
+                      <span>HRM Homies</span>
+                      <span>•</span>
+                      <span>Kỳ lương {selectedPeriod.split('-')[1]}/{selectedPeriod.split('-')[0]}</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white mt-0.5">{String(emp.name || '')}</h3>
+                    <div className="text-xs text-white/80 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <span>{String(emp.code || '')}</span>
+                      <span>•</span>
+                      <span>{String(emp.department || '')}</span>
+                      <span>•</span>
+                      <span>{String(emp.storeName || '')}</span>
+                      {emp.secondaryStoreNames && emp.secondaryStoreNames.length > 0 && (
+                        <span className="px-1.5 py-0.5 text-[10px] rounded bg-amber-400/20 text-amber-200 border border-amber-300/30">
+                          Hỗ trợ: {emp.secondaryStoreNames.map(s => s.replace('Homies Milk Tea - ', '').trim()).join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveModal(null)}
+                    className="text-white/70 hover:text-white rounded-xl p-1.5 hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Hero Net Amount Box */}
+                <div className="mt-3.5 p-3 rounded-xl bg-white/10 backdrop-blur-xs border border-white/15 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-white/90">Lương thực nhận (NET):</span>
+                  <span className="text-xl font-mono font-bold text-emerald-300 tabular-nums">
+                    {formatVND(Number(emp.netSalary) || 0)}
+                  </span>
+                </div>
               </div>
-              <button onClick={() => setActiveModal(null)} className="text-white/80 hover:text-white rounded-lg p-1">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-5 space-y-3 text-xs">
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-gray-500">Mã NV / Vị trí</span>
-                <span className="font-semibold text-gray-800">{String(modalTargetEmp.code || '')} • {String(modalTargetEmp.department || '')}</span>
+
+              {/* Scrollable Body */}
+              <div className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
+                {/* Khối 1: Ngày công & Giờ làm */}
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="text-[11px] text-gray-500">Số công chuẩn</div>
+                    <div className="text-xs font-bold text-gray-800 font-mono mt-0.5">26 công</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-gray-500">Công thực làm</div>
+                    <div className="text-xs font-bold text-[#2F6FA8] font-mono mt-0.5">{emp.totalDays || 0} công</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-gray-500">Tổng giờ làm</div>
+                    <div className="text-xs font-bold text-[#001D3D] font-mono mt-0.5">{emp.totalHours || 0}h</div>
+                  </div>
+                </div>
+
+                {/* Khối 2: Các khoản thu nhập */}
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">1. Thu nhập &amp; Phụ cấp</div>
+                  <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl px-3.5 bg-white">
+                    <div className="flex justify-between py-2">
+                      <span className="text-gray-600">Mức lương cơ bản</span>
+                      <span className="font-semibold text-gray-800 font-mono">{String(emp.baseSalaryFormatted || '')}</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-gray-600">Lương tính theo công/giờ</span>
+                      <span className="font-bold text-gray-900 font-mono">{formatVND(Number(emp.workedSalary) || 0)}</span>
+                    </div>
+                    {Number(emp.otSalary) > 0 && (
+                      <div className="flex justify-between py-2">
+                        <span className="text-gray-600">Lương tăng ca ({emp.otHours}h)</span>
+                        <span className="font-semibold text-amber-700 font-mono">+{formatVND(Number(emp.otSalary))}</span>
+                      </div>
+                    )}
+                    {Number(emp.allowances) > 0 && (
+                      <div className="flex justify-between py-2">
+                        <span className="text-gray-600">Tổng phụ cấp (ca/ăn/khác)</span>
+                        <span className="font-semibold text-gray-800 font-mono">+{formatVND(Number(emp.allowances))}</span>
+                      </div>
+                    )}
+                    {totalBonus > 0 && (
+                      <div className="flex justify-between py-2">
+                        <span className="text-gray-600">Thưởng, KPI &amp; Phiếu cộng</span>
+                        <span className="font-bold text-emerald-700 font-mono">+{formatVND(totalBonus)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between py-2 bg-emerald-50/40 -mx-3.5 px-3.5 rounded-b-xl">
+                      <span className="font-bold text-[#001D3D]">Tổng thu nhập (GROSS)</span>
+                      <span className="font-bold text-[#001D3D] font-mono">{formatVND(Number(emp.grossSalary) || 0)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Khối 3: Các khoản giảm trừ */}
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">2. Các khoản giảm trừ</div>
+                  <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl px-3.5 bg-white">
+                    <div className="flex justify-between py-2">
+                      <span className="text-gray-600">Phạt vi phạm &amp; Đi trễ</span>
+                      <span className="font-semibold text-rose-600 font-mono">
+                        {Number(emp.totalPenalties) > 0 ? `-${formatVND(Number(emp.totalPenalties))}` : '0 đ'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-gray-600">Phiếu trừ tiền khác</span>
+                      <span className="font-semibold text-rose-600 font-mono">
+                        {Number(emp.deductionTickets) > 0 ? `-${formatVND(Number(emp.deductionTickets))}` : '0 đ'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-gray-600">Bảo hiểm (BHXH, BHYT, BHTN)</span>
+                      <span className="font-semibold text-gray-700 font-mono">
+                        {Number(emp.insurance) > 0 ? `-${formatVND(Number(emp.insurance))}` : '0 đ'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-gray-600">Thuế TNCN</span>
+                      <span className="font-semibold text-gray-700 font-mono">
+                        {Number(emp.tax) > 0 ? `-${formatVND(Number(emp.tax))}` : '0 đ'}
+                      </span>
+                    </div>
+                    {Number(emp.advanceSalary) > 0 && (
+                      <div className="flex justify-between py-2">
+                        <span className="text-gray-600">Tạm ứng lương đã nhận</span>
+                        <span className="font-semibold text-rose-600 font-mono">-{formatVND(Number(emp.advanceSalary))}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between py-2 bg-rose-50/40 -mx-3.5 px-3.5 rounded-b-xl">
+                      <span className="font-bold text-rose-800">Tổng giảm trừ</span>
+                      <span className="font-bold text-rose-700 font-mono">
+                        {totalDeductionsCalc > 0 ? `-${formatVND(totalDeductionsCalc)}` : '0 đ'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-gray-500">Lương cơ bản</span>
-                <span className="font-semibold text-gray-800">{String(modalTargetEmp.baseSalaryFormatted || '')}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-gray-500">Lương ngày công</span>
-                <span className="font-semibold text-gray-800">{formatVND(Number(modalTargetEmp.workedSalary) || 0)}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-gray-500">Thưởng / Phiếu cộng</span>
-                <span className="font-semibold text-emerald-600">+{formatVND(Number(modalTargetEmp.bonusTickets) || 0)}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100">
-                <span className="text-gray-500">Phạt / Khấu trừ</span>
-                <span className="font-semibold text-rose-600">-{formatVND((Number(modalTargetEmp.totalPenalties) || 0) + (Number(modalTargetEmp.deductionTickets) || 0))}</span>
-              </div>
-              <div className="flex justify-between py-2 border-t border-gray-200 text-sm font-bold bg-emerald-50 px-3 rounded-xl mt-3">
-                <span className="text-gray-900">Thực nhận (NET)</span>
-                <span className="text-emerald-700">{formatVND(Number(modalTargetEmp.netSalary) || 0)}</span>
-              </div>
-            </div>
-            <div className="px-5 py-3.5 bg-vanilla-50 border-t border-gray-100 flex items-center justify-between gap-2">
-              <button
-                onClick={() => window.print()}
-                className="btn bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs py-1.5 px-3 rounded-xl border-0 font-medium cursor-pointer"
-              >
-                🖨️ In phiếu
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const emp = modalTargetEmp
-                    setActiveModal(null)
-                    openPaySalaryModal(emp)
-                  }}
-                  className="btn bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-1.5 px-3 rounded-xl border-0 font-semibold cursor-pointer shadow-2xs"
-                >
-                  💳 Thanh toán VietQR
-                </button>
-                <button onClick={() => setActiveModal(null)} className="btn bg-slate-500 hover:bg-slate-600 text-white text-xs py-1.5 px-3 rounded-xl border-0 cursor-pointer">
-                  Đóng
-                </button>
+
+              {/* Action Bar Footer */}
+              <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Printer size={13} className="text-[#2F6FA8]" />
+                    <span>In phiếu</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveModal(null)
+                      router.push(`/payroll/salary-slip?period=${selectedPeriod}&employee=${emp.id}`)
+                    }}
+                    className="px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <ExternalLink size={13} className="text-[#2F6FA8]" />
+                    <span>Trang riêng</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setActiveModal(null)
+                      openPaySalaryModal(emp)
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                  >
+                    <CreditCard size={13} />
+                    <span>Thanh toán VietQR</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveModal(null)}
+                    className="px-3 py-1.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold transition cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
+
+      {/* DRAWER ĐIỀU CHỈNH ĐƠN GIÁ LƯƠNG 1-CHẠM */}
+      <PayrollHourlyRateDrawer
+        isOpen={!!rateDrawerTarget}
+        onClose={() => setRateDrawerTarget(null)}
+        target={rateDrawerTarget}
+        onSuccess={() => {
+          setPayrollReloadKey(k => k + 1)
+        }}
+      />
     </AppShell>
   )
 }
 
 function PayslipDetail({ slip }: { slip: PayrollTableRow }) {
+  const isZeroSalary = slip.netSalary === 0 && slip.workedSalary === 0
+
   return (
     <div className="px-3 pb-3 space-y-1.5 border-t" style={{ borderColor: 'var(--gray-100)' }}>
       <div className="pt-2" />
+      
+      {/* Thông tin ngày công tóm tắt */}
+      <div className="grid grid-cols-3 gap-2 p-2 bg-slate-50 rounded-lg text-[11px] mb-2 text-slate-600 font-medium">
+        <div>Công chuẩn: <span className="font-bold text-slate-800">26 ngày</span></div>
+        <div>Ngày đi làm: <span className="font-bold text-slate-800">{slip.regularDays} ngày</span></div>
+        <div>Tổng giờ làm: <span className="font-bold text-slate-800">{slip.totalHours}h</span></div>
+      </div>
+
+      <div className="flex justify-between text-xs py-1 border-b border-gray-100">
+        <span className="text-slate-500">Mức lương cơ bản</span>
+        <span className="font-semibold text-slate-800">{slip.baseSalaryFormatted}</span>
+      </div>
+
+      {isZeroSalary && (
+        <div className="py-2 text-[11px] text-amber-700 bg-amber-50/70 px-2.5 rounded-lg border border-amber-200/60 my-1">
+          ⚠️ Nhân viên chưa có dữ liệu ca làm việc/chấm công trong kỳ này.
+        </div>
+      )}
+
       {[
-        { label: 'Lương theo công', val: slip.workedSalary, color: '' },
+        { label: 'Lương theo công thực tế', val: slip.workedSalary, color: '' },
         { label: `Tăng ca (${slip.otHours}h)`, val: slip.otSalary, color: 'var(--primary)' },
         { label: 'Thưởng / phiếu cộng', val: slip.bonusTickets + slip.kpiSalary, color: 'var(--success)' },
         { label: 'Phụ cấp', val: slip.allowances, color: '' },
-        { label: 'Phạt', val: -slip.totalPenalties, color: 'var(--error)' },
+        { label: 'Phạt vi phạm & đi trễ', val: -slip.totalPenalties, color: 'var(--error)' },
         { label: 'Phiếu trừ tiền', val: -slip.deductionTickets, color: 'var(--error)' },
-        { label: 'Bảo hiểm', val: -slip.insurance, color: '' },
+        { label: 'Bảo hiểm (BHXH/BHYT/BHTN)', val: -slip.insurance, color: '' },
         { label: 'Thuế TNCN', val: -slip.tax, color: '' },
         { label: 'Tạm ứng', val: -slip.advanceSalary, color: '' },
-      ].filter(r => r.val !== 0).map((row, i) => (
-        <div key={i} className="flex justify-between text-xs py-1">
-          <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
-          <span className="font-medium" style={{ color: row.val < 0 ? 'var(--error)' : row.color || 'var(--text-primary)' }}>
-            {row.val > 0 ? '+' : ''}{formatVND(row.val)}
-          </span>
-        </div>
-      ))}
+      ]
+        .filter(r => !isZeroSalary ? r.val !== 0 : true)
+        .map((row, i) => (
+          <div key={i} className="flex justify-between text-xs py-1">
+            <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
+            <span className="font-medium" style={{ color: row.val < 0 ? 'var(--error)' : row.color || 'var(--text-primary)' }}>
+              {row.val > 0 ? '+' : ''}{formatVND(row.val)}
+            </span>
+          </div>
+        ))}
       <div className="flex justify-between text-sm font-bold pt-2 border-t" style={{ borderColor: 'var(--gray-200)' }}>
         <span>Thực nhận</span>
         <span style={{ color: 'var(--success)' }}>{formatVND(slip.netSalary)}</span>

@@ -38,18 +38,71 @@ export default function ShiftSwapPage() {
   const [targetSchedule, setTargetSchedule] = useState<Schedule | null>(null)
   const [reason, setReason] = useState('')
 
+  const [apiMySchedules, setApiMySchedules] = useState<Schedule[]>([])
+  const [apiTargetSchedules, setApiTargetSchedules] = useState<Schedule[]>([])
+
   useEffect(() => { if (!isAuthenticated) router.push('/login') }, [isAuthenticated, router])
+
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    fetch(`/api/shifts?employee_id=${user.id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (active && json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          const list: Schedule[] = json.data.map((s: { id: string; employee_id: string; store_id?: string; shift_id: string; date: string; status?: string; notes?: string; shift_name?: string }) => ({
+            id: s.id,
+            org_id: 'org-001',
+            store_id: s.store_id || user.store_id,
+            employee_id: s.employee_id,
+            shift_id: s.shift_id,
+            date: s.date,
+            notes: s.notes || s.shift_name,
+            status: s.status === 'APPROVED' ? ('published' as const) : ('draft' as const),
+            updated_at: new Date().toISOString(),
+          }))
+          setApiMySchedules(list)
+        }
+      })
+      .catch(e => console.warn('[ShiftSwapPage] fetch my shifts error:', e))
+    return () => { active = false }
+  }, [user])
+
+  useEffect(() => {
+    if (!targetUser) return
+    let active = true
+    fetch(`/api/shifts?employee_id=${targetUser.id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (active && json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          const list: Schedule[] = json.data.map((s: { id: string; employee_id: string; store_id?: string; shift_id: string; date: string; status?: string; notes?: string; shift_name?: string }) => ({
+            id: s.id,
+            org_id: 'org-001',
+            store_id: s.store_id || targetUser.store_id,
+            employee_id: s.employee_id,
+            shift_id: s.shift_id,
+            date: s.date,
+            notes: s.notes || s.shift_name,
+            status: s.status === 'APPROVED' ? ('published' as const) : ('draft' as const),
+            updated_at: new Date().toISOString(),
+          }))
+          setApiTargetSchedules(list)
+        }
+      })
+      .catch(e => console.warn('[ShiftSwapPage] fetch target shifts error:', e))
+    return () => { active = false }
+  }, [targetUser])
 
   const mySchedules = useMemo(() => {
     if (!user) return []
-    const raw = ScheduleService.getSchedulesForUser(user, user.id)
+    const raw = apiMySchedules.length > 0 ? apiMySchedules : ScheduleService.getSchedulesForUser(user, user.id)
     const todayStr = new Date().toISOString().split('T')[0]
     const future = new Date()
     future.setDate(future.getDate() + 14)
     const futureStr = future.toISOString().split('T')[0]
     return raw.filter(s => s.date >= todayStr && s.date <= futureStr)
       .sort((a, b) => a.date.localeCompare(b.date))
-  }, [user])
+  }, [user, apiMySchedules])
 
   const incomingRequests = useMemo(
     () => user ? getSwapRequestsForMe(user.id).filter(request => request.status === 'pending') : [],
@@ -74,18 +127,19 @@ export default function ShiftSwapPage() {
   const targetSchedules = useMemo(() => {
     if (!targetUser || !user) return []
     const todayStr = new Date().toISOString().split('T')[0]
-    return ScheduleService.getPeerSchedulesForSwap(user, targetUser.id).filter(s =>
+    const raw = apiTargetSchedules.length > 0 ? apiTargetSchedules : ScheduleService.getPeerSchedulesForSwap(user, targetUser.id)
+    return raw.filter(s =>
       s.employee_id === targetUser.id && s.date >= todayStr
     ).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 14)
-  }, [targetUser, user])
+  }, [targetUser, user, apiTargetSchedules])
 
   if (!user) return null
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedSchedule || !targetUser) return
     let created
     try {
-      created = createSwapRequest(
+      created = await createSwapRequest(
         user.id, selectedSchedule.id, targetUser.id,
         swapType === 'swap' ? targetSchedule?.id : undefined,
         swapType, reason,

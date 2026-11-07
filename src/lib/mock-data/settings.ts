@@ -97,6 +97,12 @@ export const settingItems: SettingItem[] = [
     isRequired: false, setupOrder: 6.8,
   },
   {
+    id: 'ipos-cloud-integration', category: 'system', icon: '☁️', iconBg: 'bg-amber-100',
+    title: 'Tích Hợp Bên Thứ 3 & Cổng iPOS Cloud', description: 'Cấu hình Private Cloud API iPOS HRM, máy chấm công vân tay, tự động đồng bộ giờ công & lương 24/7',
+    href: '/settings/integrations/ipos', status: 'completed', statusText: 'iPOS Cloud • Worker 24/7',
+    isRequired: false, setupOrder: 6.9,
+  },
+  {
     id: 'permissions', category: 'system', icon: '🔐', iconBg: 'bg-error-100',
     title: 'Phân quyền & Bảo mật (RBAC)', description: 'Vai trò, phân quyền theo chi nhánh, quyền duyệt đơn',
     href: '/settings/permissions', status: 'completed', statusText: '6 vai trò hệ thống',

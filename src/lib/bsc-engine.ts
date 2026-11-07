@@ -108,45 +108,69 @@ export function scoreOperationCriteria(errorPoints: number, hasCriticalError: bo
   return { score: 1, label }
 }
 
-export function scoreCustomerCriteria(qrScore: number, reviewScore: number = 0): { score: number; label: string } {
+export function scoreCustomerCriteria(qrScore: number = 0, reviewScore: number = 0, hasNoQr: boolean = false): { score: number; label: string } {
   // Lấy tỷ lệ % trọng số cài đặt động (Mặc định 50% QR - 50% Review, CEO có thể chỉnh 60%-40%)
   const qrWeight = (bscSafetySettings.customer_qr_weight_pct || 50) / 100
   const reviewWeight = (bscSafetySettings.customer_review_weight_pct || 50) / 100
 
-  // 1. Quy đổi điểm 1-5 cho Tiêu chí con 1 (QR Feedback)
-  const qrRule = bscCriteriaThresholdsCatalog.find(r => r.criteria_key === 'customer_qr')
-  let qrConverted = 1
-  const qr5 = qrRule?.score_5 ?? 90
-  const qr4 = qrRule?.score_4 ?? 80
-  const qr3 = qrRule?.score_3 ?? 70
-  const qr2 = qrRule?.score_2 ?? 60
-  if (qrScore >= qr5) qrConverted = 5
-  else if (qrScore >= qr4) qrConverted = 4
-  else if (qrScore >= qr3) qrConverted = 3
-  else if (qrScore >= qr2) qrConverted = 2
-  else qrConverted = 1
+  const hasQr = !hasNoQr && qrScore > 0
+  const hasReview = reviewScore > 0
 
-  // 2. Quy đổi điểm 1-5 cho Tiêu chí con 2 (Đánh giá trực tiếp & CSKH)
-  const revRule = bscCriteriaThresholdsCatalog.find(r => r.criteria_key === 'customer_review')
-  let revConverted = 1
-  const rev5 = revRule?.score_5 ?? 90
-  const rev4 = revRule?.score_4 ?? 80
-  const rev3 = revRule?.score_3 ?? 70
-  const rev2 = revRule?.score_2 ?? 60
-  if (reviewScore >= rev5) revConverted = 5
-  else if (reviewScore >= rev4) revConverted = 4
-  else if (reviewScore >= rev3) revConverted = 3
-  else if (reviewScore >= rev2) revConverted = 2
-  else revConverted = 1
-
-  // Logic Fallback: Nếu không có review ➔ Tự lấy 100% điểm QR
-  if (bscSafetySettings.fallback_qr_only_if_no_review && (!reviewScore || reviewScore === 0)) {
-    const finalScore = qrConverted
-    const label = `${finalScore}/5đ KH (100% QR: ${qrConverted}đ [${qrScore}đ thô])`
-    return { score: finalScore, label }
+  // 1. Quy đổi điểm 1-5 cho Tiêu chí con 1 (QR Feedback) nếu có dữ liệu
+  let qrConverted = 5
+  if (hasQr) {
+    const qrRule = bscCriteriaThresholdsCatalog.find(r => r.criteria_key === 'customer_qr')
+    const qr5 = qrRule?.score_5 ?? 90
+    const qr4 = qrRule?.score_4 ?? 80
+    const qr3 = qrRule?.score_3 ?? 70
+    const qr2 = qrRule?.score_2 ?? 60
+    if (qrScore >= qr5) qrConverted = 5
+    else if (qrScore >= qr4) qrConverted = 4
+    else if (qrScore >= qr3) qrConverted = 3
+    else if (qrScore >= qr2) qrConverted = 2
+    else qrConverted = 1
   }
 
-  // 3. Tính điểm Khách Hàng tổng hợp theo trọng số nội bộ
+  // 2. Quy đổi điểm 1-5 cho Tiêu chí con 2 (Đánh giá trực tiếp & CSKH) nếu có dữ liệu
+  let revConverted = 5
+  if (hasReview) {
+    const revRule = bscCriteriaThresholdsCatalog.find(r => r.criteria_key === 'customer_review')
+    const rev5 = revRule?.score_5 ?? 90
+    const rev4 = revRule?.score_4 ?? 80
+    const rev3 = revRule?.score_3 ?? 70
+    const rev2 = revRule?.score_2 ?? 60
+    if (reviewScore >= rev5) revConverted = 5
+    else if (reviewScore >= rev4) revConverted = 4
+    else if (reviewScore >= rev3) revConverted = 3
+    else if (reviewScore >= rev2) revConverted = 2
+    else revConverted = 1
+  }
+
+  // TRƯỜNG HỢP 1: Tháng đó quán KHÔNG LÀM KHẢO SÁT QR (hasNoQr || qrScore = 0 hoặc để trống)
+  // → Tuyệt đối không tính 1 điểm phạt. Dồn 100% về Đánh giá trực tiếp & CSKH (hoặc đạt chuẩn 5đ nếu không có khiếu nại)
+  if (!hasQr) {
+    if (hasReview) {
+      const finalScore = revConverted
+      const label = `${finalScore}/5đ KH (100% Đánh giá CSKH: ${revConverted}đ [Không triển khai QR khảo sát])`
+      return { score: finalScore, label }
+    } else {
+      const finalScore = 5
+      const label = `5/5đ KH (Đạt chuẩn - Không triển khai QR & Không có khiếu nại CSKH)`
+      return { score: finalScore, label }
+    }
+  }
+
+  // TRƯỜNG HỢP 2: Có làm QR khảo sát nhưng KHÔNG có bài đánh giá trực tiếp / phản ánh
+  // → Tự động lấy 100% điểm QR
+  if (hasQr && !hasReview) {
+    if (bscSafetySettings.fallback_qr_only_if_no_review !== false) {
+      const finalScore = qrConverted
+      const label = `${finalScore}/5đ KH (100% QR: ${qrConverted}đ [${qrScore}đ thô])`
+      return { score: finalScore, label }
+    }
+  }
+
+  // TRƯỜNG HỢP 3: Có đầy đủ cả 2 tiêu chí con → Tính theo trọng số cấu hình (50% QR - 50% Review)
   const finalScore = Number((qrConverted * qrWeight + revConverted * reviewWeight).toFixed(2))
   const label = `${finalScore}/5đ KH (QR ${Math.round(qrWeight * 100)}%: ${qrConverted}đ [${qrScore}đ] | Đánh giá ${Math.round(reviewWeight * 100)}%: ${revConverted}đ [${reviewScore}đ])`
 
@@ -191,46 +215,60 @@ export function calculateStoreBSC(
     period,
     profit_threshold_daily: 6500000,
     target_daily: 8000000,
-    target_monthly: 240000000,
-    days_in_month: 30,
-    actual_revenue_monthly: 240000000,
-    actual_revenue_daily: 8000000,
-    is_unlocked: true,
+    target_monthly: 248000000,
+    days_in_month: 31,
+    actual_revenue_monthly: 0,
+    actual_revenue_daily: 0,
+    is_unlocked: false,
   }
 
   const rawMetrics = metricsSource.find(m => m.store_id === storeId && m.period === period) || {
     store_id: storeId,
     period,
-    waste_percentage: 2.5,
-    operation_error_points: 6,
-    customer_qr_score: 85,
-    customer_review_score: 83,
+    waste_percentage: 0,
+    operation_error_points: 0,
+    customer_qr_score: 0,
+    customer_review_score: 0,
   }
 
-  // Target daily = MAX(Mốc lợi nhuận, Doanh thu TB 3-6 tháng * 115%)
-  const effectiveTargetDaily = revTarget.avg_3_6_months_daily
-    ? Math.max(revTarget.profit_threshold_daily, Math.round(revTarget.avg_3_6_months_daily * 1.15))
-    : revTarget.target_daily
+  // Target daily: Nếu target_mode = 'manual' hoặc có manual_target_daily thì ưu tiên target chỉ định
+  const effectiveTargetDaily = revTarget.target_mode === 'manual'
+    ? (revTarget.manual_target_daily || revTarget.target_daily || 8000000)
+    : (revTarget.avg_3_6_months_daily
+        ? Math.max(revTarget.profit_threshold_daily, Math.round(revTarget.avg_3_6_months_daily * 1.15))
+        : (revTarget.target_daily || 8000000))
 
   // Gate Check
-  const isUnlocked = revTarget.actual_revenue_daily >= revTarget.profit_threshold_daily
+  const isUnlocked = revTarget.actual_revenue_daily >= revTarget.profit_threshold_daily && revTarget.actual_revenue_daily > 0
 
   // Chấm điểm 4 tiêu chí
   const revRes = isUnlocked
     ? scoreRevenueCriteria(revTarget.actual_revenue_daily, effectiveTargetDaily, revTarget.profit_threshold_daily)
-    : { score: 0, label: `Dưới Mốc Hòa Vốn (${(revTarget.actual_revenue_daily / 1000000).toFixed(1)}tr < ${(revTarget.profit_threshold_daily / 1000000).toFixed(1)}tr - Khóa 0đ)` }
+    : {
+        score: 0,
+        label: revTarget.actual_revenue_monthly === 0
+          ? 'Chưa có dữ liệu doanh thu'
+          : `Dưới Mốc Hòa Vốn (${(revTarget.actual_revenue_daily / 1000000).toFixed(1)}tr < ${(revTarget.profit_threshold_daily / 1000000).toFixed(1)}tr - Khóa 0đ)`,
+      }
 
   // % Hao hụt tự tính từ COGS định mức & COGS thực tế
   const wastePct =
     revTarget.cogs_budget && revTarget.cogs_actual && revTarget.cogs_budget > 0
       ? Number((((revTarget.cogs_actual - revTarget.cogs_budget) / revTarget.cogs_budget) * 100).toFixed(1))
-      : rawMetrics.waste_percentage
+      : (revTarget.waste_percentage ?? rawMetrics?.waste_percentage ?? 2.0)
 
-  const wasteRes = scoreWasteCriteria(wastePct)
-  const opRes = scoreOperationCriteria(rawMetrics.operation_error_points)
+  const wasteRes = scoreWasteCriteria(Number(wastePct || 0))
+
+  const effectiveOpPoints = revTarget.operation_error_points !== undefined ? revTarget.operation_error_points : rawMetrics.operation_error_points
+  const opRes = scoreOperationCriteria(effectiveOpPoints, revTarget.has_critical_op_error)
 
   // Đánh giá KH: Ép 1 điểm nếu có dị vật / ATTP
-  let custRes = scoreCustomerCriteria(rawMetrics.customer_qr_score, rawMetrics.customer_review_score)
+  const effectiveQrScore = revTarget.has_no_qr
+    ? 0
+    : (revTarget.customer_qr_score !== undefined ? revTarget.customer_qr_score : rawMetrics.customer_qr_score)
+  const effectiveReviewScore =
+    revTarget.customer_review_score !== undefined ? revTarget.customer_review_score : rawMetrics.customer_review_score
+  let custRes = scoreCustomerCriteria(effectiveQrScore, effectiveReviewScore, revTarget.has_no_qr)
   if (revTarget.has_attp_foreign_body) {
     custRes = { score: 1, label: 'Ép 1đ (Có dị vật / Vi phạm ATTP)' }
   }
@@ -263,12 +301,23 @@ export function calculateStoreBSC(
     : 0
 
   // Hệ số & Quỹ
-  const { coefficient: bsc_coefficient, label: coefficient_label } = isUnlocked
-    ? getBSCCoefficient(total_bsc_score)
-    : { coefficient: 0, label: 'Chưa mở (Dưới mốc lợi nhuận)' }
+  let bsc_coefficient = 0
+  let coefficient_label = 'Chưa mở (Dưới mốc lợi nhuận)'
+  if (isUnlocked) {
+    if (revTarget.bsc_coefficient !== undefined) {
+      bsc_coefficient = revTarget.bsc_coefficient
+      coefficient_label = `${Math.round(bsc_coefficient * 100)}% Quỹ nền (CEO chỉ định thủ công)`
+    } else {
+      const tierRes = getBSCCoefficient(total_bsc_score)
+      bsc_coefficient = tierRes.coefficient
+      coefficient_label = tierRes.label
+    }
+  }
 
   const base_bonus_pool = isUnlocked ? Math.round(revTarget.actual_revenue_monthly * 0.01) : 0
-  const store_bonus_pool = Math.round(base_bonus_pool * bsc_coefficient)
+  const store_bonus_pool = isUnlocked
+    ? Math.round(base_bonus_pool * bsc_coefficient)
+    : 0
 
   return {
     store_id: storeId,
@@ -277,6 +326,7 @@ export function calculateStoreBSC(
     revenue_target: {
       ...revTarget,
       target_daily: effectiveTargetDaily,
+      is_unlocked: isUnlocked,
     },
     criteria_scores,
     total_bsc_score,
@@ -296,11 +346,30 @@ export function calculateStoreBSC(
  * Tra hệ số cấp bậc từ bscPositionMultipliersCatalog động:
  */
 export function getRankCoefficient(role: string): { coefficient: number; label: string } {
-  const found = bscPositionMultipliersCatalog.find(p => p.role_key === role)
+  const normRole = (role || '').toLowerCase()
+  let matchedKey = 'full_time'
+
+  if (normRole.includes('quản lý') || normRole.includes('manager') || normRole === 'pos-006' || normRole === 'store_manager') {
+    matchedKey = 'store_manager'
+  } else if (normRole.includes('trưởng ca') || normRole.includes('leader') || normRole === 'pos-004' || normRole === 'shift_leader') {
+    matchedKey = 'shift_leader'
+  } else if (normRole.includes('part') || normRole.includes('bán thời gian') || normRole.includes('thử việc') || normRole === 'probation' || normRole === 'part_time') {
+    matchedKey = 'part_time'
+  } else if (normRole === 'full_time' || normRole.includes('chính thức') || normRole.includes('toàn thời gian') || normRole === 'employee') {
+    matchedKey = 'full_time'
+  } else {
+    // Check direct key in catalog
+    const direct = bscPositionMultipliersCatalog.find(p => p.role_key === role)
+    if (direct) {
+      return { coefficient: direct.multiplier, label: `${direct.role_title} (${direct.multiplier})` }
+    }
+  }
+
+  const found = bscPositionMultipliersCatalog.find(p => p.role_key === matchedKey)
   if (found) {
     return { coefficient: found.multiplier, label: `${found.role_title} (${found.multiplier})` }
   }
-  return { coefficient: 1.0, label: 'Staff (1.0)' }
+  return { coefficient: 1.0, label: 'Nhân Viên Chính Thức (1.0)' }
 }
 
 /**
@@ -355,18 +424,22 @@ export function calculateBSCTeamBonus(
   const interimResults = empDataList.map(emp => {
     total_team_hours += emp.work_hours
 
+    // Theo Phương án A: Quán nào tính theo quỹ của quán đó. 
+    // Nhân sự phải đạt đủ định mức giờ tại chính chi nhánh đó mới được tham gia chia quỹ chi nhánh.
     const is_eligible_hours = emp.work_hours >= min_hours_required
     const rankInfo = getRankCoefficient(emp.role)
 
-    // Chỉ tính điểm các lỗi đã được CEO Duyệt Chốt chính thức (approved_ceo)
-    const approvedErrors = emp.errors.filter(err => err.approval_status === 'approved_ceo' || !err.approval_status)
+    // Chỉ tính điểm các lỗi đã được CEO Duyệt Chốt chính thức (approved_ceo / confirmed)
+    const approvedErrors = emp.errors.filter(err => 
+      err.approval_status === 'approved_ceo' || (err.approval_status as string) === 'confirmed'
+    )
     const totalErrorPoints = approvedErrors.reduce((sum, err) => sum + err.points, 0)
     const hasSerious = approvedErrors.some(err => err.is_serious || err.locks_personal_bonus)
 
     const errInfo = getPersonalErrorCoefficient(totalErrorPoints, hasSerious)
 
     let lock_reason: string | undefined
-    if (!is_eligible_hours) lock_reason = `Chưa đủ ${min_hours_required}h làm việc (${emp.work_hours}h)`
+    if (!is_eligible_hours) lock_reason = `Chưa đủ ${min_hours_required}h làm việc tại cơ sở (${emp.work_hours}h)`
     else if (errInfo.coefficient === 0) lock_reason = errInfo.note
 
     const isEligible = is_eligible_hours && errInfo.coefficient > 0 && storeResult.store_bonus_pool > 0

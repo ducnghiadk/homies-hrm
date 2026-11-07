@@ -87,7 +87,8 @@ export function setShiftExtraMeta(keys: (string | undefined)[], meta: Partial<Sh
 }
 
 // ----------------------------------------------------
-// 4 Default Homies Shifts from User Configuration
+// ----------------------------------------------------
+// 5 Khung ca chuẩn Homies F&B thực tế và ca linh hoạt
 // ----------------------------------------------------
 export const DEFAULT_HOMIES_SHIFTS: ShiftTemplate[] = [
   {
@@ -101,58 +102,75 @@ export const DEFAULT_HOMIES_SHIFTS: ShiftTemplate[] = [
     store_scope: 'global',
     is_active: true,
     is_flexible: false,
-    allowed_position_ids: ['pos-001', 'pos-002', 'pos-003'],
+    allowed_position_ids: ['pos-001', 'pos-002', 'pos-bep'],
     min_headcount: 1,
-    max_headcount: 2,
+    max_headcount: 3,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
   {
     id: 'shift-002',
     base_shift_id: 'shift-002',
-    name: 'Ca Chiều',
-    code: 'AFTERNOON',
+    name: 'Ca Trưa',
+    code: 'NOON',
     start_time: '12:00',
     end_time: '17:00',
     color: '#059669',
     store_scope: 'global',
     is_active: true,
     is_flexible: false,
-    allowed_position_ids: ['pos-001', 'pos-002', 'pos-003'],
+    allowed_position_ids: ['pos-001', 'pos-002', 'pos-bep'],
     min_headcount: 1,
-    max_headcount: 2,
+    max_headcount: 3,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
   {
     id: 'shift-003',
     base_shift_id: 'shift-003',
-    name: 'Ca Đêm',
+    name: 'Ca Tối',
     code: 'EVENING',
     start_time: '17:00',
-    end_time: '10:00',
+    end_time: '22:00',
     color: '#DC2626',
     store_scope: 'global',
     is_active: true,
     is_flexible: false,
-    allowed_position_ids: ['pos-001', 'pos-002', 'pos-003'],
+    allowed_position_ids: ['pos-001', 'pos-002', 'pos-003', 'pos-bep'],
     min_headcount: 1,
-    max_headcount: 2,
+    max_headcount: 3,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
   {
     id: 'shift-004',
     base_shift_id: 'shift-004',
-    name: 'Ca phát sinh (Linh hoạt)',
-    code: 'FLEX',
-    start_time: '00:00',
-    end_time: '23:59',
-    color: '#2563EB',
+    name: 'Ca Cao Điểm Trưa (11:30 - 14:30)',
+    code: 'PEAK_NOON',
+    start_time: '11:30',
+    end_time: '14:30',
+    color: '#8B5CF6',
     store_scope: 'global',
     is_active: true,
     is_flexible: true,
-    allowed_position_ids: ['pos-001', 'pos-002', 'pos-003', 'pos-004'],
+    allowed_position_ids: ['pos-001', 'pos-002', 'pos-003', 'pos-bep'],
+    min_headcount: 1,
+    max_headcount: 3,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'shift-005',
+    base_shift_id: 'shift-005',
+    name: 'Ca Dọn Quầy (22:00 - 01:30)',
+    code: 'NIGHT_CLEAN',
+    start_time: '22:00',
+    end_time: '01:30',
+    color: '#4B5563',
+    store_scope: 'global',
+    is_active: true,
+    is_flexible: false,
+    allowed_position_ids: ['pos-001', 'pos-002', 'pos-003', 'pos-bep'],
     min_headcount: 1,
     max_headcount: 2,
     created_at: new Date().toISOString(),
@@ -191,7 +209,7 @@ const mapRowToShiftTemplate = (row: Record<string, unknown>): ShiftTemplate => {
 
   return {
     id: rowId,
-    base_shift_id: maCa === 'MORNING' ? 'shift-001' : maCa === 'AFTERNOON' ? 'shift-002' : maCa === 'EVENING' ? 'shift-003' : 'shift-004',
+    base_shift_id: maCa === 'MORNING' ? 'shift-001' : (maCa === 'AFTERNOON' || maCa === 'NOON') ? 'shift-002' : maCa === 'EVENING' ? 'shift-003' : 'shift-004',
     name: ten,
     code: maCa || 'SHIFT',
     start_time: formatTimeFromDb(String(row.gio_bat_dau || '')),
@@ -219,6 +237,48 @@ export interface ShiftAdapter {
 
 export const shiftAdapter: ShiftAdapter = {
   async getShiftTemplates(): Promise<ShiftTemplate[]> {
+    // 1. Ưu tiên đọc trực tiếp từ Database máy chủ (/api/shifts)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/shifts')
+        if (res.ok) {
+          const json = await res.json()
+          if (json?.success && Array.isArray(json.shift_templates) && json.shift_templates.length > 0) {
+            const mapped: ShiftTemplate[] = json.shift_templates.map((t: Record<string, unknown>) => ({
+              id: String(t.id || ''),
+              base_shift_id: String(t.id || ''),
+              name: String(t.name || ''),
+              code: String(
+                t.id === 'shift-001' ? 'MORNING' :
+                t.id === 'shift-002' ? 'NOON' :
+                t.id === 'shift-003' ? 'EVENING' :
+                t.id === 'shift-004' ? 'PEAK_NOON' :
+                t.id === 'shift-005' ? 'NIGHT_CLEAN' : 'FLEX'
+              ),
+              start_time: String(t.start || '08:30'),
+              end_time: String(t.end || '12:00'),
+              color: t.id === 'shift-001' ? '#D97706' :
+                     t.id === 'shift-002' ? '#059669' :
+                     t.id === 'shift-003' ? '#DC2626' :
+                     t.id === 'shift-004' ? '#8B5CF6' :
+                     t.id === 'shift-005' ? '#4B5563' : '#2563EB',
+              store_scope: 'global',
+              is_active: true,
+              is_flexible: t.id === 'shift-004',
+              allowed_position_ids: ['pos-001', 'pos-002', 'pos-003', 'pos-bep'],
+              min_headcount: 1,
+              max_headcount: 3,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }))
+            return mapped
+          }
+        }
+      } catch (err) {
+        console.warn('[ShiftAdapter] API /api/shifts fetch fallback:', err)
+      }
+    }
+
     if (isSupabaseConfigured && isRealDbMode()) {
       try {
         const { data, error } = await supabase
@@ -228,28 +288,11 @@ export const shiftAdapter: ShiftAdapter = {
 
         if (!error && data && data.length > 0) {
           const mapped = data.map(row => mapRowToShiftTemplate(row))
-          // Save backup cache
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(LOCAL_SHIFTS_BACKUP_KEY, JSON.stringify(mapped))
-          }
           return mapped
         }
       } catch (err) {
         console.warn('[ShiftAdapter] Supabase query fallback:', err)
       }
-    }
-
-    // Fallback to localStorage or defaults
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem(LOCAL_SHIFTS_BACKUP_KEY)
-        if (raw) {
-          const parsed = JSON.parse(raw) as ShiftTemplate[]
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed
-          }
-        }
-      } catch {}
     }
 
     return DEFAULT_HOMIES_SHIFTS
@@ -309,6 +352,28 @@ export const shiftAdapter: ShiftAdapter = {
       } catch {}
     }
 
+    // 2. Sync to Server DB via /api/shifts
+    if (typeof window !== 'undefined') {
+      try {
+        fetch('/api/shifts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'template',
+            shift_template: {
+              id: fullTemplate.id,
+              name: fullTemplate.name,
+              start: fullTemplate.start_time,
+              end: fullTemplate.end_time,
+              hours: 5.5,
+            },
+          }),
+        }).catch(err => console.warn('[ShiftAdapter] API sync error:', err))
+      } catch (err) {
+        console.warn('[ShiftAdapter] Server DB API error:', err)
+      }
+    }
+
     // 3. Sync to Supabase
     if (isSupabaseConfigured && isRealDbMode()) {
       try {
@@ -362,7 +427,20 @@ export const shiftAdapter: ShiftAdapter = {
       } catch {}
     }
 
-    // 2. Remove from Supabase
+    // 2. Remove from Server DB
+    if (typeof window !== 'undefined') {
+      try {
+        fetch('/api/shifts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ delete_template_id: id }),
+        }).catch(err => console.warn('[ShiftAdapter] Server delete fallback:', err))
+      } catch (err) {
+        console.warn('[ShiftAdapter] API delete error:', err)
+      }
+    }
+
+    // 3. Remove from Supabase
     if (isSupabaseConfigured && isRealDbMode()) {
       try {
         const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i

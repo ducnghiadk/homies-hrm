@@ -9,6 +9,7 @@ import {
   Settings,
   Building2,
   BellRing,
+  CalendarDays,
 } from 'lucide-react'
 import type { Store } from '@/lib/mock-data'
 
@@ -82,6 +83,17 @@ export default function ApprovalExecutiveHeader({
             </select>
             <Building2 size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
+
+          {/* Nút Xem Bản Đồ Thời Gian Trống */}
+          <Link
+            href="/schedule/registrations"
+            className="px-3 py-2 min-h-[38px] rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-1.5 transition shadow-2xs"
+            title="Xem bản đồ thời gian rảnh của nhân viên và duyệt ca 1-chạm"
+          >
+            <CalendarDays size={15} className="text-amber-700" />
+            <span className="hidden md:inline">Bản Đồ Trống &amp; Đăng Ký Ca</span>
+            <span className="md:hidden">Đăng Ký Ca</span>
+          </Link>
 
           {/* Nút Xuất Excel */}
           <button

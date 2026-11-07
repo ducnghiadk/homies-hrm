@@ -237,76 +237,38 @@ export const mockBSCRevenueTargets: BSCRevenueTarget[] = [
   {
     store_id: 'store-001',
     store_name: 'Homies Hồ Bá Phấn',
-    period: '2026-07',
+    period: '2026-08',
     profit_threshold_daily: 6500000,
-    avg_3_6_months_daily: 7000000,
+    avg_3_6_months_daily: 7483870,
+    target_mode: 'auto_3_6_months',
     target_daily: 8000000,
-    target_monthly: 248000000, // 8tr * 31 ngày
+    target_monthly: 248000000,
     days_in_month: 31,
-    actual_revenue_monthly: 255440000, // 8.24tr/ngày -> đạt 103% target
-    actual_revenue_daily: 8240000,
+    actual_revenue_monthly: 209361294,
+    actual_revenue_daily: 6753590,
     is_unlocked: true,
-    cogs_budget: 85000000,
-    cogs_actual: 87125000, // (87.125m - 85m)/85m = 2.5% hao hụt
+    cogs_budget: 86000000,
+    cogs_actual: 89741000,
+    waste_percentage: 4.35,
+    operation_error_points: 2,
+    customer_qr_score: 100,
     has_attp_foreign_body: false,
-    min_hours_threshold: 110,
+    min_hours_threshold: 100,
+    bsc_coefficient: 0.5,
+    store_bonus_pool: 1046806,
     retain_deducted_bonus: true,
     approval_status: 'approved_published',
-    approved_by: 'CEO Nguyễn Văn A',
-    approved_at: '2026-08-01 10:00',
+    valid_from: '2026-08',
+    valid_to: '2026-12',
   },
-  // Hồ Bá Phấn - Tháng 6/2026 (Đạt điều kiện)
-  {
-    store_id: 'store-001',
-    store_name: 'Homies Hồ Bá Phấn',
-    period: '2026-06',
-    profit_threshold_daily: 6500000,
-    avg_3_6_months_daily: 6900000,
-    target_daily: 8000000,
-    target_monthly: 240000000,
-    days_in_month: 30,
-    actual_revenue_monthly: 249600000, // 8.32tr/ngày
-    actual_revenue_daily: 8320000,
-    is_unlocked: true,
-    cogs_budget: 80000000,
-    cogs_actual: 81600000,
-    has_attp_foreign_body: false,
-    min_hours_threshold: 110,
-    retain_deducted_bonus: true,
-    approval_status: 'approved_published',
-    approved_by: 'CEO Nguyễn Văn A',
-    approved_at: '2026-07-01 09:30',
-  },
-  // Hồ Bá Phấn - Tháng 5/2026 (Không đạt mốc hòa vốn - ví dụ để test lock)
-  {
-    store_id: 'store-001',
-    store_name: 'Homies Hồ Bá Phấn',
-    period: '2026-05',
-    profit_threshold_daily: 6500000,
-    avg_3_6_months_daily: 6500000,
-    target_daily: 7500000,
-    target_monthly: 232500000,
-    days_in_month: 31,
-    actual_revenue_monthly: 186000000, // 6.0tr/ngày -> Dưới mốc 6.5tr
-    actual_revenue_daily: 6000000,
-    is_unlocked: false,
-    cogs_budget: 70000000,
-    cogs_actual: 73500000,
-    has_attp_foreign_body: false,
-    min_hours_threshold: 110,
-    retain_deducted_bonus: true,
-    approval_status: 'approved_published',
-    approved_by: 'CEO Nguyễn Văn A',
-    approved_at: '2026-06-01 11:00',
-  },
-  // Chi nhánh 429 - Tháng 7/2026 (Sẵn sàng nhập liệu mới)
   {
     store_id: 'store-002',
     store_name: 'Homies Chi nhánh 429',
-    period: '2026-07',
+    period: '2026-08',
     profit_threshold_daily: 6500000,
-    target_daily: 7500000,
-    target_monthly: 232500000,
+    avg_3_6_months_daily: 0,
+    target_daily: 0,
+    target_monthly: 0,
     days_in_month: 31,
     actual_revenue_monthly: 0,
     actual_revenue_daily: 0,
@@ -317,6 +279,8 @@ export const mockBSCRevenueTargets: BSCRevenueTarget[] = [
     min_hours_threshold: 110,
     retain_deducted_bonus: true,
     approval_status: 'draft',
+    valid_from: '2026-08',
+    valid_to: '2026-12',
   },
 ]
 
@@ -324,160 +288,13 @@ export const mockBSCRevenueTargets: BSCRevenueTarget[] = [
 // 3. THỐNG KÊ CHI TIẾT TỪNG TIÊU CHÍ THEO STORE & PERIOD
 // ═══════════════════════════════════
 
-export const mockBSCStoreRawMetrics: BSCStoreRawMetrics[] = [
-  {
-    store_id: 'store-001',
-    period: '2026-07',
-    waste_percentage: 2.5, // 2.5% -> 4 điểm
-    operation_error_points: 7, // 7 điểm -> 4 điểm (mức 5-8 lỗi)
-    customer_qr_score: 86,
-    customer_review_score: 82, // TB = 84 -> 4 điểm
-  },
-  {
-    store_id: 'store-001',
-    period: '2026-06',
-    waste_percentage: 1.8, // <2% -> 5 điểm
-    operation_error_points: 3, // 0-4 lỗi -> 5 điểm
-    customer_qr_score: 92,
-    customer_review_score: 90, // TB = 91 -> 5 điểm
-  },
-  {
-    store_id: 'store-001',
-    period: '2026-05',
-    waste_percentage: 4.2, // 4-5% -> 2 điểm
-    operation_error_points: 14, // 13-15 -> 2 điểm
-    customer_qr_score: 70,
-    customer_review_score: 68, // TB = 69 -> 2 điểm
-  },
-  {
-    store_id: 'store-002',
-    period: '2026-07',
-    waste_percentage: 0,
-    operation_error_points: 0,
-    customer_qr_score: 0,
-    customer_review_score: 0,
-  },
-]
+export const mockBSCStoreRawMetrics: BSCStoreRawMetrics[] = []
 
 // ═══════════════════════════════════
 // 4. DANH SÁCH LỖI VẬN HÀNH CỬA HÀNG (MOCK LOG)
 // ═══════════════════════════════════
 
-export const mockBSCOperationErrors: BSCOperationErrorRecord[] = [
-  {
-    id: 'op-err-001',
-    event_id: 'ERR-HBP-202607-0001',
-    store_id: 'store-001',
-    period: '2026-07',
-    group: 'lam_don',
-    group_name: '1. Làm đơn',
-    sub_error_id: 'sub-op-01',
-    sub_error_name: 'Pha sai đường / đá / sai size',
-    example: 'Pha sai đường 50% thành 100% đơn Grab #1204',
-    points: 1,
-    occurred_at: '2026-07-05 14:20',
-    source_type: 'grab',
-    order_code: 'GRAB-1204',
-    evidence_type: 'order_code',
-    evidence_note: 'Đơn hàng Grab #1204 bị khách nhắn đính kèm trên App',
-    approval_status: 'approved_ceo',
-    affects_op_score: true,
-  },
-  {
-    id: 'op-err-002',
-    event_id: 'ERR-HBP-202607-0002',
-    store_id: 'store-001',
-    period: '2026-07',
-    group: 'kiem_giao_don',
-    group_name: '2. Kiểm đơn & giao đơn',
-    sub_error_id: 'sub-op-03',
-    sub_error_name: 'Thiếu món / thiếu topping đơn app',
-    example: 'Thiếu trân trùng đen đơn ShopeeFood #8832',
-    points: 1,
-    occurred_at: '2026-07-09 18:30',
-    source_type: 'shopeefood',
-    order_code: 'SPF-8832',
-    evidence_type: 'order_code',
-    evidence_note: 'Khách nhắn đòi bồi thường topping 15.000đ',
-    approval_status: 'proposed_manager',
-    affects_op_score: true,
-  },
-  {
-    id: 'op-err-003',
-    event_id: 'ERR-HBP-202607-0003',
-    store_id: 'store-001',
-    period: '2026-07',
-    group: 'dong_goi',
-    group_name: '3. Đóng gói',
-    sub_error_id: 'sub-op-04',
-    sub_error_name: 'Bung nắp / rò rỉ ly khi tài xế nhận',
-    example: 'Bung nắp ly trà sữa nướng khi tài xế nhận',
-    points: 1,
-    occurred_at: '2026-07-12 11:15',
-    source_type: 'internal',
-    evidence_type: 'image',
-    evidence_note: 'Ảnh chụp ly trà sữa bị đổ bung nắp trên quầy',
-    approval_status: 'approved_ceo',
-    affects_op_score: true,
-  },
-  {
-    id: 'op-err-004',
-    event_id: 'ERR-HBP-202607-0004',
-    store_id: 'store-001',
-    period: '2026-07',
-    group: 'lam_lai_do_bo',
-    group_name: '4. Làm lại / đổ bỏ',
-    example: 'Làm hỏng 2 ca trà ô long do đun quá thời gian',
-    points: 1,
-    occurred_at: '2026-07-16 09:40',
-    source_type: 'internal',
-    evidence_type: 'verifier_confirm',
-    verifier_name: 'Trưởng Ca Lê Thị B',
-    approval_status: 'approved_ceo',
-    affects_op_score: true,
-  },
-  {
-    id: 'op-err-005',
-    event_id: 'ERR-HBP-202607-0005',
-    store_id: 'store-001',
-    period: '2026-07',
-    shift_name: 'Ca Sáng (06:00 - 14:00)',
-    event_category: 'operation_store',
-    group: 'checklist_quy_trinh',
-    group_name: '6. Checklist & quy trình ca',
-    example: 'Ca sáng tick checklist mở cửa nhưng quên kiểm tra đá tủ',
-    points: 1,
-    occurred_at: '2026-07-20 07:15',
-    source_type: 'internal',
-    approval_status: 'proposed_manager',
-    affects_op_score: true,
-  },
-  {
-    id: 'op-err-012',
-    event_id: 'ERR-HBP-202607-0012',
-    store_id: 'store-001',
-    period: '2026-07',
-    shift_name: 'Ca Chiều (14:00 - 22:00)',
-    event_category: 'operation_store',
-    group: 'kiem_giao_don',
-    group_name: '2. Kiểm đơn & giao đơn',
-    sub_error_id: 'sub-op-03',
-    sub_error_name: 'Thiếu topping trong đơn đã giao khách',
-    example: 'Đơn #1204 thiếu topping trân châu. Khách phản ánh qua Zalo lúc 14:20. Camera xác minh nhân viên A không kiểm bill trước khi bàn giao đơn.',
-    points: 2,
-    occurred_at: '2026-07-25 14:20',
-    source_type: 'grab',
-    order_code: 'GRAB-1204',
-    evidence_type: 'customer_chat',
-    evidence_note: 'Khách nhắn Zalo lúc 14:20 + Video Camera mốc 14:15 ca chiều',
-    verifier_name: 'Quản Lý Nguyễn Văn A',
-    scope_reason: 'Đơn thiếu topping đã đến tay khách, khách nhắn Zalo và camera xác minh NV A không kiểm bill trước khi bàn giao.',
-    approval_status: 'proposed_manager',
-    affects_op_score: true,
-    affects_customer_score: true,
-    affects_personal_multiplier: true,
-  },
-]
+export const mockBSCOperationErrors: BSCOperationErrorRecord[] = []
 
 export function findErrorEventByOrderCode(orderCode: string) {
   if (!orderCode || !orderCode.trim()) return null
@@ -489,152 +306,7 @@ export function findErrorEventByOrderCode(orderCode: string) {
 // 5. GIỜ LÀM & LỖI CÁ NHÂN NHÂN VIÊN
 // ═══════════════════════════════════
 
-export const mockBSCEmployeeData: BSCEmployeePersonalData[] = [
-  // ── STORE-001: HOMIES HỒ BÁ PHẤN ──
-  {
-    employee_id: 'emp-002', // Quản lý cửa hàng
-    employee_name: 'Trần Thị Lan',
-    role: 'store_manager',
-    store_id: 'store-001',
-    period: '2026-07',
-    work_hours: 190,
-    errors: [],
-  },
-  {
-    employee_id: 'emp-004', // Tổ trưởng ca
-    employee_name: 'Phạm Thị Hương',
-    role: 'shift_leader',
-    store_id: 'store-001',
-    period: '2026-07',
-    work_hours: 180,
-    errors: [],
-  },
-  {
-    employee_id: 'emp-005', // Pha chế chính
-    employee_name: 'Võ Thanh Bình',
-    role: 'senior_staff',
-    store_id: 'store-001',
-    period: '2026-07',
-    work_hours: 160,
-    errors: [
-      {
-        id: 'per-err-001',
-        event_id: 'ERR-PERS-202607-0001',
-        employee_id: 'emp-005',
-        period: '2026-07',
-        group: 'dong_phuc_tac_phong',
-        group_name: 'Đồng phục & tác phong',
-        sub_error_id: 'sub-pers-05',
-        sub_error_name: 'Quên đeo bảng tên / nón / tạp dề',
-        example: 'Quên đeo bảng tên 2 lần trong ca',
-        impact: 'Giảm hệ số nhẹ (80% thưởng)',
-        points: 2, // 2 điểm -> hệ số 0.8
-        is_serious: false,
-        occurred_at: '2026-07-10 08:30',
-        source_type: 'camera',
-        evidence_type: 'camera',
-        evidence_note: 'Camera quầy thu ngân lúc 08:30 ca sáng',
-        approval_status: 'approved_ceo',
-        affects_personal_multiplier: true,
-      },
-    ],
-  },
-  {
-    employee_id: 'emp-006', // Thu ngân
-    employee_name: 'Nguyễn Thị Mai',
-    role: 'employee',
-    store_id: 'store-001',
-    period: '2026-07',
-    work_hours: 120,
-    errors: [],
-  },
-  {
-    employee_id: 'emp-007', // Phục vụ
-    employee_name: 'Đỗ Thị Thảo',
-    role: 'employee',
-    store_id: 'store-001',
-    period: '2026-07',
-    work_hours: 145,
-    errors: [
-      {
-        id: 'per-err-002',
-        event_id: 'ERR-PERS-202607-0002',
-        employee_id: 'emp-007',
-        period: '2026-07',
-        group: 'gio_lam_cham_cong',
-        group_name: 'Giờ làm & chấm công',
-        sub_error_id: 'sub-pers-03',
-        sub_error_name: 'Đi trễ quá 30 phút',
-        example: 'Trễ ca 3 lần không xin phép',
-        impact: 'Giảm 50% thưởng cá nhân (hệ số 0.5)',
-        points: 4,
-        is_serious: false,
-        occurred_at: '2026-07-18 14:00',
-        source_type: 'pos',
-        evidence_type: 'verifier_confirm',
-        verifier_name: 'Quản lý Trần Thị Lan',
-        approval_status: 'approved_ceo',
-        affects_personal_multiplier: true,
-      },
-    ],
-  },
-  {
-    employee_id: 'emp-008', // Nhân viên làm không đủ 110h
-    employee_name: 'Lê Văn Tuấn',
-    role: 'employee',
-    store_id: 'store-001',
-    period: '2026-07',
-    work_hours: 80, // <110h -> Khoá thưởng
-    errors: [],
-  },
-
-  // ── STORE-002: HOMIES CHI NHÁNH 429 (SẴN SÀNG NHẬP LIỆU MỚI) ──
-  {
-    employee_id: 'emp-003', // Quản lý cửa hàng
-    employee_name: 'Lê Hoàng Nam',
-    role: 'store_manager',
-    store_id: 'store-002',
-    period: '2026-07',
-    work_hours: 0,
-    errors: [],
-  },
-  {
-    employee_id: 'emp-011', // Tổ trưởng ca
-    employee_name: 'Huỳnh Lê Kiều Linh',
-    role: 'shift_leader',
-    store_id: 'store-002',
-    period: '2026-07',
-    work_hours: 0,
-    errors: [],
-  },
-  {
-    employee_id: 'emp-009', // Pha chế
-    employee_name: 'Trần Văn An',
-    role: 'senior_staff',
-    store_id: 'store-002',
-    period: '2026-07',
-    work_hours: 0,
-    errors: [],
-  },
-  {
-    employee_id: 'emp-010', // Thu ngân
-    employee_name: 'Lê Thị Bích',
-    role: 'employee',
-    store_id: 'store-002',
-    period: '2026-07',
-    work_hours: 0,
-    errors: [],
-  },
-  {
-    employee_id: 'emp-012', // Phục vụ
-    employee_name: 'Ngô Văn Cường',
-    role: 'employee',
-    store_id: 'store-002',
-    period: '2026-07',
-    work_hours: 0,
-    errors: [],
-  },
-]
+export const mockBSCEmployeeData: BSCEmployeePersonalData[] = []
 
 // ═══════════════════════════════════
 // Dynamic Helpers for Error Logs & Settings
@@ -841,6 +513,7 @@ export const bscSafetySettings: BSCSafetySettings = {
   customer_qr_weight_pct: 50,
   customer_review_weight_pct: 50,
   min_qr_feedback_count: 30, // Mẫu số phản hồi QR tối thiểu/tháng
+  allow_store_manager_view_bonus: true, // Cho phép Quản lý cửa hàng xem bảng thưởng & mã VietQR
 }
 
 export function updateBSCSafetySettings(updates: Partial<BSCSafetySettings>) {

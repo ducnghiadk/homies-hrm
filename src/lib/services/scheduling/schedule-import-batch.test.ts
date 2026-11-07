@@ -1,7 +1,19 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-const { getImportWeekStarts, getMappedImportPreviewDates, mergeScheduleImportWorkbooks, consolidateScheduleRows, isSummaryOrHeaderEmployeeCell, cleanEmployeeDisplayName, normalizeEmployeeCanonicalKey, extractDateFromHeader, isNonWorkingScheduleCell } = await import('./schedule-import-batch.ts')
+import {
+  getImportWeekStarts,
+  getMappedImportPreviewDates,
+  mergeScheduleImportWorkbooks,
+  consolidateScheduleRows,
+  isSummaryOrHeaderEmployeeCell,
+  cleanEmployeeDisplayName,
+  normalizeEmployeeCanonicalKey,
+  extractDateFromHeader,
+  isNonWorkingScheduleCell,
+  parseIposShiftCode,
+  extractTimeRangeFromText,
+} from './schedule-import-batch.ts'
 
 describe('getImportWeekStarts', () => {
   it('returns every unique Monday represented by a multi-week import', () => {
@@ -276,3 +288,81 @@ describe('consolidateScheduleRows', () => {
     assert.equal(result.rows[0][29], 'Ca Sáng [08:30-12:00]') // 27/07
   })
 })
+
+describe('extractTimeRangeFromText', () => {
+  it('extracts start and end times from various formats', () => {
+    assert.deepEqual(extractTimeRangeFromText('11h30-14h30'), { startTime: '11:30', endTime: '14:30' })
+    assert.deepEqual(extractTimeRangeFromText('12h - 15h'), { startTime: '12:00', endTime: '15:00' })
+    assert.deepEqual(extractTimeRangeFromText('08:30 - 12:00'), { startTime: '08:30', endTime: '12:00' })
+    assert.equal(extractTimeRangeFromText('Ca Sáng'), null)
+  })
+})
+
+describe('parseIposShiftCode', () => {
+  it('maps morning shorthand codes to shift-001 (Ca Sáng: 08:30 - 12:00)', () => {
+    const morningCodes = ['S', 's', 'SANG', 'sang', 'CA SANG', 'Ca Sáng', 'MORNING', 'morning', 'CA 1', 'C1']
+    for (const code of morningCodes) {
+      const parsed = parseIposShiftCode(code)
+      assert.ok(parsed, `Failed to parse ${code}`)
+      assert.equal(parsed.shiftId, 'shift-001')
+      assert.equal(parsed.startTime, '08:30')
+      assert.equal(parsed.endTime, '12:00')
+      assert.equal(parsed.isFlexible, false)
+    }
+  })
+
+  it('maps afternoon/noon shorthand codes to shift-002 (Ca Trưa: 12:00 - 17:00)', () => {
+    const afternoonCodes = ['C', 'c', 'CHIEU', 'chieu', 'T', 't', 'TRUA', 'trua', 'AFTERNOON', 'afternoon', 'CA TRUA', 'CA CHIEU', 'Ca Chiều', 'CA 2', 'C2']
+    for (const code of afternoonCodes) {
+      const parsed = parseIposShiftCode(code)
+      assert.ok(parsed, `Failed to parse ${code}`)
+      assert.equal(parsed.shiftId, 'shift-002')
+      assert.equal(parsed.startTime, '12:00')
+      assert.equal(parsed.endTime, '17:00')
+      assert.equal(parsed.isFlexible, false)
+    }
+  })
+
+  it('maps night/evening shorthand codes to shift-003 (Ca Tối: 17:00 - 22:00)', () => {
+    const nightCodes = ['TOI', 'toi', 'CA TOI', 'Ca Tối', 'NIGHT', 'night', 'EVENING', 'CA 3', 'C3', 'DEM', 'Ca Đêm']
+    for (const code of nightCodes) {
+      const parsed = parseIposShiftCode(code)
+      assert.ok(parsed, `Failed to parse ${code}`)
+      assert.equal(parsed.shiftId, 'shift-003')
+      assert.equal(parsed.startTime, '17:00')
+      assert.equal(parsed.endTime, '22:00')
+      assert.equal(parsed.isFlexible, false)
+    }
+  })
+
+  it('detects custom / adhoc / lẻ shift intervals (e.g. 11h30-14h30, 12h-15h) and maps to shift-004', () => {
+    const flex1 = parseIposShiftCode('11h30-14h30')
+    assert.ok(flex1)
+    assert.equal(flex1.shiftId, 'shift-004')
+    assert.equal(flex1.startTime, '11:30')
+    assert.equal(flex1.endTime, '14:30')
+    assert.equal(flex1.isFlexible, true)
+
+    const flex2 = parseIposShiftCode('12h-15h')
+    assert.ok(flex2)
+    assert.equal(flex2.shiftId, 'shift-004')
+    assert.equal(flex2.startTime, '12:00')
+    assert.equal(flex2.endTime, '15:00')
+    assert.equal(flex2.isFlexible, true)
+
+    const flex3 = parseIposShiftCode('12h30 - 15h00')
+    assert.ok(flex3)
+    assert.equal(flex3.shiftId, 'shift-004')
+    assert.equal(flex3.startTime, '12:30')
+    assert.equal(flex3.endTime, '15:00')
+    assert.equal(flex3.isFlexible, true)
+  })
+
+  it('returns null for empty or off cells', () => {
+    assert.equal(parseIposShiftCode(''), null)
+    assert.equal(parseIposShiftCode('OFF'), null)
+    assert.equal(parseIposShiftCode('Nghỉ'), null)
+    assert.equal(parseIposShiftCode('--'), null)
+  })
+})
+

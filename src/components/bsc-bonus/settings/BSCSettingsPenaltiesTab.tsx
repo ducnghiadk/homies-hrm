@@ -316,7 +316,7 @@ export default function BSCSettingsPenaltiesTab({
           {/* Rule 3 */}
           <div className="p-4 rounded-2xl border border-blue-200/80 bg-blue-50/40 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-blue-950 text-xs">Bảo Vệ Điểm Khách Hàng (100% QR)</span>
+              <span className="font-bold text-blue-950 text-xs">Bảo Vệ Điểm Khách Hàng (Tự Động Gom 100% Điểm)</span>
               <input
                 type="checkbox"
                 disabled={!isCEOOrHR}
@@ -328,7 +328,7 @@ export default function BSCSettingsPenaltiesTab({
                 className="w-4 h-4 text-[#2F6FA8] rounded focus:ring-[#2F6FA8] cursor-pointer"
               />
             </div>
-            <p className="text-xs text-blue-900 font-medium">Nếu tháng đó không có bài đánh giá phản ánh trực tiếp → Tự lấy 100% điểm QR Feedback, không bị chia đôi trừ điểm oan.</p>
+            <p className="text-xs text-blue-900 font-medium">Nếu tháng đó không làm QR khảo sát → Tự động gom 100% về Đánh giá trực tiếp &amp; CSKH (hoặc đạt chuẩn 5đ nếu không vi phạm), tuyệt đối không ép 1 điểm phạt. Ngược lại nếu không có đánh giá trực tiếp → Tự lấy 100% điểm QR.</p>
           </div>
         </div>
       </div>

@@ -14,6 +14,8 @@ export const mockPayrollPeriods: Array<{
   total_net: number
   employee_count: number
 }> = [
+  { id: 'pr-2026-09', period: '2026-09', status: PAYROLL_PERIOD_STATUS.DRAFT, total_gross: 90000000, total_net: 81000000, employee_count: 14 },
+  { id: 'pr-2026-08', period: '2026-08', status: PAYROLL_PERIOD_STATUS.CONFIRMED, total_gross: 44280000, total_net: 43480000, employee_count: 14 },
   { id: 'pr-2026-02', period: '2026-02', status: PAYROLL_PERIOD_STATUS.DRAFT, total_gross: 87500000, total_net: 78750000, employee_count: 12 },
   { id: 'pr-2026-01', period: '2026-01', status: PAYROLL_PERIOD_STATUS.PAID, total_gross: 85200000, total_net: 76680000, employee_count: 12 },
   { id: 'pr-2025-12', period: '2025-12', status: PAYROLL_PERIOD_STATUS.PAID, total_gross: 92100000, total_net: 82890000, employee_count: 13 },
@@ -65,9 +67,9 @@ export const mockStockHistory = [
 // ========== REPORTS & ANALYTICS ==========
 
 export const mockRevenueByStore = [
-  { store_id: 'store-001', name: 'Homies Milk Tea Q.1', revenue: 125000000, orders: 3200, avg_ticket: 39063 },
-  { store_id: 'store-002', name: 'Homies Milk Tea Q.3', revenue: 98000000, orders: 2800, avg_ticket: 35000 },
-  { store_id: 'store-003', name: 'Homies Milk Tea Q.7', revenue: 110000000, orders: 3100, avg_ticket: 35484 },
+  { store_id: 'store-001', name: 'Homies Milk Tea - Hồ Bá Phấn', revenue: 78000000, orders: 2150, avg_ticket: 36279 },
+  { store_id: 'store-002', name: 'Homies Milk Tea - Đường 429', revenue: 74000000, orders: 2020, avg_ticket: 36633 },
+  { store_id: 'store-003', name: 'Homies Milk Tea - Lê Văn Sỹ (Dự kiến)', revenue: 0, orders: 0, avg_ticket: 0 },
 ]
 
 export const mockRevenueByMonth = [

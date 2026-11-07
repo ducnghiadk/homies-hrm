@@ -4,9 +4,13 @@ import { createSupabaseKpiRepository } from '../kpi/supabase-repository'
 import { createKpiSourceService, confirmManualPosSource } from '../kpi/source-service'
 import type { KpiIncidentPolicy } from '../kpi/incident-service'
 import type { CreateKpiSourceServiceOptions } from '../kpi/source-service'
+import type { KpiIncident } from '../kpi/types'
+import type { KpiDatabase } from '../kpi/repository'
+
+import { isRealDbMode } from './repository-config'
 
 const seed = buildKpiSeed()
-const repository = process.env.NEXT_PUBLIC_KPI_REPOSITORY === 'supabase'
+const repository = (process.env.NEXT_PUBLIC_KPI_REPOSITORY === 'supabase' || isRealDbMode())
   ? createSupabaseKpiRepository()
   : createLocalKpiRepository()
 const STATIC_SOURCE_OPTIONS: CreateKpiSourceServiceOptions = {
@@ -81,7 +85,7 @@ async function ensureSeeded() {
   const current = await repository.load()
 
   if (current.sets.length === 0 && current.periods.length === 0 && current.audit_logs.length === 0) {
-    if (process.env.NEXT_PUBLIC_KPI_REPOSITORY === 'supabase') {
+    if (process.env.NEXT_PUBLIC_KPI_REPOSITORY === 'supabase' || isRealDbMode()) {
       return current
     }
     await repository.reset(seed)
@@ -94,7 +98,97 @@ async function ensureSeeded() {
 export const kpiAdapter = {
   repository,
   async getDatabase() {
-    return ensureSeeded()
+    const current = await ensureSeeded()
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/kpi/incidents')
+        const json = await res.json()
+        if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          const serverIncidents: KpiIncident[] = json.data.map((srv: Record<string, unknown>) => ({
+            id: String(srv.id || ''),
+            store_id: String(srv.store_id || 'store-001'),
+            employee_id: String(srv.employee_id || ''),
+            occurred_at: String(srv.occurred_at || ''),
+            source: (srv.source as KpiIncident['source']) || 'attendance',
+            status: (srv.status as KpiIncident['status']) || 'confirmed',
+            violations: [
+              {
+                code: String(srv.violation_code || 'attendance_late'),
+                primary: true,
+                independent_behavior: true,
+                reason: String(srv.reason || 'Lỗi kỷ luật chấm công'),
+                evidence_refs: Array.isArray(srv.evidence_refs) ? srv.evidence_refs.map(String) : [],
+              },
+            ],
+            description: String(srv.description || ''),
+            evidence_refs: Array.isArray(srv.evidence_refs) ? srv.evidence_refs.map(String) : [],
+          }))
+          const existingIds = new Set(current.incidents.map((i) => i.id))
+          const merged = [...current.incidents]
+          for (const inc of serverIncidents) {
+            if (!existingIds.has(inc.id)) {
+              merged.unshift(inc)
+              existingIds.add(inc.id)
+            }
+          }
+          return { ...current, incidents: merged }
+        }
+      } catch (err) {
+        console.warn('[kpiAdapter] fetch server incidents error:', err)
+      }
+    }
+    return current
+  },
+  async addIncident(incident: KpiIncident, actorId = 'system'): Promise<KpiIncident> {
+    const current = await ensureSeeded()
+    const periodId = incident.period_id || current.periods.find((p) => (
+      incident.occurred_at.startsWith(p.month) && p.store_id === incident.store_id
+    ))?.id
+
+    const nextIncident: KpiIncident = {
+      ...incident,
+      period_id: periodId,
+    }
+
+    const existingIdx = current.incidents.findIndex((i) => i.id === incident.id)
+    let nextIncidents: KpiIncident[]
+    if (existingIdx >= 0) {
+      nextIncidents = [...current.incidents]
+      nextIncidents[existingIdx] = nextIncident
+    } else {
+      nextIncidents = [nextIncident, ...current.incidents]
+    }
+
+    const nextDb: KpiDatabase = {
+      ...current,
+      revision: current.revision + 1,
+      incidents: nextIncidents,
+      audit_logs: [
+        ...current.audit_logs,
+        {
+          id: `audit_incident_${nextIncident.id}`,
+          entity_type: 'kpi_incident',
+          entity_id: nextIncident.id,
+          action: existingIdx >= 0 ? 'update' : 'create',
+          actor_id: actorId,
+          new_value: nextIncident,
+          created_at: new Date().toISOString(),
+        },
+      ],
+    }
+
+    try {
+      await repository.save(nextDb, current.revision)
+    } catch (saveError) {
+      console.warn('[kpiAdapter] Supabase save failed, fallback to local repository:', saveError)
+      try {
+        const localRepo = createLocalKpiRepository()
+        await localRepo.save(nextDb, current.revision)
+      } catch (localErr) {
+        console.warn('[kpiAdapter] Local repository save fallback warning:', localErr)
+      }
+    }
+    return nextIncident
   },
   async collectEmployeeSources(periodId: string, employeeId: string) {
     const current = await ensureSeeded()

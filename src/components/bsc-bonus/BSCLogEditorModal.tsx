@@ -21,6 +21,8 @@ import {
   findErrorEventByOrderCode,
 } from '@/lib/mock-data-bsc'
 import { bscAdapter } from '@/lib/adapters/bsc-adapter'
+import { kpiAdapter } from '@/lib/adapters/kpi-adapter'
+import { mapToKpiViolationCode } from '@/lib/services/kpi-bsc-sync-service'
 
 import type {
   BSCPersonalErrorGroup,
@@ -250,6 +252,33 @@ export default function BSCLogEditorModal({
       }
 
       await bscAdapter.addOperationError(record)
+    }
+
+    // Đồng bộ tức thì sang kho KPI Incident để trừ điểm tiêu chí và kiểm tra điều kiện xét thăng bậc
+    try {
+      const isPersonal = eventCategory === 'personal'
+      const kpiCode = mapToKpiViolationCode(selectedSubErrorId || (isPersonal ? personalGroupKey : opGroupKey), description || subObj?.name || '')
+      await kpiAdapter.addIncident({
+        id: `inc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        store_id: storeId,
+        employee_id: isPersonal ? selectedEmployeeId : 'all_store_staff',
+        occurred_at: formattedOccurred,
+        source: kpiCode.startsWith('attendance') ? 'attendance' : 'operation',
+        status: 'confirmed',
+        violations: [
+          {
+            code: kpiCode,
+            primary: true,
+            independent_behavior: true,
+            reason: description.trim() || subObj?.name || 'Sự cố vận hành từ BSC',
+            evidence_refs: evidenceUrl.trim() ? [evidenceUrl.trim()] : [],
+          },
+        ],
+        description: description.trim() || subObj?.name || 'Ghi nhận sự cố từ BSC Log',
+        evidence_refs: evidenceUrl.trim() ? [evidenceUrl.trim()] : [],
+      }, verifierName.trim() || 'manager')
+    } catch (kpiErr) {
+      console.warn('[BSCLogEditorModal] Error syncing incident to KPI:', kpiErr)
     }
 
     onSuccess()

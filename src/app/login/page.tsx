@@ -1,53 +1,73 @@
 'use client'
 
 import Image from 'next/image'
-import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth-store'
-import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle, PhoneCall } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
   const { login, user, isLoading, hasHydrated, rememberMe, setRememberMe } = useAuthStore()
 
-  const [mounted, setMounted] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showForgotModal, setShowForgotModal] = useState(false)
   const [error, setError] = useState('')
+  const emailRef = useRef<HTMLInputElement>(null)
+  const passwordRef = useRef<HTMLInputElement>(null)
 
+  // ─── BƯỚC 1: Fallback auth store nhanh (tối đa 200ms) không làm nghẽn giao diện ─────
   useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Already logged in → redirect to target page or dashboard
-  useEffect(() => {
-    if (mounted && hasHydrated && !isLoading && user) {
-      const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
-      const redirectParam = searchParams.get('redirect')
-      const target = redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
-        ? redirectParam
-        : '/'
-
-      if (typeof window !== 'undefined') {
-        window.location.href = target
-      } else {
-        router.replace(target)
+    // Fallback: nếu Zustand persist chưa kịp rehydrate sau 200ms → ép true để mở khóa
+    const timer = setTimeout(() => {
+      if (!useAuthStore.getState().hasHydrated) {
+        useAuthStore.setState({ hasHydrated: true })
       }
-    }
-  }, [mounted, hasHydrated, isLoading, router, user])
+    }, 200)
+    return () => clearTimeout(timer)
+  }, []) // ← [] Chạy 1 lần khi component mount
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // ─── BƯỚC 2: Nếu đã đăng nhập → redirect ─────────────────────────────────
+  useEffect(() => {
+    if (hasHydrated && !isLoading && user) {
+      const searchParams = new URLSearchParams(window.location.search)
+      const redirectParam = searchParams.get('redirect')
+      const target =
+        redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
+          ? redirectParam
+          : '/'
+      window.location.replace(target)
+    }
+  }, [hasHydrated, isLoading, user])
+
+  // ─── HANDLER ĐĂNG NHẬP ───────────────────────────────────────────────────
+  const handleLogin = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
     if (isLoading) return
 
     setError('')
 
-    try {
-      const result = await login(email, password)
+    // Đọc thẳng từ ref để không bị phụ thuộc controlled-state khi autofill
+    const finalEmail = (emailRef.current?.value ?? email).trim()
+    const finalPassword = (passwordRef.current?.value ?? password).trim()
 
+    if (!finalEmail) { setError('Vui lòng nhập Email hoặc Số điện thoại'); return }
+    if (!finalPassword) { setError('Vui lòng nhập mật khẩu'); return }
+
+    try {
+      const result = await login(finalEmail, finalPassword)
       if (result.success) {
-        // Không redirect thủ công — để useEffect (isAuthenticated) tự xử lý một lần duy nhất
+        const searchParams = new URLSearchParams(window.location.search)
+        const redirectParam = searchParams.get('redirect')
+        const target =
+          redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
+            ? redirectParam
+            : '/'
+        window.location.replace(target)
       } else {
         setError(result.error || 'Đăng nhập thất bại')
       }
@@ -57,20 +77,9 @@ export default function LoginPage() {
     }
   }
 
-  // Chờ mount trên client để triệt tiêu 100% lỗi hydration mismatch giữa server và client
-  if (!mounted || !hasHydrated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-6"
-           style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
-        <div className="flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 text-sm font-semibold text-gray-600 shadow-lg border border-gray-100">
-          <Loader2 size={18} className="animate-spin text-primary-500" />
-          Đang tải trang đăng nhập...
-        </div>
-      </div>
-    )
-  }
 
-  if (!isLoading && user) {
+  // ─── ĐÃ ĐĂNG NHẬP: hiển thị trạng thái redirect ─────────────────────────
+  if (hasHydrated && !isLoading && user) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6"
            style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
@@ -82,6 +91,7 @@ export default function LoginPage() {
     )
   }
 
+  // ─── FORM ĐĂNG NHẬP ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden"
          style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
@@ -122,18 +132,22 @@ export default function LoginPage() {
             Đăng nhập
           </h2>
 
-          <form onSubmit={handleLogin} className="space-y-5">
+          {/* onSubmit bắt Enter key; onClick bắt click chuột */}
+          <form onSubmit={handleLogin} noValidate className="space-y-5">
             {/* Email */}
             <div>
-              <label className="block text-sm font-semibold mb-2 uppercase tracking-wide text-gray-600">
-                Email
+              <label htmlFor="login-email" className="block text-sm font-semibold mb-2 uppercase tracking-wide text-gray-600">
+                Email hoặc Số điện thoại
               </label>
               <div className="relative group">
                 <Mail size={20} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors"
                       style={{ color: email ? '#3971B8' : '#BDBDBD' }} />
                 <input
-                  type="email"
-                  placeholder="name@company.com"
+                  ref={emailRef}
+                  id="login-email"
+                  data-testid="login-email"
+                  type="text"
+                  placeholder="Email thật (Gmail) hoặc Số điện thoại"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError('') }}
                   className="w-full pl-12 pr-4 py-[14px] rounded-[14px] border outline-none transition-all text-[15px]"
@@ -152,20 +166,23 @@ export default function LoginPage() {
                     e.target.style.backgroundColor = '#FAFAFA'
                     e.target.style.boxShadow = 'none'
                   }}
-                  autoComplete="email"
+                  autoComplete="username"
                 />
               </div>
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-semibold mb-2 uppercase tracking-wide text-gray-600">
+              <label htmlFor="login-password" className="block text-sm font-semibold mb-2 uppercase tracking-wide text-gray-600">
                 Mật khẩu
               </label>
               <div className="relative group">
                 <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors"
                       style={{ color: password ? '#3971B8' : '#BDBDBD' }} />
                 <input
+                  ref={passwordRef}
+                  id="login-password"
+                  data-testid="login-password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Nhập mật khẩu"
                   value={password}
@@ -209,9 +226,11 @@ export default function LoginPage() {
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="sr-only peer"
+                    suppressHydrationWarning
                   />
                   <div className="w-5 h-5 rounded-[6px] border-2 transition-all peer-checked:border-transparent peer-checked:bg-primary-600"
-                       style={{ borderColor: rememberMe ? '#3971B8' : '#E0E0E0', backgroundColor: rememberMe ? '#3971B8' : 'transparent' }}>
+                       style={{ borderColor: rememberMe ? '#3971B8' : '#E0E0E0', backgroundColor: rememberMe ? '#3971B8' : 'transparent' }}
+                       suppressHydrationWarning>
                     {rememberMe && (
                       <svg className="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -224,10 +243,14 @@ export default function LoginPage() {
                 </span>
               </label>
 
-              <button type="button" className="text-[14px] font-semibold transition-colors"
-                      style={{ color: '#3971B8' }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#2A5A8F' }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#3971B8' }}>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(true)}
+                className="text-[14px] font-semibold transition-colors cursor-pointer"
+                style={{ color: '#3971B8' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#2A5A8F' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#3971B8' }}
+              >
                 Quên mật khẩu?
               </button>
             </div>
@@ -243,9 +266,11 @@ export default function LoginPage() {
 
             {/* Login Button */}
             <button
+              id="login-submit-btn"
+              data-testid="login-submit-btn"
               type="submit"
               disabled={isLoading}
-              className="w-full py-[15px] rounded-[16px] text-white text-[16px] font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-70"
+              className="w-full py-[15px] rounded-[16px] text-white text-[16px] font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-70 cursor-pointer"
               style={{
                 background: isLoading
                   ? '#6B9AD0'
@@ -287,8 +312,39 @@ export default function LoginPage() {
           © 2026 Homies Milk Tea. Quản trị nhân sự chuỗi F&B
         </p>
 
-
       </div>
+      {/* Modal Popup: Quên mật khẩu */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#2F6FA8] flex items-center justify-center mx-auto">
+              <PhoneCall size={24} />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-[#001D3D]">Cấp Lại Mật Khẩu</h3>
+              <p className="text-xs text-gray-600 leading-relaxed font-medium">
+                Vui lòng liên hệ Quản lý cơ sở hoặc Hotline <strong className="text-[#2F6FA8] font-mono font-bold">0919.246.273</strong> để được cấp lại mật khẩu trong 1 phút.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col gap-2">
+              <a
+                href="tel:0919246273"
+                className="w-full py-2.5 rounded-xl bg-[#2F6FA8] text-white text-xs font-bold hover:bg-[#1D3E61] transition flex items-center justify-center gap-2 shadow-xs"
+              >
+                <PhoneCall size={14} />
+                <span>Gọi Hotline: 0919.246.273</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                className="w-full py-2.5 rounded-xl border border-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-50 transition cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

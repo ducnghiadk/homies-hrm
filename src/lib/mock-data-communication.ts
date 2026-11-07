@@ -155,9 +155,9 @@ export const mockPolicies: Policy[] = [
 
 // ============ Chat Messages ============
 export const mockChatGroups: ChatGroup[] = [
-  { id: 'grp-001', name: 'Homies Milk Tea Q.1', store_id: 'store-001', member_count: 7, last_message: 'Mai nhớ kiểm tra hàng nha', last_message_at: '2026-02-15T20:30:00', unread_count: 3 },
-  { id: 'grp-002', name: 'Homies Milk Tea Q.3', store_id: 'store-002', member_count: 5, last_message: 'OK anh ạ', last_message_at: '2026-02-15T18:00:00', unread_count: 0 },
-  { id: 'grp-003', name: 'Homies Milk Tea Thủ Đức', store_id: 'store-003', member_count: 5, last_message: 'Máy blender bị hư rồi', last_message_at: '2026-02-15T16:00:00', unread_count: 1 },
+  { id: 'grp-001', name: 'Homies Milk Tea - Hồ Bá Phấn', store_id: 'store-001', member_count: 7, last_message: 'Mai nhớ kiểm tra hàng nha', last_message_at: '2026-02-15T20:30:00', unread_count: 3 },
+  { id: 'grp-002', name: 'Homies Milk Tea - Đường 429', store_id: 'store-002', member_count: 5, last_message: 'OK anh ạ', last_message_at: '2026-02-15T18:00:00', unread_count: 0 },
+  { id: 'grp-003', name: 'Homies Milk Tea - Lê Văn Sỹ (Dự kiến)', store_id: 'store-003', member_count: 2, last_message: 'Kế hoạch setup quầy bar', last_message_at: '2026-02-15T16:00:00', unread_count: 0 },
 ]
 
 export const mockChatMessages: ChatMessage[] = [

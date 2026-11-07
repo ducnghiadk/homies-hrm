@@ -84,6 +84,14 @@ export interface EmployeeInvitation {
   cccd?: string
   emergency_contact?: string
   candidate_notes?: string
+  shirt_size?: string
+  id_card_front_url?: string
+  id_card_back_url?: string
+  bank_name?: string
+  bank_account_number?: string
+  bank_account_name?: string
+  health_cert_date?: string
+  policy_agreed?: boolean
 }
 
 export interface InvitationFormData {
@@ -363,19 +371,19 @@ export const importTemplate: ImportTemplate = {
     { key: 'gender', label: 'Gioi tinh', required: true, type: 'enum:male,female', example: 'male' },
     { key: 'address', label: 'Dia chi', required: false, type: 'text', example: '123 ABC, Q.1' },
     { key: 'position', label: 'Vi tri', required: true, type: 'enum:pos-001,...', example: 'Pha che' },
-    { key: 'store', label: 'Cua hang', required: true, type: 'enum:store-001,...', example: 'Homies Milk Tea Q.1' },
+    { key: 'store', label: 'Cua hang', required: true, type: 'enum:store-001,...', example: 'Homies Milk Tea - Hồ Bá Phấn' },
     { key: 'hire_date', label: 'Ngay vao', required: true, type: 'date', example: '2026-02-15' },
     { key: 'base_salary', label: 'Luong co ban', required: false, type: 'number', example: '5500000' },
   ],
 }
 
 export const mockImportResults: ImportValidationResult[] = [
-  { row: 1, employee_name: 'Tran Van Hung', status: 'valid', errors: [], warnings: [], data: { full_name: 'Tran Van Hung', phone: '0911111111', position: 'Pha che', store: 'Homies Milk Tea Q.1', hire_date: '2026-03-01' } },
-  { row: 2, employee_name: 'Le Thi Nga', status: 'valid', errors: [], warnings: ['Email trong'], data: { full_name: 'Le Thi Nga', phone: '0922222222', position: 'Thu ngan', store: 'Homies Milk Tea Q.3', hire_date: '2026-03-01' } },
-  { row: 3, employee_name: '', status: 'error', errors: ['Thieu ho ten', 'Thieu SDT'], warnings: [], data: { full_name: '', phone: '', position: 'Phuc vu', store: 'Homies Milk Tea Q.1', hire_date: '2026-03-01' } },
-  { row: 4, employee_name: 'Pham Minh Duc', status: 'valid', errors: [], warnings: [], data: { full_name: 'Pham Minh Duc', phone: '0944444444', position: 'Phuc vu', store: 'Homies Milk Tea Thu Duc', hire_date: '2026-03-01' } },
-  { row: 5, employee_name: 'Ngo Thi Hoa', status: 'error', errors: ['SDT da ton tai (emp-008)'], warnings: [], data: { full_name: 'Ngo Thi Hoa', phone: '0945678901', position: 'Pha che', store: 'Homies Milk Tea Q.1', hire_date: '2026-03-01' } },
-  { row: 6, employee_name: 'Vo Van Binh', status: 'valid', errors: [], warnings: [], data: { full_name: 'Vo Van Binh', phone: '0966666666', position: 'Pha che', store: 'Homies Milk Tea Q.3', hire_date: '2026-03-15' } },
+  { row: 1, employee_name: 'Tran Van Hung', status: 'valid', errors: [], warnings: [], data: { full_name: 'Tran Van Hung', phone: '0911111111', position: 'Pha che', store: 'Homies Milk Tea - Hồ Bá Phấn', hire_date: '2026-03-01' } },
+  { row: 2, employee_name: 'Le Thi Nga', status: 'valid', errors: [], warnings: ['Email trong'], data: { full_name: 'Le Thi Nga', phone: '0922222222', position: 'Thu ngan', store: 'Homies Milk Tea - Đường 429', hire_date: '2026-03-01' } },
+  { row: 3, employee_name: '', status: 'error', errors: ['Thieu ho ten', 'Thieu SDT'], warnings: [], data: { full_name: '', phone: '', position: 'Phuc vu', store: 'Homies Milk Tea - Hồ Bá Phấn', hire_date: '2026-03-01' } },
+  { row: 4, employee_name: 'Pham Minh Duc', status: 'valid', errors: [], warnings: [], data: { full_name: 'Pham Minh Duc', phone: '0944444444', position: 'Phuc vu', store: 'Homies Milk Tea - Đường 429', hire_date: '2026-03-01' } },
+  { row: 5, employee_name: 'Ngo Thi Hoa', status: 'error', errors: ['SDT da ton tai (emp-008)'], warnings: [], data: { full_name: 'Ngo Thi Hoa', phone: '0945678901', position: 'Pha che', store: 'Homies Milk Tea - Hồ Bá Phấn', hire_date: '2026-03-01' } },
+  { row: 6, employee_name: 'Vo Van Binh', status: 'valid', errors: [], warnings: [], data: { full_name: 'Vo Van Binh', phone: '0966666666', position: 'Pha che', store: 'Homies Milk Tea - Lê Văn Sỹ (Dự kiến)', hire_date: '2026-03-15' } },
 ]
 
 export const exportColumns: ExportColumn[] = [

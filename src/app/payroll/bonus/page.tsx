@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Image from 'next/image'
 import AppShell from '@/components/layout/AppShell'
 import { mockEmployees, mockStores } from '@/lib/mock-data'
 import { Plus, X, Calendar, Image as ImageIcon, RotateCcw, Eye, Trash2, CheckCircle2, Loader2 } from 'lucide-react'
 import { payrollAdapter, storeAdapter } from '@/lib/adapters'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const fmt = (n: number) => n.toLocaleString('vi-VN') + ' đ'
 
@@ -24,13 +24,17 @@ interface TicketItem {
   status: string
 }
 
-export default function BonusSlipPage() {
+function BonusSlipContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialPeriod = searchParams.get('period') || '2026-02'
+  const [initYear, initMonth] = initialPeriod.includes('-') ? initialPeriod.split('-') : ['2026', '02']
+  const initialMonthStr = `${initMonth}/${initYear}`
 
   // Filter States matching Reference Screenshot
   const [filterStore, setFilterStore] = useState('all')
   const [filterType, setFilterType] = useState('all')
-  const [filterMonth, setFilterMonth] = useState('08/2026')
+  const [filterMonth, setFilterMonth] = useState(initialMonthStr)
 
   // Real Database State (Starts EMPTY, loaded directly from Supabase)
   const [bonuses, setBonuses] = useState<TicketItem[]>([])
@@ -46,8 +50,8 @@ export default function BonusSlipPage() {
   const [customTicketType, setCustomTicketType] = useState('Thưởng doanh thu')
   const [targetEmpId, setTargetEmpId] = useState(mockEmployees[0]?.id || '')
   const [ticketScope, setTicketScope] = useState('date') // 'date' | 'period'
-  const [ticketDate, setTicketDate] = useState('15/08/2026')
-  const [selectedPeriod, setSelectedPeriod] = useState('2026-02')
+  const [ticketDate, setTicketDate] = useState(`15/${initialMonthStr}`)
+  const [selectedPeriod, setSelectedPeriod] = useState(initialPeriod)
   const [ticketCalcType, setTicketCalcType] = useState('amount')
   const [ticketAmount, setTicketAmount] = useState<number>(0)
   const [ticketNote, setTicketNote] = useState('')
@@ -72,6 +76,12 @@ export default function BonusSlipPage() {
   useEffect(() => {
     loadRealData()
     storeAdapter.getStores().then(res => setStores(res))
+
+    const handleDataChanged = () => {
+      loadRealData()
+    }
+    window.addEventListener('homies-data-changed', handleDataChanged)
+    return () => window.removeEventListener('homies-data-changed', handleDataChanged)
   }, [])
 
   // Image Upload Handler
@@ -535,5 +545,13 @@ export default function BonusSlipPage() {
         </div>
       )}
     </AppShell>
+  )
+}
+
+export default function BonusSlipPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-xs text-slate-500">Đang tải phiếu thưởng...</div>}>
+      <BonusSlipContent />
+    </Suspense>
   )
 }

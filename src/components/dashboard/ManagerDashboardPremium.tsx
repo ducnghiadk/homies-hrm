@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
   Bell,
   Settings,
@@ -27,20 +28,147 @@ import {
 
 interface Props { user: { id: string; name: string; avatar?: string; storeId: string; storeName: string }; }
 
+interface ServerShiftItem {
+  id: string;
+  employee_id: string;
+  employee_name?: string;
+  store_id: string;
+  date: string;
+  shift_id: string;
+  shift_name?: string;
+  status: string;
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
+  avatar?: string;
+  status: 'checked_in' | 'upcoming' | 'off';
+}
+
+interface TeamShift {
+  id: string;
+  name: string;
+  time: string;
+  icon: string;
+  members: TeamMember[];
+  required: number;
+}
+
 export function ManagerDashboardPremium({ user }: Props) {
-  const actions = getActionItems(user.id, 'manager');
-  const shifts = getTeamShifts(user.storeId);
+  const [shifts, setShifts] = useState<TeamShift[]>(() => getTeamShifts(user.storeId) as TeamShift[]);
+  const [pendingCount, setPendingCount] = useState<number>(0);
+  const rawActions = getActionItems(user.id, 'manager');
   const top = getTeamTopPerformers(user.storeId);
   const warns = getTeamWarnings(user.storeId);
+
+  // Tải danh sách ca trực thật và số lượng đơn chờ duyệt từ máy chủ
+  useEffect(() => {
+    let isMounted = true;
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    // 1. Tải ca trực hôm nay từ GET /api/shifts
+    fetch(`/api/shifts?store_id=${encodeURIComponent(user.storeId)}`)
+      .then(res => res.json())
+      .then(json => {
+        if (!isMounted || !json?.success || !Array.isArray(json.data)) return;
+        const list: ServerShiftItem[] = json.data;
+        
+        // Ưu tiên lấy ca ngày hôm nay, nếu hôm nay chưa có ca thì lấy ngày gần nhất có ca
+        let targetShifts = list.filter(s => s.date === todayStr);
+        if (targetShifts.length === 0 && list.length > 0) {
+          const sortedDates = [...new Set(list.map(s => s.date))].sort().reverse();
+          if (sortedDates[0]) {
+            targetShifts = list.filter(s => s.date === sortedDates[0]);
+          }
+        }
+
+        if (targetShifts.length > 0) {
+          const morningMembers: TeamMember[] = [];
+          const afternoonMembers: TeamMember[] = [];
+
+          targetShifts.forEach((s, idx) => {
+            const shiftNameLower = (s.shift_name || '').toLowerCase();
+            const isMorning = s.shift_id === 'shift-001' || shiftNameLower.includes('sáng');
+            const empName = s.employee_name || 'Nhân sự';
+            const empId = s.employee_id || `emp-${idx}`;
+            const memberObj = {
+              id: empId,
+              name: empName,
+              status: isMorning ? ('checked_in' as const) : ('upcoming' as const),
+            };
+
+            const targetList = isMorning ? morningMembers : afternoonMembers;
+            if (!targetList.some(m => m.id === empId)) {
+              targetList.push(memberObj);
+            }
+          });
+
+          setShifts([
+            {
+              id: 'ts-morning',
+              name: 'Ca Sáng',
+              time: '06:00 - 14:00',
+              icon: '🌅',
+              required: morningMembers.length || 3,
+              members: morningMembers,
+            },
+            {
+              id: 'ts-afternoon',
+              name: 'Ca Chiều',
+              time: '14:00 - 22:00',
+              icon: '☀️',
+              required: afternoonMembers.length || 3,
+              members: afternoonMembers,
+            },
+          ]);
+        }
+      })
+      .catch(err => {
+        console.warn('[ManagerDashboard] Failed to fetch shifts:', err);
+      });
+
+    // 2. Tải số đơn chờ duyệt thật từ GET /api/requests?status=pending
+    fetch('/api/requests?status=pending')
+      .then(res => res.json())
+      .then(json => {
+        if (!isMounted || !json?.success) return;
+        const requests = Array.isArray(json.data) ? json.data : [];
+        // Lọc đơn của cửa hàng hiện tại nếu có thông tin store_id
+        const storeRequests = requests.filter((r: { store_id?: string }) => !r.store_id || r.store_id === user.storeId);
+        setPendingCount(storeRequests.length);
+      })
+      .catch(err => {
+        console.warn('[ManagerDashboard] Failed to fetch pending requests:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user.storeId]);
+
   const totalOnline = shifts.reduce((s, sh) => s + sh.members.length, 0);
-  const morningFull = shifts[0]?.members.length >= shifts[0]?.required;
+  const morningFull = shifts[0] ? shifts[0].members.length >= shifts[0].required : true;
+
+  // Cập nhật Action Items với số đơn chờ duyệt thật
+  const actions = rawActions.map(act => {
+    if (act.id === 'a2') {
+      return {
+        ...act,
+        title: `${pendingCount > 0 ? pendingCount : 'Không có'} đơn cần phê duyệt`,
+        description: pendingCount > 0 ? `${pendingCount} yêu cầu đang chờ quản lý phê duyệt` : 'Tất cả đơn đã được xử lý',
+        badge: pendingCount > 0 ? pendingCount : undefined,
+      };
+    }
+    return act;
+  });
 
   const quickActions = [
-    { id: 'schedule', icon: <Calendar size={22} />, label: 'Quản lý lịch', href: '/schedules' },
-    { id: 'admin-registration', icon: <Clock size={22} />, label: 'Mở đợt xếp ca', href: '/schedules' },
-    { id: 'admin-review', icon: <Zap size={22} />, label: 'Phân ca tự động', href: '/schedules' },
-    { id: 'leave', icon: <ClipboardCheck size={22} />, label: 'Duyệt phép', href: '/leave/approval', badge: 3 },
-    { id: 'violations', icon: <FileText size={22} />, label: 'Ghi lỗi', href: '/kpi/violations', badge: 2 },
+    { id: 'schedule', icon: <Calendar size={22} />, label: 'Quản lý lịch', href: '/schedule' },
+    { id: 'admin-registration', icon: <Clock size={22} />, label: 'Mở đợt xếp ca', href: '/schedule' },
+    { id: 'admin-review', icon: <Zap size={22} />, label: 'Phân ca tự động', href: '/schedule' },
+    { id: 'leave', icon: <ClipboardCheck size={22} />, label: 'Duyệt phép', href: '/leave/approval', badge: pendingCount > 0 ? pendingCount : undefined },
+    { id: 'violations', icon: <FileText size={22} />, label: 'Ghi lỗi', href: '/kpi/violations' },
     { id: 'addEmp', icon: <UserPlus size={22} />, label: 'Thêm NV', href: '/employees/new' },
   ];
 
@@ -55,10 +183,14 @@ export function ManagerDashboardPremium({ user }: Props) {
               <Settings size={18} />
             </a>
             <div className="relative">
-              <button className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition">
+              <a href="/leave/approval" className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition">
                 <Bell size={18} />
-              </button>
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-error-500 text-white text-xs font-bold rounded-full flex items-center justify-center">3</span>
+              </a>
+              {pendingCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-error-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm">
+                  {pendingCount}
+                </span>
+              )}
             </div>
           </div>
         }

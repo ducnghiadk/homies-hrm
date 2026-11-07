@@ -54,6 +54,7 @@ export type AuthUser = {
   cccd_issue_date?: string
   tax_code?: string
   base_salary?: number
+  hourly_rate?: number
   has_insurance?: boolean
   dependents_count?: number
   marital_status?: string
@@ -185,6 +186,7 @@ type AuthState = {
   loginError: string | null
 
   // Actions
+  setHasHydrated: (val: boolean) => void
   login: (email: string, password: string) => Promise<LoginResult>
   logout: () => void
   setRememberMe: (val: boolean) => void
@@ -193,31 +195,61 @@ type AuthState = {
   loginAsDemo: (email: string) => void
 }
 
-// Validate password (mock - in production use Supabase Auth)
+// Validate password (chỉ dùng cho chế độ ngoại tuyến khẩn cấp)
 const validatePassword = (password: string): boolean => {
-  if (password === '123456') return true
-  if (password.length >= 4) return true
-  return false
+  return password === '123456'
+}
+
+function getInitialAuthState(): { user: AuthUser | null; isAuthenticated: boolean; hasHydrated: boolean } {
+  if (typeof window === 'undefined') {
+    return { user: null, isAuthenticated: false, hasHydrated: false }
+  }
+  try {
+    const rawLocal = localStorage.getItem(AUTH_STORAGE_KEY)
+    if (rawLocal) {
+      const parsed = JSON.parse(rawLocal)
+      if (parsed?.state?.user?.id) {
+        return { user: parsed.state.user, isAuthenticated: true, hasHydrated: true }
+      }
+    }
+    const rawSession = sessionStorage.getItem(AUTH_STORAGE_KEY)
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession)
+      if (parsed?.state?.user?.id) {
+        return { user: parsed.state.user, isAuthenticated: true, hasHydrated: true }
+      }
+    }
+    // Dự phòng kiểm tra cookie hrm-auth hợp lệ
+    if (typeof document !== 'undefined' && document.cookie.includes('hrm-auth=1')) {
+      return { user: null, isAuthenticated: true, hasHydrated: true }
+    }
+  } catch (err) {
+    console.warn('[AuthStore] Error getting initial auth state:', err)
+  }
+  return { user: null, isAuthenticated: false, hasHydrated: false }
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      user: null,
-      isAuthenticated: false,
+      ...getInitialAuthState(),
       isLoading: false,
-      hasHydrated: false,
       rememberMe: false,
       loginError: null,
+
+      setHasHydrated: (val: boolean) => {
+        set({ hasHydrated: val })
+      },
 
       login: async (email: string, password: string): Promise<LoginResult> => {
         set({ isLoading: true, loginError: null })
 
         await new Promise(resolve => setTimeout(resolve, 600))
 
-        if (!email.trim()) {
-          set({ isLoading: false, loginError: 'Vui lòng nhập email' })
-          return { success: false, error: 'Vui lòng nhập email' }
+        const identifier = email.trim()
+        if (!identifier) {
+          set({ isLoading: false, loginError: 'Vui lòng nhập Email hoặc Số điện thoại' })
+          return { success: false, error: 'Vui lòng nhập Email hoặc Số điện thoại' }
         }
 
         if (!password.trim()) {
@@ -225,10 +257,66 @@ export const useAuthStore = create<AuthState>()(
           return { success: false, error: 'Vui lòng nhập mật khẩu' }
         }
 
-        const user = EmployeeService.getUserByEmail(email)
+        // 1. Thử xác thực trực tiếp qua API máy chủ Server DB
+        try {
+          const apiRes = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: identifier, password }),
+          })
+          if (apiRes.ok) {
+            const json = await apiRes.json()
+            const serverUser = json.data?.user || json.user
+            if (json.success && serverUser) {
+              const mappedUser: AuthUser = {
+                id: serverUser.id,
+                full_name: serverUser.full_name,
+                email: serverUser.email,
+                role: serverUser.role,
+                store_id: serverUser.store_id || 'store-001',
+                secondary_store_ids: serverUser.secondary_store_ids,
+                position_id: serverUser.position_id || 'pos-001',
+                phone: serverUser.phone || '',
+                employee_code: serverUser.employee_code || '',
+                status: serverUser.status || 'active',
+                account_status: serverUser.account_status || 'dang_hoat_dong',
+                department_name: serverUser.department_name || '',
+                official_salary: Number(serverUser.base_salary || 0),
+                hourly_rate: Number(serverUser.hourly_rate || 0),
+                hire_date: serverUser.hire_date || '',
+                total_points: Number(serverUser.total_points || 1500),
+                gamification_level: serverUser.gamification_level || 'silver',
+              }
+              set({
+                user: mappedUser,
+                isAuthenticated: true,
+                isLoading: false,
+                hasHydrated: true,
+                loginError: null,
+              })
+              syncAuthCookie(mappedUser)
+              console.log(`[Auth] User logged in via Server API: ${mappedUser.full_name} (${mappedUser.role})`)
+              return { success: true }
+            } else if (json.error) {
+              set({ isLoading: false, loginError: json.error })
+              return { success: false, error: json.error }
+            }
+          } else {
+            // Máy chủ phản hồi từ chối (sai mật khẩu hoặc tài khoản bị khóa)
+            const json = await apiRes.json().catch(() => ({}))
+            const errorMsg = json.error || 'Tài khoản hoặc mật khẩu không chính xác'
+            set({ isLoading: false, loginError: errorMsg })
+            return { success: false, error: errorMsg }
+          }
+        } catch (e) {
+          console.warn('[AuthStore] API login failed, attempting local fallback:', e)
+        }
+
+        // 2. Fallback ngoại tuyến: tìm bằng EmployeeService
+        const user = EmployeeService.getUserByIdentifier(identifier)
         if (!user) {
-          set({ isLoading: false, loginError: 'Email không tồn tại trong hệ thống' })
-          return { success: false, error: 'Email không tồn tại trong hệ thống' }
+          set({ isLoading: false, loginError: 'Tài khoản không tồn tại trên hệ thống' })
+          return { success: false, error: 'Tài khoản không tồn tại trên hệ thống' }
         }
 
         if (!validatePassword(password)) {
@@ -236,7 +324,7 @@ export const useAuthStore = create<AuthState>()(
           return { success: false, error: 'Mật khẩu không đúng' }
         }
 
-        if (user.status === 'inactive') {
+        if (user.status === 'inactive' || user.account_status === 'bi_khoa') {
           set({ isLoading: false, loginError: 'Tài khoản đã bị khóa. Vui lòng liên hệ HR.' })
           return { success: false, error: 'Tài khoản đã bị khóa' }
         }
@@ -304,6 +392,12 @@ export const useAuthStore = create<AuthState>()(
             loginError: null,
           })
           syncAuthCookie(user)
+          // Đồng bộ session server cookie cho tài khoản demo
+          fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: user.email, password: '123456' }),
+          }).catch(() => {})
           console.log(`[Auth] loginAsDemo: Switched to ${user.full_name} (${user.role})`)
         }
       },
@@ -317,7 +411,10 @@ export const useAuthStore = create<AuthState>()(
         rememberMe: state.rememberMe,
       }),
       onRehydrateStorage: () => (state) => {
-        if (!state) return
+        if (!state) {
+          useAuthStore.setState({ hasHydrated: true })
+          return
+        }
         state.clearError()
 
         const isServiceReady = typeof EmployeeService !== 'undefined' && typeof EmployeeService.resolveSessionUser === 'function'
@@ -325,22 +422,28 @@ export const useAuthStore = create<AuthState>()(
         let targetUser = state.user
         let targetAuth = state.isAuthenticated
 
-        if (isServiceReady) {
-          const refreshedUser = EmployeeService.resolveSessionUser(state.user)
-
-          if (state.user && !refreshedUser) {
-            targetUser = null
-            targetAuth = false
-          } else if (refreshedUser) {
-            targetUser = refreshedUser
-            targetAuth = true
+        if (isServiceReady && state.user) {
+          try {
+            const refreshedUser = EmployeeService.resolveSessionUser(state.user)
+            if (refreshedUser) {
+              targetUser = refreshedUser
+              targetAuth = true
+            }
+          } catch (err) {
+            console.warn('[AuthStore] Failed to refresh session user, keeping current state:', err)
           }
+        }
+
+        // Đảm bảo nếu state đã có user thì luôn xác thực là true
+        if (targetUser && targetUser.id) {
+          targetAuth = true
         }
 
         // Cập nhật trực tiếp đồng bộ để các hàm ngoài React đọc được ngay
         state.user = targetUser
         state.isAuthenticated = targetAuth
         state.hasHydrated = true
+        state.isLoading = false
 
         // Đồng bộ cookie
         syncAuthCookie(targetUser)
@@ -351,12 +454,73 @@ export const useAuthStore = create<AuthState>()(
             user: targetUser,
             isAuthenticated: targetAuth,
             hasHydrated: true,
+            isLoading: false,
           })
         }, 0)
       },
     }
   )
 )
+
+// Helper đọc trực tiếp user từ localStorage hoặc sessionStorage cứu hộ tức thì
+export function getStoredAuthUser(): AuthUser | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const rawLocal = localStorage.getItem(AUTH_STORAGE_KEY)
+    if (rawLocal) {
+      const parsed = JSON.parse(rawLocal)
+      if (parsed?.state?.user?.id) return parsed.state.user
+    }
+    const rawSession = sessionStorage.getItem(AUTH_STORAGE_KEY)
+    if (rawSession) {
+      const parsed = JSON.parse(rawSession)
+      if (parsed?.state?.user?.id) return parsed.state.user
+    }
+  } catch (err) {
+    console.warn('[AuthStore] Error reading stored auth user:', err)
+  }
+  return null
+}
+
+// Tận dụng hook/listener onFinishHydration chuẩn của Zustand v4/v5 và kích hoạt tức thì
+if (typeof window !== 'undefined') {
+  if (useAuthStore.persist?.hasHydrated?.()) {
+    useAuthStore.setState({ hasHydrated: true })
+  }
+  useAuthStore.persist?.onFinishHydration?.(() => {
+    useAuthStore.setState({ hasHydrated: true })
+  })
+
+  // Đồng bộ tức thì ngay khi file được import phía client
+  const current = useAuthStore.getState()
+  if (!current.hasHydrated || !current.user) {
+    const fallbackUser = getStoredAuthUser()
+    if (fallbackUser) {
+      useAuthStore.setState({
+        hasHydrated: true,
+        user: fallbackUser,
+        isAuthenticated: true,
+        isLoading: false,
+      })
+    } else if (typeof document !== 'undefined' && document.cookie.includes('hrm-auth=1')) {
+      useAuthStore.setState({ hasHydrated: true })
+    }
+  }
+
+  // Cứu hộ bổ sung sau 50ms cho các trường hợp mạng chậm/Turbopack
+  setTimeout(() => {
+    const state = useAuthStore.getState()
+    if (!state.hasHydrated) {
+      const fallbackUser = getStoredAuthUser()
+      useAuthStore.setState({
+        hasHydrated: true,
+        user: state.user || fallbackUser,
+        isAuthenticated: Boolean(state.user || fallbackUser),
+        isLoading: false,
+      })
+    }
+  }, 50)
+}
 
 // ─────────────────────────────────────────────
 // HELPERS

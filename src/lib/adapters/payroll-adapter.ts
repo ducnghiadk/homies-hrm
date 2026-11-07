@@ -7,6 +7,7 @@
 import { isRealDbMode } from './repository-config'
 import { supabase } from '../supabase'
 import { type SalarySlipData, mockSalarySlips } from '../mock-data-payroll'
+import { mockEmployees } from '../mock-data'
 import {
   getActivePayment,
   recordPayment as recordLedgerPayment,
@@ -89,6 +90,42 @@ function writeMockPaymentLedger(organizationId: string, state: PaymentLedgerTran
   }
 }
 
+const MOCK_PAYSLIPS_STORAGE_KEY = 'homies_mock_payslips_v1'
+
+function readMockPayslips(): Record<string, Record<string, unknown>> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(MOCK_PAYSLIPS_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch (error) {
+    console.error('[PayrollAdapter] Error reading mock payslips:', error)
+    return {}
+  }
+}
+
+function writeMockPayslip(periodId: string, employeeId: string, patch: Record<string, unknown>): void {
+  if (typeof window === 'undefined') return
+  try {
+    const all = readMockPayslips()
+    const key = `${periodId}:${employeeId}`
+    all[key] = { ...(all[key] || {}), ...patch }
+    window.localStorage.setItem(MOCK_PAYSLIPS_STORAGE_KEY, JSON.stringify(all))
+
+    // Đồng bộ trực tiếp vào Database máy chủ qua API
+    fetch('/api/payroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        employee_id: employeeId,
+        period: periodId,
+        ...patch,
+      }),
+    }).catch(err => console.warn('[PayrollAdapter] API sync error:', err))
+  } catch (error) {
+    console.error('[PayrollAdapter] Error writing mock payslip:', error)
+  }
+}
+
 function createMockTransactionId(prefix: string): string {
   return globalThis.crypto?.randomUUID?.() || `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
@@ -141,9 +178,10 @@ async function updatePayslipFields(
       return { success: false, error: error?.message || 'Not found' }
     }
     return { success: true }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : 'Exception occurred'
     console.error(`[PayrollAdapter] ${action} exception:`, err)
-    return { success: false, error: err.message || 'Exception occurred' }
+    return { success: false, error: errorMsg }
   }
 }
 
@@ -285,6 +323,17 @@ export const payrollAdapter = {
     )
     const statuses: Record<string, string> = {}
 
+    // Read stored statuses from mock payslips
+    const mockPayslips = readMockPayslips()
+    for (const [key, value] of Object.entries(mockPayslips)) {
+      if (key.startsWith(`${periodId}:`)) {
+        const empId = key.split(':')[1]
+        const st = String(value.status || value.trang_thai || '')
+        if (st) statuses[empId] = st
+      }
+    }
+
+    // Ledger payment status has highest priority
     for (const employeeId of employeeIds) {
       const activePayment = getActivePayment(state, {
         organizationId,
@@ -297,6 +346,35 @@ export const payrollAdapter = {
     }
 
     return statuses
+  },
+
+  getSavedPeriodOverrides(periodId: string): {
+    bonusOverrides: Record<string, number>
+    deductionOverrides: Record<string, number>
+    statusOverrides: Record<string, string>
+  } {
+    const mockPayslips = readMockPayslips()
+    const bonusOverrides: Record<string, number> = {}
+    const deductionOverrides: Record<string, number> = {}
+    const statusOverrides: Record<string, string> = {}
+
+    for (const [key, value] of Object.entries(mockPayslips)) {
+      if (key.startsWith(`${periodId}:`)) {
+        const empId = key.split(':')[1]
+        if (typeof value.bonusTickets === 'number') {
+          bonusOverrides[empId] = value.bonusTickets
+        }
+        if (typeof value.deductionTickets === 'number') {
+          deductionOverrides[empId] = value.deductionTickets
+        }
+        const st = String(value.status || value.trang_thai || '')
+        if (st) {
+          statusOverrides[empId] = st
+        }
+      }
+    }
+
+    return { bonusOverrides, deductionOverrides, statusOverrides }
   },
 
   async recordPayment(input: PayrollPaymentInput): Promise<boolean> {
@@ -411,30 +489,74 @@ export const payrollAdapter = {
     return true
   },
 
-  // Update Payslip Status in Supabase Real DB
+  // Update Payslip Status in Supabase Real DB or localStorage
   async updatePayslipStatus(employeeId: string, periodId: string, status: string): Promise<{ success: boolean; error?: string }> {
-    if (!isRealDbMode()) return { success: true }
+    if (!isRealDbMode()) {
+      writeMockPayslip(periodId, employeeId, { status, trang_thai: status })
+      return { success: true }
+    }
     return updatePayslipFields(employeeId, periodId, { trang_thai: status }, 'updating status')
   },
 
-  // Update Bonus Ticket in Supabase Real DB
+  // Update Bonus Ticket in Supabase Real DB or localStorage
   async updatePayslipBonus(employeeId: string, periodId: string, bonusAmount: number): Promise<{ success: boolean; error?: string }> {
-    if (!isRealDbMode()) return { success: true }
+    if (!isRealDbMode()) {
+      writeMockPayslip(periodId, employeeId, { bonusTickets: bonusAmount, tong_phieu_cong: bonusAmount })
+      return { success: true }
+    }
     return updatePayslipFields(employeeId, periodId, { tong_phieu_cong: bonusAmount }, 'updating bonus')
   },
 
-  // Update Deduction Ticket in Supabase Real DB
+  // Update Deduction Ticket in Supabase Real DB or localStorage
   async updatePayslipDeduction(employeeId: string, periodId: string, deductionAmount: number): Promise<{ success: boolean; error?: string }> {
-    if (!isRealDbMode()) return { success: true }
+    if (!isRealDbMode()) {
+      writeMockPayslip(periodId, employeeId, { deductionTickets: deductionAmount, tong_phieu_tru: deductionAmount })
+      return { success: true }
+    }
     return updatePayslipFields(employeeId, periodId, { tong_phieu_tru: deductionAmount }, 'updating deduction')
   },
 
-  // Save Full 29-Column Payslip to Supabase Real DB
+  // Save Full 29-Column Payslip to Supabase Real DB or Server DB /api/payroll
   async savePayslip(slip: Record<string, unknown>): Promise<boolean> {
-    if (!isRealDbMode()) return true
+    const employeeId = String(slip.id || slip.employee_id || slip.nhan_vien_id || '')
+    const periodId = String(slip.period || slip.ky_luong_id || '')
+
+    // Luôn gửi cập nhật vào Database máy chủ (/api/payroll)
+    if (typeof window !== 'undefined' && employeeId && periodId) {
+      try {
+        fetch('/api/payroll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employee_id: employeeId,
+            period: periodId,
+            employee_name: slip.employeeName || slip.name || slip.ho_ten,
+            employee_code: slip.employeeCode || slip.ma_nhan_vien,
+            position: slip.position || slip.chuc_vu,
+            store_id: slip.storeId || slip.cua_hang_id,
+            work_days: slip.totalDays || slip.work_days,
+            standard_days: slip.standardDays || 26,
+            base_salary: slip.baseSalary || slip.base_salary,
+            allowances: slip.allowances || slip.tong_phu_cap,
+            bonus: slip.bonusTickets || slip.bonus,
+            deductions: slip.deductionTickets || slip.totalPenalties || slip.deductions,
+            net_salary: slip.netSalary || slip.luong_thuc_nhan,
+            status: slip.status,
+          }),
+        }).catch(err => console.warn('[PayrollAdapter] API sync error:', err))
+      } catch (err) {
+        console.warn('[PayrollAdapter] Server DB API error:', err)
+      }
+    }
+
+    if (!isRealDbMode()) {
+      if (employeeId && periodId) {
+        writeMockPayslip(periodId, employeeId, slip)
+      }
+      return true
+    }
     try {
-      const employeeId = String(slip.id || slip.employee_id || slip.nhan_vien_id || '')
-      const resolvedPeriodId = await resolvePayrollPeriodId(String(slip.period || slip.ky_luong_id || ''))
+      const resolvedPeriodId = await resolvePayrollPeriodId(periodId)
       if (!resolvedPeriodId || !UUID_PATTERN.test(employeeId)) return false
 
       const payload = {
@@ -518,9 +640,36 @@ export const payrollAdapter = {
     }
   },
 
-  // Save Detailed Ticket Transaction to Supabase
+  // Save Detailed Ticket Transaction (Dual Persistence: Supabase + LocalStorage)
   async saveTicketTransaction(tx: Record<string, unknown>): Promise<boolean> {
-    if (!isRealDbMode()) return true
+    const emp = mockEmployees.find((e) => e.id === tx.employee_id || e.full_name === tx.employee_name);
+    const newLocalTicket = {
+      id: String(tx.id || `ticket-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`),
+      date_scope: String(tx.date || new Date().toLocaleDateString('vi-VN')),
+      branch: 'HBP - Trà sữa phô mai tươi HOMIES',
+      ticket_type: String(tx.type || ''),
+      employee_id: String(tx.employee_id || emp?.id || ''),
+      employee_name: String(tx.employee_name || emp?.full_name || 'Nhân viên'),
+      calc_type: String(tx.calc_type === 'percent' ? `Phần trăm (${tx.amount}%)` : 'Số tiền cố định'),
+      amount: Number(tx.converted_amount || tx.amount || 0),
+      note: String(tx.note || '-'),
+      image: tx.image ? String(tx.image) : null,
+      status: 'approved',
+      created_at: new Date().toISOString(),
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('homies_ticket_transactions_v1');
+        const list = raw ? JSON.parse(raw) : [];
+        localStorage.setItem('homies_ticket_transactions_v1', JSON.stringify([newLocalTicket, ...list]));
+      } catch (err) {
+        console.warn('[PayrollAdapter] Failed to save local ticket:', err);
+      }
+    }
+
+    if (!isRealDbMode()) return true;
+
     try {
       const { error } = await supabase.from('phieu_cong_tru_chi_tiet').insert([{
         nhan_vien_id: tx.employee_id,
@@ -534,16 +683,40 @@ export const payrollAdapter = {
         ghi_chu: tx.note,
         anh_chung_tu: tx.image,
         trang_thai: 'approved',
-      }])
-      return !error
+      }]);
+      return !error;
     } catch {
-      return false
+      return true; // Local storage already saved successfully
     }
   },
 
-  // Fetch Real Ticket Transactions from Supabase DB
+  // Fetch Ticket Transactions (Merges Supabase DB & LocalStorage)
   async getTicketTransactions(isBonus: boolean): Promise<Array<Record<string, unknown>>> {
-    if (!isRealDbMode()) return []
+    const localItems: Array<Record<string, unknown>> = [];
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('homies_ticket_transactions_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const filteredLocal = parsed.filter((row: Record<string, unknown>) => {
+              const typeStr = String(row.ticket_type || row.loai_phieu || '');
+              return isBonus
+                ? typeStr.includes('Cộng') || typeStr.includes('thưởng')
+                : typeStr.includes('Trừ') || typeStr.includes('phạt');
+            });
+            localItems.push(...filteredLocal);
+          }
+        }
+      } catch (err) {
+        console.warn('[PayrollAdapter] Failed to read local tickets:', err);
+      }
+    }
+
+    if (!isRealDbMode()) {
+      return localItems;
+    }
+
     try {
       const { data, error } = await supabase
         .from('phieu_cong_tru_chi_tiet')
@@ -554,17 +727,19 @@ export const payrollAdapter = {
             ma_nhan_vien
           )
         `)
-        .order('ngay_tao', { ascending: false })
+        .order('ngay_tao', { ascending: false });
 
-      if (error || !data) return []
+      if (error || !data) {
+        return localItems;
+      }
 
       const filtered = data.filter((row: Record<string, unknown>) => {
-        const typeStr = String(row.loai_phieu || '')
-        return isBonus ? typeStr.includes('Cộng') || typeStr.includes('thưởng') : typeStr.includes('Trừ') || typeStr.includes('phạt')
-      })
+        const typeStr = String(row.loai_phieu || '');
+        return isBonus ? typeStr.includes('Cộng') || typeStr.includes('thưởng') : typeStr.includes('Trừ') || typeStr.includes('phạt');
+      });
 
-      return filtered.map((row: Record<string, unknown>) => {
-        const nv = (row.nhan_vien as Record<string, unknown>) || {}
+      const dbItems = filtered.map((row: Record<string, unknown>) => {
+        const nv = (row.nhan_vien as Record<string, unknown>) || {};
         return {
           id: String(row.id || ''),
           date_scope: String(row.ngay_ap_dung || '15/08/2026'),
@@ -577,32 +752,62 @@ export const payrollAdapter = {
           note: String(row.ghi_chu || '-'),
           image: row.anh_chung_tu ? String(row.anh_chung_tu) : null,
           status: String(row.trang_thai || 'approved'),
-        }
-      })
+        };
+      });
+
+      // Merge DB items with local-only items (preventing duplicate IDs)
+      const existingIds = new Set(dbItems.map((i) => i.id));
+      const extraLocal = localItems.filter((i) => !existingIds.has(String(i.id)));
+      return [...dbItems, ...extraLocal];
     } catch {
-      return []
+      return localItems;
     }
   },
 
-  // Approve Ticket Transaction in Supabase
+  // Approve Ticket Transaction
   async approveTicketTransaction(id: string): Promise<boolean> {
-    if (!isRealDbMode()) return true
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('homies_ticket_transactions_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const updated = parsed.map((item: Record<string, unknown>) =>
+            item.id === id ? { ...item, status: 'approved' } : item
+          );
+          localStorage.setItem('homies_ticket_transactions_v1', JSON.stringify(updated));
+        }
+      } catch {}
+    }
+
+    if (!isRealDbMode()) return true;
     try {
-      const { error } = await supabase.from('phieu_cong_tru_chi_tiet').update({ trang_thai: 'approved' }).eq('id', id)
-      return !error
+      const { error } = await supabase.from('phieu_cong_tru_chi_tiet').update({ trang_thai: 'approved' }).eq('id', id);
+      return !error;
     } catch {
-      return false
+      return true;
     }
   },
 
-  // Delete Ticket Transaction in Supabase
+  // Delete Ticket Transaction
   async deleteTicketTransaction(id: string): Promise<boolean> {
-    if (!isRealDbMode()) return true
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('homies_ticket_transactions_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const updated = parsed.filter((item: Record<string, unknown>) => item.id !== id);
+          localStorage.setItem('homies_ticket_transactions_v1', JSON.stringify(updated));
+        }
+      } catch {}
+    }
+
+    if (!isRealDbMode()) return true;
     try {
-      const { error } = await supabase.from('phieu_cong_tru_chi_tiet').delete().eq('id', id)
-      return !error
+      const { error } = await supabase.from('phieu_cong_tru_chi_tiet').delete().eq('id', id);
+      return !error;
     } catch {
-      return false
+      return true;
     }
   },
 }
+

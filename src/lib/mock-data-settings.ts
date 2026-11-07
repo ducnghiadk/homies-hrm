@@ -14,9 +14,9 @@ export const settingsPayroll = {
 
 // ===== Master Data (7) =====
 export const masterStores = [
-  { id: 'store-001', name: 'Homies Milk Tea Q.1', code: 'BH-Q1', address: '123 Nguyễn Huệ, Q.1', phone: '028 1234 5670', is_active: true },
-  { id: 'store-002', name: 'Homies Milk Tea Q.3', code: 'BH-Q3', address: '456 Võ Văn Tần, Q.3', phone: '028 1234 5671', is_active: true },
-  { id: 'store-003', name: 'Homies Milk Tea Thủ Đức', code: 'BH-TD', address: '789 Phạm Văn Đồng, Thủ Đức', phone: '028 1234 5672', is_active: true },
+  { id: 'store-001', name: 'Homies Milk Tea - Hồ Bá Phấn', code: 'BH-HBP', address: '49 Hồ Bá Phấn, Phước Long A, TP. Thủ Đức', phone: '028 3821 1111', is_active: true },
+  { id: 'store-002', name: 'Homies Milk Tea - Đường 429', code: 'BH-429', address: '429 Đường 429, Tăng Nhơn Phú A, TP. Thủ Đức', phone: '028 3822 2222', is_active: true },
+  { id: 'store-003', name: 'Homies Milk Tea - Lê Văn Sỹ', code: 'BH-LVS', address: 'Lê Văn Sỹ, Phước Long A, TP. Thủ Đức', phone: '028 3823 3333', is_active: false },
 ]
 
 export const masterDepartments = [
@@ -26,9 +26,9 @@ export const masterDepartments = [
 ]
 
 export const masterShifts = [
-  { id: 'shift-am', name: 'Ca Sáng', start_time: '07:00', end_time: '14:00', break_minutes: 30, color: '#2F6FA8', is_active: true },
-  { id: 'shift-pm', name: 'Ca Chiều', start_time: '14:00', end_time: '21:00', break_minutes: 30, color: '#F6C85F', is_active: true },
-  { id: 'shift-ev', name: 'Ca Tối', start_time: '17:00', end_time: '23:00', break_minutes: 15, color: '#001D3D', is_active: true },
+  { id: 'shift-am', name: 'Ca Sáng', start_time: '08:30', end_time: '12:00', break_minutes: 15, color: '#2F6FA8', is_active: true },
+  { id: 'shift-pm', name: 'Ca Trưa', start_time: '12:00', end_time: '17:00', break_minutes: 30, color: '#F6C85F', is_active: true },
+  { id: 'shift-ev', name: 'Ca Tối', start_time: '17:00', end_time: '22:00', break_minutes: 15, color: '#001D3D', is_active: true },
 ]
 
 export const masterLeaveTypes = [
@@ -42,6 +42,7 @@ export const masterLeaveTypes = [
 export const masterPositions = [
   { id: 'pos-001', name: 'Pha chế', level: 1, base_salary: 5500000 },
   { id: 'pos-002', name: 'Thu ngân', level: 1, base_salary: 5000000 },
+  { id: 'pos-bep', name: 'Bếp / Chế biến', level: 1, base_salary: 5200000 },
   { id: 'pos-003', name: 'Phục vụ', level: 1, base_salary: 4800000 },
   { id: 'pos-004', name: 'Trưởng ca', level: 2, base_salary: 8000000 },
   { id: 'pos-005', name: 'Quản lý', level: 3, base_salary: 12000000 },

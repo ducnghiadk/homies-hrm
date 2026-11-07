@@ -1,21 +1,31 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
+  ChevronDown,
   ChevronRight,
   Filter,
+  MessageSquare,
   Plus,
+  Share2,
   ShieldAlert,
   Sliders,
+  UserCheck,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import AppShell from '@/components/layout/AppShell'
+import { useMounted } from '@/hooks/useMounted'
 import KPIIncidentDrawer, {
   type KPIIncidentOption,
   type KPIIncidentViolationOption,
 } from '@/components/kpi/incidents/KPIIncidentDrawer'
 import KPIIncidentTable, { type KPIIncidentRow } from '@/components/kpi/incidents/KPIIncidentTable'
+import AuthorizedVerifiersModal from '@/components/kpi/incidents/AuthorizedVerifiersModal'
+import StoreOperationIncidentModal from '@/components/kpi/incidents/StoreOperationIncidentModal'
+import IncidentCatalogSettingsModal from '@/components/kpi/incidents/IncidentCatalogSettingsModal'
+import { kpiBscSyncService } from '@/lib/services/kpi-bsc-sync-service'
 import { useAuthStore } from '@/store/auth-store'
 import { kpiAdapter } from '@/lib/adapters/kpi-adapter'
 import { canKpi } from '@/lib/kpi/permissions'
@@ -36,27 +46,61 @@ const INCIDENT_POLICY: KpiIncidentPolicy = {
 }
 
 const VIOLATION_OPTIONS: KPIIncidentViolationOption[] = [
-  { code: 'attendance_late', label: 'Di tre / cham gio tre', note: 'Nguon attendance' },
-  { code: 'attendance_no_show', label: 'Bo ca / vang mat khong bao', note: 'Loi nang lien quan ky luat' },
-  { code: 'wrong_topping', label: 'Sai topping / sai thanh pham', note: 'Loi thao tac va san pham' },
-  { code: 'hygiene_breach', label: 'Vi pham ve sinh / an toan', note: 'Anh huong chat luong va SOP' },
-  { code: 'cash_shortage', label: 'Thieu tien / sai ket ca', note: 'Lien quan ban giao va tai san' },
-  { code: 'customer_complaint', label: 'Phan nan khach hang', note: 'Chi tach ra neu co hanh vi doc lap' },
+  { code: 'attendance_late', label: 'Đi trễ / chấm giờ trễ', note: 'Nguồn chấm công attendance' },
+  { code: 'attendance_no_show', label: 'Bỏ ca / vắng mặt không báo', note: 'Lỗi nặng liên quan kỷ luật' },
+  { code: 'wrong_topping', label: 'Sai topping / sai thành phẩm', note: 'Lỗi thao tác và chất lượng sản phẩm' },
+  { code: 'hygiene_breach', label: 'Vi phạm vệ sinh / an toàn', note: 'Ảnh hưởng tiêu chuẩn SOP và VSATTP' },
+  { code: 'cash_shortage', label: 'Thiếu tiền / sai két ca', note: 'Liên quan bàn giao tiền và tài sản' },
+  { code: 'customer_complaint', label: 'Phàn nàn của khách hàng', note: 'Sự cố trực tiếp từ phản ánh khách hàng' },
 ]
 
 export default function KpiViolationsPage() {
   const router = useRouter()
   const { user, isAuthenticated, hasHydrated } = useAuthStore()
+  const mounted = useMounted()
 
   const [database, setDatabase] = useState<KpiDatabase | null>(null)
-  const [selectedMonth, setSelectedMonth] = useState('2026-08')
+  const [selectedMonth, setSelectedMonth] = useState('2026-09')
   const [selectedStoreId, setSelectedStoreId] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState<'all' | KpiIncident['status']>('all')
   const [drawerMode, setDrawerMode] = useState<'create' | 'detail'>('detail')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedIncident, setSelectedIncident] = useState<KpiIncident | null>(null)
+  const [editingIncident, setEditingIncident] = useState<{
+    id: string
+    store_id: string
+    period?: string
+    target_type?: 'store_operation' | 'individual_discipline'
+    employee_id?: string
+    employee_name?: string
+    error_id: string
+    error_name?: string
+    custom_title?: string
+    penalty_points: number
+    occurred_at: string
+    shift_name?: string
+    order_code?: string
+    evidence_note?: string
+    verifier_name?: string
+    impact_rating_1star?: boolean
+  } | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isVerifiersModalOpen, setIsVerifiersModalOpen] = useState(false)
+  const [isStoreOpModalOpen, setIsStoreOpModalOpen] = useState(false)
+  const [isCatalogSettingsOpen, setIsCatalogSettingsOpen] = useState(false)
+  const [isUtilitiesOpen, setIsUtilitiesOpen] = useState(false)
+  const utilitiesRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (utilitiesRef.current && !utilitiesRef.current.contains(event.target as Node)) {
+        setIsUtilitiesOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const actor = useMemo<KpiActor | null>(() => {
     if (!user) return null
@@ -71,6 +115,16 @@ export default function KpiViolationsPage() {
   const canAccess = actor ? actor.role !== 'employee' : false
   const canCreate = actor ? canKpi(actor.role, 'log_incident') : false
 
+  // ── Mở khóa hydration an toàn tránh kẹt vòng xoay tải ──
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!useAuthStore.getState().hasHydrated) {
+        useAuthStore.setState({ hasHydrated: true })
+      }
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [])
+
   useEffect(() => {
     if (hasHydrated && !isAuthenticated) {
       router.push('/login?redirect=/kpi/violations')
@@ -81,10 +135,21 @@ export default function KpiViolationsPage() {
     const db = await kpiAdapter.getDatabase()
     setDatabase(db)
 
-    if (db.periods.length > 0) {
-      const sortedMonths = Array.from(new Set(db.periods.map((period) => period.month))).sort().reverse()
-      setSelectedMonth((current) => current || sortedMonths[0] || '2026-08')
-    }
+    const nowMonth = new Date().toISOString().slice(0, 7)
+    const incidentMonths = (db.incidents || []).map((inc) => inc.occurred_at.slice(0, 7))
+    const periodMonths = (db.periods || []).map((period) => period.month)
+    const sortedMonths = Array.from(new Set([...incidentMonths, ...periodMonths, nowMonth, '2026-09', '2026-08'])).sort().reverse()
+    
+    // Nếu tháng hiện tại chưa có hồ sơ nào, tự động chọn tháng gần nhất có dữ liệu
+    const monthsWithIncidents = sortedMonths.filter((m) => (db.incidents || []).some((inc) => inc.occurred_at.startsWith(m)))
+    const bestMonth = monthsWithIncidents[0] || sortedMonths[0] || '2026-08'
+
+    setSelectedMonth((current) => {
+      if (current && (db.incidents || []).some((inc) => inc.occurred_at.startsWith(current))) {
+        return current
+      }
+      return bestMonth
+    })
   }, [])
 
   useEffect(() => {
@@ -98,8 +163,11 @@ export default function KpiViolationsPage() {
   }, [canAccess, hasHydrated, isAuthenticated, refreshData, user])
 
   const periodOptions = useMemo(() => {
-    const months = Array.from(new Set((database?.periods ?? []).map((period) => period.month))).sort().reverse()
-    return months.length > 0 ? months : ['2026-08']
+    const nowMonth = new Date().toISOString().slice(0, 7)
+    const monthsFromPeriods = (database?.periods ?? []).map((period) => period.month)
+    const monthsFromIncidents = (database?.incidents ?? []).map((inc) => inc.occurred_at.slice(0, 7))
+    const months = Array.from(new Set([...monthsFromPeriods, ...monthsFromIncidents, nowMonth, '2026-09', '2026-08', '2026-07'])).sort().reverse()
+    return months
   }, [database])
 
   const storeOptions = useMemo<KPIIncidentOption[]>(() => (
@@ -146,18 +214,59 @@ export default function KpiViolationsPage() {
           employeeLabel: getEmployeeName(incident.employee_id),
           primaryViolationLabel: getViolationLabel(primary?.code),
           impactLabel: impact.promotion_block_months > 0
-            ? `Chan thang bac ${impact.promotion_block_months} thang`
+            ? `Chặn thăng bậc ${impact.promotion_block_months} tháng`
             : impact.suggested_score === undefined
-            ? 'Chi canh bao'
-            : `Goi y diem ${impact.suggested_score}/5`,
+            ? 'Chỉ cảnh báo'
+            : `Gợi ý điểm ${impact.suggested_score}/5`,
           severity,
         }
       })
       .sort((a, b) => b.incident.occurred_at.localeCompare(a.incident.occurred_at))
   ), [visibleIncidents])
 
-  if (!hasHydrated || !user) return null
-  if (!canAccess) return null
+  const handleEditIncident = useCallback((incident: KpiIncident) => {
+    const isEmp = incident.employee_id && incident.employee_id !== 'all_store_staff'
+    const violation = incident.violations?.[0]
+    setEditingIncident({
+      id: incident.id,
+      store_id: incident.store_id,
+      period: incident.occurred_at?.slice(0, 7) || selectedMonth,
+      target_type: isEmp ? 'individual_discipline' : 'store_operation',
+      employee_id: isEmp ? incident.employee_id : undefined,
+      employee_name: isEmp ? getEmployeeName(incident.employee_id) : undefined,
+      error_id: violation?.code || 'PER-OTHER',
+      error_name: violation?.reason || incident.description,
+      custom_title: incident.description,
+      penalty_points: 1,
+      occurred_at: incident.occurred_at,
+      shift_name: 'Ca làm việc',
+      order_code: '',
+      evidence_note: incident.description,
+      verifier_name: user?.full_name || user?.email || 'Quản lý',
+      impact_rating_1star: incident.violations.some((v) => v.reason?.includes('1 sao') || v.reason?.includes('khiếu nại')),
+    })
+    setIsStoreOpModalOpen(true)
+  }, [selectedMonth, user])
+
+  if (!mounted) {
+    return (
+      <AppShell showNav className="min-h-screen w-full max-w-none bg-[#FFF8E8]">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#2F6FA8] border-t-transparent" />
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (!user || !canAccess) {
+    return (
+      <AppShell showNav className="min-h-screen w-full max-w-none bg-[#FFF8E8]">
+        <div className="flex items-center justify-center min-h-[50vh] text-xs font-semibold text-gray-500">
+          Đang xác thực quyền truy cập...
+        </div>
+      </AppShell>
+    )
+  }
 
   async function handleCreateIncident(payload: { incident: KpiIncident }) {
     if (!database || !actor) return
@@ -195,8 +304,30 @@ export default function KpiViolationsPage() {
 
       const saved = await kpiAdapter.repository.save(nextDatabase, database.revision)
       setDatabase(saved)
+
+      // Đồng bộ tức thì sang trừ điểm BSC cá nhân nếu có employee_id
+      try {
+        if (payload.incident.employee_id && payload.incident.employee_id !== 'all_store_staff') {
+          const violationCode = payload.incident.violations[0]?.code || 'ATT-01'
+          const desc = payload.incident.description || payload.incident.violations[0]?.reason || 'Vi phạm kỷ luật'
+          await kpiBscSyncService.logIncident({
+            employee_id: payload.incident.employee_id,
+            store_id: payload.incident.store_id,
+            period: selectedMonth,
+            occurred_at: payload.incident.occurred_at,
+            violation_code: violationCode,
+            description: desc,
+            penalty_points: 1,
+            logged_by: user?.full_name || 'Quản lý',
+            logged_by_role: actor.role || 'manager',
+            is_operation_error: false,
+          })
+        }
+      } catch (syncErr) {
+        console.warn('[KPI Violations] Sync to BSC warning:', syncErr)
+      }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Khong the luu ho so su co')
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể lưu hồ sơ sự cố')
     } finally {
       setIsSaving(false)
     }
@@ -216,36 +347,36 @@ export default function KpiViolationsPage() {
 
   return (
     <AppShell showNav className="min-h-screen w-full max-w-none bg-[#FFF8E8]">
-      <div className="sticky top-0 z-30 w-full border-b border-gray-100 bg-white px-4 py-3.5 shadow-2xs sm:px-6 lg:px-8">
-        <div className="flex w-full flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="sticky top-0 z-30 w-full border-b border-gray-100 bg-white px-4 py-3 shadow-2xs sm:px-6 lg:px-8">
+        <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          {/* Cột trái: Breadcrumb + Tiêu đề gọn gàng */}
           <div className="space-y-0.5">
             <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
               <span>HRM Homies</span>
               <ChevronRight size={12} className="text-gray-400" />
-              <Link href="/kpi" className="transition hover:text-[#2F6FA8]">Dieu hanh KPI</Link>
+              <Link href="/kpi" className="transition hover:text-[#2F6FA8]">Điều hành KPI</Link>
               <ChevronRight size={12} className="text-gray-400" />
-              <span className="font-bold text-[#2F6FA8]">Ho so su co</span>
+              <span className="font-bold text-[#2F6FA8]">Hồ sơ sự cố</span>
             </div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-lg font-bold tracking-tight text-[#001D3D] sm:text-xl">
-                Ho so su co van hanh va ky luat
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-bold tracking-tight text-[#001D3D] sm:text-lg">
+                Hồ sơ sự cố vận hành và kỷ luật
               </h1>
-              <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-rose-700">
-                Route canonical
+              <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700">
+                Chuẩn KPI &amp; BSC
               </span>
-            </div>
-            <div className="text-xs text-gray-500">
-              Khong dung mock violation cu. Tat ca ho so moi se luu ve kho KPI local-first.
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex min-h-[36px] items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5">
+          {/* Cột phải: Thanh công cụ gom gọn trên 1 dòng duy nhất */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            {/* Bộ lọc tháng */}
+            <div className="flex min-h-[36px] items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-1.5 shrink-0">
               <Filter size={13} className="text-gray-400" />
               <select
                 value={selectedMonth}
                 onChange={(event) => setSelectedMonth(event.target.value)}
-                className="bg-transparent text-xs font-bold text-gray-700 outline-none"
+                className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer"
               >
                 {periodOptions.map((month) => (
                   <option key={month} value={month}>{formatMonth(month)}</option>
@@ -253,15 +384,16 @@ export default function KpiViolationsPage() {
               </select>
             </div>
 
+            {/* Bộ lọc chi nhánh (nếu có quyền) */}
             {(actor?.role === 'ceo' || actor?.role === 'area_manager' || actor?.role === 'hr_admin') ? (
-              <div className="flex min-h-[36px] items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5">
+              <div className="flex min-h-[36px] items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-1.5 shrink-0">
                 <ShieldAlert size={13} className="text-gray-400" />
                 <select
                   value={selectedStoreId}
                   onChange={(event) => setSelectedStoreId(event.target.value)}
-                  className="bg-transparent text-xs font-bold text-gray-700 outline-none"
+                  className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer"
                 >
-                  <option value="all">Tat ca cua hang</option>
+                  <option value="all">Tất cả quán</option>
                   {storeOptions.map((store) => (
                     <option key={store.id} value={store.id}>{store.label}</option>
                   ))}
@@ -269,29 +401,94 @@ export default function KpiViolationsPage() {
               </div>
             ) : null}
 
-            <Link
-              href="/kpi/violations/appeals"
-              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 shadow-2xs hover:bg-gray-50"
+            {/* Nút chia sẻ link Leader nhanh */}
+            <button
+              type="button"
+              onClick={() => {
+                const url = `${window.location.origin}/kpi/violations/public`
+                navigator.clipboard.writeText(url)
+                toast.success('Đã sao chép link Leader: ' + url)
+              }}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-100 transition cursor-pointer shrink-0"
+              title="Sao chép link Leader nhập sự cố trên điện thoại"
             >
-              <span>Queue khieu nai</span>
-            </Link>
+              <Share2 size={13} className="text-amber-700" />
+              <span>Link Leader</span>
+            </button>
 
-            <Link
-              href="/kpi/violations/settings"
-              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 shadow-2xs hover:bg-gray-50"
-            >
-              <Sliders size={13} className="text-[#2F6FA8]" />
-              <span>Cau hinh khung loi</span>
-            </Link>
+            {/* Menu Tiện ích (Gom gọn các công cụ quản trị vào 1 menu thông minh) */}
+            <div className="relative shrink-0" ref={utilitiesRef}>
+              <button
+                type="button"
+                onClick={() => setIsUtilitiesOpen((prev) => !prev)}
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 shadow-2xs hover:bg-gray-50 transition cursor-pointer"
+                title="Các công cụ quản trị và cài đặt khác"
+              >
+                <Sliders size={13} className="text-[#2F6FA8]" />
+                <span>Tiện ích</span>
+                <ChevronDown size={12} className={`text-gray-400 transition-transform ${isUtilitiesOpen ? 'rotate-180' : ''}`} />
+              </button>
 
+              {isUtilitiesOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-60 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUtilitiesOpen(false)
+                      setIsVerifiersModalOpen(true)
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-emerald-50 hover:text-emerald-800 transition cursor-pointer"
+                  >
+                    <UserCheck size={14} className="text-emerald-700 shrink-0" />
+                    <span>Phân quyền người nhập &amp; PIN</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUtilitiesOpen(false)
+                      setIsCatalogSettingsOpen(true)
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-amber-50 hover:text-amber-900 transition cursor-pointer"
+                  >
+                    <Sliders size={14} className="text-amber-600 shrink-0" />
+                    <span>Cài đặt danh mục &amp; Điểm phạt</span>
+                  </button>
+
+                  <Link
+                    href="/kpi/violations/appeals"
+                    onClick={() => setIsUtilitiesOpen(false)}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-800 transition cursor-pointer"
+                  >
+                    <MessageSquare size={14} className="text-purple-600 shrink-0" />
+                    <span>Hàng đợi khiếu nại</span>
+                  </Link>
+
+                  <Link
+                    href="/settings/bsc?tab=penalties"
+                    onClick={() => setIsUtilitiesOpen(false)}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-[#2F6FA8] transition cursor-pointer"
+                  >
+                    <Sliders size={14} className="text-[#2F6FA8] shrink-0" />
+                    <span>Cài đặt khung lỗi BSC</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Nút hành động chính: Ghi Nhận Sự Cố */}
             {canCreate ? (
               <button
                 type="button"
-                onClick={openCreateDrawer}
-                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl bg-[#D9381E] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-[#b62d17]"
+                onClick={() => {
+                  setEditingIncident(null)
+                  setIsStoreOpModalOpen(true)
+                }}
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl bg-[#2F6FA8] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-[#1D3E61] cursor-pointer shrink-0"
+                title="Ghi nhận sự cố vận hành quán hoặc lỗi kỷ luật cá nhân"
               >
                 <Plus size={14} />
-                <span>Tao ho so su co</span>
+                <span>Ghi Nhận Sự Cố</span>
               </button>
             ) : null}
           </div>
@@ -300,32 +497,38 @@ export default function KpiViolationsPage() {
 
       <div className="w-full space-y-5 px-4 py-5 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-          <MetricCard label="Tong ho so trong bo loc" value={String(incidentRows.length)} note="Tat ca ho so su co dang hien" />
+          <MetricCard label="Tổng hồ sơ trong bộ lọc" value={String(incidentRows.length)} note="Tất cả hồ sơ sự cố đang hiển thị" />
           <MetricCard
-            label="Cho xac nhan / khieu nai"
+            label="Chờ xác nhận / khiếu nại"
             value={String(incidentRows.filter((row) => ['proposed', 'appealed'].includes(row.incident.status)).length)}
-            note="Can leader / CEO xu ly tiep"
+            note="Cần Leader / Quản lý xử lý tiếp"
           />
           <MetricCard
-            label="Loi nang / liet"
+            label="Lỗi nặng / liệt"
             value={String(incidentRows.filter((row) => row.severity === 'serious').length)}
-            note="Co nguy co khoa thang bac hoac diem rat thap"
+            note="Có nguy cơ khóa thăng bậc hoặc trừ điểm"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-100 bg-white p-3 shadow-2xs">
-          {(['all', 'proposed', 'confirmed', 'appealed', 'finalized'] as const).map((status) => (
+          {[
+            { id: 'all', label: 'Tất cả' },
+            { id: 'proposed', label: 'Chờ duyệt' },
+            { id: 'confirmed', label: 'Đã duyệt' },
+            { id: 'appealed', label: 'Đang khiếu nại' },
+            { id: 'finalized', label: 'Đã chốt' },
+          ].map((item) => (
             <button
-              key={status}
+              key={item.id}
               type="button"
-              onClick={() => setSelectedStatus(status)}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                selectedStatus === status
+              onClick={() => setSelectedStatus(item.id as 'all' | KpiIncident['status'])}
+              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                selectedStatus === item.id
                   ? 'bg-[#2F6FA8] text-white shadow-2xs'
                   : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
             >
-              {status === 'all' ? 'Tat ca' : status}
+              {item.label}
             </button>
           ))}
         </div>
@@ -336,7 +539,11 @@ export default function KpiViolationsPage() {
           </div>
         ) : null}
 
-        <KPIIncidentTable rows={incidentRows} onSelect={openDetailDrawer} />
+        <KPIIncidentTable
+          rows={incidentRows}
+          onSelect={openDetailDrawer}
+          onEdit={handleEditIncident}
+        />
 
         <KPIIncidentDrawer
           open={drawerOpen}
@@ -349,14 +556,40 @@ export default function KpiViolationsPage() {
           violationOptions={VIOLATION_OPTIONS}
           policy={INCIDENT_POLICY}
           onClose={() => setDrawerOpen(false)}
+          onEdit={handleEditIncident}
           onSubmit={async ({ incident }) => {
             await handleCreateIncident({ incident })
           }}
         />
 
         {isSaving ? (
-          <div className="text-xs font-medium text-gray-500">Dang luu ho so su co...</div>
+          <div className="text-xs font-medium text-gray-500">Đang lưu hồ sơ sự cố...</div>
         ) : null}
+
+        <AuthorizedVerifiersModal
+          isOpen={isVerifiersModalOpen}
+          onClose={() => setIsVerifiersModalOpen(false)}
+        />
+
+        {/* Modal Ghi Nhận Lỗi Vận Hành & Cá Nhân (1 Form Thống Nhất Auto BSC & KPI) */}
+        <StoreOperationIncidentModal
+          isOpen={isStoreOpModalOpen}
+          onClose={() => {
+            setIsStoreOpModalOpen(false)
+            setEditingIncident(null)
+          }}
+          onSuccess={() => void refreshData()}
+          defaultStoreId={actor?.store_id || selectedStoreId}
+          defaultPeriod={selectedMonth}
+          editingIncident={editingIncident}
+        />
+
+        {/* Modal Cài Đặt Danh Mục Lỗi & Điểm Phạt F&B (Full Button Suite) */}
+        <IncidentCatalogSettingsModal
+          isOpen={isCatalogSettingsOpen}
+          onClose={() => setIsCatalogSettingsOpen(false)}
+          onUpdate={() => void refreshData()}
+        />
       </div>
     </AppShell>
   )
@@ -381,9 +614,9 @@ function getEmployeeName(employeeId: string) {
 }
 
 function getViolationLabel(code?: string) {
-  return VIOLATION_OPTIONS.find((option) => option.code === code)?.label ?? (code ?? 'Chua ro')
+  return VIOLATION_OPTIONS.find((option) => option.code === code)?.label ?? (code ?? 'Chưa rõ')
 }
 
 function formatMonth(month: string) {
-  return `Thang ${month.slice(5)}/${month.slice(0, 4)}`
+  return `Tháng ${month.slice(5)}/${month.slice(0, 4)}`
 }

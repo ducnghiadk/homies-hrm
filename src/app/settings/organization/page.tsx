@@ -25,6 +25,7 @@ import {
   Sparkles,
   Loader2,
   Link2,
+  Lock,
 } from 'lucide-react'
 
 function OrganizationSettingsContent() {
@@ -66,6 +67,7 @@ function OrganizationSettingsContent() {
     latitude: 10.825000,
     longitude: 106.765000,
     checkin_radius_meters: 100,
+    pin_code: '3535',
     is_active: true,
   })
 
@@ -88,7 +90,7 @@ function OrganizationSettingsContent() {
     setTimeout(() => setToastMessage(null), 3000)
   }
 
-  // Load saved organization & stores from localStorage on mount
+  // Load saved organization & stores on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedOrg = localStorage.getItem('homies_org_info')
@@ -100,6 +102,7 @@ function OrganizationSettingsContent() {
         }
       }
 
+      // First check localStorage for immediate render, then refresh from storeAdapter (server API / DB)
       const savedStores = localStorage.getItem('homies_stores')
       if (savedStores) {
         try {
@@ -107,9 +110,14 @@ function OrganizationSettingsContent() {
         } catch (e) {
           console.error('Failed to parse saved stores', e)
         }
-      } else {
-        storeAdapter.getStores().then(res => setStores(res))
       }
+
+      storeAdapter.getStores().then(res => {
+        if (res && res.length > 0) {
+          setStores(res)
+          localStorage.setItem('homies_stores', JSON.stringify(res))
+        }
+      })
     }
   }, [])
 
@@ -190,6 +198,7 @@ function OrganizationSettingsContent() {
       latitude: 10.7736,
       longitude: 106.7024,
       checkin_radius_meters: 100,
+      pin_code: '3535',
       is_active: true,
     })
     setIsModalOpen(true)
@@ -235,6 +244,7 @@ function OrganizationSettingsContent() {
       latitude: store.latitude,
       longitude: store.longitude,
       checkin_radius_meters: store.checkin_radius_meters,
+      pin_code: store.pin_code || '3535',
       is_active: store.is_active,
     })
     setIsModalOpen(true)
@@ -324,37 +334,37 @@ function OrganizationSettingsContent() {
     }
 
     const fullAddress = computedFullAddress
+    const targetStore: Store = editingStore
+      ? {
+          ...editingStore,
+          name: storeForm.name,
+          address: fullAddress,
+          phone: storeForm.phone,
+          latitude: Number(storeForm.latitude),
+          longitude: Number(storeForm.longitude),
+          checkin_radius_meters: Number(storeForm.checkin_radius_meters),
+          pin_code: storeForm.pin_code || '3535',
+          is_active: storeForm.is_active,
+        }
+      : {
+          id: `store-${Date.now()}`,
+          org_id: mockOrg.id,
+          name: storeForm.name,
+          address: fullAddress,
+          phone: storeForm.phone,
+          latitude: Number(storeForm.latitude),
+          longitude: Number(storeForm.longitude),
+          checkin_radius_meters: Number(storeForm.checkin_radius_meters),
+          pin_code: storeForm.pin_code || '3535',
+          is_active: storeForm.is_active,
+        }
 
     let updatedStores: Store[] = []
     if (editingStore) {
-      updatedStores = stores.map(s =>
-        s.id === editingStore.id
-          ? {
-              ...s,
-              name: storeForm.name,
-              address: fullAddress,
-              phone: storeForm.phone,
-              latitude: Number(storeForm.latitude),
-              longitude: Number(storeForm.longitude),
-              checkin_radius_meters: Number(storeForm.checkin_radius_meters),
-              is_active: storeForm.is_active,
-            }
-          : s
-      )
+      updatedStores = stores.map(s => (s.id === editingStore.id ? targetStore : s))
       showToast(`Đã cập nhật cửa hàng ${storeForm.name}!`)
     } else {
-      const newStore: Store = {
-        id: `store-${Date.now()}`,
-        org_id: mockOrg.id,
-        name: storeForm.name,
-        address: fullAddress,
-        phone: storeForm.phone,
-        latitude: Number(storeForm.latitude),
-        longitude: Number(storeForm.longitude),
-        checkin_radius_meters: Number(storeForm.checkin_radius_meters),
-        is_active: storeForm.is_active,
-      }
-      updatedStores = [...stores, newStore]
+      updatedStores = [...stores, targetStore]
       showToast(`Đã thêm cửa hàng ${storeForm.name}!`)
     }
 
@@ -362,6 +372,8 @@ function OrganizationSettingsContent() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('homies_stores', JSON.stringify(updatedStores))
     }
+    // Persist to Server DB (data/server-db.json) & Supabase
+    void storeAdapter.upsertStore(targetStore)
     setIsModalOpen(false)
   }
 
@@ -519,9 +531,14 @@ function OrganizationSettingsContent() {
                             <strong className="font-mono text-gray-800">{store.longitude}</strong>
                           </span>
                         </div>
-                        <span className="bg-[#E6F0FA] text-[#2F6FA8] px-2 py-0.5 rounded font-bold">
-                          R = {store.checkin_radius_meters}m
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="bg-[#E6F0FA] text-[#2F6FA8] px-2 py-0.5 rounded font-bold">
+                            R = {store.checkin_radius_meters}m
+                          </span>
+                          <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold font-mono">
+                            PIN: {store.pin_code || '3535'}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -779,18 +796,38 @@ function OrganizationSettingsContent() {
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">
-                  Bán kính check-in hợp lệ (Meters)
-                </label>
-                <input
-                  type="number"
-                  value={storeForm.checkin_radius_meters}
-                  onChange={e =>
-                    setStoreForm({ ...storeForm, checkin_radius_meters: parseInt(e.target.value) || 100 })
-                  }
-                  className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#001D3D] focus:ring-2 focus:ring-[#2F6FA8] outline-none"
-                />
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                    Bán kính check-in (Mét)
+                  </label>
+                  <input
+                    type="number"
+                    value={storeForm.checkin_radius_meters}
+                    onChange={e =>
+                      setStoreForm({ ...storeForm, checkin_radius_meters: parseInt(e.target.value) || 100 })
+                    }
+                    className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#001D3D] focus:ring-2 focus:ring-[#2F6FA8] outline-none font-mono"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-0.5">Khoảng cách cho phép bấm giờ</p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block flex items-center gap-1">
+                    <Lock size={12} className="text-[#2F6FA8]" /> Mã PIN cơ sở
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    placeholder="VD: 3535"
+                    value={storeForm.pin_code}
+                    onChange={e =>
+                      setStoreForm({ ...storeForm, pin_code: e.target.value.replace(/\D/g, '') })
+                    }
+                    className="w-full bg-vanilla-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#001D3D] focus:ring-2 focus:ring-[#2F6FA8] outline-none font-mono font-bold tracking-widest"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-0.5">Xác thực ký biên bản tại quán</p>
+                </div>
               </div>
 
               <div className="flex items-center gap-2 pt-1">

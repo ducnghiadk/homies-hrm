@@ -19,6 +19,7 @@ import {
   getEmployeeById,
   getStoreById,
   getPositionById,
+  checkRestPeriodViolation,
 } from '@/lib/mock-data'
 import { formatDate } from '@/lib/utils'
 
@@ -81,6 +82,11 @@ export default function ApprovalDetailModal({
   const position = emp ? getPositionById(emp.position_id) : null
   const cat = APPROVAL_CATEGORIES[item.category]
   const swapEmp = item.swap_with_employee_id ? getEmployeeById(item.swap_with_employee_id) : null
+
+  // Kiểm tra vi phạm thời gian nghỉ ngơi giữa 2 ca (< 8 tiếng)
+  const restViolation = (item.category === 'swap' && item.swap_with_employee_id)
+    ? checkRestPeriodViolation(item.swap_with_employee_id, item.target_date, item.shift_name)
+    : { hasViolation: false }
 
   // Cấu hình cấp duyệt: 2 cấp vs 1 cấp theo Master Workflow
   const isTwoLevel = ['leave', 'salary_advance', 'kpi_review', 'new_employee'].includes(item.category)
@@ -264,6 +270,22 @@ export default function ApprovalDetailModal({
             </div>
           </div>
 
+          {/* CẢNH BÁO VI PHẠM THỜI GIAN NGHỈ NGƠI < 8 TIẾNG */}
+          {restViolation.hasViolation && (
+            <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 space-y-2 text-amber-900 shadow-sm animate-fade-in">
+              <div className="flex items-center gap-2 font-bold text-xs text-amber-800">
+                <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+                <span className="uppercase">Cảnh Báo Vi Phạm Thời Gian Nghỉ Ngơi</span>
+              </div>
+              <p className="text-xs font-bold leading-relaxed text-amber-950">
+                ⚠️ {restViolation.warning || 'Nhân viên chưa đủ 8 tiếng nghỉ ngơi giữa 2 ca'}
+              </p>
+              <p className="text-[11px] text-amber-800 font-medium">
+                Ca tối kết thúc lúc 23:00 và ca sáng hôm sau bắt đầu lúc 06:30 (khoảng cách 7.5 tiếng &lt; 8 tiếng tối thiểu). Quản lý cần cân nhắc kỹ trước khi phê duyệt!
+              </p>
+            </div>
+          )}
+
           {/* KHỐI 1: NỘI DUNG CHI TIẾT YÊU CẦU */}
           <div className="p-4 rounded-2xl bg-white border border-gray-100 space-y-3 shadow-2xs">
             <h4 className="text-xs font-bold text-[#001D3D] uppercase tracking-wider flex items-center gap-1.5 border-b border-gray-100 pb-2">
@@ -395,6 +417,12 @@ export default function ApprovalDetailModal({
               <button
                 type="button"
                 onClick={() => {
+                  if (restViolation.hasViolation) {
+                    const confirmed = window.confirm(
+                      'Cảnh báo: Nhân viên chưa đủ 8 tiếng nghỉ ngơi giữa 2 ca. Bạn có chắc chắn muốn duyệt đổi ca này không?'
+                    )
+                    if (!confirmed) return
+                  }
                   onApprove(item.id, reviewNotes)
                   onClose()
                 }}

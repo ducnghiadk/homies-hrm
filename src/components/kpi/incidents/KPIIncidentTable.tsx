@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { AlertTriangle, ChevronRight, Clock3, MessageSquare, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Clock3, MessageSquare, Pencil, ShieldAlert } from 'lucide-react'
 import type { KpiIncident } from '@/lib/kpi/types'
 
 export interface KPIIncidentRow {
@@ -16,9 +16,10 @@ export interface KPIIncidentRow {
 interface KPIIncidentTableProps {
   rows: KPIIncidentRow[]
   onSelect: (incident: KpiIncident) => void
+  onEdit?: (incident: KpiIncident) => void
 }
 
-export default function KPIIncidentTable({ rows, onSelect }: KPIIncidentTableProps) {
+export default function KPIIncidentTable({ rows, onSelect, onEdit }: KPIIncidentTableProps) {
   const pendingConfirmation = rows.filter((row) => row.incident.status === 'proposed').length
   const appealedCount = rows.filter((row) => row.incident.status === 'appealed').length
   const severeCount = rows.filter((row) => row.severity === 'serious').length
@@ -29,18 +30,19 @@ export default function KPIIncidentTable({ rows, onSelect }: KPIIncidentTablePro
         <table className="min-w-full">
           <thead className="bg-gray-50">
             <tr className="text-left">
-              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Su co</th>
-              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Nhan su / cua hang</th>
-              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Loi goc</th>
-              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Tac dong</th>
-              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Trang thai</th>
+              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Sự cố</th>
+              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Nhân sự / Cửa hàng</th>
+              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Lỗi gốc</th>
+              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Tác động</th>
+              <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Trạng thái</th>
+              <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-gray-500">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-sm text-gray-500">
-                  Chua co ho so su co nao trong bo loc hien tai.
+                <td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-500">
+                  Chưa có hồ sơ sự cố nào trong bộ lọc hiện tại.
                 </td>
               </tr>
             ) : (
@@ -64,7 +66,7 @@ export default function KPIIncidentTable({ rows, onSelect }: KPIIncidentTablePro
                   <td className="px-4 py-3 align-top">
                     <div className="text-sm font-bold text-gray-900">{row.primaryViolationLabel}</div>
                     <div className="mt-1 text-xs text-gray-500">
-                      {row.incident.violations.length > 1 ? `${row.incident.violations.length - 1} loi phu doc lap` : 'Khong co loi phu'}
+                      {row.incident.violations.length > 1 ? `${row.incident.violations.length - 1} lỗi phụ độc lập` : 'Không có lỗi phụ'}
                     </div>
                   </td>
                   <td className="px-4 py-3 align-top">
@@ -82,6 +84,17 @@ export default function KPIIncidentTable({ rows, onSelect }: KPIIncidentTablePro
                       <ChevronRight size={14} className="text-gray-400" />
                     </div>
                   </td>
+                  <td className="px-4 py-3 align-top text-right" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => onEdit?.(row.incident)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-[#2F6FA8] bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer"
+                      title="Chỉnh sửa biên bản sự cố"
+                    >
+                      <Pencil size={12} />
+                      <span>Sửa</span>
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
@@ -90,10 +103,10 @@ export default function KPIIncidentTable({ rows, onSelect }: KPIIncidentTablePro
       </div>
 
       <div className="grid grid-cols-1 gap-3 border-t border-gray-100 bg-gray-50 px-4 py-4 md:grid-cols-4">
-        <FooterMetric icon={<ShieldAlert size={14} className="text-[#2F6FA8]" />} label="Tong ho so" value={String(rows.length)} />
-        <FooterMetric icon={<Clock3 size={14} className="text-amber-700" />} label="Cho xac nhan" value={String(pendingConfirmation)} />
-        <FooterMetric icon={<MessageSquare size={14} className="text-purple-700" />} label="Dang khieu nai" value={String(appealedCount)} />
-        <FooterMetric icon={<AlertTriangle size={14} className="text-rose-700" />} label="Loi nang / liet" value={String(severeCount)} />
+        <FooterMetric icon={<ShieldAlert size={14} className="text-[#2F6FA8]" />} label="Tổng hồ sơ" value={String(rows.length)} />
+        <FooterMetric icon={<Clock3 size={14} className="text-amber-700" />} label="Chờ xác nhận" value={String(pendingConfirmation)} />
+        <FooterMetric icon={<MessageSquare size={14} className="text-purple-700" />} label="Đang khiếu nại" value={String(appealedCount)} />
+        <FooterMetric icon={<AlertTriangle size={14} className="text-rose-700" />} label="Lỗi nặng / liệt" value={String(severeCount)} />
       </div>
     </div>
   )

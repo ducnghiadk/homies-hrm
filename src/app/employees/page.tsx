@@ -1276,7 +1276,7 @@ export default function EmployeesPage() {
           </div>
         </section>
 
-        {/* MODAL ĐẶT LẠI MẬT KHẨU NHÂN SỰ */}
+        {/* Modal đặt lại mật khẩu nhân sự */}
         {resetPasswordTarget && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
             <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white p-6 shadow-2xl space-y-5">

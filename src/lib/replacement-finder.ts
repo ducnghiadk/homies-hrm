@@ -74,9 +74,9 @@ function periodToShiftId(period: ShiftPeriod): string {
 
 function getStoreName(storeId: string): string {
   const storeNames: Record<string, string> = {
-    'store-001': 'Homies Milk Tea Q.1',
-    'store-002': 'Homies Milk Tea Thủ Đức',
-    'store-003': 'Homies Milk Tea Q.3',
+    'store-001': 'Homies Milk Tea - Hồ Bá Phấn',
+    'store-002': 'Homies Milk Tea - Đường 429',
+    'store-003': 'Homies Milk Tea - Lê Văn Sỹ (Dự kiến)',
   }
   return storeNames[storeId] || storeId
 }

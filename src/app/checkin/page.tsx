@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/store/auth-store'
 import AppShell from '@/components/layout/AppShell'
-import { getShiftById, type Attendance } from '@/lib/mock-data'
+import { getShiftById, type Attendance, type Schedule } from '@/lib/mock-data'
 import { saveOfflineCheckin, syncPendingCheckins, getPendingCount } from '@/lib/offline-checkin'
 import { isEmployeeOnLeave } from '@/lib/leave-attendance-sync'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
@@ -15,8 +15,8 @@ import confetti from 'canvas-confetti'
 import {
   ArrowLeft, Clock, Navigation, AlertTriangle,
   CheckCircle2, LogIn, LogOut, Loader2, WifiOff, CloudOff, Wifi,
+  QrCode, ScanLine, Camera, X,
 } from 'lucide-react'
-import WifiSimulator from '@/components/checkin/WifiSimulator'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { ScheduleService } from '@/lib/services/schedule-service'
 import { AttendanceService } from '@/lib/services/attendance-service'
@@ -75,16 +75,20 @@ function CheckInPageContent() {
   const [store, setStore] = useState<StoreWithWifi | null>(null)
   const [storeLoadMessage, setStoreLoadMessage] = useState('Đang tải thông tin cửa hàng...')
   const todayStr = new Date().toISOString().split('T')[0]
+
+  const [apiTodaySchedule, setApiTodaySchedule] = useState<Schedule | null>(null)
+
   const publishedTodaySchedules = ScheduleService.getSchedulesForUser(currentUser, currentUser.id)
-    .filter(s => s.status === 'published' && ScheduleService.isWeekPublished(s.store_id, ScheduleService.getWeekStartDate(s.date)))
+    .filter(s => s.status === 'published' || (s.status as string) === 'APPROVED')
     .filter(s => s.date === todayStr)
   const currentMinutes = new Date().getHours() * 60 + new Date().getMinutes()
-  const todaySchedule = publishedTodaySchedules.find(schedule => isScheduleActive(schedule, currentMinutes))
+  const fallbackSchedule = publishedTodaySchedules.find(schedule => isScheduleActive(schedule, currentMinutes))
     || publishedTodaySchedules.find(schedule => {
       const start = toMinutes(getShiftById(schedule.shift_id)?.start_time)
       return start !== null && start > currentMinutes
     })
     || publishedTodaySchedules[0]
+  const todaySchedule = apiTodaySchedule || fallbackSchedule
   const shift = todaySchedule ? getShiftById(todaySchedule.shift_id) : null
 
   const [checkinRecord, setCheckinRecord] = useState<Attendance | null>(() => {
@@ -103,6 +107,77 @@ function CheckInPageContent() {
     return 'locating'
   })
 
+  // Gọi trực tiếp GET /api/shifts & GET /api/attendance để đồng bộ dữ liệu thật từ máy chủ
+  useEffect(() => {
+    if (!currentUser) return
+    let active = true
+
+    // 1. Nạp ca làm hôm nay trực tiếp từ máy chủ
+    fetch(`/api/shifts?employee_id=${currentUser.id}&date=${todayStr}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (!active) return
+        if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          const validShifts = json.data.filter((s: { status: string }) => s.status === 'APPROVED' || s.status?.toLowerCase() === 'published')
+          if (validShifts.length > 0) {
+            const first = validShifts[0]
+            const mapped: Schedule = {
+              id: first.id,
+              org_id: 'org-001',
+              store_id: first.store_id || currentUser.store_id,
+              employee_id: first.employee_id,
+              shift_id: first.shift_id,
+              date: first.date,
+              notes: first.notes || first.shift_name,
+              status: 'published',
+              updated_at: new Date().toISOString(),
+            }
+            setApiTodaySchedule(mapped)
+          }
+        }
+      })
+      .catch(e => console.warn('[CheckInPage] Lỗi tải ca từ /api/shifts:', e))
+
+    // 2. Nạp trạng thái chấm công hôm nay trực tiếp từ máy chủ
+    fetch(`/api/attendance?employee_id=${currentUser.id}&date=${todayStr}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (!active) return
+        if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          const rec = json.data[0]
+          const mappedAtt: Attendance = {
+            id: rec.id,
+            org_id: rec.org_id || 'org-001',
+            employee_id: rec.employee_id,
+            store_id: rec.store_id,
+            shift_id: rec.shift_id || 'shift-001',
+            date: rec.date,
+            check_in_time: rec.check_in_time,
+            check_out_time: rec.check_out_time,
+            check_in_lat: rec.check_in_lat,
+            check_in_lng: rec.check_in_lng,
+            check_out_lat: rec.check_out_lat,
+            check_out_lng: rec.check_out_lng,
+            check_in_distance_meters: rec.check_in_distance_meters || 0,
+            status: rec.status === 'late' ? 'late' : 'on_time',
+            late_minutes: rec.late_minutes || 0,
+            total_hours: rec.total_hours !== undefined ? Number(rec.total_hours) : 0,
+            overtime_hours: rec.overtime_hours !== undefined ? Number(rec.overtime_hours) : 0,
+            qr_code: rec.qr_code,
+          }
+          setCheckinRecord(mappedAtt)
+          if (rec.check_out_time) {
+            setStatus('checked_out')
+          } else if (rec.check_in_time) {
+            setStatus('checked_in')
+          }
+        }
+      })
+      .catch(e => console.warn('[CheckInPage] Lỗi tải chấm công từ /api/attendance:', e))
+
+    return () => { active = false }
+  }, [currentUser, todayStr])
+
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null)
   const [distance, setDistance] = useState<number | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -113,26 +188,28 @@ function CheckInPageContent() {
     return getPendingCount(currentUser.id)
   })
   const [isOfflineCheckin, setIsOfflineCheckin] = useState(false)
-
-  const [simulatedWifi, setSimulatedWifi] = useState<{ ssid: string; bssid?: string } | null>(null)
   const [checkinMethod, setCheckinMethod] = useState<CheckinMethod | null>(null)
+  const [showQrModal, setShowQrModal] = useState(false)
   const watchIdRef = useRef<number | null>(null)
   const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevOnlineRef = useRef(true)
 
   const noSchedule = !todaySchedule
+  const targetStoreId = todaySchedule?.store_id || currentUser.store_id
 
   useEffect(() => {
     let active = true
-    const storeId = currentUser.store_id
+    const storeId = targetStoreId
     if (!storeId) {
-      setStore(null)
-      setStoreLoadMessage('Nhân viên chưa có cua_hang_id nên chưa xác định được cửa hàng.')
-      setStatus('gps_error')
+      setTimeout(() => {
+        if (!active) return
+        setStore(null)
+        setStoreLoadMessage('Nhân viên chưa có cua_hang_id nên chưa xác định được cửa hàng.')
+        setStatus('gps_error')
+      }, 0)
       return
     }
 
-    setStoreLoadMessage('Đang tải thông tin cửa hàng...')
     storeAdapter.getStoreById(storeId)
       .then(result => {
         if (!active) return
@@ -155,10 +232,8 @@ function CheckInPageContent() {
     return () => {
       active = false
     }
-  }, [currentUser.store_id])
+  }, [targetStoreId])
 
-  // ─── WiFi declaration (for reference only, not location proof) ───
-  const declaredWifiMatches = !!(store?.wifi_ssid && simulatedWifi?.ssid === store.wifi_ssid)
   const gpsInRange = userPos !== null && distance !== null && store ? distance <= store.checkin_radius_meters : false
   const canCheckin = !!store
 
@@ -329,7 +404,7 @@ function CheckInPageContent() {
       // ── Online: write directly ──
       const result = await AttendanceService.checkinToday(
         currentUser.id,
-        currentUser.store_id,
+        targetStoreId,
         userPos?.lat,
         userPos?.lng,
         decision.distanceMeters,
@@ -369,7 +444,7 @@ function CheckInPageContent() {
       // ── Offline: save to localStorage ──
       saveOfflineCheckin(
         currentUser.id,
-        currentUser.store_id,
+        targetStoreId,
         userPos?.lat ?? 0,
         userPos?.lng ?? 0,
         decision.distanceMeters,
@@ -396,6 +471,96 @@ function CheckInPageContent() {
     }
   }
 
+  // ─── QR Code Check-in handler (Fallback chống GPS yếu / treo) ───
+  const handleQrCheckin = async (qrCodeVal?: string) => {
+    if (!store) {
+      setToastTone('error')
+      setToast('Chưa có thông tin cửa hàng để quét QR.')
+      setTimeout(() => setToast(null), 3000)
+      return
+    }
+
+    const leaveStatus = isEmployeeOnLeave(currentUser.id, todayStr)
+    if (leaveStatus.onLeave) {
+      setToast(`Không thể check-in: Bạn đang nghỉ phép (${leaveStatus.leaveType || 'leave'})`)
+      setTimeout(() => setToast(null), 4000)
+      return
+    }
+
+    setShowQrModal(false)
+    setCheckinMethod('gps')
+    const timeStr = formatTime(new Date())
+    const qrIdentifier = qrCodeVal || `HOMIES-${store.id.toUpperCase()}-POS`
+
+    if (isOnline) {
+      const result = await AttendanceService.checkinToday(
+        currentUser.id,
+        targetStoreId,
+        store.latitude,
+        store.longitude,
+        0, // Coi như tại quầy
+        shift?.id,
+        shift?.start_time,
+        {
+          waitForDb: true,
+          phuongThucCheckIn: 'gps',
+          ghiChuViTri: `Quét QR quầy thu ngân: ${qrIdentifier}`,
+        },
+      )
+      if (result.trangThai === 'that_bai' || !result.record) {
+        setToastTone('error')
+        setToast(`Check-in QR thất bại.${result.loi ? ` ${result.loi}` : ''}`)
+        setTimeout(() => setToast(null), 4000)
+        return
+      }
+
+      setCheckinRecord(result.record)
+      setStatus('checked_in')
+      setIsOfflineCheckin(result.trangThai === 'chi_luu_may')
+
+      confetti({
+        particleCount: 140,
+        spread: 85,
+        origin: { y: 0.6 },
+        colors: ['#2F6FA8', '#F6C85F', '#1E9E57'],
+      })
+
+      setToastTone('success')
+      setToast(`✓ Đã xác thực có mặt bằng QR quầy thu ngân lúc ${timeStr}`)
+      setTimeout(() => {
+        setToast(null)
+        router.push('/')
+      }, 2500)
+    } else {
+      saveOfflineCheckin(
+        currentUser.id,
+        targetStoreId,
+        store.latitude,
+        store.longitude,
+        0,
+        shift?.id,
+        shift?.start_time,
+      )
+      setStatus('checked_in')
+      setIsOfflineCheckin(true)
+      setPendingCount(getPendingCount(currentUser.id))
+
+      confetti({
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.6 },
+        colors: ['#F6C85F', '#d97706'],
+      })
+
+      setToastTone('warning')
+      setToast(`Đã lưu xác thực QR offline lúc ${timeStr}, sẽ gửi lại khi có mạng.`)
+      setTimeout(() => {
+        setToast(null)
+        router.push('/')
+      }, 3000)
+    }
+  }
+
   // ─── Check-out handler ───
   const handleCheckout = async () => {
     if (!store) return
@@ -405,36 +570,84 @@ function CheckInPageContent() {
       return
     }
 
-    const result = await AttendanceService.checkoutToday(
-      currentUser.id,
-      userPos?.lat,
-      userPos?.lng,
-      shift?.id,
-      { waitForDb: true, phuongThucCheckIn: decision.method, ghiChuViTri: decision.ghiChuViTri },
-    )
-    if (result.trangThai === 'that_bai' || !result.record) {
+    try {
+      // Gọi trực tiếp POST /api/attendance với trạng thái check_out lên máy chủ
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_id: currentUser.id,
+          employee_name: currentUser.full_name,
+          store_id: store.id,
+          store_name: store.name,
+          status: 'check_out',
+          action: 'check_out',
+          check_out_time: new Date().toISOString(),
+          check_out_lat: userPos?.lat || store.latitude,
+          check_out_lng: userPos?.lng || store.longitude,
+          date: todayStr,
+          shift_id: shift?.id,
+          shift_end_time: shift?.end_time,
+        }),
+      })
+
+      const resJson = await res.json()
+      if (!res.ok || !resJson?.success) {
+        setToastTone('error')
+        setToast(`Check-out thất bại: ${resJson?.error || 'Lỗi kết nối máy chủ'}`)
+        setTimeout(() => setToast(null), 4000)
+        return
+      }
+
+      const recordData = resJson.data
+      const updatedRecord: Attendance = {
+        id: recordData?.id || checkinRecord?.id || `att-${Date.now()}`,
+        org_id: 'org-001',
+        employee_id: currentUser.id,
+        store_id: store.id,
+        shift_id: shift?.id,
+        date: todayStr,
+        check_in_time: recordData?.check_in_time || checkinRecord?.check_in_time || new Date().toISOString(),
+        check_out_time: recordData?.check_out_time || new Date().toISOString(),
+        check_in_lat: recordData?.check_in_lat || checkinRecord?.check_in_lat,
+        check_in_lng: recordData?.check_in_lng || checkinRecord?.check_in_lng,
+        check_out_lat: recordData?.check_out_lat || userPos?.lat,
+        check_out_lng: recordData?.check_out_lng || userPos?.lng,
+        status: recordData?.status || 'on_time',
+        late_minutes: recordData?.late_minutes || 0,
+        total_hours: recordData?.total_hours !== undefined ? Number(recordData.total_hours) : 8,
+        overtime_hours: recordData?.overtime_hours !== undefined ? Number(recordData.overtime_hours) : 0,
+      }
+
+      setCheckinRecord(updatedRecord)
+      setStatus('checked_out')
+
+      // Đồng bộ dự phòng cho local storage nếu có
+      try {
+        AttendanceService.checkoutToday(
+          currentUser.id,
+          userPos?.lat,
+          userPos?.lng,
+          shift?.id,
+        )
+      } catch {}
+
+      const totalH = Math.floor(updatedRecord.total_hours)
+      const totalM = Math.round((updatedRecord.total_hours - totalH) * 60)
+      setToastTone('success')
+      setToast(
+        resJson.message || `Đã ghi nhận tan ca thành công lên máy chủ — Tổng ${totalH} giờ ${totalM} phút`
+      )
+      setTimeout(() => {
+        setToast(null)
+        router.push('/')
+      }, 2500)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể kết nối máy chủ để ghi nhận tan ca.'
       setToastTone('error')
-      setToast(`Check-out THẤT BẠI, chưa được ghi nhận.${result.loi ? ` ${result.loi}` : ''}`)
+      setToast(`Check-out thất bại: ${msg}`)
       setTimeout(() => setToast(null), 4000)
-      return
     }
-    const record = result.record
-
-    setCheckinRecord(record)
-    setStatus('checked_out')
-
-    const totalH = Math.floor(record.total_hours)
-    const totalM = Math.round((record.total_hours - totalH) * 60)
-    setToastTone(result.trangThai === 'da_luu_db' ? 'success' : 'warning')
-    setToast(
-      result.trangThai === 'da_luu_db'
-        ? `Đã kết thúc ca — Tổng ${totalH} giờ ${totalM} phút`
-        : 'Đã lưu tạm trên máy, CHƯA vào hệ thống. Sẽ tự gửi lại khi có mạng.'
-    )
-    setTimeout(() => {
-      setToast(null)
-      router.push('/')
-    }, 3000)
   }
 
   return (
@@ -517,51 +730,57 @@ function CheckInPageContent() {
           )}
         </div>
 
-        {/* ─── WiFi Simulator + Verification method ─── */}
+        {/* ─── Phương thức xác nhận chấm công chuẩn F&B (GPS + QR Kiosk) ─── */}
         {status !== 'checked_in' && status !== 'checked_out' && (
           <div className="mb-4 space-y-3">
-            <WifiSimulator onWifiChange={setSimulatedWifi} currentWifi={simulatedWifi} />
-
-            {/* Verification method display */}
-            <div className="bg-vanilla-50 rounded-xl p-3 space-y-2">
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Phương thức xác nhận</p>
-
-              {/* WiFi status */}
-              <div className="flex items-center gap-2">
-                {declaredWifiMatches ? (
-                  <>
-                    <Wifi size={14} className="text-success-500" />
-                    <span className="text-xs text-success-700 font-medium">WiFi tự khai báo: {simulatedWifi?.ssid} (khớp cấu hình)</span>
-                  </>
-                ) : (
-                  <>
-                    <WifiOff size={14} className="text-gray-400" />
-                    <span className="text-xs text-gray-400">
-                      {simulatedWifi ? `WiFi tự khai báo: ${simulatedWifi.ssid}` : 'WiFi tự khai báo: Chưa chọn'}
-                    </span>
-                  </>
-                )}
-              </div>
-              <p className="text-xs text-warning-700">Tự khai báo, không dùng để xác minh vị trí</p>
+            <div className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-2xs space-y-2.5">
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider flex items-center justify-between">
+                <span>Phương thức xác nhận chấm công</span>
+                <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">Bảo mật F&B</span>
+              </p>
 
               {/* GPS status */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${gpsInRange ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <Navigation size={16} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-800">Định vị GPS</span>
+                    <p className="text-[11px] text-gray-400">Bán kính cho phép &le; {store?.checkin_radius_meters || 100}m</p>
+                  </div>
+                </div>
                 {gpsInRange ? (
-                  <>
-                    <Navigation size={14} className="text-success-500" />
-                    <span className="text-xs text-success-700 font-medium">GPS: Trong phạm vi ({distance}m) ✓</span>
-                  </>
+                  <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg">
+                    Hợp lệ ({distance}m) ✓
+                  </span>
                 ) : distance !== null ? (
-                  <>
-                    <Navigation size={14} className="text-error-400" />
-                    <span className="text-xs text-error-500">GPS: Ngoài phạm vi ({distance}m)</span>
-                  </>
+                  <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                    Cách {distance}m
+                  </span>
                 ) : (
-                  <>
-                    <Navigation size={14} className="text-gray-300" />
-                    <span className="text-xs text-gray-400">{status === 'gps_error' ? 'GPS: Không lấy được' : 'GPS: Đang xác định...'}</span>
-                  </>
+                  <span className="text-xs text-gray-400">Đang dò GPS...</span>
                 )}
+              </div>
+
+              {/* QR Kiosk POS status */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-[#2F6FA8] flex items-center justify-center">
+                    <QrCode size={16} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-800">Mã QR Kiosk quầy thu ngân</span>
+                    <p className="text-[11px] text-gray-400">Đổi mã 30-60 giây chống gian lận</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowQrModal(true)}
+                  className="text-xs font-bold text-[#2F6FA8] bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
+                >
+                  Quét QR
+                </button>
               </div>
             </div>
           </div>
@@ -719,6 +938,18 @@ function CheckInPageContent() {
               Về trang chủ
             </button>
           )}
+
+          {/* ─── QR Code Fallback Button ─── */}
+          {status !== 'checked_in' && status !== 'checked_out' && (
+            <button
+              type="button"
+              onClick={() => setShowQrModal(true)}
+              className="w-full py-3 rounded-2xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 text-sm font-bold flex items-center justify-center gap-2.5 transition-all shadow-xs cursor-pointer active:scale-[0.98]"
+            >
+              <QrCode size={18} className="text-sky-600" />
+              <span>Chấm công bằng QR Code (Dự phòng sóng yếu)</span>
+            </button>
+          )}
         </div>
 
         {/* Pending sync notice */}
@@ -759,6 +990,73 @@ function CheckInPageContent() {
           {!isOnline && ' • Offline'}
         </p>
       </div>
+
+      {/* ─── Modal Quét Mã QR Quầy (Fallback GPS) ─── */}
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 animate-scale-up">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center">
+                  <QrCode size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-gray-900">Mã QR Chấm Công Tại Quầy</h3>
+                  <p className="text-[11px] text-gray-500">{store?.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowQrModal(false)}
+                className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* QR Mock Display */}
+            <div className="bg-slate-50 border-2 border-dashed border-sky-300 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-3">
+              <div className="w-36 h-36 bg-white p-3 rounded-2xl shadow-inner border border-gray-200 flex flex-col items-center justify-center relative">
+                <QrCode size={110} className="text-slate-800" />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center shadow-md">
+                    <ScanLine size={18} />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 font-bold">
+                  {`HOMIES-${store?.id.toUpperCase()}-POS-VERIFY`}
+                </span>
+                <p className="text-xs text-gray-600 mt-2 font-medium">
+                  Mã QR tĩnh dán tại quầy thu ngân cơ sở
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  Dùng khi sóng GPS trong quầy bar bị yếu hoặc chập chờn
+                </p>
+              </div>
+            </div>
+
+            {/* Action button */}
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => handleQrCheckin(`HOMIES-${store?.id.toUpperCase()}-POS-VERIFY`)}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md hover:from-sky-500 hover:to-blue-600 cursor-pointer active:scale-[0.98] transition-all"
+              >
+                <Camera size={16} />
+                Xác nhận đã quét mã tại quầy
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowQrModal(false)}
+                className="w-full py-2.5 text-xs text-gray-500 hover:text-gray-700 font-semibold cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Toast notification ─── */}
       {toast && (

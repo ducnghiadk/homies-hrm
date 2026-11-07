@@ -11,6 +11,18 @@ import {
   type ScheduleRule, type ScheduleRuleOverride, type WarningLevel, type RuleKey
 } from '../mock-data-schedule-rules'
 
+function getCurrentUserRole(): string {
+  if (typeof window === 'undefined') return 'store_manager'
+  try {
+    const raw = localStorage.getItem('hrm-auth')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      return parsed?.state?.user?.role || parsed?.user?.role || 'store_manager'
+    }
+  } catch {}
+  return 'store_manager'
+}
+
 export interface DbScheduleRuleRow {
   id: string
   rule_key: string
@@ -33,9 +45,26 @@ export interface DbRuleOverrideRow {
 
 export const scheduleRulesAdapter = {
   /**
-   * Lấy danh sách tất cả Quy tắc xếp ca (Supabase DB -> LocalStorage -> Mock Data)
+   * Lấy danh sách tất cả Quy tắc xếp ca (Server DB -> Supabase DB -> LocalStorage -> Mock Data)
    */
   async getRules(): Promise<ScheduleRule[]> {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/schedule-rules')
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.rules) && json.rules.length > 0) {
+            scheduleRules.length = 0
+            scheduleRules.push(...json.rules)
+            saveRulesToStorage()
+            return scheduleRules
+          }
+        }
+      } catch (err) {
+        console.warn('[ScheduleRulesAdapter] /api/schedule-rules fetch fallback:', err)
+      }
+    }
+
     if (isRealDbMode()) {
       try {
         const { data, error } = await supabase
@@ -69,7 +98,7 @@ export const scheduleRulesAdapter = {
   },
 
   /**
-   * Cập nhật 1 quy tắc (Supabase + Memory + LocalStorage)
+   * Cập nhật 1 quy tắc (Server DB + Supabase + Memory + LocalStorage)
    */
   async updateRule(
     ruleKey: RuleKey,
@@ -84,6 +113,19 @@ export const scheduleRulesAdapter = {
     }
 
     saveRulesToStorage()
+
+    if (typeof window !== 'undefined' && target) {
+      try {
+        const userRole = getCurrentUserRole()
+        await fetch('/api/schedule-rules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': userRole },
+          body: JSON.stringify({ rule: target, user_role: userRole }),
+        })
+      } catch (err) {
+        console.warn('[ScheduleRulesAdapter] Update rule server fallback:', err)
+      }
+    }
 
     if (isRealDbMode() && target) {
       try {
@@ -108,6 +150,23 @@ export const scheduleRulesAdapter = {
    * Lấy danh sách Ngoại lệ vị trí
    */
   async getOverrides(): Promise<ScheduleRuleOverride[]> {
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/schedule-rules')
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.overrides)) {
+            ruleOverrides.length = 0
+            ruleOverrides.push(...json.overrides)
+            saveRulesToStorage()
+            return ruleOverrides
+          }
+        }
+      } catch (err) {
+        console.warn('[ScheduleRulesAdapter] Fetch overrides server fallback:', err)
+      }
+    }
+
     if (isRealDbMode()) {
       try {
         const { data, error } = await supabase
@@ -151,6 +210,19 @@ export const scheduleRulesAdapter = {
     ruleOverrides.push(newOv)
     saveRulesToStorage()
 
+    if (typeof window !== 'undefined') {
+      try {
+        const userRole = getCurrentUserRole()
+        await fetch('/api/schedule-rules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': userRole },
+          body: JSON.stringify({ override: newOv, user_role: userRole }),
+        })
+      } catch (err) {
+        console.warn('[ScheduleRulesAdapter] Add override server fallback:', err)
+      }
+    }
+
     if (isRealDbMode()) {
       try {
         await supabase
@@ -177,6 +249,19 @@ export const scheduleRulesAdapter = {
       saveRulesToStorage()
     }
 
+    if (typeof window !== 'undefined') {
+      try {
+        const userRole = getCurrentUserRole()
+        await fetch('/api/schedule-rules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': userRole },
+          body: JSON.stringify({ delete_override_id: id, user_role: userRole }),
+        })
+      } catch (err) {
+        console.warn('[ScheduleRulesAdapter] Remove override server fallback:', err)
+      }
+    }
+
     if (isRealDbMode()) {
       try {
         await supabase.from('ngoai_le_quy_tac').delete().eq('id', id)
@@ -187,10 +272,23 @@ export const scheduleRulesAdapter = {
   },
 
   /**
-   * Lưu cố định tất cả quy tắc (upsert hàng loạt sang DB nếu chế độ DB bật)
+   * Lưu cố định tất cả quy tắc (upsert hàng loạt sang Server DB & Supabase)
    */
   async saveAllRules(): Promise<void> {
     saveRulesToStorage()
+
+    if (typeof window !== 'undefined') {
+      try {
+        const userRole = getCurrentUserRole()
+        await fetch('/api/schedule-rules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-role': userRole },
+          body: JSON.stringify({ rules: scheduleRules, overrides: ruleOverrides, user_role: userRole }),
+        })
+      } catch (err) {
+        console.warn('[ScheduleRulesAdapter] Save all server DB fallback:', err)
+      }
+    }
 
     if (isRealDbMode()) {
       try {
@@ -215,12 +313,6 @@ export const scheduleRulesAdapter = {
    */
   async resetToDefault(): Promise<void> {
     resetMockDefaults()
-    if (isRealDbMode()) {
-      try {
-        await this.saveAllRules()
-      } catch (err) {
-        console.warn('[ScheduleRulesAdapter] Reset DB fallback:', err)
-      }
-    }
+    await this.saveAllRules()
   }
 }

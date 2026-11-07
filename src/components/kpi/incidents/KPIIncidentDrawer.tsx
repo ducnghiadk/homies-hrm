@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Calendar,
   ClipboardList,
+  Pencil,
   Plus,
   ShieldAlert,
   Sparkles,
@@ -44,6 +45,7 @@ interface KPIIncidentDrawerProps {
   violationOptions: KPIIncidentViolationOption[]
   policy: KpiIncidentPolicy
   onClose: () => void
+  onEdit?: (incident: KpiIncident) => void
   onSubmit: (payload: { incident: KpiIncident; impact: KpiIncidentImpact }) => Promise<void> | void
 }
 
@@ -75,6 +77,7 @@ export default function KPIIncidentDrawer({
   violationOptions,
   policy,
   onClose,
+  onEdit,
   onSubmit,
 }: KPIIncidentDrawerProps) {
   const [createInput, setCreateInput] = useState<CreateIncidentInput>(DEFAULT_CREATE_INPUT)
@@ -218,6 +221,22 @@ export default function KPIIncidentDrawer({
                 </div>
               ))}
             </DetailBlock>
+
+            {onEdit ? (
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose()
+                    onEdit(incident)
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#2F6FA8] px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#1D3E61] cursor-pointer"
+                >
+                  <Pencil size={13} />
+                  <span>Chỉnh Sửa Sự Cố (1 Form Thống Nhất)</span>
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-5 p-5">

@@ -208,6 +208,27 @@ export class AttendanceService {
         }),
       })
 
+      // Ghi nhận đồng bộ trực tiếp vào Database máy chủ
+      if (typeof window !== 'undefined') {
+        fetch('/api/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employee_id: record.employee_id,
+            store_id: record.store_id,
+            check_in_time: record.check_in_time || new Date().toISOString(),
+            check_in_lat: record.check_in_lat,
+            check_in_lng: record.check_in_lng,
+            check_in_distance_meters: distanceMeters,
+            status: record.status || 'on_time',
+            late_minutes: record.late_minutes || 0,
+            date: record.date,
+          }),
+        }).catch(err => {
+          console.warn('[AttendanceService] Server attendance log error:', err)
+        })
+      }
+
       if (result.ok) {
         if (result.id) {
           this.upsertLiveCheckin({ ...record, id: result.id })
@@ -247,6 +268,26 @@ export class AttendanceService {
           device: getDeviceInfo(),
         }),
       })
+
+      // Ghi nhận đồng bộ trực tiếp vào Database máy chủ (POST /api/attendance với status check_out)
+      if (typeof window !== 'undefined') {
+        fetch('/api/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employee_id: record.employee_id,
+            store_id: record.store_id,
+            status: 'check_out',
+            check_out_time: record.check_out_time || new Date().toISOString(),
+            check_out_lat: record.check_out_lat,
+            check_out_lng: record.check_out_lng,
+            total_hours: record.total_hours,
+            date: record.date,
+          }),
+        }).catch(err => {
+          console.warn('[AttendanceService] Server attendance check-out log error:', err)
+        })
+      }
 
       if (result.ok) return { record, trangThai: 'da_luu_db' }
 

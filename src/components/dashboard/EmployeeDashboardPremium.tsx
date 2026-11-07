@@ -50,7 +50,7 @@ export function EmployeeDashboardPremium({ user }: Props) {
     { id: 'swap', icon: <RefreshCw size={22} />, label: 'Đổi ca', href: '/schedule/swap' },
     { id: 'checkin', icon: <CheckCircle2 size={22} />, label: 'Chấm công', href: '/checkin' },
     { id: 'onboarding', icon: <Compass size={22} />, label: 'Onboarding', href: '/onboarding' },
-    { id: 'payroll', icon: <CreditCard size={22} />, label: 'Bảng lương', href: '/payroll/salary-slip' },
+    { id: 'payroll', icon: <CreditCard size={22} />, label: 'Phiếu lương của tôi', href: '/payroll/salary-slip' },
     { id: 'kpi', icon: <TrendingUp size={22} />, label: 'Kết quả KPI', href: '/kpi' },
     { id: 'profile', icon: <User size={22} />, label: 'Hồ sơ', href: '/profile' },
     { id: 'more', icon: <MoreHorizontal size={22} />, label: 'Thêm', href: '/more' },

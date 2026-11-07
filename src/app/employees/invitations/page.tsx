@@ -197,7 +197,26 @@ export default function InvitationsPage() {
     return
   }
 
-  const handleApproveConfirmed = (invitationId: string) => {
+  const handleApproveConfirmed = async (invitationId: string) => {
+    try {
+      const res = await fetch(`/api/invitations/${invitationId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const resData = await res.json()
+      if (resData.ok) {
+        EmployeeService.confirmInvitation(invitationId, user)
+        toast.success('Đã duyệt hồ sơ & tạo tài khoản nhân sự', {
+          description: `Mã NV: ${resData.employee?.employee_code || 'Thành công'} - Mật khẩu mặc định: 123456`,
+        })
+        setSelectedInvitation(null)
+        forceRefresh()
+        return
+      }
+    } catch {
+      // Fallback
+    }
+
     const employee = EmployeeService.confirmInvitation(invitationId, user)
     if (employee) {
       toast.success('Đã duyệt hồ sơ', {

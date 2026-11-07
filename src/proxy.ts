@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { verifyRoleSignature } from '@/lib/security/token-signer'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ROUTE PERMISSION CONFIGURATION
@@ -30,7 +31,7 @@ const ROLE_HIERARCHY: Record<string, number> = {
 const ROUTE_PERMISSIONS: RoutePermission[] = [
   // Employee-safe personal pages. The page still scopes the returned records.
   {
-    paths: ['/payroll/salary-slip'],
+    paths: ['/payroll/salary-slip', '/my-payslip', '/requests', '/my-requests', '/swap', '/schedule/swap'],
     requiredRoles: ['employee', 'shift_leader', 'store_manager', 'area_manager', 'hr_admin', 'ceo'],
   },
 
@@ -157,15 +158,18 @@ function hasRequiredRole(userRole: string | undefined, requiredRoles: string[] |
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Routes that don't require authentication
-const publicRoutes = ['/login', '/verify', '/rbac']
+const publicRoutes = ['/login', '/verify', '/rbac', '/kpi/violations/public', '/forgot-password', '/incident', '/leader/log', '/bsc/log']
 
 // Routes that don't require permission check
-const skipPermissionRoutes = ['/login', '/verify', '/', '/rbac']
+const skipPermissionRoutes = ['/login', '/verify', '/', '/rbac', '/kpi/violations/public', '/forgot-password', '/my-payslip', '/my-requests', '/swap', '/incident', '/leader/log', '/bsc/log']
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const authCookie = request.cookies.get('hrm-auth')?.value
   const roleCookie = request.cookies.get('hrm-role')?.value
+  const roleSig = request.cookies.get('hrm-role-sig')?.value
+  const userId = request.cookies.get('hrm-user-id')?.value
+  const sessionToken = request.cookies.get('homies_session')?.value
   const redirectPath = `${pathname}${request.nextUrl.search}`
 
   // Allow public routes
@@ -193,8 +197,29 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // Chống giả mạo vai trò bằng F12 / DevTools
+  if (isProtectedRoute && roleCookie) {
+    // Nếu có chữ ký số: bắt buộc chữ ký số HMAC-SHA256 phải khớp chính xác
+    if (roleSig && userId) {
+      const isValid = verifyRoleSignature(roleCookie, userId, roleSig)
+      if (!isValid) {
+        // Phát hiện can thiệp cookie vai trò trái phép -> hủy quyền truy cập
+        const loginUrl = new URL('/login', request.url)
+        loginUrl.searchParams.set('denied', 'signature_invalid')
+        return NextResponse.redirect(loginUrl)
+      }
+    } else if (process.env.NODE_ENV === 'production' && !sessionToken) {
+      // Trong môi trường production: bắt buộc phải có phiên đăng nhập hợp lệ
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', redirectPath)
+      return NextResponse.redirect(loginUrl)
+    }
+  }
+
   if (isProtectedRoute && !hasRequiredRole(roleCookie, routePermission.requiredRoles)) {
-    return NextResponse.redirect(new URL('/', request.url))
+    const deniedUrl = new URL('/', request.url)
+    deniedUrl.searchParams.set('denied', '1')
+    return NextResponse.redirect(deniedUrl)
   }
 
   return NextResponse.next()

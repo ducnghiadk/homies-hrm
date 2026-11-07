@@ -28,11 +28,11 @@ export interface HermesSystemConfig {
 }
 
 export const DEFAULT_HERMES_CONFIG: HermesSystemConfig = {
-  mode: 'local',
-  provider: 'custom_webhook',
-  endpoint: '',
+  mode: 'external',
+  provider: 'openai_compatible',
+  endpoint: 'http://localhost:20128/v1/chat/completions',
   apiKey: '',
-  model: 'nousresearch/hermes-3-llama-3.1-8b',
+  model: 'ag/gemini-3.8-flash',
   temperature: 0.7,
   alertWebhookUrl: '',
   enableTelemetryContext: true,
@@ -57,6 +57,10 @@ export const HermesConfigService = {
       return {
         ...DEFAULT_HERMES_CONFIG,
         ...parsed,
+        endpoint: parsed.endpoint?.trim() || DEFAULT_HERMES_CONFIG.endpoint,
+        apiKey: parsed.apiKey?.trim() || DEFAULT_HERMES_CONFIG.apiKey,
+        model: parsed.model?.trim() || DEFAULT_HERMES_CONFIG.model,
+        mode: parsed.endpoint?.trim() ? parsed.mode : DEFAULT_HERMES_CONFIG.mode,
         specialists: {
           ...DEFAULT_HERMES_CONFIG.specialists,
           ...(parsed?.specialists || {}),

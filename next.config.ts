@@ -144,6 +144,9 @@ const nextConfig: NextConfig = {
       { source: '/kpi/evaluate/trial', destination: '/kpi/development/challenges', permanent: false },
       { source: '/kpi/violations/batch', destination: '/kpi/violations/log', permanent: false },
       { source: '/kpi/violations/store', destination: '/kpi/violations', permanent: false },
+      { source: '/incident', destination: '/kpi/violations/public', permanent: false },
+      { source: '/leader/log', destination: '/kpi/violations/public', permanent: false },
+      { source: '/bsc/log', destination: '/kpi/violations/public', permanent: false },
 
       // 4. Lương & Phụ cấp
       { source: '/payroll/salary-slip', destination: '/payroll', permanent: false },
@@ -160,6 +163,12 @@ const nextConfig: NextConfig = {
       { source: '/admin', destination: '/settings', permanent: false },
       { source: '/rbac', destination: '/settings/permissions', permanent: false },
       { source: '/offline-demo', destination: '/settings/system', permanent: false },
+
+      // 6. Mapping link trang chủ chống lỗi 404
+      { source: '/branches', destination: '/stores', permanent: false },
+      { source: '/leave/approvals', destination: '/leave/approval', permanent: false },
+      { source: '/tasks', destination: '/tasks/daily', permanent: false },
+      { source: '/career-path/promotions', destination: '/career-path', permanent: false },
     ]
   },
 

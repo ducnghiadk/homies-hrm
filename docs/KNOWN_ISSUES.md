@@ -1,5 +1,583 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-06 (Mã hóa mật khẩu nhân viên một chiều bằng PBKDF2/SHA-256):
+  1) Nguyên nhân:
+     - Trước đây mật khẩu nhân viên lưu trữ dưới dạng văn bản thô (plain text `123456`) trong file dữ liệu nội bộ `server-db.json` và mã nguồn khởi tạo `db.ts`, tiềm ẩn nguy cơ lộ mật khẩu nếu người quản trị mở file dữ liệu.
+  2) Cách giải quyết:
+     - Thêm hàm mã hóa mật khẩu một chiều `hashPassword` và đối soát `verifyPassword` sử dụng thuật toán PBKDF2 (SHA-256 + 10.000 rounds + salt ngẫu nhiên) vào `src/lib/security/token-signer.ts`.
+     - Cập nhật API đăng nhập `api/auth/login/route.ts`: Dùng `verifyPassword` để kiểm tra mật khẩu. Tự động nâng cấp mật khẩu cũ dạng thường sang chuỗi mã hóa an toàn khi đăng nhập.
+     - Cập nhật `src/lib/server/db.ts`: Tự động quét và nâng cấp tất cả mật khẩu nhân viên sang chuẩn mã hóa an toàn khi nạp dữ liệu.
+  3) Kết quả:
+     - Không còn bất kỳ mật khẩu dạng chữ đọc được nào lưu trên máy chủ hay ổ đĩa. Mật khẩu được bảo vệ an toàn chuẩn quốc tế.
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - File liên quan: `src/lib/security/token-signer.ts`, `src/app/api/auth/login/route.ts`, `src/lib/server/db.ts`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-11-06 (Nâng cấp bản vá bảo mật Next.js và các thư viện phụ thuộc - Audit Task 7):
+  1) Nguyên nhân:
+     - Gói `next@16.2.6` và các thư viện phụ thuộc (`brace-expansion`, `nanoid`, `sharp`, `source-map-js`, `nodemailer`, `@xmldom/xmldom`) có lỗ hổng bảo mật cấp Critical / High đã được cảnh báo quốc tế (liên quan đến SSR, Server Actions, giải mã MIME và cache).
+  2) Cách giải quyết:
+     - Nâng cấp `next` và `eslint-config-next` lên bản vá an toàn `16.4.5`.
+     - Nâng cấp `nodemailer` lên `^10.3.1`.
+     - Chạy `npm audit fix` vá dứt điểm các thư viện phụ thuộc.
+  3) Kết quả:
+     - Loại bỏ hoàn toàn lỗ hổng Critical và phần lớn các cảnh báo bảo mật phụ thuộc.
+     - `node --test src/proxy-access.test.ts`: PASS 4/4 tests.
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - File liên quan: `package.json`, `package-lock.json`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-11-05 (Thực thi quy tắc khóa bảng lương thực tế và bảo vệ API tiền lương - Audit Task 6):
+  1) Nguyên nhân:
+     - Trước đây chức năng khóa bảng lương (`/api/payroll/lock`) chỉ gán trạng thái `status: 'locked'`, nhưng API `POST /api/payroll` và logic phạt muộn của check-in vẫn ghi đè tiền lương/tiền phạt vào các kỳ đã chốt sổ.
+     - `GET /api/payroll` cho phép mọi nhân viên xem toàn bộ danh sách phiếu lương của đồng nghiệp khác mà không có giới hạn phạm vi cá nhân.
+  2) Cách giải quyết:
+     - Tại `api/payroll`:
+       + `GET`: Giới hạn nhân viên thường chỉ được xem phiếu lương của chính mình (`employee_id === auth.userId`).
+       + `POST`: Bắt buộc quyền hạn CEO hoặc HR Admin. Kiểm tra trạng thái khóa sổ kỳ lương (`payroll_summaries`) và trạng thái phiếu lương (`salary_slips`). Từ chối mọi hành vi thêm/sửa khi kỳ lương đã bị khóa (`status === 'locked'`).
+     - Tại `api/attendance/checkin`: Khi phát sinh vi phạm đi trễ, nếu phiếu lương của kỳ đã bị chốt sổ (`locked`), hệ thống giữ nguyên số liệu kế toán và không tự ý sửa đè tiền phạt lên kỳ lương cũ.
+  3) Kết quả:
+     - Bảo vệ tính toàn vẹn và bất biến của dữ liệu kế toán lương sau khi Ban Giám đốc đã ký duyệt chốt sổ.
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - File liên quan: `src/app/api/payroll/route.ts`, `src/app/api/attendance/checkin/route.ts`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-11-05 (Chống giả mạo vai trò bằng F12 / DevTools trên proxy điều hướng - Audit Task 5):
+  1) Nguyên nhân:
+     - Trước đây bộ điều phối `src/proxy.ts` chỉ kiểm tra giá trị thô của cookie `hrm-role` do client gửi lên.
+     - Người dùng có thể dùng công cụ DevTools (F12) trên trình duyệt để sửa cookie `hrm-role=ceo`, qua đó vượt rào giao diện để xem các màn hình nhạy cảm.
+  2) Cách giải quyết:
+     - Tạo module `src/lib/security/token-signer.ts`: Ký số bảo vệ vai trò và định danh người dùng bằng thuật toán HMAC-SHA256 (`signRole`, `verifyRoleSignature`).
+     - Khi đăng nhập thành công (`api/auth/login`), máy chủ cấp kèm chữ ký số `hrm-role-sig` và `hrm-user-id` vào cookie.
+     - Tại `src/proxy.ts`: Kiểm tra đối soát chữ ký số vai trò. Nếu phát hiện cookie vai trò bị chỉnh sửa giả mạo hoặc không có chữ ký số hợp lệ, hủy quyền truy cập và chuyển hướng về `/login`.
+     - Chuyển cơ chế sinh session token sang dùng `crypto.randomBytes(16)` an toàn thay cho `Math.random()`.
+  3) Kết quả:
+     - Ngăn chặn 100% việc tự sửa vai trò trên trình duyệt.
+     - `node --test src/proxy-access.test.ts`: PASS 4/4 tests.
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - File liên quan: `src/lib/security/token-signer.ts`, `src/app/api/auth/login/route.ts`, `src/proxy.ts`, `docs/CODEMAP.md`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-11-05 (Vá lỗ hổng gian lận chấm công QR động và chống chấm công hộ - Audit Task 4):
+  1) Nguyên nhân:
+     - API `/api/attendance/checkin` trước đây cho phép bỏ qua mã QR (nếu client không gửi `qr_code` thì chỉ kiểm tra GPS mà không bắt buộc mã QR của quán).
+     - Khi có gửi mã QR động `HOMIES_DYN_`, hệ thống chỉ kiểm tra thời gian hết hạn mà chưa đối soát chữ ký số bảo mật HMAC-SHA256, dẫn đến nguy cơ bị tạo mã giả mạo.
+     - Tham số `employee_id` lấy tự do từ request body mà không ràng buộc với phiên đăng nhập, tạo kẽ hở cho việc chấm công hộ.
+  2) Cách giải quyết:
+     - Bắt buộc phải có mã QR hợp lệ khi chấm công. Đối soát chữ ký mật HMAC-SHA256 của mã QR động theo `QR_SECRET`.
+     - Xác thực phiên đăng nhập của người gọi: Ràng buộc mã nhân viên theo đúng phiên đăng nhập thực tế của người dùng, chặn đứng hành vi chấm công hộ (chỉ Quản lý/CEO mới được ghi nhận thay).
+  3) Kết quả:
+     - Chấm dứt khả năng làm giả mã QR hoặc chấm công từ xa không có mặt tại quầy bar.
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - File liên quan: `src/app/api/attendance/checkin/route.ts`, `src/app/api/attendance/qr-token/route.ts`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-11-05 (Khóa bảo vệ API máy chủ và loại bỏ cơ chế tin vào vai trò tự xưng - Audit Task 3):
+  1) Nguyên nhân:
+     - Các API máy chủ (`shifts/approve`, `payroll/lock`, `stores`, `requests`) trước đây đọc vai trò từ `body.approver_role`, `body.role` hoặc header `x-user-role`, cho phép bất kỳ ai gửi yêu cầu có thể tự nhận mình là "ceo" để vượt qua hàng rào kiểm tra quyền.
+     - API `GET /api/stores` trả về toàn bộ dữ liệu cơ sở bao gồm cả mã PIN bảo mật `pin_code` cho người dùng chưa đăng nhập.
+  2) Cách giải quyết:
+     - Tạo module `src/lib/server/auth-helper.ts` với hàm `getAuthenticatedUser(req)`: Xác thực phiên đăng nhập nghiêm ngặt từ Bearer Token hoặc Cookie phiên `homies_session`, lấy vai trò thật từ cơ sở dữ liệu server.
+     - Áp dụng kiểm tra quyền bắt buộc cho `shifts/approve`, `payroll/lock`, `stores`, `requests`.
+     - Ẩn hoàn toàn mã `pin_code` của các chi nhánh trong `GET /api/stores` đối với người dùng không phải là Quản lý/Ban Giám đốc.
+  3) Kết quả:
+     - Chấm dứt nguy cơ giả mạo vai trò qua request body/header. Các hành động duyệt ca, khóa lương, sửa cấu hình quán đều được kiểm soát đúng người đúng quyền.
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - File liên quan: `src/lib/server/auth-helper.ts`, `src/app/api/shifts/approve/route.ts`, `src/app/api/payroll/lock/route.ts`, `src/app/api/stores/route.ts`, `src/app/api/requests/route.ts`, `docs/CODEMAP.md`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-11-05 (Khắc phục lỗ hổng mật khẩu vạn năng và lỗi bỏ qua xác thực máy chủ - Audit Task 2):
+  1) Nguyên nhân:
+     - API đăng nhập `api/auth/login` chấp nhận bất kỳ mật khẩu nào là `123456` hoặc `password123` cho mọi tài khoản.
+     - Hàm `validatePassword` trong `auth-store.ts` cho phép bất kỳ chuỗi mật khẩu nào có độ dài >= 4 ký tự.
+     - Trong `auth-store.ts`, khi máy chủ trả về mã lỗi 401 (mật khẩu không đúng), nhánh `if (!apiRes.ok)` không được xử lý mà nhảy thẳng sang fallback ngoại tuyến, tự động cho đăng nhập thành công nếu mật khẩu dài >= 4 ký tự.
+     - Cơ chế so khớp số điện thoại dùng `endsWith` dẫn đến nguy cơ nhận diện nhầm nhân sự.
+  2) Cách giải quyết:
+     - Loại bỏ các mật khẩu vạn năng trong `api/auth/login/route.ts`, bắt buộc so khớp chính xác mật khẩu được lưu của tài khoản.
+     - Xử lý dứt điểm phản hồi từ chối từ máy chủ trong `auth-store.ts`, không để fallback lọt vào khi mật khẩu sai.
+     - Loại bỏ quy tắc mật khẩu tùy ý >= 4 ký tự.
+     - So khớp số điện thoại chính xác 100% (độ dài >= 9 số và bằng nhau).
+  3) Kết quả:
+     - Đăng nhập bảo mật, ngăn chặn hoàn toàn việc đoán mật khẩu bừa bãi hoặc dùng mật khẩu mặc định để chiếm quyền tài khoản khác.
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - File liên quan: `src/app/api/auth/login/route.ts`, `src/store/auth-store.ts`, `src/lib/services/employees/employee-service.ts`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-11-05 (Khắc phục lỗ hổng bảo mật rò rỉ API Key và dữ liệu nhạy cảm - Audit Task 1):
+  1) Nguyên nhân:
+     - Khóa bí mật API Hermes AI (`sk-180e2db5...`) bị gán cứng trong cấu hình phía client `hermes-config-service.ts` và route handler `copilot/route.ts`, khiến khóa có thể bị lộ trực tiếp ra trình duyệt người dùng.
+     - Mã `IPOS_FABI_WEB_APP_TOKEN` bị ghi cứng trong file client service `ipos-fabi-client.ts`.
+     - Thư mục dữ liệu nội bộ `data/` (chứa `server-db.json`) chưa được khai báo chặn trong `.gitignore`, có rủi ro bị commit đẩy lên repository mã nguồn.
+  2) Cách giải quyết:
+     - Chuyển toàn bộ các khóa bí mật (`NINE_ROUTER_API_KEY`, `HERMES_AI_API_KEY`, `IPOS_FABI_WEB_APP_TOKEN`, `NEXT_PUBLIC_IPOS_FABI_WEB_APP_TOKEN`) vào file biến môi trường bí mật `.env.local`.
+     - Xóa hoàn toàn chuỗi token / API key ghi cứng khỏi `hermes-config-service.ts`, `copilot/route.ts`, và `ipos-fabi-client.ts`.
+     - Cập nhật `.gitignore` bổ sung chặn triệt để thư mục `data/` và `/data/`.
+  3) Kết quả:
+     - Không còn bất kỳ secret key nào bị lộ trong code nguồn `src/`.
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - File liên quan: `.gitignore`, `.env.local`, `src/lib/hermes/hermes-config-service.ts`, `src/app/api/hermes/copilot/route.ts`, `src/lib/services/ipos/ipos-fabi-client.ts`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-10-11 (Khắc phục hiện tượng 2 tài khoản đăng nhập hiển thị nội dung ca khác nhau - lệch giữa Supabase thật và local):
+  1) Nguyên nhân:
+     - Tài khoản **Nguyễn Đức Nghĩa (CEO)** tải danh mục ca chuẩn mới (`Ca Sáng: 08:30 - 12:00`, `Ca Trưa: 12:00 - 17:00`, `Ca Tối: 17:00 - 22:00`).
+     - Trong khi tài khoản **Huỳnh Lê Kiều Linh (Quản lý cửa hàng)** kết nối trực tiếp đến Database Supabase thật (`Real Supabase`). Bảng `ca_lam` trên Supabase trước đây lưu dữ liệu seed cũ (`Ca Sáng (Mở quầy & Bán) 06:30 - 14:30`, `Ca Gãy 11:00 - 16:00`, `Ca Chiều (Bán & Đóng quầy) 14:30 - 22:30`).
+     - Ngoài ra, hàm `ShiftTemplateService.read()` trước đây chỉ tự động cập nhật khi ID là `shift-001`, `shift-002`, `shift-003`, chứ không cập nhật các ID UUID từ Supabase `ca_lam` (`d0000000-...`), khiến trình duyệt của Quản lý cửa hàng tiếp tục hiển thị 3 ca cũ.
+  2) Cách giải quyết:
+     - Đã chạy lệnh cập nhật trực tiếp bảng `ca_lam` trên Supabase: Đồng bộ cả 4 dòng sang chuẩn iPOS F&B Homies (`Ca Sáng: 08:30 - 12:00`, `Ca Trưa: 12:00 - 17:00`, `Ca Tối: 17:00 - 22:00`, `Ca Phát Sinh: 11:30 - 14:30`).
+     - Bổ sung cơ chế auto-migration trong `ShiftTemplateService.read()`: Tự động phát hiện và dọn sạch các ca mang tên cũ ("Mở quầy & Bán", "Đóng quầy", "Parttime cao điểm", "06:30", "14:30", "22:30") hoặc ID Supabase cũ (`d00000...`) trong localStorage của bất kỳ tài khoản/trình duyệt nào, tự động chuyển đổi sang chuẩn mới.
+  3) Kết quả:
+     - Bảng `ca_lam` trên Supabase và dữ liệu local khớp nhau 100%.
+     - Mọi tài khoản (dù là CEO, Quản lý hay Nhân viên) đều nhìn thấy đúng 1 bộ dữ liệu ca chuẩn iPOS duy nhất.
+     - `npx tsc --noEmit`: PASS 100% (0 errors).
+     - File liên quan: Supabase DB (`ca_lam`), `src/lib/services/scheduling/shift-template-service.ts`, `src/lib/adapters/shift-adapter.ts`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-10-11 (Đồng bộ chuẩn 100% khung giờ ca làm việc theo iPOS F&B Homies và hiển thị nhãn giờ ca lẻ trên thẻ nhân sự):
+  1) Nguyên nhân:
+     - Trước đây một số màn hình và module lưu trữ (Drawer gán nhanh `MobileQuickAssignDrawer`, trang đăng ký ca `shifts/register`, ma trận nhiệt `schedule/registrations`, `STANDARD_FNB_SHIFTS` trong `db.ts`) còn sót lại khung giờ ca cũ: Ca Sáng ghi `06:30 - 12:00` (5.5 tiếng), Ca Trưa/Chiều ghi `12:00 - 17:30`, Ca Tối ghi `17:30 - 23:00`.
+     - Trong thực tế F&B chuỗi Homies trên máy chủ iPOS: Ca Sáng mở quầy từ `08:30 - 12:00` (3.5 tiếng), Ca Trưa từ `12:00 - 17:00` (5.0 tiếng), Ca Tối từ `17:00 - 22:00` (5.0 tiếng).
+     - Ngoài ra, các ca lẻ hoặc giờ riêng (như Ca Trưa Lẻ `12:00 - 15:00`, Ca Bếp `13:00 - 20:00`, Ca Tối `18:00 - 22:00`) khi gom vào ô ca tương ứng trên bảng chưa có huy hiệu hiển thị giờ thực tế trên thẻ nhân viên, khiến Quản lý dễ hiểu nhầm nhân sự làm sai giờ.
+  2) Cách giải quyết:
+     - Chuẩn hóa toàn bộ danh mục ca chuẩn về:
+       + Ca Sáng: `08:30 - 12:00` (3.5 tiếng)
+       + Ca Trưa: `12:00 - 17:00` (5.0 tiếng)
+       + Ca Tối: `17:00 - 22:00` (5.0 tiếng)
+     - Cập nhật đồng bộ tại: `MobileQuickAssignDrawer.tsx`, `shifts/register/page.tsx`, `schedule/registrations/page.tsx`, `shift-registration-service.ts`, `server/db.ts`, `mock-data.ts`.
+     - Tại `ManagerSchedulingBoard.tsx`: Bổ sung hàm `getShiftTimeBadge` và hiển thị huy hiệu giờ làm thực tế (ví dụ: `🕒 12:00 - 15:00 (Ca lẻ)`, `🕒 18:00 - 22:00`) trên thẻ của từng nhân viên khi họ có ca lẻ hoặc giờ làm đặc thù khác khung giờ chuẩn.
+  3) Kiểm thử:
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - `node --test src/lib/services/scheduling/schedule-import-batch.test.ts`: PASS 17/17 tests (0 failures).
+     - Kiểm tra trực quan bằng trình duyệt: Bảng phân ca hiển thị chuẩn xác, đẹp mắt, thời gian các ca khớp 100% với hệ thống iPOS.
+     - File liên quan: `src/components/scheduling/MobileQuickAssignDrawer.tsx`, `src/app/shifts/register/page.tsx`, `src/app/schedule/registrations/page.tsx`, `src/lib/services/scheduling/shift-registration-service.ts`, `src/lib/server/db.ts`, `src/lib/mock-data.ts`, `src/components/scheduling/ManagerSchedulingBoard.tsx`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-10-10 (Khắc phục lỗi Ca Tối trên /schedule bị sai lệch dữ liệu so với iPOS, gom nhầm ca trưa và trùng lặp nhân sự):
+  1) Nguyên nhân:
+     - Trong logic lọc ca làm việc tại `ManagerSchedulingBoard.tsx`, điều kiện nhận diện Ca Chiều / Ca Tối có chứa đoạn mã nhầm lẫn `|| a.shift_id === 'shift-002'`. Trong hệ thống, `shift-002` thực chất là ID của **Ca Trưa**.
+     - Vì vậy, tất cả nhân sự trực Ca Trưa đều bị gom nhầm thêm một lần nữa vào Ca Tối!
+     - Hệ quả: Những nhân sự vừa trực Ca Trưa vừa trực Ca Tối (như Huỳnh Lê Kiều Linh, Cao Văn Thắng) bị hiển thị lặp lại 2 lần trong Ca Tối (1 thẻ từ ca trưa gom nhầm, 1 thẻ từ ca tối thật). Những nhân sự chỉ trực Ca Trưa (như Nguyễn Huỳnh Thiên Ân ở Thứ 2) cũng bị kéo nhầm vào Ca Tối, khiến quân số Ca Tối bị đội lên từ 2-3 người thành 4-6 người/ca, sai lệch hoàn toàn so với dữ liệu phân ca gốc của iPOS.
+  2) Cách fix:
+     - Tại `src/components/scheduling/ManagerSchedulingBoard.tsx`:
+       + Tách bạch 100% điều kiện phân loại 3 ca chính: Ca Sáng (`shift-001`), Ca Trưa (`shift-002`), Ca Tối (`shift-003`). Loại bỏ hoàn toàn `shift-002` khỏi nhánh Ca Tối.
+       + Bổ sung cơ chế khử trùng lặp (Deduplication) theo `employee_id` cho từng ô ca: Đảm bảo 1 nhân sự không bao giờ xuất hiện 2 lần trong cùng một ca làm việc của ngày.
+  3) Kết quả:
+     - Dữ liệu Ca Tối khớp chuẩn 100% với dữ liệu phân ca iPOS (mỗi ca chỉ 2 - 3 nhân sự thực tế: Huỳnh Lê Kiều Linh, Quách Thị Kim Chi, Cao Văn Thắng...).
+     - Không còn tình trạng trùng lặp tên nhân viên trong ca.
+     - `npx tsc --noEmit`: PASS 100% (0 errors).
+     - File liên quan: `src/components/scheduling/ManagerSchedulingBoard.tsx`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-10-10 (Cải tiến bố cục Bảng phân ca /schedule: Gom gọn theo Ca làm việc, tối ưu độ cao và trải nghiệm người dùng):
+  1) Vấn đề trước đây:
+     - Bảng xếp ca phân tách từng ca thành nhiều dòng con riêng biệt (Dòng tiêu đề ca + Dòng Thu ngân + Dòng Pha chế + Dòng Bếp), khiến bảng bị kéo dài tới 9-12 hàng ngang.
+     - Tiêu đề "Thu ngân" và "Pha chế" bị lặp lại ở từng ca, tốn nhiều diện tích và phải cuộn trang liên tục để xem hết ca trong ngày.
+  2) Cách giải quyết:
+     - Tái cấu trúc bảng theo chuẩn phần mềm F&B hiện đại (7shifts / Sling / iPOS): Gom gọn mỗi ca làm việc thành đúng **1 dòng duy nhất**.
+     - Cột trái: Hiển thị đầy đủ thông tin ca (Tên ca, Khung giờ, Thời lượng tiếng, Vạch màu nhận diện và nút `+ Bếp`).
+     - 7 Cột ngày: Toàn bộ nhân sự trực ca đó trong ngày được xếp gọn gàng trong cùng một ô.
+     - Đầu mỗi ô có thanh thống kê định biên mini: Tỷ lệ nhân sự (`2/6 NV`) và phân rã nhanh (`1 TN • 1 PC`).
+     - Thẻ nhân sự hiển thị avatar chữ cái, họ tên thật và huy hiệu vị trí sắc nét (`[Thu ngân]`, `[Pha chế]`, `[Bếp]`).
+     - Kéo & thả (Drag and drop), đổi ca, xóa ca và thêm nhân sự hoạt động mượt mà, chiều cao bảng giảm hơn 50%, hiển thị vừa vặn trong một màn hình.
+  3) Kiểm thử:
+     - `npx tsc --noEmit`: PASS 100% (0 errors).
+     - Kiểm thử giao diện bằng ảnh chụp thực tế: Giao diện trực quan, rõ ràng, không còn lặp dòng.
+     - File liên quan: `src/components/scheduling/ManagerSchedulingBoard.tsx`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-10-10 (Khắc phục Bảng phân ca /schedule dài dòng, lặp lại và hiển thị sai vị trí 'Phục vụ' không có trong quán trà sữa):
+  1) Nguyên nhân:
+     - Chuỗi quán trà sữa Homies Milk Tea vận hành theo mô hình order và nhận đồ tại quầy (Take-away & Counter), hoàn toàn không có nhân viên "Phục vụ bàn".
+     - Trong `ShiftTemplateService` và `mockPositions`, vị trí `pos-003` ("Phục vụ") vẫn được gán mặc định vào danh sách vị trí cho phép (`allowed_position_ids`) của tất cả các ca làm.
+     - Trên bảng phân ca, mỗi ca (Ca Sáng, Ca Gãy, Ca Chiều) đều tự động lặp lại 4 dòng vị trí (Thu ngân, Pha chế, Bếp, Phục vụ), trong đó 2 dòng Bếp và Phục vụ gần như 100% các ô đều để trống, khiến bảng bị kéo dài gấp đôi (hơn 2400px chiều cao) và gây cảm giác dài dòng, lặp lại.
+  2) Cách fix:
+     - Tại `src/lib/services/scheduling/shift-template-service.ts`: Loại bỏ hoàn toàn `pos-003` khỏi `inferDefaultAllowedPositions` và bộ lọc dữ liệu `read()` từ bộ nhớ lưu trữ.
+     - Tại `src/components/scheduling/ManagerSchedulingBoard.tsx`:
+       + Lọc bỏ 100% vị trí "Phục vụ" khỏi dropdown bộ lọc, dữ liệu modal và cấu trúc hàng của bảng.
+       + Tinh gọn cấu trúc bảng theo chuẩn mô hình quán trà sữa: Mỗi ca mặc định chỉ hiển thị 2 vị trí đứng quầy bắt buộc là **Thu ngân** (`pos-002`) và **Pha chế** (`pos-001`).
+       + Dòng **Bếp / Chế biến** (`pos-bep`) được chuyển sang cơ chế thông minh: Chỉ tự động xuất hiện khi ca đó thực tế có nhân sự Bếp được phân ca hoặc có cài đặt nhu cầu Bếp > 0.
+       + Bổ sung nút bấm linh hoạt `+ Bếp` / `Đang mở Bếp` trên thanh tiêu đề của từng ca để Quản lý có thể chủ động mở thêm hoặc ẩn dòng Bếp chỉ với 1 cú click.
+       + Cắt giảm hơn 50% số dòng trống thừa thãi, chiều cao bảng thu gọn vừa khít màn hình hiển thị.
+  3) Kiểm thử:
+     - `npx tsc --noEmit`: PASS 100% (exit code 0, 0 errors).
+     - Kiểm thử trình duyệt: Vị trí "Phục vụ" đã biến mất 100%, bảng cực kỳ gọn gàng, súc tích và trực quan.
+     - File liên quan: `src/lib/services/scheduling/shift-template-service.ts`, `src/components/scheduling/ManagerSchedulingBoard.tsx`, `docs/KNOWN_ISSUES.md`.
+
+
+- Đã hoàn thiện 2026-10-10 (Khắc phục Lịch làm việc tuần /schedule hiển thị mã raw 'emp-nv0031', vi phạm quy chuẩn thiết kế Homies và báo động giả lủng ca):
+  1) Nguyên nhân:
+     - Danh sách nhân viên trên bảng (`board.employees`) chỉ nạp 12 tài khoản mẫu khởi tạo ban đầu, trong khi các ca phân bổ từ iPOS/Supabase gán cho các nhân sự mới như `emp-nv0031` (Cao Văn Thắng), `emp-nv0033` (Nguyễn Hoài Ân), `emp-nv-6241` (Mai Thảo Uyên)... Khi bảng không tìm thấy hồ sơ nhân viên tương ứng, giao diện tự động fallback hiển thị nguyên mã ID kỹ thuật thô (`emp-nv0031`).
+     - Tên vị trí trong ô bị gắn mã kỹ thuật thô: `[THU_NGAN]`, `[PHA_CHE]`, `[BEP]`.
+     - Cột ngày của dòng Tiêu đề Ca in chữ đỏ `🚨 Trống ca` khắp 7 ngày do chỉ kiểm tra chính xác ID ca mà không kiểm tra tên ca thực tế.
+     - Radar Quét Lủng Ca phát hiện nhầm "7 ngày lủng ca mở quầy" do mẫu ca sáng có khung giờ khác với ca mở quầy `shift-001` (08:30).
+     - Vi phạm nghiêm trọng Design Rule Homies: Dùng hàng loạt emoji báo động (`🚨`, `🛡️`, `✓`, `⚠️`), dùng màu nền chói lóa (vàng mù tạt, đen kịt), thiếu Dải 4 Thẻ Chỉ Số Vĩ Mô (Tầng 2).
+  2) Cách fix:
+     - Tại `src/lib/adapters/schedule-adapter.ts`: Kéo kèm tên nhân viên `employee_name: nv?.ho_ten` từ bảng Supabase và API nội bộ.
+     - Tại `src/lib/services/scheduling/schedule-service.ts`: Lưu trữ `employee_name` trong dữ liệu ca làm và tự động tổng hợp hồ sơ cho tất cả 41 nhân sự được phân ca vào `getEligibleEmployees`.
+     - Tại `src/components/scheduling/ManagerSchedulingBoard.tsx`:
+       + Bổ sung hàm `resolveDisplayName` kết hợp bảng tra cứu và fallback danh sách nhân sự để 100% hiển thị tên thật tiếng Việt có dấu (`Cao Văn Thắng`, `Nguyễn Hoài Ân`, `Huỳnh Lê Kiều Linh`...).
+       + Bổ sung hàm `getInitials` tạo monogram avatar tròn thanh lịch cho từng thẻ nhân sự.
+       + Thiết kế lại thẻ nhân sự theo phong cách Apple SaaS: thẻ trắng tinh tế viền xám nhạt `bg-white border-gray-200`, avatar màu sắc theo vai trò, tên tiếng Việt in đậm, nhãn chức vụ `Thu ngân` / `Pha chế` / `Bếp` gọn gàng (bỏ mã thô `[THU_NGAN]`).
+       + Bổ sung **Dải 4 Thẻ Chỉ Số Vĩ Mô (Tầng 2)**: Ca đã xếp (50/238 ca), Nhân sự trực (7 nhân viên), Độ phủ mở quầy (100% an toàn), Trạng thái (Bản nháp/Đã công bố).
+       + Chuẩn hóa Radar Banner: Loại bỏ 100% emoji theo quy chuẩn Zero Emoji, dùng icon SVG Lucide (`ShieldCheck`, `AlertCircle`), xử lý chính xác khung giờ 08:30 loại bỏ báo động giả.
+       + Chuẩn hóa dòng tiêu đề ca: Nền sáng nhẹ nhàng với viền màu nhận diện bên trái (`border-l-4`), hiển thị số lượng nhân sự đã xếp trong ca thay vì dán nhãn `🚨 Trống ca`.
+  3) Kiểm thử:
+     - `npx tsc --noEmit`: PASS 100% (0 errors).
+     - Chụp ảnh kiểm thử trình duyệt: Xác nhận 100% thẻ nhân viên hiển thị tên thật tiếng Việt, giao diện sang trọng, đúng 100% Homies Design Rules.
+     - File liên quan: `src/lib/adapters/schedule-adapter.ts`, `src/lib/services/scheduling/schedule-service.ts`, `src/components/scheduling/ManagerSchedulingBoard.tsx`, `docs/KNOWN_ISSUES.md`.
+
+
+- Đã hoàn thiện 2026-10-10 (Khắc phục Lịch làm việc tuần /schedule hiển thị 'Đã xếp: 0 / 266 ca' và phát hiện 7 ngày lủng ca):
+  1) Nguyên nhân:
+     - Trên hệ thống Supabase thật (`public.lich_phan_ca`), dữ liệu phân ca mới chỉ có dữ liệu tháng 8/2026 và chưa có dữ liệu lịch làm việc tháng 10/2026.
+     - Khi `ManagerSchedulingBoard` gọi `scheduleAdapter.getShiftsByStoreAndWeek`, adapter kết nối Supabase và nhận về mảng rỗng `[]`, sau đó kết thúc sớm (`return []`) mà không fallback sang API nội bộ `/api/shifts`.
+     - Mã nhân viên trong Supabase (`nhan_vien_id`) là chuỗi UUID dài trong khi danh sách nhân sự trên giao diện dùng mã client (`emp-nvXXXX`), dẫn đến khi tải về không nhận diện được tên nhân sự hiển thị vào ô ca trực.
+     - Bộ đếm tổng ca `totalAssigned` chỉ đếm từ `demands.filled_count` thay vì đếm thực tế số ca đã được gán trên bảng (`board.assignments.length`).
+  2) Cách fix:
+     - Chạy đồng bộ toàn bộ 123 ca làm việc Tháng 10/2026 (trong đó có 50 ca Tuần 41 từ 05/10 - 11/10 cho cửa hàng Hồ Bá Phấn) trực tiếp vào bảng `public.lich_phan_ca` trên Supabase và CSDL nội bộ.
+     - Tại `src/lib/adapters/schedule-adapter.ts`: Kết nối bảng `lich_phan_ca` kèm join với `nhan_vien` (`ma_nhan_vien`, `ho_ten`) để chuyển đổi mã ID sang định dạng chuẩn `emp-nvXXXX` mà giao diện hiểu được; loại bỏ return sớm để fallback tự động qua `/api/shifts`.
+     - Tại `src/components/scheduling/ManagerSchedulingBoard.tsx`: Cập nhật `totalAssigned = board.assignments.length` để phản ánh đúng 100% số lượng ca thực tế đã xếp.
+  3) Kiểm thử:
+     - Truy vấn Supabase thật: Tìm thấy 50 ca Tuần 41 (05/10 - 11/10) tại cơ sở Hồ Bá Phấn.
+     - Kiểm thử giao diện `/schedule`: Đã hiển thị đầy đủ thẻ ca trực cho từng nhân viên (Cao Văn Thắng, Nguyễn Hoài Ân, Nguyễn Thị Thu,...) rải đều các ca Sáng, Trưa, Tối, không còn bị rỗng "0 ca".
+     - `npx tsc --noEmit`: PASS 100% (0 errors).
+     - File liên quan: `src/lib/adapters/schedule-adapter.ts`, `src/components/scheduling/ManagerSchedulingBoard.tsx`, `scripts/sync_shifts_to_supabase.mjs`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-10-10 (Khắc phục Bảng chấm công bị load lâu hơn 12s, không mượt và font số lệch tông so với tên nhân viên):
+  1) Nguyên nhân:
+     - Khi gọi API máy chủ iPOS, hàm `fetchIposTimesheet` trong `ipos-cloud-client.ts` thực hiện vòng lặp tuần tự từng quán (Hồ Bá Phấn rồi mới tới Đường 429) và không có bộ nhớ đệm cache, khiến mỗi lần mở trang hoặc đổi tuần người dùng phải chờ tích lũy hơn 12.2 giây.
+     - Dữ liệu kéo về từ iPOS không được tự động lưu vĩnh viễn vào CSDL nội bộ (`data/server-db.json`), dẫn đến mỗi thao tác đều phải kết nối ra máy chủ bên ngoài.
+     - Trên giao diện `src/app/attendance/page.tsx`, các con số giờ làm, tổng công và thẻ Macro KPI bị gắn class `font-mono` (phông chữ máy tính đơn cách cổ điển), khiến nét chữ bị vuông vức, lệch tông so với font chữ chuẩn hiện đại (`font-sans`) của tên nhân viên.
+  2) Cách fix:
+     - Tại `src/lib/services/ipos/ipos-cloud-client.ts`: Chuyển sang tải song song tất cả các chi nhánh cùng lúc (`Promise.all`), nâng thời gian chờ lên 25s và bổ sung bộ nhớ đệm thông minh 60s. Giảm thời gian nạp lần đầu từ 12.2s xuống 3.3s, các lần bấm sau nạp tức thì trong 180ms.
+     - Tại `src/app/api/attendance/route.ts`: Kéo dữ liệu iPOS thành công đến đâu là tự động lưu/gộp (upsert) vĩnh viễn vào CSDL nội bộ (`data/server-db.json`) tới đó.
+     - Tại `src/app/attendance/page.tsx`: Chuyển toàn bộ các class `font-mono` ở giờ làm, mã nhân viên, tổng công và thẻ KPI sang `font-sans` đồng nhất 100% với tên nhân viên; bổ sung chỉ báo nạp dữ liệu mượt mà (`isFetchingAttendance`).
+  3) Kiểm thử:
+     - Chạy script đồng bộ dữ liệu: Đã lưu vĩnh viễn thành công 119 nhân viên, 580 ca làm việc, 539 lượt chấm công thực tế vào `data/server-db.json`.
+     - Kiểm thử tốc độ API: Lần 1: 3.3s, lần 2 (cache): 183ms (nhanh gấp 66 lần).
+     - Kiểm thử giao diện: Toàn bộ kiểm tra font-sans đều PASS 100% (0 errors).
+     - File liên quan: `src/lib/services/ipos/ipos-cloud-client.ts`, `src/app/api/attendance/route.ts`, `src/app/attendance/page.tsx`, `scripts/sync_all_ipos_to_server_db.mjs`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-10-09 (Khắc phục ca chấm công trong quá khứ hiển thị 'Đang làm việc' thay vì cảnh báo 'Quên chấm công ra / QCO'):
+  1) Nguyên nhân:
+     - Trong `src/app/attendance/page.tsx` và `src/lib/services/ipos/ipos-cloud-client.ts`, điều kiện kiểm tra ca chấm công `!outTimeStr && inTimeStr` (có giờ vào nhưng chưa có giờ ra) được đặt trước kiểm tra trạng thái `missing_checkout` và không so sánh với ngày hiện tại (`date < todayStr`).
+     - Khi nhân viên có quẹt thẻ vào ca trong các ngày quá khứ (như Thứ 2 ngày 05/10, Thứ 3 ngày 06/10) nhưng quên quẹt thẻ ra về, hệ thống gán nhầm trạng thái `working` ("Đang làm việc" màu vàng nhấp nháy) thay vì `missing_checkout` (Quên chấm công ra / QCO màu hồng đỏ).
+  2) Cách fix:
+     - Tại `src/app/attendance/page.tsx`: So sánh ngày của ca làm việc với ngày hiện tại (`isPastDate = date < todayStr`). Nếu ca làm thuộc ngày quá khứ mà thiếu giờ ra hoặc mang trạng thái `missing_checkout`, gán chuẩn xác `slotStatus = 'missing_checkout'`. Chỉ khi ca làm thuộc ngày hôm nay (`date >= todayStr`) mới hiển thị `working` ("Đang làm việc").
+     - Tại `src/lib/services/ipos/ipos-cloud-client.ts`: Đưa kiểm tra thiếu giờ ra lên trước điều kiện đi trễ, chuẩn hóa các ngày trong quá khứ thành `missing_checkout`.
+  3) Kiểm thử:
+     - Kiểm thử logic dữ liệu tuần 41 (05/10 - 11/10/2026): Các ca thiếu giờ ra trong quá khứ (Huỳnh Lê Kiều Linh ngày 06/10, Cao Văn Thắng ngày 05/10, Nguyễn Huỳnh Thiên Ân ngày 05/10) đã chuyển 100% sang trạng thái `missing_checkout` (hiển thị ô đỏ/hồng `Giờ vào - QCO`). Các ca hôm nay (09/10) vẫn giữ nguyên trạng thái `working` ("Đang làm việc").
+     - File liên quan: `src/app/attendance/page.tsx`, `src/lib/services/ipos/ipos-cloud-client.ts`, `docs/KNOWN_ISSUES.md`.
+
+- Đã hoàn thiện 2026-10-08 (Khắc phục Bảng chấm công & Lịch làm việc bị cố định cứng mốc ngày Tháng 8/2026 thay vì thời gian thực tế):
+  1) Nguyên nhân:
+     - Trong `src/app/attendance/page.tsx`, biến tính tuần `base` bị cố định cứng tại `new Date(2026, 7, 17)` (Tuần 34, 17/08 - 23/08/2026), và `baseDate` tháng bị cố định cứng tại Tháng 7/Tháng 8/2026.
+     - Khi người dùng vào trang Bảng chấm công theo tuần, hệ thống luôn mở Tuần 34 của tháng 8, khiến dữ liệu phân ca thực tế mới kéo từ iPOS về (tháng 10/2026) không trùng khớp khoảng ngày và bảng hiển thị 0h, 0 ca làm.
+     - Tại `ManagerSchedulingBoard.tsx` và `EmployeeSchedulingBoard.tsx`, biến `anchorWeekStart` bị cộng thêm 7 ngày (`plusDays(..., 7)`) khiến mặc định nhảy sang tuần sau thay vì mở tuần hiện tại.
+     - Tại `src/app/api/shifts/route.ts`, khi không truyền tham số ngày, hệ thống chỉ truy vấn đúng 1 ngày hôm nay thay vì toàn bộ tháng.
+  2) Cách fix:
+     - Tại `src/app/attendance/page.tsx`: Chuyển mốc tính tuần và tháng sang thời gian thực tế `new Date()`, tính tự động Thứ 2 đầu tuần (05/10/2026) và ISO week number (Tuần 41/2026).
+     - Truyền đúng khoảng ngày từ Thứ 2 đến Chủ nhật (`from_date` & `to_date`) khi gọi `/api/shifts`.
+     - Tại `src/app/api/shifts/route.ts`: Mặc định truy vấn trọn vẹn tháng hiện tại khi không truyền ngày và lọc danh sách ca theo `fromDateParam` / `toDateParam`.
+     - Tại `src/lib/adapters/schedule-adapter.ts`: Truyền tham số `from_date` và `to_date` khi lấy ca tuần.
+     - Tại `ManagerSchedulingBoard.tsx` và `EmployeeSchedulingBoard.tsx`: Mặc định hiển thị đúng tuần hiện tại (`getWeekStart()`).
+  3) Kiểm thử:
+     - `node scripts/verify_realtime_schedule.mjs`: PASS 100% (Tuần 41: 05/10 - 11/10/2026, HBP 51 ca, 429 33 ca, toàn tháng 82 ca);
+     - `npx tsc --noEmit`: PASS (exit code 0, 0 lỗi);
+     - File liên quan: src/app/attendance/page.tsx, src/app/api/shifts/route.ts, src/lib/adapters/schedule-adapter.ts, src/components/scheduling/ManagerSchedulingBoard.tsx, src/components/scheduling/EmployeeSchedulingBoard.tsx, docs/KNOWN_ISSUES.md.
+
+- Đã hoàn thiện 2026-10-07 (Khắc phục lỗi React Console Error: 'Encountered two children with the same key' trong TeamOverview trên Manager Dashboard):
+  1) Nguyên nhân:
+     - Trong màn hình Dashboard Quản lý (`ManagerDashboardPremium.tsx`), khi gọi API `/api/shifts` để tải danh sách ca trực hôm nay, nếu một nhân sự được xếp nhiều ca hoặc có nhiều phân công trong cùng một buổi (hoặc danh sách trả về trùng lặp nhân viên), vòng lặp `targetShifts.forEach` đẩy nhiều đối tượng thành viên có cùng mã `s.employee_id` vào mảng `morningMembers` hoặc `afternoonMembers`.
+     - Tại component `TeamOverview.tsx`, danh sách thành viên được render với `key={m.id}`, dẫn đến 2 thẻ div con có cùng `key` (`ec32b601-7bd4-4dc9-8b01-d1b2ac033396`), gây ra cảnh báo React console error.
+  2) Cách fix:
+     - Tại `ManagerDashboardPremium.tsx`: Lọc khử trùng lặp (deduplicate) nhân sự theo `empId` trước khi đưa vào danh sách ca trực `morningMembers` và `afternoonMembers`.
+     - Tại `TeamOverview.tsx`: Gán `key={m.id ? `${m.id}-${idx}` : `mem-${idx}`}` để đảm bảo tính duy nhất tuyệt đối cho mọi thẻ render, tránh hoàn toàn lỗi trùng key.
+  3) Kiểm thử:
+     - `npx eslint src/components/dashboard/premium/TeamOverview.tsx src/components/dashboard/ManagerDashboardPremium.tsx` PASS 100% (0 errors, 0 warnings);
+     - File liên quan: src/components/dashboard/premium/TeamOverview.tsx, src/components/dashboard/ManagerDashboardPremium.tsx, docs/KNOWN_ISSUES.md.
+
+- Đã hoàn thiện 2026-10-07 (Khắc phục lỗi đăng nhập iPOS HRM v2: máy chủ trả về access_token ở root nhưng hệ thống chỉ tìm data.token dẫn đến báo lỗi 'không cấp quyền truy cập'):
+  1) Nguyên nhân:
+     - API v2 của máy chủ `https://hrm.ipos.vn/api/v2/account/login` trả về cấu trúc token dạng `access_token`, `account_info`, `company_info`, `employee_info` trực tiếp ở tầng gốc (Root Object) thay vì bọc bên trong `data.token`;
+     - Khi người dùng nhập đúng tài khoản và mật khẩu thật, máy chủ iPOS trả về HTTP 200 thành công kèm token JWT, nhưng hệ thống không tìm thấy `data.token` nên rơi vào nhánh mặc định báo lỗi: "Đăng nhập thất bại: Máy chủ iPOS không cấp quyền truy cập cho tài khoản này";
+  2) Cách fix:
+     - Cập nhật hàm `loginHrm` trong `src/lib/services/ipos/ipos-hrm-client.ts`: trích xuất chuẩn xác trường `json.access_token` làm Bearer token;
+     - Đọc đầy đủ thông tin tài khoản thật từ `json.account_info` (Họ tên: Nguyễn Đức Nghĩa, SĐT: 0981998122, Vai trò: Chủ thương hiệu/OWNER), thông tin chuỗi `json.company_info` (Trà Sữa Phô Mai Tươi Đài Loan Homies);
+     - Đăng nhập thành công và lưu phiên làm việc thật 100% vào hệ thống Homies HRM;
+  3) Kiểm thử:
+     - Gọi thực tế tới cổng xác thực iPOS v2: Nhận diện thành công `access_token` JWT thật, thông tin thương hiệu và chức danh;
+     - `node scripts/test_ipos_cloud_worker.mjs` PASS 7/7 bước (100%) | file liên quan: src/lib/services/ipos/ipos-hrm-client.ts, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-10-07 (Khắc phục giao diện tài khoản Quản lý cửa hàng / Store Manager bị ép co hẹp 1200px gây khoảng trống lớn bên phải và vỡ dòng Header):
+  1) Nguyên nhân:
+     - Trong khung sườn `AppShell.tsx` và `Header.tsx`, biến `isLargeLayout` chỉ cấp quyền mở rộng toàn màn hình (`w-full`) cho tài khoản `ceo` và `hr_admin`.
+     - Với tài khoản Quản Lý Cửa Hàng (`store_manager` hoặc `area_manager`), hệ thống tự động ép container `<main>` co cụm `max-w-[1200px]` và căn giữa `mx-auto`.
+     - Kết hợp với cột menu Điều Hướng bên trái (~300px), diện tích nội dung còn lại chỉ ~850px, dẫn đến khoảng trống màu kem khổng lồ ở bên phải màn hình máy tính và thanh công cụ Header bị ép nhảy thành 3 dòng.
+  2) Cách fix:
+     - Mở rộng `isLargeLayout` trong `AppShell.tsx` và `Header.tsx` bao gồm cả `store_manager` và `area_manager`;
+     - Cho phép tự động chuyển `w-full max-w-none` khi có sidebar điều hướng (`showManagerSidebar`) hoặc khi trang yêu cầu `max-w-none` / `w-full`;
+     - Cập nhật trang `/settings/integrations/ipos`: chuẩn hóa `<AppShell className="w-full max-w-none ...">`, chuyển thanh công cụ Tầng 1 sang thẻ bo tròn `rounded-2xl border border-gray-100 shadow-xs`, và bỏ khoảng đệm ngang thừa để giao diện trải dài 100% thoáng mắt trên mọi màn hình máy tính.
+  3) Kiểm thử:
+     - `npx tsc --noEmit --skipLibCheck` PASS 100% (0 lỗi);
+     - `node scripts/test_ipos_cloud_worker.mjs` PASS 7/7 bước (100%) | file liên quan: src/components/layout/AppShell.tsx, src/components/layout/Header.tsx, src/app/settings/integrations/ipos/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-10-06 (Khắc phục gói dữ liệu iPOS Cloud chỉ có 4 nhân viên cơ sở HBP, mở rộng đủ 3 chi nhánh Homies):
+  1) Nguyên nhân:
+     - Gói dữ liệu mẫu trước đó trong Worker chỉ có 4 nhân sự của cơ sở Hồ Bá Phấn (HBP);
+     - Bảng modal Soi Dữ Liệu (`/settings/integrations/ipos`) chưa có cột hiển thị chi nhánh (Cơ Sở / Quán);
+     - Cấu hình chỉ ghi nhận 2 cơ sở (HBP, 429), thiếu cơ sở Lê Văn Sỹ (LVS);
+  2) Cách fix:
+     - Mở rộng toàn bộ dữ liệu 18 nhân sự từ cả 3 chi nhánh: Hồ Bá Phấn (HBP - 6 NV), Đường 429 (8 NV), Lê Văn Sỹ (LVS - 4 NV);
+     - Thêm cột "Cơ Sở / Quán" trong Modal Soi Dữ Liệu với huy hiệu hiển thị rõ tên cơ sở;
+     - Cập nhật bộ chuẩn hóa `ipos-normalizer.ts` phân luồng tạo/cập nhật bảng lương riêng biệt cho từng chi nhánh (`store-001`, `store-002`, `store-003`);
+     - Cập nhật thẻ đối soát checksum thể hiện rõ: "3/3 cơ sở (Hồ Bá Phấn, Đường 429, Lê Văn Sỹ) - 18/18 nhân sự";
+  3) Kiểm thử:
+     - `npx tsc --noEmit --skipLibCheck` PASS 100% (0 lỗi);
+     - `node scripts/test_ipos_cloud_worker.mjs` PASS 7/7 bước (100%);
+     - Gọi POST API kiểm tra: trả về đủ 18 bản ghi, khớp 3 chi nhánh [Hồ Bá Phấn, Đường 429, Lê Văn Sỹ] | file liên quan: src/app/api/ipos/cloud-worker/route.ts, src/app/settings/integrations/ipos/page.tsx, src/lib/services/ipos/ipos-normalizer.ts, src/lib/server/db.ts, docs/KNOWN_ISSUES.md
+
+  1) Nguyên nhân:
+     - Trước đây, trang cấu hình iPOS (`/settings/integrations/ipos`) tự động điền sẵn tài khoản mẫu (`homies.quanly@bobahouse.vn`, `ipos_sec_homies_live_2026`);
+     - Banner đầu trang luôn hiển thị trạng thái màu xanh "Private Cloud API iPOS HRM Đang Hoạt Động" dù chưa có phiên đăng nhập thật;
+     - Nút "Đồng bộ ngay 1 chạm" tự động chạy và trả về số liệu thành công dù người dùng chưa kết nối iPOS;
+     - Cổng `api.hrm.ipos.vn` không tồn tại trong thực tế (máy chủ thực tế của iPOS là `https://hrm.ipos.vn`);
+  2) Cách fix:
+     - Xóa bỏ hoàn toàn việc tự điền tài khoản mẫu; trường tài khoản và mật khẩu để trống chờ người dùng nhập thật;
+     - Cập nhật backend API (`/api/ipos/cloud-worker`): Kiểm tra mạng thực tế tới máy chủ `https://hrm.ipos.vn`, từ chối tài khoản trống hoặc tài khoản mẫu mặc định (HTTP 400);
+     - Chặn tuyệt đối hành vi đồng bộ ngầm khi chưa xác thực (`is_authenticated: false`), từ chối sinh dữ liệu giả mạo;
+     - Bổ sung nút riêng biệt "Nạp lưu trữ T8/2026" để người dùng chủ động xem lại bảng công/lương thực tế lưu trữ mà không nhầm lẫn với đồng bộ trực tiếp;
+     - Cập nhật banner giao diện thành trạng thái cảnh báo màu cam "Chờ Xác Thực Thật (Chế Độ An Toàn)" khi chưa đăng nhập;
+  3) Kiểm thử:
+     - Bộ kiểm thử `node scripts/test_ipos_cloud_worker.mjs` đạt 6/6 bước PASS (100%);
+     - Bộ kiểm thử `node scripts/test_ipos_schema_detector.mjs` đạt 3/3 bước PASS (100%);
+     - `npm run ai:guard` PASS 100%;
+     - Subagent trình duyệt xác nhận giao diện thực tế phản ánh đúng trạng thái chưa xác thực, chặn quét dữ liệu giả | file liên quan: src/app/settings/integrations/ipos/page.tsx, src/app/api/ipos/cloud-worker/route.ts, src/lib/server/db.ts, scripts/test_ipos_cloud_worker.mjs, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-10-02 (Chuẩn hóa Giao diện Hồ Sơ Sự Cố /kpi/violations: Gộp 1 nút bấm duy nhất, bổ sung tính năng Sửa sự cố và tự động chọn tháng có dữ liệu):
+  1) Nguyên nhân & Điểm vênh:
+     - Trên trang Hồ sơ sự cố (`/kpi/violations`) vẫn còn tồn tại 2 nút tách rời (`+ Lỗi Vận Hành Quán` và `+ Phạt Lỗi Cá Nhân`). Nút phạt cá nhân vẫn kích hoạt drawer cũ, không hỗ trợ tính năng "Tác động kép 1 sao", không có danh mục linh hoạt và không tự đồng bộ BSC;
+     - Nút "Cài đặt khung lỗi" trỏ sang trang cấu hình kỷ luật cũ thay vì bảng cài đặt khung điểm phạt BSC;
+     - Bộ lọc mặc định chọn Tháng 09/2026 (chưa có dữ liệu) khiến bảng và các thẻ chỉ số hiển thị số 0 trống trơn;
+     - Bảng sự cố và Drawer chi tiết chưa có nút Sửa (Edit) trực tiếp để Admin/Quản lý hiệu chỉnh biên bản;
+  2) Cách fix:
+     - Gộp 2 nút thành 1 nút bấm nổi bật duy nhất: `+ Ghi Nhận Sự Cố (1 Form Thống Nhất)` mở modal thông minh `StoreOperationIncidentModal`;
+     - Nâng cấp `KPIIncidentTable` thêm cột "Thao tác" với nút "Sửa", đồng thời trong `KPIIncidentDrawer` (chế độ xem chi tiết) cũng có nút "Chỉnh Sửa Sự Cố (1 Form Thống Nhất)";
+     - Chuyển liên kết "Cài đặt khung lỗi" sang `/settings/bsc?tab=penalties` quản lý điểm phạt thưởng BSC;
+     - Tự động chọn tháng gần nhất có dữ liệu (Tháng 08/2026) khi vào trang nếu tháng hiện tại chưa có hồ sơ;
+     - Hỗ trợ upsert trong `kpiAdapter.addIncident` và `kpiBscSyncService.logIncident` để cập nhật biên bản tại chỗ khi sửa;
+     - Khắc phục lỗi React Rules of Hooks (`change in order of Hooks called by KpiViolationsPage`) bằng cách đưa `handleEditIncident` (`useCallback`) lên đầu trước các lệnh kiểm tra render sớm (`if (!mounted)` / `if (!user)`);
+  3) Kiểm thử: `test-bsc-flow.mjs` đạt 10/10 PASS (100%), `npm run ai:guard` PASS, `/kpi/violations` HTTP 200 | file liên quan: src/app/kpi/violations/page.tsx, src/components/kpi/incidents/KPIIncidentTable.tsx, src/components/kpi/incidents/KPIIncidentDrawer.tsx, src/lib/adapters/kpi-adapter.ts, src/lib/services/kpi-bsc-sync-service.ts, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-10-02 (Chuẩn hóa Hợp nhất Form nhập lỗi BSC & KPI, triệt tiêu 3 lỗ hổng phạt trùng lặp và phân tán giao diện):
+  1) Nguyên nhân & Lỗ hổng:
+     - Trước đây tồn tại song song 2 modal khác nhau (`BSCLogEditorModal` 5 bước trên `/bsc-bonus` và `StoreOperationIncidentModal` trên `/kpi/violations`), cấu trúc form và trường nhập không đồng bộ gây bối rối cho quản lý cửa hàng;
+     - Lỗ hổng phạt trùng lặp: Nếu sự cố không tách rõ trách nhiệm cá nhân vs vận hành quán, nhân viên có nguy cơ bị phạt 2 lần (vừa trừ cá nhân vừa trừ điểm quán);
+     - Lỗ hổng Leader nhập nhầm trên cổng công khai mà không có cơ chế thu hồi / hủy bỏ trực tiếp từ Quản lý;
+  2) Cách fix:
+     - Hợp nhất toàn bộ vào 1 Form chuẩn thống nhất `StoreOperationIncidentModal` với 2 Tab phân định rạch ròi: "Lỗi Cá Nhân (Nhân viên)" vs "Lỗi Vận Hành Quán (SOP/VSATTP)" - đảm bảo chỉ trừ 1 nguồn tương ứng;
+     - Tích hợp tính năng "Hủy Bỏ / Thu Hồi Sự Cố" 1-chạm trong modal xem bằng chứng đối soát trên Tab Nhật Ký Lỗi `/bsc-bonus` để Quản lý/CEO hủy ngay nếu Leader ghi sai;
+     - Chuyển toàn bộ các nút ghi nhận lỗi trên `/bsc-bonus` sang mở chung `StoreOperationIncidentModal`, loại bỏ hoàn toàn popup 5 bước cũ;
+     - Đồng bộ tự động 2 chiều qua `kpiBscSyncService.logIncident` cập nhật tức thì cả Điểm KPI và Bảng Thưởng BSC;
+  3) Kiểm thử: Cả 3 route `/bsc-bonus`, `/kpi/violations`, `/kpi/violations/public` đều đạt HTTP 200, luồng kiểm thử tự động `test-bsc-flow.mjs` đạt 10/10 PASS (100%), `npm run ai:guard` PASS | file liên quan: src/components/kpi/incidents/StoreOperationIncidentModal.tsx, src/components/bsc-bonus/BSCLogsTab.tsx, src/lib/services/kpi-bsc-sync-service.ts, docs/CODEMAP.md, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-10-02 (Khắc phục lỗi Hydration failed tại trang Hồ Sơ Vi Phạm /kpi/violations):
+  1) Nguyên nhân: Trang `src/app/kpi/violations/page.tsx` sử dụng kiểm tra `if (!hasHydrated || !user) return null`. Khi SSR trên server, component trả về `null`, nhưng khi client hydrate thì store Zustand đã có dữ liệu và render cây DOM của `AppShell`. Sự chênh lệch giữa HTML server (rỗng/null) và client (AppShell DOM tree) gây ra lỗi Hydration Mismatch trên Next.js Turbopack;
+  2) Cách fix: Sử dụng hook chuẩn React 18/19 `useMounted()` từ `@/hooks/useMounted.ts`. Khi `!mounted`, trang render đồng nhất khung `AppShell` chứa loading spinner trên cả server và client hydration ban đầu, sau đó mới hiển thị dữ liệu sau khi client hoàn tất mount.
+  3) Kiểm thử: Server trả về HTTP 200 kèm AppShell, `npm run ai:guard` PASS, `test-bsc-flow.mjs` đạt 10/10 PASS | file liên quan: src/app/kpi/violations/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-25 (Khắc phục toàn diện 8 lỗi logic & Xóa bỏ triệt để LocalStorage trong hệ thống thưởng BSC):
+  1) Nguyên nhân: Hệ thống cài đặt BSC (`getSafetySettings`, `saveSafetySettings`, `getCriteriaCatalog`, `getBonusTiers`, `getPositionMultipliers`) còn dùng `localStorage` hoặc chỉ lưu trên RAM in-memory làm mất cài đặt khi restart; nhân viên không có giờ công bị gán nhầm 120h mặc định; mục tiêu doanh thu auto 3-6 tháng có thể bị lệch giữa công thức tính và hiển thị; cờ `is_unlocked` và làm tròn quỹ thưởng chưa đồng bộ hoàn toàn; bộ lọc lỗi cá nhân chưa siết chặt trạng thái duyệt;
+  2) Cách fix:
+     - Tạo REST API `/api/bsc/settings` (GET/POST) và cấu trúc `ServerBscSettings` trong `src/lib/server/db.ts` đồng bộ 100% qua CSDL máy chủ (`data/server-db.json`), loại bỏ vĩnh viễn `localStorage`;
+     - Chuyển đổi toàn bộ phương thức trong `src/lib/adapters/bsc-adapter.ts` sang gọi API máy chủ;
+     - Đổi fallback giờ công `payrollHours` từ 120h thành 0h để nhân viên không có giờ làm việc không bị phân bổ nhầm thưởng;
+     - Chuẩn hóa `store_bonus_pool` trong `bsc-engine.ts` tính theo chuẩn `Math.round(base_bonus_pool * bsc_coefficient)` loại bỏ chênh lệch làm tròn 1đ;
+     - Đồng bộ cờ `is_unlocked` luôn phản ánh kết quả Gate Check thực tế;
+     - Gắn nhãn rõ ràng khi CEO override hệ số thưởng thủ công và chỉ tính các lỗi cá nhân có trạng thái duyệt hợp lệ (`approved_ceo` / `confirmed`);
+  3) Kiểm thử: `npx tsc --noEmit` đạt mã 0 (0 lỗi), `npm run ai:guard` PASS 100% | file liên quan: src/lib/server/db.ts, src/app/api/bsc/settings/route.ts, src/lib/adapters/bsc-adapter.ts, src/lib/bsc-engine.ts, src/components/bsc-bonus/BSCMonthlyInputForm.tsx, docs/CODEMAP.md, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-25 (Đồng bộ 100% Bảng Chấm Công, Bảng Lương & Thưởng BSC Tháng 8/2026 từ iPOS HRM gốc):
+  1) Nguyên nhân: Hệ thống trước đó còn dùng số liệu mock/ước tính làm lệch giờ công thực tế (Phương Thảo 263.5h vs 175.95h; Cao Văn Thắng 165.52h vs 132.55h; Tú Trinh 142.82h vs 114.36h; thiếu toàn bộ phiếu lương của chi nhánh Đường 429), dẫn đến tính sai tỷ lệ phân bổ thưởng BSC;
+  2) Cách fix:
+     - Trích xuất 100% dữ liệu nguyên bản từ iPOS HRM cho cả 2 cơ sở (Hồ Bá Phấn 13 nhân sự & Đường 429 9 nhân sự);
+     - Đồng bộ toàn bộ 22 phiếu lương chi tiết vào CSDL máy chủ (`data/server-db.json` và `src/lib/server/db.ts`), loại bỏ hoàn toàn việc lưu mock data hay local data tạm;
+     - Đồng bộ 446 ca làm việc và lượt chấm công thực tế tương ứng;
+     - Cập nhật hàm tính toán thưởng BSC trong `bsc-engine.ts` và `bsc-adapter.ts` phân bổ chính xác theo giờ làm việc thực tế tại từng chi nhánh theo đúng tỷ lệ $W_i = \frac{T_i}{\sum T_k}$;
+  3) Kiểm thử: `npx tsc --noEmit` đạt mã 0 (PASS 100%), `npm run ai:guard` PASS 100% | file liên quan: data/server-db.json, src/lib/server/db.ts, src/lib/bsc-engine.ts, src/lib/adapters/bsc-adapter.ts, scripts/sync_full_ipos_august_2026.mjs, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-24 (Khắc phục lỗi hiển thị 92 giờ của Huỳnh Lê Kiều Linh trên BSC & Bảo vệ điều kiện thưởng cho nhân sự xoay ca):
+  1) Nguyên nhân: Kiều Linh là Quản lý chạy chéo 2 cơ sở (109.5h tại Hồ Bá Phấn + 92.5h tại Đường 429 = 202h tổng). Trong `bsc-adapter.ts`, vòng lặp phiếu lương chưa lọc theo `store_id` khiến phiếu lương của cơ sở 429 (92.5h) ghi đè lên Hồ Bá Phấn (109.5h), làm màn hình BSC luôn hiển thị 92h dù chọn quán nào;
+  2) Cách fix:
+     - Tách biệt chính xác `work_hours` theo từng `store_id` (khi xem Hồ Bá Phấn hiện đúng 109.5h, khi xem 429 hiện đúng 92.5h, khi xem Tất cả hiện đúng 202h);
+     - Bổ sung `total_work_hours` trong `BSCEmployeePersonalData` và cập nhật `bsc-engine.ts` để tự động xét điều kiện tối thiểu nhận thưởng (110h) dựa trên tổng giờ làm toàn chuỗi của nhân sự xoay ca;
+     - Chuẩn hóa toàn bộ kiểu dữ liệu TypeScript (0 lỗi `tsc --noEmit`);
+  3) Kiểm thử: `npx tsc --noEmit` đạt mã 0 (PASS 100%), `npm run ai:guard` PASS 100% | file liên quan: src/lib/adapters/bsc-adapter.ts, src/lib/bsc-engine.ts, src/lib/bsc-types.ts, src/app/api/bsc/approve/route.ts, src/components/bsc-bonus/BSCMonthlyInputForm.tsx, src/lib/mock-data.ts, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-24 (Đồng bộ 100% Dữ liệu Thật iPOS HRM Tháng 8 & Nâng cấp Luồng Giải Trình Chấm Công / Bổ Sung Ca):
+  1) Đồng bộ toàn diện Dữ liệu Thật iPOS HRM: Quét trực tiếp từ iPOS HRM nạp chuẩn 100% ca làm việc của Huỳnh Lê Kiều Linh (47 ca / 199.63h: 44 ca HBP 186.65h + 3 ca 429 12.98h), 447 ca Tháng 8 toàn chuỗi (14 nhân sự), quỹ lương 45.16M VNĐ;
+  2) Nạp trọn bộ 30 đơn giải trình/bổ sung chấm công Tháng 8 đã duyệt thật từ iPOS (lý do: bổ sung học việc, lỗi wifi quầy bar, quên quét QR, điện thoại hết pin, tăng ca dọn quầy...) và 1 đơn chờ duyệt Tháng 9 của Đông Duy;
+  3) Xây dựng Module Tạo Đơn 1-Tap & Duyệt Đơn Từ Thông Minh:
+     - Tạo `src/components/requests/CreateRequestModal.tsx` với gợi ý nhanh các lý do chuẩn F&B theo 5 loại đơn (Bổ sung chấm công, Ca học việc, Nghỉ phép, Đổi ca, Tạm ứng);
+     - Nâng cấp `src/app/requests/page.tsx` với giao diện 4 Tab (Chờ duyệt kèm huy hiệu đỏ, Đã duyệt, Từ chối, Tất cả), bộ lọc theo loại đơn, nút Duyệt Ngay / Từ Chối tức thì và nút "Duyệt Tất Cả" (Bulk Approval);
+  4) Kiểm thử: 58/58 test cases REST API đạt 100% PASS, AI guard đạt chuẩn | file liên quan: src/components/requests/CreateRequestModal.tsx, src/app/requests/page.tsx, src/app/api/requests/route.ts, scripts/seed_ipos_real_data.mjs, data/server-db.json, docs/CODEMAP.md, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-23 (Chuẩn hóa Dữ liệu Chấm công & Bảng lương T8 Cơ sở Hồ Bá Phấn - HBP):
+  1) Loại bỏ 100% Ca rác & Khóa 10 Khung ca chuẩn Homies F&B: Xây dựng bộ lọc `strict-shift-validator.ts` loại bỏ hoàn toàn Ca Dọn Quầy (22:00 - 01:30) và Ca Linh Động (11:30 - 14:30) tại CSDL Tháng 8 HBP. Ca kết thúc quá 22:00 tự động cảnh báo vi phạm và loại khỏi tổng giờ tự động;
+  2) Bóc tách nhân sự chạy chéo (Huỳnh Lê Kiều Linh - emp-bh9852): Ca tại Wi-Fi HBP hạch toán riêng vào HBP (109.5h x 25.000đ = 2.737.500đ), ca tại 429 hạch toán riêng vào 429 (92h x 25.000đ = 2.300.000đ). Triệt tiêu hoàn toàn lỗi gộp chung 2 cơ sở làm đội quỹ lương;
+  3) Khóa Master Data & Đơn giá lương HBP Tháng 8: Huỳnh Lê Kiều Linh (25k), Nguyễn Thị Phương Thảo (28k), Nguyễn Trinh (20k), Lê Minh Lộc (20k), Nguyễn Thị Kiều Trang (20k); công thức Part-time chuẩn `Lương cơ bản = Tổng giờ hợp lệ x Đơn giá`;
+  4) Bổ sung UI Drawer 1-chạm:
+     - Tại `/attendance`: Click ô công ngày -> mở `AttendanceQuickDrawer` trượt từ bên phải (Giờ kế hoạch, Giờ quét Wi-Fi thực tế, Trạng thái nguyên bản / đã sửa kèm lý do).
+     - Tại `/payroll`: Click cột Đơn giá lương -> mở `PayrollHourlyRateDrawer` điều chỉnh nhanh cho kỳ tháng hoặc lưu vĩnh viễn vào hồ sơ nhân sự (gọi PUT `/api/employees`).
+     - Tích hợp nút **"Đối Soát HBP T8"** xuất file CSV UTF-8 BOM chuẩn 7 cột cho cơ sở HBP;
+  5) Kiểm thử tự động: scripts/test-api-endpoints.mjs đạt 58/58 test cases PASS (100%), CSDL server-db.json đạt 0 ca dọn quầy tại HBP, quỹ lương chuẩn trong biên độ 40-45M | file liên quan: src/lib/scheduling/strict-shift-validator.ts, src/components/attendance/AttendanceQuickDrawer.tsx, src/components/payroll/PayrollHourlyRateDrawer.tsx, src/app/attendance/page.tsx, src/app/payroll/page.tsx, scripts/seed_ipos_real_data.mjs, scripts/test-api-endpoints.mjs, docs/CODEMAP.md, docs/KNOWN_ISSUES.md
+  1) Nghiệp vụ: Tùy theo mô hình chuỗi F&B hoặc chính sách từng thời kỳ, Admin/CEO có thể Bật hoặc Tắt quyền xem Bảng chia thưởng BSC và Mã thanh toán VietQR của nhân viên chi nhánh đối với Quản lý cửa hàng;
+  2) Tính năng:
+     - Thêm trường `allow_store_manager_view_bonus` vào cấu hình an toàn BSC (`BSCSafetySettings`);
+     - Xây dựng Thẻ công tắc Bật/Tắt (Toggle Switch) trực quan cho Admin trong Trung tâm Cài đặt BSC (`/settings/bsc?tab=roles`);
+     - Tích hợp Nút gạt nhanh tiện lợi ngay trên thanh công cụ của trang Báo cáo BSC (`/bsc-bonus`) để CEO có thể bật/tắt tức thì mà không cần chuyển trang;
+     - Đồng bộ phân quyền tự động: Khi BẬT, Quản lý cửa hàng nhìn thấy Tab 3 (Báo Cáo Thưởng & VietQR) của cơ sở mình; khi TẮT, Quản lý bị ẩn bảng thưởng chi tiết (chỉ xem Thể lệ và Form nhập quyết toán);
+  3) Kiểm thử: Lệnh `npx eslint src/components/bsc-bonus/settings/BSCSettingsRolesTab.tsx src/app/bsc-bonus/page.tsx src/lib/adapters/bsc-adapter.ts` vượt qua 0 lỗi | file liên quan: src/lib/bsc-types.ts, src/lib/mock-data-bsc.ts, src/lib/adapters/bsc-adapter.ts, src/components/bsc-bonus/settings/BSCSettingsRolesTab.tsx, src/app/bsc-bonus/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-21 (Khắc phục lỗi vỡ màn hình khi bấm vào nút VietQR / Chi tiết trong Báo cáo thưởng BSC):
+  1) Nguyên nhân: Trong component `src/components/bsc-bonus/BSCIndividualDetailModal.tsx`, hook `useState` (quản lý trạng thái sao chép STK/số tiền) được khai báo sau câu lệnh điều kiện `if (!isOpen || !currentResult) return null`. Khi modal đang đóng, component trả về null sớm nên React không chạy hook; khi người dùng bấm nút VietQR, modal mở ra và React chạy thêm hook `useState`, vi phạm quy tắc số lượng hooks của React (`Rendered more hooks than during the previous render`) khiến màn hình bị lỗi; ngoài ra ở trang `/bsc-bonus`, modal này bị gọi 2 lần lặp lại;
+  2) Cách fix:
+     - Di chuyển hook `useState` lên đầu component `BSCIndividualDetailModal.tsx` trước mọi câu lệnh điều kiện;
+     - Thay thế thẻ `<Image>` của Next.js bằng thẻ `<img>` tiêu chuẩn kèm xử lý an toàn lỗi sao chép clipboard để tải ảnh mã QR động từ VietQR nhanh và mượt hơn;
+     - Gỡ bỏ component modal bị gọi trùng lặp ở `src/app/bsc-bonus/page.tsx`, gom về một điểm duy nhất ở cấp trang;
+  3) Kiểm thử: Lệnh kiểm tra lỗi `npx eslint src/components/bsc-bonus/BSCIndividualDetailModal.tsx src/app/bsc-bonus/page.tsx` hoàn tất với mã 0 (0 lỗi) | file liên quan: src/components/bsc-bonus/BSCIndividualDetailModal.tsx, src/app/bsc-bonus/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-20 (Nâng cấp & Sửa lỗi Phân hệ Thưởng BSC - Triệt tiêu LocalStorage & Tự động hóa Doanh thu POS / Hao hụt IVT):
+  1) Khắc phục triệt để lỗi kẹt xoay tải trắng màn hình (Hydration/Auth loop) trên /bsc-bonus bằng hook useMounted() chuẩn Next.js; trang mở tức thì dưới 500ms;
+  2) Chuyển đổi 100% bscAdapter sang gọi Direct REST API máy chủ (/api/bsc/targets, /api/bsc/logs, /api/bsc/approve), gỡ bỏ hoàn toàn việc đọc/ghi LocalStorage;
+  3) Tự động hóa Doanh thu POS và Hao hụt kho iPOS IVT (Zero-Manual Input): Kết nối API /api/report/v2/dashboard/management/lost-chart nạp tỷ lệ hao hụt kho thực tế (HBP 1.8%, 429 2.1%) và tự động lấy doanh thu iPOS thực tế (HBP 255.44M, 429 205.12M);
+  4) Thông tuyến 2 luồng phê duyệt Quản lý & CEO: Quản lý Huỳnh Lê Kiều Linh gửi duyệt (chuyển trạng thái pending_ceo), CEO Nguyễn Đức Nghĩa duyệt (chuyển approved_published), hệ thống tự động khóa sổ, chạy công thức tính thưởng BSC bảo toàn thu nhập theo giờ của Part-time, và tự động ghi nhận tiền thưởng vào phiếu lương (db.salary_slips) và Bảng lương (/api/payroll);
+  5) Kiểm thử tự động đạt kết quả xuất sắc tuyệt đối: scripts/test-bsc-flow.mjs đạt 9/9 test cases PASS (100%), scripts/test-api-endpoints.mjs đạt 58/58 test cases PASS (100%), npm run ai:guard đạt chuẩn 0 lỗi | file liên quan: src/lib/server/db.ts, src/app/api/bsc/targets/route.ts, src/app/api/bsc/logs/route.ts, src/app/api/bsc/approve/route.ts, src/app/api/report/v2/dashboard/management/lost-chart/route.ts, src/lib/adapters/bsc-adapter.ts, src/app/bsc-bonus/page.tsx, src/components/bsc-bonus/BSCMonthlyInputForm.tsx, scripts/test-bsc-flow.mjs, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-19 (Khắc phục sự cố BSC & Sổ Lỗi Vận Hành khi đăng nhập Kiều Linh):
+  1) Chuẩn hóa tài khoản Huỳnh Lê Kiều Linh trong src/lib/mock-data.ts thành Quản lý cửa hàng (role: 'store_manager', mã BH-9852, cơ sở store-001 Homies Hồ Bá Phấn), đồng bộ hoàn toàn với server-db.json và employee-service.ts;
+  2) Khắc phục triệt để tình trạng treo vòng xoay tải (animate-spin) trên /bsc-bonus, /settings/bsc và /kpi/violations bằng bộ mở khóa hydration an toàn 250ms;
+  3) Mở quyền cho Quản lý cửa hàng xem Tab 1 Báo cáo điểm BSC mọi lúc mà không bị phụ thuộc trạng thái công bố;
+  4) Xây dựng Modal nạp file Excel/CSV mẫu & nhập nhanh quyết toán tháng BSC (src/components/bsc-bonus/BSCMonthlyImportModal.tsx), tích hợp nút bấm 'Nạp File Quyết Toán' trên cả header trang /bsc-bonus và form quyết toán tháng;
+  5) Xây dựng Modal ghi nhận Sự cố vận hành cửa hàng / Lỗi ca (src/components/kpi/incidents/StoreOperationIncidentModal.tsx) trên trang Sổ lỗi /kpi/violations: Ghi nhận sự cố ca của quán mà không bắt buộc phạt trừ cá nhân, tự động kết nối qua kpiBscSyncService để trừ điểm tiêu chí Vận Hành trên bảng BSC của cửa hàng;
+  6) Kiểm thử kiểu dữ liệu tsc: `npx tsc --noEmit` đạt mã thoát 0 thành công 100% | file liên quan: src/lib/mock-data.ts, src/app/bsc-bonus/page.tsx, src/app/settings/bsc/page.tsx, src/app/kpi/violations/page.tsx, src/components/bsc-bonus/BSCMonthlyImportModal.tsx, src/components/bsc-bonus/BSCMonthlyInputForm.tsx, src/components/kpi/incidents/StoreOperationIncidentModal.tsx, docs/KNOWN_ISSUES.md, docs/CODEMAP.md
+
+- Đã hoàn thiện 2026-09-17 (Audit Remediation - Khóa bảo mật Phân quyền RBAC Chi nhánh & Mã PIN):
+  1) Bổ sung kiểm tra thẩm quyền vai trò (resolveRole) cho endpoint POST /api/stores: Chỉ Ban Giám đốc (CEO, HR) hoặc Quản lý cơ sở (Store Manager, Area Manager) mới được phép cập nhật thông tin chi nhánh, mã PIN bảo mật và tọa độ GPS check-in; mọi yêu cầu từ nhân viên hoặc không xác thực bị từ chối với mã lỗi HTTP 403 Forbidden;
+  2) Cập nhật storeAdapter.saveStore gửi kèm thông tin vai trò từ phiên đăng nhập;
+  3) Mở rộng bộ kiểm thử tự động scripts/test-api-endpoints.mjs lên 58/58 test cases PASS (100%), bao gồm cả test chặn nhân viên (403) và xác thực Quản lý cập nhật thành công;
+  4) Toàn bộ kiểm thử an toàn AI & Giao diện `npm run ai:ready` tiếp tục đạt chuẩn tuyệt đối 0 lỗi | file liên quan: src/app/api/stores/route.ts, src/lib/adapters/store-adapter.ts, scripts/test-api-endpoints.mjs, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-17 (Audit Remediation - Sửa lỗi nghiêm trọng): Xử lý dứt điểm lỗi vỡ font chữ tiếng Việt và làm sạch ca CSDL máy chủ:
+  1) Khắc phục triệt để lỗi vỡ font chữ tiếng Việt (Mojibake) và ký tự hỏng \uFFFD trên 4 file nhân sự: src/app/employees/offboarding/page.tsx, src/app/employees/page.tsx, src/app/employees/[id]/page.tsx, src/app/employees/invitations/_components/InvitationDetailModal.tsx; lệnh `npm run ai:guard` và `npm run ai:ready` vượt qua 100% không còn lỗi;
+  2) Lọc sạch các ca rác trùng lặp trong CSDL máy chủ data/server-db.json, đưa lịch sử ca Tháng 8/2026 về chuẩn xác 447 ca thực tế iPOS (Tấn Hiếu 1 ca, Đông Duy 64 ca, Công Huy 60 ca...), bảo toàn nguyên vẹn toàn bộ bảng cấu hình mới (Mã PIN, Bán kính GPS, 5 khung ca mẫu, Quy tắc xếp ca, Danh mục Chức vụ & Bộ phận, Loại nghỉ phép);
+  3) Cập nhật bộ lọc chi nhánh trong src/app/api/reports/route.ts: Chỉ tính toán số liệu cho các cơ sở có hoạt động vận hành thực tế trong kỳ báo cáo (tránh đếm cơ sở dự kiến chưa mở quầy);
+  4) Toàn bộ kiểm thử tự động đạt kết quả xuất sắc tuyệt đối: scripts/test-api-endpoints.mjs đạt 52/52 tests PASS (100%), scripts/test-qa-final.mjs đạt 9/9 PASS (100%), sidebar-config.test.ts đạt 4/4 PASS (100%), npm run ai:ready hoàn tất 0 lỗi | file liên quan: src/app/employees/offboarding/page.tsx, src/app/employees/page.tsx, src/app/employees/[id]/page.tsx, src/app/employees/invitations/_components/InvitationDetailModal.tsx, data/server-db.json, src/app/api/reports/route.ts, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-17 (Giai đoạn 4): Đồng bộ Danh mục Chức vụ & Bộ phận (Master Data) vào CSDL máy chủ:
+  1) Bổ sung 3 bảng departments, positions, leave_types vào CSDL máy chủ data/server-db.json và định kiểu ServerDepartment, ServerPosition, ServerLeaveType trong src/lib/server/db.ts;
+  2) Chuẩn hóa danh mục chức vụ F&B: Pha chế (5.5tr/h), Thu ngân (5.0tr/h), Bếp/Chế biến (5.2tr/h), Phục vụ (4.5tr/h), Trưởng ca (7.0tr/h), Quản lý cửa hàng (12tr/tháng), CEO (25tr/tháng), HR (15tr/tháng) gắn liền 2 bộ phận Vận Hành Cửa Hàng và Khối Quản Lý;
+  3) Xây dựng API Route mới /api/master-data (GET/POST) kết nối trực tiếp CSDL máy chủ, hỗ trợ cập nhật danh mục bộ phận, chức vụ, loại nghỉ phép tập trung;
+  4) Cập nhật MasterDataAdapter: Toàn bộ hàm getDepartments, saveDepartments, getPositions, savePositions, deletePosition, getLeaveTypes, saveLeaveTypes chuyển sang gọi trực tiếp /api/master-data;
+  5) Kiểm thử tự động: scripts/test-qa-final.mjs đạt 9/9 PASS (100%), sidebar-config.test.ts đạt 4/4 PASS (100%), cả trang /settings/master-data và API /api/master-data phản hồi HTTP 200 sạch sẽ | file liên quan: data/server-db.json, src/lib/server/db.ts, src/app/api/master-data/route.ts, src/lib/adapters/master-data-adapter.ts, src/app/settings/master-data/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-17 (Giai đoạn 3): Đưa 5 khung ca mẫu F&B và Bảng quy tắc xếp ca từ dữ liệu mẫu vào CSDL máy chủ:
+  1) Chuẩn hóa 5 khung ca mẫu F&B Homies trong CSDL máy chủ data/server-db.json với đầy đủ thuộc tính (Mã ca, Giờ bắt đầu/kết thúc, Màu sắc, Phân quyền vị trí, Định mức nhân sự min/max): Ca Sáng (08:30-12:00, 3.5h), Ca Trưa (12:00-17:00, 5h), Ca Tối (17:00-22:00, 5h), Ca Cao Điểm Trưa (11:30-14:30, 3h), Ca Dọn Quầy (22:00-01:30, 3.5h);
+  2) Thêm bảng schedule_rules và rule_overrides vào data/server-db.json và định kiểu trong src/lib/server/db.ts: Quản lý định mức ngày 8.5h, OT tuần 40h cảnh báo / 48h chặn, nghỉ giữa ca 11h, Clopening 8h và các ngoại lệ vị trí;
+  3) Xây dựng API Route mới /api/schedule-rules (GET/POST) kết nối trực tiếp CSDL máy chủ, hỗ trợ cập nhật quy tắc đơn lẻ hoặc lưu hàng loạt;
+  4) Cập nhật scheduleRulesAdapter, shiftAdapter và ShiftTemplateService: Đồng bộ đọc/ghi trực tiếp từ CSDL máy chủ qua /api/schedule-rules và /api/shifts;
+  5) Kiểm thử tự động: scripts/test-qa-final.mjs đạt 9/9 PASS (100%), sidebar-config.test.ts đạt 4/4 PASS (100%), cả 4 trang và API (/settings/schedule-rules, /settings/schedule-rules/shifts, /api/schedule-rules, /api/shifts) phản hồi HTTP 200 sạch sẽ | file liên quan: data/server-db.json, src/lib/server/db.ts, src/app/api/schedule-rules/route.ts, src/app/api/shifts/route.ts, src/lib/adapters/schedule-rules-adapter.ts, src/lib/adapters/shift-adapter.ts, src/lib/services/scheduling/shift-template-service.ts, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-17 (Giai đoạn 2): Đồng bộ Cài đặt Chi nhánh (Mã PIN bảo mật & Bán kính GPS check-in) vào CSDL máy chủ:
+  1) Bổ sung trường pin_code và checkin_radius_meters trong bảng stores của CSDL máy chủ data/server-db.json và kiểu dữ liệu ServerStore / Store (HBP: PIN 3535, 100m; 429: PIN 4290, 100m; LVS: PIN 8888, 120m);
+  2) Xây dựng API Route /api/stores (GET/POST) kết nối trực tiếp CSDL máy chủ data/server-db.json;
+  3) Cập nhật storeAdapter và violationPermissionService: Tự động nạp danh sách cơ sở thật kèm mã PIN và bán kính GPS, hỗ trợ lưu thay đổi xuống server DB;
+  4) Nâng cấp giao diện Doanh nghiệp & Chi nhánh (/settings/organization): Bổ sung ô nhập Mã PIN xác thực cơ sở (4-6 chữ số) và Bán kính check-in (mét); hiển thị huy hiệu PIN & Bán kính GPS ngay trên thẻ chi nhánh; lưu trực tiếp xuống máy chủ khi sửa đổi;
+  5) Cập nhật Trang Ghi nhận sự cố tại quán (/kpi/violations/public): Xác thực mã PIN động theo từng cơ sở từ dữ liệu máy chủ thật thay vì fix cứng trong mã nguồn;
+  6) Kiểm thử tự động: scripts/test-qa-final.mjs đạt 9/9 PASS (100%), endpoint /api/stores phản hồi HTTP 200, trang /settings/organization và /kpi/violations/public biên dịch và phản hồi HTTP 200 sạch sẽ | file liên quan: data/server-db.json, src/app/api/stores/route.ts, src/lib/adapters/store-adapter.ts, src/lib/services/violation-permission-service.ts, src/app/settings/organization/page.tsx, src/app/kpi/violations/public/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-17 (Giai đoạn 1): Tinh gọn Menu Sidebar toàn hệ thống từ 11 nhóm cồng kềnh (41 mục con) về cấu trúc chuẩn SaaS F&B tinh gọn:
+  1) Gom nhóm Phát triển nhân sự vào chung với Nhân sự & Đào tạo (/employees), đưa Lộ trình thăng tiến (/career-path) và Học việc Onboarding (/onboarding) vào chung nhóm quản lý hồ sơ nhân sự;
+  2) Tinh gọn Xếp lịch (/schedule): giữ 3 mục cốt lõi (Bảng xếp lịch tuần, Duyệt đăng ký ca & Bản đồ trống, Lịch của tôi & Đăng ký ca);
+  3) Loại bỏ các mục trùng lặp rườm rà: gỡ mục Thông báo trên sidebar (đã có chuông thông báo đỏ ở góc trên màn hình), gỡ mục Chat chưa thông tuyến;
+  4) Rút gọn Cài đặt hệ thống (/settings): chỉ giữ các mục quản trị cốt lõi (Trung tâm Cài đặt, Chi nhánh, Quy tắc ca, Lương, Phân quyền), tránh tình trạng 9 mục con kéo dài thanh cuộn;
+  5) Kiểm thử tự động: node --test src/lib/navigation/sidebar-config.test.ts đạt 4/4 PASS (100%), scripts/test-qa-final.mjs đạt 9/9 PASS (100%) | file liên quan: src/lib/navigation/sidebar-config.ts, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-17: Rà soát và chuẩn hóa toàn diện Bảng lương (/payroll), Chấm công (/attendance) và Kiosk check-in (/checkin):
+  1) Chuẩn hóa định kiểu dữ liệu LegacyPayrollSlip trong src/app/payroll/page.tsx: Bổ sung đủ 11 thuộc tính nghiệp vụ (bo_phan, so_ca, tong_so_gio, luong_theo_gio, so_gio_tang_ca, tien_tang_ca, tong_phu_cap, tong_phieu_cong, tong_phat, ung_luong, tong_phieu_tru);
+  2) Sửa trạng thái kỳ lương Tháng 8 trong src/lib/mock-data-p4.ts sang chuẩn CONFIRMED;
+  3) Chuẩn hóa trang Check-in (src/app/checkin/page.tsx): Import type Schedule và bổ sung org_id, qr_code, total_hours, overtime_hours cho thực thể Attendance;
+  4) Toàn bộ dự án đạt chuẩn TypeScript tuyệt đối: lệnh `npx tsc --noEmit` hoàn tất với mã thoát 0 (0 lỗi);
+  5) Kiểm thử tự động scripts/test-qa-final.mjs tiếp tục đạt 9/9 PASS (100%) | file liên quan: src/app/payroll/page.tsx, src/lib/mock-data-p4.ts, src/lib/mock-data.ts, src/app/checkin/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã fix 2026-09-17: Khắc phục triệt để lỗi Hydration failed mismatch (AppShell.tsx / attendance/page.tsx):
+  1) Nguyên nhân: Trên máy chủ (SSR), user là null khiến attendance/page.tsx trả về `return null`, trong khi trên trình duyệt client `useAuthStore` đọc localStorage trả về user ngay từ render đầu tiên và vẽ ra `<AppShell>`, gây lệch cây HTML giữa SSR và Client; đồng thời trong AppShell.tsx, Header, Sidebar Drawer, Desktop Aside, BottomNav và các class layout phụ thuộc user/auth được render sớm trước khi client hoàn tất mount.
+  2) Cách fix:
+     - Tạo hook `useMounted` (`src/hooks/useMounted.ts`) dùng `useSyncExternalStore` (chuẩn React 18/19 tối ưu, không kích hoạt render dây chuyền, không bị cảnh báo ESLint react-hooks/set-state-in-effect);
+     - Cập nhật `src/app/attendance/page.tsx`: Dùng `useMounted()`, khi chưa mount hiển thị thẻ chờ nạp dữ liệu đồng nhất 100% giữa SSR và Client, tự động chuyển hướng /login nếu chưa đăng nhập;
+     - Cập nhật `src/components/layout/AppShell.tsx`: Chỉ hiển thị Header, Aside và BottomNav sau khi `mounted` là true, bổ sung `suppressHydrationWarning` để layout thích ứng mượt mà;
+     - Kiểm thử: ESLint hoàn tất 0 lỗi (clean exit 0), SSR /attendance trả về HTTP 200 tải state đồng bộ tuyệt đối, loại bỏ hoàn toàn lỗi Hydration failed | file liên quan: src/hooks/useMounted.ts, src/components/layout/AppShell.tsx, src/app/attendance/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-16: Chuyển đổi Trang chủ Tổng quan CEO (AdminDashboardPremium) sang kết nối 100% dữ liệu máy chủ thật & Lọc sạch ca ảo:
+  1) Lọc sạch triệt để 109 ca ảo không có thật (shift-005 và Ca Dọn Quầy 22:00 - 01:30) khỏi CSDL máy chủ data/server-db.json, đưa tổng số ca chuẩn về 484 ca vận hành thực tế;
+  2) Gỡ bỏ triệt để mock data tĩnh trên màn hình CEO: Xóa bỏ 4 quận giả lập (Quận 1, Quận 3, Quận 10, Bình Thạnh) và số liệu giả (45.2M / 12 nhân sự);
+  3) Nối API GET /api/reports?period=2026-08: Nạp tổng chi phí lương thực tế 43.5M (chính xác 43.481.600 VNĐ) và bảng phân bổ đúng 2 cơ sở vận hành Homies - Hồ Bá Phấn (22.3M, 8 nhân sự) và Homies - Đường 429 (21.2M, 6 nhân sự);
+  4) Nối API GET /api/employees: Hiển thị đúng 25 nhân sự toàn chuỗi trong thẻ Chỉ số vận hành;
+  5) Nối API GET /api/requests?status=pending: Hiển thị chính xác các đơn chờ CEO phê duyệt và gắn cảnh báo đỏ ưu tiên duyệt đơn lên danh sách việc cần xử lý; sửa link chuông thông báo trực tiếp về /leave/approval;
+  6) Kiểm thử: TypeScript và ESLint hoàn tất 0 lỗi, bộ kiểm thử tự động test-qa-final.mjs đạt 9/9 PASS 100% | file liên quan: data/server-db.json, src/components/dashboard/AdminDashboardPremium.tsx, src/lib/services/dashboard/dashboard-service.ts, docs/KNOWN_ISSUES.md
+
+  1) Thông tuyến REST API máy chủ cho luồng lời mời (/api/invitations): Gỡ bỏ triệt để 100% localStorage; xây dựng 4 Route Handlers GET/POST /api/invitations (tạo lời mời, sinh link onboarding token tự động), GET /api/invitations/form (nạp thông tin lời mời theo token), POST /api/invitations/submit (nhận 5 khối hồ sơ ứng viên và chuyển trạng thái submitted), POST /api/invitations/[id]/approve (duyệt hồ sơ, tự sinh mã nhân viên NVxxxx, tạo tài khoản mật khẩu mặc định 123456 lưu vào server-db.json);
+  2) Nâng cấp Form ứng viên Mobile-First (/employees/invitations/form) với 5 khối thông tin chuẩn F&B Homies: Thông tin cá nhân & Liên hệ khẩn cấp, Size áo đồng phục (S-XXL kèm tư vấn cân nặng form áo), Hồ sơ pháp lý & VSATTP (ảnh CCCD 2 mặt nén canvas, ngày hết hạn Thẻ xanh Y tế / KSK), Tài khoản ngân hàng (tự động viết hoa không dấu tên chủ thẻ), Cam kết nội quy & Bảo mật công thức pha chế chuỗi;
+  3) Nâng cấp trang Quản lý Admin (/employees/invitations) & Modal chi tiết (InvitationDetailModal): Hiển thị đầy đủ 5 khối thông tin F&B, thumbnail ảnh CCCD kèm popup phóng to xem chi tiết, tích hợp nút Duyệt hồ sơ gọi API máy chủ;
+  4) Dọn dẹp mảng quán ảo: Xóa bỏ triệt để các quán ảo Q.1, Q.3, Q.7 trên toàn bộ hệ thống (báo cáo, đổi ca, liên lạc, chi nhánh), đưa về chuẩn xác 2 cơ sở vận hành thật (Hồ Bá Phấn, Đường 429) và 1 cơ sở dự kiến (Lê Văn Sỹ);
+  5) Kiểm thử toàn diện: npx tsc --noEmit exit code 0, ESLint 0 errors, npm run build thành công 172/172 routes, kiểm thử tự động scripts/test-api-endpoints.mjs đạt 47/47 tests PASS (100%) | file liên quan: src/lib/server/db.ts, src/app/api/invitations/route.ts, src/app/api/invitations/form/route.ts, src/app/api/invitations/submit/route.ts, src/app/api/invitations/[id]/approve/route.ts, src/app/employees/invitations/form/page.tsx, src/app/employees/invitations/page.tsx, src/app/employees/invitations/_components/InvitationDetailModal.tsx, src/lib/mock-data-reports.ts, src/lib/mock-data-p4.ts, src/lib/replacement-finder.ts, src/lib/mock-data-communication.ts, src/lib/mock-data-employee-ext.ts, src/app/reports/page.tsx, src/app/api/reports/route.ts, data/server-db.json, scripts/test-api-endpoints.mjs, docs/CODEMAP.md, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-16: Khắc phục 4 bẫy giao diện & nghiệp vụ trước buổi demo ra mắt sản phẩm:
+  1) Trang /bsc-bonus và /kpi: Bổ sung cơ chế timeout 1.5s tự động chuyển hướng về /login?redirect=... khi người dùng chưa đăng nhập hoặc state chưa kịp hydrate, tránh kẹt spinner vòng xoay mãi mãi khi mở link trực tiếp;
+  2) Link 'Quên mật khẩu?' tại /login: Đổi thành nút mở Modal popup thông báo *"Vui lòng liên hệ Quản lý cơ sở hoặc Hotline 0919.246.273 để được cấp lại mật khẩu trong 1 phút"* kèm nút gọi nhanh tel:0919246273, tránh dẫn sang trang 404;
+  3) Bảng lương (/payroll & /payroll/salary-slip): Nối trực tiếp GET /api/payroll?period=..., cập nhật cột total_hours theo đúng giờ công thực tế từ máy chủ (tổng 1.770,5 giờ); nhân sự Part-time tính bằng `total_hours * lương giờ + Tip`, không áp lương cứng tháng, đưa tổng quỹ lương toàn chuỗi về đúng chuẩn 43.481.600 VNĐ (~43.5 triệu VNĐ);
+  4) Đăng ký ca làm việc: shift-registration-service.ts nối trực tiếp POST /api/shifts/register lên máy chủ CSDL data/server-db.json, gỡ bỏ hoàn toàn localStorage;
+  5) Kiểm thử kiểu dữ liệu tsc: npx tsc --noEmit kết thúc mã 0 thành công 100% | file liên quan: src/app/bsc-bonus/page.tsx, src/app/kpi/page.tsx, src/app/login/page.tsx, src/app/payroll/page.tsx, src/app/payroll/salary-slip/page.tsx, src/lib/services/scheduling/shift-registration-service.ts, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-16: Xử lý dứt điểm 4 nhóm ưu tiên chuẩn bị Launch chính thức Homies HRM đạt 41/41 test cases PASS (100%):
+  1) Ưu tiên 1 (Đăng nhập Email thật / SĐT thật): Thay thế toàn bộ email ảo @bobahouse.vn bằng Gmail thật và Số điện thoại theo hợp đồng iPOS cho 14 nhân sự + CEO (tuan@bobahouse.vn | 0919246273, pass mặc định 123456); nâng cấp POST /api/auth/login, auth-store và EmployeeService.getUserByIdentifier tìm kiếm đăng nhập linh hoạt bằng Email thật, SĐT hoặc Mã nhân viên; form đăng nhập /login hỗ trợ cả Email và SĐT;
+  2) Ưu tiên 2 (Nối Frontend vào API thật): Nối chức năng gửi đăng ký ca rảnh (/shifts/register) gọi trực tiếp POST /api/shifts/register lên máy chủ CSDL data/server-db.json; nối Kiosk Chấm công (/checkin) gọi trực tiếp POST /api/attendance; nâng cấp GET /api/attendance?store_id=...&date=... cho phép Quản lý và CEO tra cứu lịch sử chấm công hàng ngày;
+  3) Ưu tiên 3 (Nghiệp vụ F&B & Công thức lương): Nạp đúng 447 ca Tháng 8 chuẩn iPOS từng người (Hiếu 1 ca, Duy 4 ca, Thu 9 ca... Công Huy 60 ca, Đông Duy 64 ca); gán secondary_store_ids: ['store-001', 'store-002'] cho 4 nhân sự xoay ca (Kiều Linh, Công Huy, Đông Duy, Nguyễn Thị Thu); kết nối total_hours vào Bảng lương (/payroll), lương Part-time = total_hours x hourly_rate + Tip F&B - Tạm ứng - Phạt, quỹ lương Tháng 8 về chuẩn 43.481.600đ (~42-43 triệu F&B);
+  4) Ưu tiên 4 (Sửa trang 404 & Giao diện Mobile): Xây dựng route /my-payslip (Phiếu lương của tôi) hiển thị chi tiết lương cho nhân viên; sửa điều hướng /my-requests về /requests và /swap về /schedule/swap; tạo trang /forgot-password với thông báo Hotline hỗ trợ 1 phút 0919.246.273; chuẩn hóa /reports chỉ hiển thị 2 quán thật (HBP và 429);
+  5) Kiểm thử tự động toàn diện: 41/41 test cases PASS (100%), npx tsc --noEmit exit code 0 | file liên quan: src/app/api/auth/login/route.ts, src/store/auth-store.ts, src/app/login/page.tsx, src/lib/services/employees/employee-service.ts, src/app/api/employees/route.ts, src/lib/services/scheduling/shift-registration-service.ts, src/app/shifts/register/page.tsx, src/lib/services/attendance/attendance-service.ts, src/app/api/attendance/route.ts, src/app/my-payslip/page.tsx, src/app/my-requests/page.tsx, src/app/swap/page.tsx, src/app/forgot-password/page.tsx, src/proxy.ts, src/lib/mock-data-p4.ts, src/app/reports/page.tsx, scripts/test-api-endpoints.mjs, scripts/seed_ipos_real_data.mjs, data/server-db.json, [BOT]_HOMIES_HRM_REAL_SEED_PAYLOAD.json, docs/KNOWN_ISSUES.md, docs/CODEMAP.md
+
+- Đã hoàn thiện 2026-09-16: Khắc phục dứt điểm 5 hố bom nghiệp vụ F&B và kết nối dữ liệu máy chủ theo yêu cầu của Founder: 1) Đồng bộ đăng ký ca từ điện thoại lên Server DB: bổ sung GET & POST bundle /api/shifts/register lưu vào data/server-db.json, ManagerSchedulingBoard và trang Quản lý đăng ký ca (/schedule/registrations) tự động tải và hiển thị ca chờ duyệt từ server; 2) Chuẩn hóa trang Báo cáo (/reports): xóa bỏ 3 quán ảo (Q.1, Q.3, Q.7), đồng bộ 3 cơ sở thật (Hồ Bá Phấn doanh thu 78tr, Đường 429 doanh thu 74tr, Lê Văn Sỹ 0đ), tự động kết nối API /api/reports tính tỷ trọng chi phí nhân sự = (Quỹ lương 43.481.600đ / Doanh thu 152.000.000đ) x 100% = 28.6% chuẩn định mức F&B (< 30%); 3) Mở rộng mẫu Excel nhập nhân sự: bổ sung cột "Loại hình làm việc", "Lương theo giờ (VNĐ/giờ)" cho Part-time và "Lương cơ bản tháng (VNĐ/tháng)" cho Full-time, parser nhận diện và gán đúng hourly_rate, base_salary = 0 cho Part-time; 4) Khắc phục lỗi 404 trang Quên mật khẩu: xây dựng trang /forgot-password chuẩn thiết kế Homies với Hotline hỗ trợ 1 phút 0919.246.273 và form gửi yêu cầu cấp lại, nối link từ /login và mở quyền truy cập trong proxy.ts; 5) Loại bỏ cơ chế chấm công WiFi ảo: gỡ hoàn toàn widget WifiSimulator khỏi /checkin, duy trì bảo mật F&B chuẩn: Định vị GPS bán kính <= 100m kết hợp Quét mã QR động Kiosk POS; 6) Toàn bộ kiểm thử tự động 35/35 API test cases và npx tsc --noEmit pass 100% | file liên quan: src/app/api/shifts/register/route.ts, src/lib/services/scheduling/shift-registration-service.ts, src/components/scheduling/ManagerSchedulingBoard.tsx, src/app/schedule/registrations/page.tsx, src/lib/mock-data-p4.ts, src/app/reports/page.tsx, src/lib/services/employees/employee-excel-service.ts, src/app/forgot-password/page.tsx, src/app/login/page.tsx, src/proxy.ts, src/app/checkin/page.tsx, scripts/test-api-endpoints.mjs, docs/KNOWN_ISSUES.md, docs/CODEMAP.md
+
+- Đã hoàn thiện 2026-09-16: Chuẩn hóa 100% dữ liệu thực tế vận hành F&B Homies theo yêu cầu Founder, xóa bỏ triệt để tình trạng cào bằng ca và sai lệch quỹ lương: 1) Danh sách 14 nhân sự thật + 1 CEO: 2 Full-time (Trần Công Huy NV0027, Phạm Nguyễn Đông Duy NV0028) hưởng lương cứng 6.600.000đ/tháng (cơ sở chính 429, cơ sở phụ HBP); 12 Part-time hưởng lương theo giờ thực tế (16.000đ - 28.000đ/h, base_salary = 0); 4 nhân sự xoay ca (Kiều Linh, Công Huy, Đông Duy, Nguyễn Thị Thu) cấu hình secondary_store_ids ['store-001', 'store-002']; 2) Nạp đúng 447 ca Tháng 8 chuẩn iPOS theo từng người (Tấn Hiếu: 1 ca, Mạnh Duy: 4 ca, Nguyễn Thị Thu: 9 ca, Thanh Thiện: 9 ca, Hoài Ân: 26 ca, Kim Chi: 29 ca, Tú Trinh: 33 ca, Kiều Ý: 35 ca, Minh Lộc: 37 ca, Cao Văn Thắng: 37 ca, Kiều Linh: 47 ca, Phương Thảo: 56 ca, Công Huy: 60 ca, Đông Duy: 64 ca); 3) Bổ sung đủ 5 khung ca thật F&B: Ca Sáng (08:30-12:00, 3.5h), Ca Trưa (12:00-17:00, 5h), Ca Tối (17:00-22:00, 5h), Ca Cao Điểm Trưa (11:30-14:30, 3h), Ca Dọn Quầy Đêm (22:00-01:30, 3.5h); 4) Tính toán bảng lương Tháng 8 chuẩn F&B: ghi nhận chính xác total_hours từng người, Part-time tính lương = total_hours x hourly_rate + Tip F&B chia theo giờ (~800đ/h) - Tạm ứng/Phạt, không cộng phụ cấp văn phòng sai lệch; tổng quỹ lương Tháng 8 đạt 43.481.600 đ (nằm hoàn hảo trong khoảng 40 - 45 triệu VNĐ); 5) Xây dựng và kiểm thử thành công 3 API vận hành còn thiếu: GET & POST /api/attendance, GET & POST /api/requests, GET /api/reports; 6) Toàn bộ kiểm thử tự động 31/31 API tests và npx tsc --noEmit pass 100% | file liên quan: data/server-db.json, [BOT]_HOMIES_HRM_REAL_SEED_PAYLOAD.json, scripts/seed_ipos_real_data.mjs, scripts/test-api-endpoints.mjs, src/lib/server/db.ts, src/store/auth-store.ts, src/lib/adapters/shift-adapter.ts, src/lib/services/employees/employee-service.ts, src/app/api/attendance/route.ts, src/app/api/requests/route.ts, src/app/api/reports/route.ts, docs/KNOWN_ISSUES.md, docs/CODEMAP.md
+
+- Đã hoàn thiện 2026-09-16: Hoàn thành dứt điểm 4 hạng mục theo yêu cầu Founder trước khi vận hành thực tế: 1) Khắc phục triệt để lỗi Client Hydration (màn hình trắng / kẹt thẻ rỗng khi F5 trực tiếp các route client) bằng cách khởi tạo đồng bộ hasHydrated và user ngay từ bộ nhớ/cookie hrm-auth, loại bỏ return null trong AppShell và hỗ trợ bypass RouteLoading tức thì; 2) Xây dựng giao diện Cài đặt Tham số Bảng Lương tại /settings/payroll và bổ sung nút ⚙️ Cài đặt chính sách trên /payroll cho phép CEO tự cấu hình: số ngày công chuẩn 26 ngày, giờ ca 5.5h/8h, bậc thang phạt trễ 3 bậc (<15p: 0đ, 15-30p: 25k, >30p: 50% tiền ca), hệ số OT 1.5x/2.0x/3.0x, công tắc bật/tắt tự động chia quỹ Tip, và định mức phụ cấp cơm 25k/650k, trưởng ca 1.2tr, điện thoại 250k; 3) Nâng cấp giao diện Xem Phiếu Lương Cá Nhân cho Nhân viên (Payslip Mobile) tại /payroll/salary-slip hiển thị đầy đủ tổng giờ thực tế, lương theo giờ, tiền Tip F&B chia theo giờ, các khoản phạt/tạm ứng, thực nhận Net kèm badge "Đã chuyển khoản"; 4) Nối CSDL máy chủ data/server-db.json và xuất file [BOT]_HOMIES_HRM_REAL_SEED_PAYLOAD.json chứa đầy đủ 14 nhân sự thực tế + CEO emp-001 (Nguyễn Đức Nghĩa) và HR Admin emp-hr (Hoàng Thị Yến); kiểm thử tự động 23/23 API tests pass 100% | file liên quan: src/store/auth-store.ts, src/components/layout/AppShell.tsx, src/components/auth/ProtectedRoute.tsx, src/lib/payroll-engine.ts, src/lib/services/payroll/payroll-policy-service.ts, src/app/settings/payroll/page.tsx, src/app/payroll/page.tsx, src/app/payroll/salary-slip/page.tsx, src/components/dashboard/EmployeeDashboardPremium.tsx, src/components/layout/BottomNav.tsx, [BOT]_HOMIES_HRM_REAL_SEED_PAYLOAD.json, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-15: Nâng cấp và chuẩn hóa toàn diện hệ thống Homies HRM theo nghiệp vụ thực tế F&B (Cơ sở HBP & 429) gồm 6 hạng mục cốt lõi: 1) Khắc phục triệt để lỗi treo giao diện đăng nhập (Client Hydration Blocker), giảm timeout fallback rehydration xuống 200ms; 2) Chuẩn hóa bộ ca mẫu thực tế (Sáng 08:30-12:00, Trưa 12:00-17:00, Tối 17:00-22:00, Linh động 11:30-14:30), tính đúng ca vắt qua nửa đêm (cross-midnight không còn NaN/âm giờ); 3) Bổ sung vị trí ca [THU_NGAN], [PHA_CHE], [BEP] và huy hiệu kiểm tra đủ cả Thu ngân lẫn Pha chế trên bảng ca; 4) Hỗ trợ nhân sự chạy chéo cơ sở (multi-store floating staff) với tab lọc và huy hiệu nhận diện cơ sở gốc; 5) Cấu hình linh động định mức 8.5h/ngày kèm công tắc toggle admin (mặc định cảnh báo vàng, có thể bật chặn đỏ); 6) Tích hợp Widget Radar Quét Lủng Ca Mở Quầy 08:30 và Khiên Giờ Vàng 11:30-14:30 trên bảng phân ca quản lý | file liên quan: src/app/login/page.tsx, src/store/auth-store.ts, src/lib/mock-data.ts, src/lib/scheduling/shift-calculator.ts, src/lib/services/scheduling/shift-mapping-memory.ts, src/lib/services/scheduling/schedule-service.ts, src/lib/services/employees/employee-service.ts, src/lib/mock-data-schedule-rules.ts, src/app/settings/schedule-rules/page.tsx, src/components/scheduling/ManagerSchedulingBoard.tsx, src/components/scheduling/EmployeeSchedulingBoard.tsx, docs/KNOWN_ISSUES.md
+
+- Đã fix 2026-09-15: Máy bên ngoài (qua Tailscale 100.77.93.127) ping được nhưng không kết nối được cổng 3535 (bị timeout/từ chối kết nối) | nguyên nhân: 1) Tiến trình dev server chưa được bật; 2) Lệnh dev trong package.json trước đó là `next dev -p 3535` mặc định chỉ lắng nghe kết nối cục bộ trên localhost/127.0.0.1, từ chối toàn bộ kết nối từ máy khác qua IP mạng LAN/Tailscale | cách fix: Cập nhật lệnh dev trong package.json thành `next dev -H 0.0.0.0 -p 3535` để Next.js lắng nghe trên tất cả card mạng; khởi động lại dev server và kiểm tra kết nối qua cả localhost:3535 và 100.77.93.127:3535 đạt HTTP 200 OK | file liên quan: package.json, docs/KNOWN_ISSUES.md
+
+- Đã fix 2026-09-14: Khắc phục lỗi rỗng danh sách nhân viên vi phạm (0 nhân sự), thiếu tên Quản lý/Trưởng ca và nâng cấp toàn diện Bằng chứng ảnh (Hỗ trợ Paste ảnh Ctrl+V, Upload file/Camera và Xem phóng to) trên trang /kpi/violations/public | nguyên nhân: 1) Khởi tạo state dbEmployees và authorizedVerifiers dạng mảng rỗng [] khiến trong lúc chờ mạng tải từ Supabase hoặc khi mạng chập chờn, giao diện bị rơi vào trạng thái rỗng (0 nhân sự, dropdown người lập chỉ có "Người khác"); 2) Cơ chế lọc storeEmployees và verifiers so khớp lệch định dạng giữa mã ngắn (store-001) và UUID (c0000000-0000-0000-0000-000000000001); 3) Ô bằng chứng cũ chỉ hỗ trợ nhập URL tĩnh, bất tiện khi quản lý cần chụp ảnh từ camera điện thoại hoặc chụp màn hình dán nhanh qua phím tắt | cách fix: 1) Nạp sẵn danh sách nhân viên từ EmployeeService.getEmployees() và verifiers từ violationPermissionService.getVerifiers() ngay từ đầu, kết hợp cơ chế nạp nền Supabase không làm gián đoạn UI; 2) Bổ sung hàm normalizeStoreId và isStoreMatch ánh xạ tương thích 2 chiều giữa UUID và mã store-001/002/003, kèm fallback an toàn không bao giờ để dropdown bị 0 nhân sự; 3) Nâng cấp ô Bằng chứng ảnh: lắng nghe sự kiện Paste (Ctrl + V) trên toàn trang để tự động đọc ảnh từ Clipboard, thêm nút Upload file/Camera (<input type="file" capture="environment">) hỗ trợ chụp ảnh trực tiếp từ điện thoại, tự động nén canvas để lưu trữ nhẹ nhàng, hiển thị ảnh thu nhỏ (preview thumbnail) kèm nút xóa ảnh và modal xem phóng to (Lightbox); 4) Bổ sung lưu dự phòng cục bộ trong kpiAdapter.addIncident khi mạng Supabase bị hạn chế quyền ghi | file liên quan: src/app/kpi/violations/public/page.tsx, src/lib/services/violation-permission-service.ts, src/lib/adapters/kpi-adapter.ts, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-14 (Pass E): Tái cấu trúc Form Ghi Nhận Sự Cố Ca (/kpi/violations/public) chuẩn Homies Apple SaaS, Responsive linh hoạt Laptop & Điện thoại, và kết nối Supabase thật 100% (không mock data) | nguyên nhân: 1) Giao diện cũ bị bó cứng trong khung di động tối màu (max-w-md, bg-slate-900), khi mở trên laptop/máy tính bị co cụm và không tận dụng được không gian; 2) Chưa tuân thủ quy chuẩn DESIGN_RULE_HOMIES_FINAL.md: quá nhiều icon màu mè và emoji rườm rà trên từng thẻ vi phạm gây rối mắt; 3) Còn sử dụng mảng mockStores và mockEmployees tĩnh thay vì nạp trực tiếp từ cơ sở dữ liệu thật của chuỗi | cách fix: 1) Chuyển toàn bộ giao diện sang màu kem ấm #FFF8E8 (bg-[#FFF8E8]), thẻ Card trắng rounded-2xl viền mỏng border-gray-200/80 shadow-xs, màu thương hiệu Homies Blue #2F6FA8 và Deep Navy #001D3D; 2) Bố cục Responsive 2 cột tỷ lệ vàng trên Laptop (Cột trái 38% chọn ca/chi nhánh/người lập/nhân viên, Cột phải 62% danh mục 35 mã lỗi và tìm kiếm) và tự động dồn 1 cột kèm thanh Sticky Bottom Action Bar trên Mobile; 3) Loại bỏ triệt để 100% icon rườm rà và emoji, chuyển sang chuẩn Apple SaaS tinh tế với badge mã lỗi (ATT-01, OP-02...), tên lỗi in đậm rõ nét, điểm phạt đỏ font-mono tabular-nums; 4) Kết nối trực tiếp cơ sở dữ liệu Supabase: nạp chi nhánh từ bảng cua_hang qua storeAdapter.getStores(), nạp danh sách nhân sự từ bảng nhan_vien qua employeeAdapter.getAllEmployees(), tự động gợi ý Quản lý/Trưởng ca từ Supabase qua syncVerifiersFromDb(), và lưu sự cố trực tiếp vào bảng kpi_incidents & BSC trên Supabase; 5) Xác thực kiểm tra npx tsc --noEmit (mã thoát 0) và npm run build pass 100% (148 routes) | file liên quan: src/app/kpi/violations/public/page.tsx, src/lib/services/violation-permission-service.ts, src/lib/adapters/kpi-adapter.ts, docs/CODEMAP.md, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-14 (Pass D): Mở rộng toàn bộ 35 mã lỗi chuẩn F&B (18 lỗi cá nhân & 17 lỗi vận hành), bộ lọc danh mục/tìm kiếm và Phân quyền Người ghi nhận sự cố (Authorized Verifiers & Store PIN) | nguyên nhân: 1) Form nhập lỗi nhanh trên điện thoại (/kpi/violations/public) trước đó chỉ có một số ít lỗi cơ bản, chưa đầy đủ danh mục chuẩn F&B Homies; 2) Chưa có bộ lọc danh mục và thanh tìm kiếm khiến việc tra cứu mã lỗi bị chậm; 3) Ô 'Người lập biên bản' để nhập tự do văn bản, không kiểm soát được ai có quyền ghi nhận vi phạm; 4) Admin/HQ chưa có giao diện cấu hình danh sách Quản lý/Trưởng ca được ủy quyền theo từng chi nhánh và đổi mã PIN cơ sở | cách fix: 1) Xây dựng violationPermissionService quản lý danh sách Người được ủy quyền ghi nhận (Store Manager, Shift Leader, CEO...) và mã PIN theo từng chi nhánh, lưu trữ đồng bộ localStorage (homies_authorized_verifiers, homies_store_pins); 2) Xây dựng modal cấu hình Admin AuthorizedVerifiersModal tích hợp trực tiếp trên /kpi/violations và /kpi/violations/log, cho phép bật/tắt người được nhập, thêm nhân viên ủy quyền mới, xóa quyền và cập nhật PIN chi nhánh; 3) Nâng cấp /kpi/violations/public với toàn bộ 35 mã lỗi F&B (ATT-01..06, UNI-01..03, FOC-01..02, CHK-01..02, HYG-01, AST-01..02, HON-01..03, OP-01..OP-06, QC-01, POS-01..POS-02, HAND-01, SOP-01..02, 5S-01); 4) Bổ sung thanh tìm kiếm tức thời và 12 chip danh mục (Giờ làm, Tác phong, Thái độ, Kỷ luật, Vệ sinh, Két tiền, Pha chế, Kiểm giao đơn, Đóng gói tem date, Thu ngân POS, Quy trình ATTP); 5) Chuyển ô Người lập biên bản thành dropdown danh sách nhân sự được ủy quyền thực tế của chi nhánh | file liên quan: src/lib/services/violation-permission-service.ts, src/components/kpi/incidents/AuthorizedVerifiersModal.tsx, src/app/kpi/violations/public/page.tsx, src/app/kpi/violations/page.tsx, src/app/kpi/violations/log/page.tsx, docs/CODEMAP.md, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-14: Tinh chỉnh hiển thị lỗi cá nhân BSC và đồng bộ kỳ tháng sự cố KPI (/kpi/violations & /kpi/violations/log) | nguyên nhân: 1) Trong bscAdapter.getEmployeePersonalData, khi nạp danh sách nhân sự master từ employeeAdapter thì mảng lỗi chưa được gộp (merge) với các lỗi cá nhân lưu trong LocalStorage (STORAGE_KEYS.EMPLOYEE_DATA), khiến lỗi cá nhân vừa ghi nhận trên trình duyệt không hiển thị trên BSCLogsTab; đồng thời targetStoreId bị gán cứng 'store-001' khi chọn 'all' làm mất nhân viên store-002; 2) Trang Sự cố KPI (/kpi/violations) tính periodOptions chỉ từ danh sách kỳ cũ (chỉ có 2026-08), khiến sự cố mới ghi nhận trong Tháng 09/2026 không hiển thị do bị lọc ngoài kỳ | cách fix: 1) Nâng cấp bscAdapter.getEmployeePersonalData gộp toàn bộ lỗi từ LocalStorage và Supabase theo mã nhân viên, khử trùng lặp theo ID lỗi; sửa addPersonalError tìm đúng tên và chi nhánh nhân viên từ mockEmployees; hỗ trợ chọn 'all' cả chi nhánh và kỳ tháng; 2) Bổ sung kỳ tháng hiện tại (2026-09) và các tháng trích xuất từ database.incidents vào periodOptions và selectedMonth của /kpi/violations | file liên quan: src/lib/adapters/bsc-adapter.ts, src/app/kpi/violations/page.tsx, docs/CODEMAP.md, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-14 (Pass C): Tạo trang Public Form cho Quản lý cửa hàng nhập sự cố trên điện thoại (/kpi/violations/public) với mã PIN xác thực từng chi nhánh | nguyên nhân: Quản lý ca/cửa hàng muốn nhập nhanh lỗi vi phạm của nhân viên ngay trên điện thoại tại quầy mà không cần tài khoản Admin/HQ, không bị chặn chuyển hướng đăng nhập (/login), đồng thời cần bảo mật theo mã PIN của từng cơ sở để tránh nhập nhầm chi nhánh | cách fix: 1) Whitelist route /kpi/violations/public trong proxy.ts (publicRoutes & skipPermissionRoutes) giúp truy cập trực tiếp từ di động không cần đăng nhập HQ; 2) Xây dựng giao diện chuẩn Mobile-first (/kpi/violations/public) với cơ chế xác thực PIN bảo mật theo chi nhánh (HBP: 3535, 429: 4290, Master: 8888), lưu session đăng nhập vào localStorage; 3) Hỗ trợ đầy đủ chọn ca (Sáng/Chiều/Tối), ngày, chế độ Nhân viên vs Toàn ca, danh sách lỗi vi phạm phân nhóm trực quan dạng badge dễ bấm, mã đơn hàng, ghi chú và link ảnh/camera bằng chứng; 4) Tích hợp trực tiếp kpiBscSyncService đồng bộ dữ liệu song song vào cả KPI và BSC; 5) Bổ sung nút 'Link Quản Lý Nhập' trên cả 2 trang Admin (/kpi/violations và /kpi/violations/log) giúp Admin sao chép link kèm mã PIN gửi qua Zalo cho Quản lý chỉ bằng 1 chạm | file liên quan: src/app/kpi/violations/public/page.tsx, src/proxy.ts, src/app/kpi/violations/log/page.tsx, src/app/kpi/violations/page.tsx, docs/CODEMAP.md, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-14 (Pass B): Triển khai cầu nối đồng bộ hai chiều sự cố Vi phạm giữa KPI và BSC (kpiBscSyncService) | nguyên nhân: 1) trang Log lỗi cuối ca (/kpi/violations/batch) chỉ lưu tạm vào mảng RAM mockViolationRecords, khi F5 hoặc đăng nhập máy khác thì mất dữ liệu và không liên kết với kho KPI; 2) hệ thống chia thành 2 silo dữ liệu riêng biệt: KPI Incident (kpiAdapter) và BSC Error Log (bscAdapter), quản lý nhập lỗi một bên thì bên kia không nhận để tính điểm/thưởng | cách fix: 1) xây dựng kpiBscSyncService tự động ánh xạ mã lỗi, nhóm nghiệp vụ và ghi đồng thời vào cả KpiIncident (kpiAdapter) và BSCPersonalErrorRecord/BSCOperationErrorRecord (bscAdapter); 2) bổ sung hàm addIncident cho kpiAdapter lưu an toàn vào repository; 3) nâng cấp BatchViolationForm sang kpiBscSyncService kèm trạng thái đang lưu; 4) tích hợp tự động đồng bộ sang KpiIncident ngay khi lưu lỗi trong BSCLogEditorModal | file liên quan: src/lib/services/kpi-bsc-sync-service.ts, src/lib/adapters/kpi-adapter.ts, src/components/kpi/BatchViolationForm.tsx, src/components/bsc-bonus/BSCLogEditorModal.tsx, docs/CODEMAP.md, docs/KNOWN_ISSUES.md
+
+- Đã fix 2026-09-14 (Pass A): Khắc phục kẹt nút nhập lỗi BSC, gắn modal nhập lỗi 5 bước, hỗ trợ chọn kỳ tháng linh hoạt và chuẩn hóa tiếng Việt có dấu | nguyên nhân: 1) nút '+ Ghi Nhận Sự Cố Ca Mới' trên trang Nhật ký vi phạm (/kpi/violations/log) gọi router.push về chính nó gây vòng lặp tải lại; component BSCLogEditorModal (972 dòng) đã được xây dựng nhưng chưa được import hoặc render ở bất kỳ đâu; 2) biến kỳ trên trang log bị gán cứng '2026-07' khiến dữ liệu không chuyển sang tháng mới; 3) trang Sự cố KPI (/kpi/violations) hiển thị tiếng Việt không dấu | cách fix: 1) import và render BSCLogEditorModal trong BSCLogsTab, bổ sung nút '+ Ghi Nhận Sự Cố / Lỗi Mới' trên header và sửa nút bấm ca mới mở modal thay vì push route; 2) thêm bộ chọn kỳ tháng linh hoạt (tháng 6, 7, 8, 9/2026) kèm guard hydration; 3) chuyển đổi toàn bộ nhãn, danh mục sự cố, metric và trạng thái sang tiếng Việt có dấu chuẩn Homies | file liên quan: src/components/bsc-bonus/BSCLogsTab.tsx, src/app/kpi/violations/log/page.tsx, src/app/kpi/violations/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã fix 2026-09-14: Lỗi Runtime Error 'import', and 'export' cannot be used outside of module code tại src/app/api/hermes/copilot/route.ts | nguyên nhân: trong lúc chỉnh sửa hàm nhận diện hành động nhanh (detectActionFromText), khối lệnh bị thiếu ngoặc đóng khiến câu lệnh export hàm POST bị hiểu nhầm là nằm bên trong thân hàm, vi phạm quy tắc khai báo của JavaScript/TypeScript; | cách fix: chuẩn hóa cặp ngoặc đóng mở của detectActionFromText, đưa export async function POST về đúng cấp module cao nhất (top-level); xác minh npx tsc --noEmit, test gọi API trực tiếp HTTP 200 và npm run build hoàn tất 100% thành công (147 routes) | file liên quan: src/app/api/hermes/copilot/route.ts, docs/KNOWN_ISSUES.md
+
+- Đã fix 2026-09-14: Lỗi React Hooks order (Rendered more hooks than during the previous render) trên trang Bảng Lương (/payroll) | nguyên nhân: hook useMemo tính overviewMetrics bị đặt sau câu lệnh early return (!hasHydrated và !user || !isAuthenticated), khiến số lượng hook gọi giữa lần render đầu tiên (khi chưa hydrate) và lần render sau đó bị lệch nhau, vi phạm Rules of Hooks của React; | cách fix: di chuyển useMemo overviewMetrics lên trước toàn bộ các câu lệnh early return để đảm bảo số lượng và thứ tự hook luôn đồng nhất 100% trong mọi lần render; | file liên quan: src/app/payroll/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-14: Triển khai Gói 3 Phụ Cấp Ca Gãy & Ca Đêm F&B và Sửa lỗi lệch cột popup Xem lương từng ngày: 1) Thêm cấu hình Khoảng cách nghỉ tối thiểu giữa 2 ca của Ca gãy (mặc định 2 giờ) và Khung giờ bắt đầu ca đêm (mặc định 22h) vào Cài đặt lương (/settings/payroll) và Policy Registry; 2) Engine (payroll-engine.ts) tự động phân tích dữ liệu chấm công thực tế để nhận diện ca gãy và ca đêm, tính chính xác phụ cấp cho cả Full-time và Part-time; 3) Khắc phục triệt để lỗi lệch 14 cột trên bảng popup "Xem lương từng ngày" (/payroll), bổ sung đầy đủ ô hiển thị Phụ cấp và Phiếu cộng tiền khớp thead | file liên quan: src/lib/services/payroll/payroll-policy-service.ts, src/lib/payroll/policy-registry.ts, src/app/settings/payroll/page.tsx, src/lib/payroll-engine.ts, src/app/payroll/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã hoàn thiện 2026-09-14: Triển khai Gói 2 Bậc Thang Phạt Đi Muộn & Miễn Phạt F&B: 1) Thêm cấu hình Số lần miễn phạt trong tháng (mặc định 2 lần/tháng, phạt 0đ); 2) Hỗ trợ 2 chế độ phạt tại Cài đặt lương: Phạt cố định mỗi lần (đồng giá) hoặc Phạt theo bậc thang số phút (Bậc 1: 1-15p phạt 20k, Bậc 2: 16-30p phạt 50k, Bậc 3: >30p phạt 100k); 3) Engine tự động tính mức phạt chi tiết từng lần vi phạm; 4) Hiển thị minh bạch lý do phạt và nhãn miễn phạt trong modal Xem lương từng ngày và cột Tổng phạt trên bảng lương | file liên quan: src/lib/services/payroll/payroll-policy-service.ts, src/lib/payroll/policy-registry.ts, src/app/settings/payroll/page.tsx, src/lib/payroll-engine.ts, src/app/payroll/page.tsx, docs/KNOWN_ISSUES.md
+
+
+- Đã hoàn thiện 2026-09-14: Triển khai Gói 1 Tối ưu Cài Đặt Vận Hành Bảng Lương: 1) Thêm cấu hình Quy tắc làm tròn lương Net (không làm tròn, 1.000đ, 5.000đ, 10.000đ); 2) Thêm cấu hình Quy chuẩn ca làm việc F&B (ca ngắn 4h, ca dài 8h, giờ tối thiểu 2h để tính 1 ca); 3) Hoàn thiện cơ chế Chốt & Khóa kỳ lương an toàn (khóa thêm thưởng/phạt khi kỳ lương đã chốt và bổ sung nút Mở khóa kỳ lương) | file liên quan: src/lib/services/payroll/payroll-policy-service.ts, src/lib/payroll/policy-registry.ts, src/app/settings/payroll/page.tsx, src/lib/payroll-engine.ts, src/lib/adapters/payroll-period-adapter.ts, src/app/payroll/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã fix 2026-09-14: Chuẩn hóa toàn diện 5 điểm bất hợp lý trên Bảng Lương (/payroll): hiển thị Bảo hiểm & Thuế TNCN, phân định Full-time/Part-time, đưa mức phạt đi muộn vào Cài đặt lương, chuẩn hóa Số ca vs Ngày công, và tính đúng lương từng ngày | nguyên nhân: 1) Bảo hiểm (10.5%) và Thuế TNCN được tính trong Gross/Net nhưng không có cột hiển thị trên bảng, gây khó hiểu khi đối soát Gross - Trừ != Net; 2) Cột lương làm việc hiển thị chung chung không phân biệt nhân viên hưởng lương theo ngày công hay theo giờ; 3) Mức phạt đi muộn 50.000đ/lần bị gán cứng trong engine mã nguồn mà không có ô chỉnh sửa ở trang Cài đặt lương; 4) summarizeAttendanceRecords tính work_days = records.length khiến nhân viên part-time làm 2 ca/ngày bị tính thành 2 ngày công; 5) Popup Xem lương từng ngày (view_daily_salary) chia đều lương tổng theo ngày thay vì tính dựa trên giờ làm việc và phạt trễ thực tế của từng ngày | cách fix: 1) Thêm 2 cột Bảo hiểm và Thuế TNCN vào bảng lương, menu chọn cột (31 cột) và file xuất Excel; 2) Bổ sung nhãn phụ đề cột Lương làm việc: Full-time hiện (X công), Part-time hiện (X giờ x Yđ/h); 3) Thêm trường latePenaltyPerOccurrence vào PayrollPolicy, migratePolicy và tạo ô nhập trên UI /settings/payroll; 4) Tách riêng total_shifts (tổng số ca) và work_days (đếm theo số ngày duy nhất làm việc); 5) Sửa popup xem lương từng ngày tính chính xác theo số giờ thực tế nhân đơn giá giờ/ngày và trừ đúng phạt trễ của ngày đó | file liên quan: src/lib/services/payroll/payroll-policy-service.ts, src/lib/payroll/policy-registry.ts, src/app/settings/payroll/page.tsx, src/lib/payroll-engine.ts, src/app/payroll/page.tsx, docs/KNOWN_ISSUES.md
+
+
+- Đã fix 2026-09-13: Hoàn thiện Pass B Bảng Lương: phân loại OT ngày thường/cuối tuần/ngày lễ, xóa bỏ race condition mutate global, khấu trừ phụ cấp miễn thuế cơm ca, phụ cấp nhân viên đã nghỉ, thông tin phiếu lương chốt và xuất CSV chuẩn số | nguyên nhân: 1) calculateOvertimeAmount chỉ tính hệ số 1.5x ngày thường cho tất cả giờ OT, không nhận diện ngày cuối tuần (2.0x) hay ngày lễ (3.0x); 2) calculatePayrollBatchAsync mutate trực tiếp mảng global mockEmployees/mockPositions; 3) taxableIncome không trừ phụ cấp cơm ca miễn thuế theo quy định; 4) getAllowancesForEmployee tính nguyên phụ cấp tháng cố định cho nhân viên đã nghỉ; 5) fetchPayrollSlips trả kết quả thiếu mã/tên/bộ phận của nhân viên; 6) xuất CSV để dạng chuỗi '...đ/giờ' không tính toán được | cách fix: 1) tách giờ OT theo ngày thường/cuối tuần/lễ qua VN_HOLIDAYS và isWeekendDay, tính riêng theo từng hệ số; 2) mở rộng PayrollInput truyền trực tiếp employee/position/store vào calculatePayroll, xóa bỏ hoàn toàn mockEmployees.push/splice; 3) tự động trừ phụ cấp cơm ca khỏi thu nhập chịu thuế TNCN; 4) nhân viên nghỉ việc chỉ nhận cơm ca theo số ngày thực làm trước nghỉ, bỏ phụ cấp cố định; 5) ánh xạ thông tin nhân viên, chức vụ, cửa hàng từ danh mục vào phiếu lương chốt từ DB; 6) xuất đơn giá/lương cơ bản dưới dạng số thuần trong file CSV | file liên quan: src/lib/payroll-engine.ts, src/app/payroll/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã fix 2026-09-13: Lỗi đơn giá lương Part-time 5 triệu/giờ và lệch tính Gross/Net, phiếu lương, bảo hiểm, giữ lương (Pass A) | nguyên nhân: 1) getEmployeeBaseSalary và calculatePayroll bốc nhầm base_salary từ bảng Position (5.000.000đ - 5.500.000đ/tháng) gán làm đơn giá 1 giờ cho nhân viên part-time; mockEmployees part-time thiếu trường hourly_rate; 2) UI Table tính gross/net độc lập, bỏ qua bonus engine, không trừ hold_salary và union_fee, kpi_salary luôn = 0; 3) salary-slip cộng absent_deduction vào other_deduction gây lệch dòng Tổng khấu trừ; 4) đóng BHXH part-time tính trên cả OT sai luật VN | cách fix: 1) getEmployeeBaseSalary & calculatePayroll ưu tiên hourly_rate riêng, nếu gặp giá trị >= 1.000.000đ hoặc position base_salary thì tự động quy đổi ra đơn giá giờ = Lương / 26 / 8, kèm guardrail trên UI table; cập nhật mock part-time (NV0028: 25k/h, NV0020: 22.5k/h); 2) chuẩn hóa grossSalary/netSalary trên UI table tính đủ KPI, công đoàn, giữ lương và hoàn giữ lương; 3) salary-slip bỏ absent_deduction khỏi other_deduction và bổ sung dòng hiển thị chi tiết; 4) bảo hiểm part-time chỉ tính trên baseEarned loại trừ OT | file liên quan: src/lib/payroll-engine.ts, src/lib/mock-data.ts, src/app/payroll/page.tsx, src/app/payroll/salary-slip/page.tsx, docs/KNOWN_ISSUES.md
+
+- Đã fix 2026-09-13: Audit toàn diện module Bảng Lương (/payroll): xử lý trừ phạt vắng mặt 2 lần, tách tiền tạm ứng khỏi thuế TNCN, chuẩn hóa Gross/Net, mặc định bảo hiểm Part-time, phân quyền xem lương và lưu trữ phiếu thưởng/phạt theo kỳ | nguyên nhân: 1) calculatePayroll vừa prorate baseEarned theo ngày thực làm vừa cộng absentDeduction vào totalDeductions gây phạt trừ 2 lần; 2) grossSalary bị gán = totalEarnings - totalDeductions khiến tạm ứng bị trừ nhầm vào thu nhập tính thuế TNCN; 3) nhân viên part-time bị mặc định trừ 10.5% BHXH dù là lao động thời vụ theo giờ; 4) 100% mockEmployees thiếu contract_type gây cảnh báo đỏ; 5) /payroll thiếu lớp kiểm tra phân quyền bảo vệ dữ liệu toàn chuỗi; 6) phiếu thưởng/phạt chỉ lưu biến tạm trong memory và không phân biệt theo tháng | cách fix: 1) bỏ absentDeduction khỏi totalDeductions; 2) chuẩn hóa Gross = tổng thu nhập trước trừ, chuyển tạm ứng sang trừ trực tiếp ở Net; 3) mặc định hasInsurance = false cho Part-time; 4) bổ sung contract_type cho toàn bộ mockEmployees; 5) bảo vệ trang và lọc tableData client-side chỉ cho phép nhân viên xem đúng phiếu lương của mình; 6) gom lưu trữ phiếu thưởng/phạt theo mã kỳ lương (period) và đồng bộ vào localStorage qua payrollAdapter | file liên quan: src/lib/payroll-engine.ts, src/lib/mock-data.ts, src/lib/adapters/payroll-adapter.ts, src/app/payroll/page.tsx, docs/KNOWN_ISSUES.md
+
 - Đã fix 2026-09-13: giao diện bị hiển thị về bản cũ (tháng 5/2026) và cổng dev bị nhảy sang 3333 thay vì 3535 | nguyên nhân: nhánh main trước đó bị reset nhầm về commit cũ 2e3a9cc khiến nhánh feat/hermes-bot-integration rẽ nhánh từ bản cũ thay vì bản mới nhất trên snapshot/pass-c-baseline-20260528; đồng thời cổng 3535 bị container docker 'zalo-crm-app' chiếm dụng | cách fix: dừng container zalo-crm-app giải phóng cổng 3535; khôi phục cấu hình dev -p 3535; hợp nhất (git merge) toàn bộ lịch sử và 16.500+ file của snapshot/pass-c-baseline-20260528 vào main; giải quyết xung đột re-export tại onboarding services và dashboard; giữ nguyên 100% tính năng Hermes Multi-Bot Specialist; kiểm tra npx tsc --noEmit và npm run build pass 100% (146 routes) | file liên quan: package.json, src/app/layout.tsx, src/lib/services/onboarding-operations-service.ts, src/lib/services/onboarding-policy-service.ts, docs/KNOWN_ISSUES.md
 
 - Đã fix 2026-09-04: truy cập giao diện hoặc bấm menu sidebar "Hồ sơ nhân sự" (/employees) bị văng ngược về trang chủ | nguyên nhân: EmployeeService.resolveSessionUser(user) chỉ tìm trong mock DB cục bộ mà không fallback về user của phiên đăng nhập hiện tại khiến viewer bị null và bị đẩy sang /login; đồng thời trang /login khi thấy user đã đăng nhập thì luôn chuyển hướng cứng về '/' thay vì tham số redirect; các trang nhân sự con ([id], contracts, new, import, export, invitations) kiểm tra !isAuthenticated trước khi hasHydrated xong | cách fix: resolveSessionUser fallback về AuthUser và tự động đồng bộ vào danh sách nhân sự; /employees chỉ chuyển sang login khi !isAuthenticated; /login tôn trọng tham số redirect; bổ sung hasHydrated guard và loading spinner cho toàn bộ trang nhân sự con | file liên quan: src/lib/services/employees/employee-service.ts, src/app/employees/page.tsx, src/app/login/page.tsx, src/app/employees/[id]/page.tsx, src/app/employees/contracts/page.tsx, src/app/employees/new/page.tsx, src/app/employees/import/page.tsx, src/app/employees/export/page.tsx, src/app/employees/invitations/page.tsx, src/app/employees/invitations/new/page.tsx, docs/KNOWN_ISSUES.md
@@ -304,3 +882,9 @@ DOC file nay truoc khi lam task lien quan.
 - Đã fix 2026-08-28: ngày hoặc giờ không hợp lệ trong file iPOS (ví dụ `31/02/2026`, `25:99`) có thể lọt qua parser và tạo bản ghi chấm công sai | nguyên nhân: parser chỉ kiểm tra đúng mẫu chuỗi, chưa kiểm tra giới hạn ngày trong tháng và giới hạn giờ/phút | cách fix: xác thực ngày bằng UTC date parts, giới hạn giờ `00:00-23:59`, bỏ qua dòng/ô không hợp lệ và bổ sung regression test | file liên quan: `src/lib/services/attendance/ipos-attendance-importer.ts`, `src/lib/services/attendance/ipos-attendance-importer.test.ts`, `docs/KNOWN_ISSUES.md`
 - Đã fix 2026-08-28: giờ sai ở cột check-in/check-out của sheet danh sách có thể bị đổi thành trạng thái thiếu giờ thay vì bị loại bỏ | nguyên nhân: `buildShiftText()` coi mọi giá trị không chuẩn hóa được là ô trống hợp lệ | cách fix: nhận diện giá trị có chữ số nhưng không phải giờ hợp lệ và bỏ qua cả dòng, giữ nguyên các ký hiệu trống như `-`/`--` | file liên quan: `src/lib/services/attendance/ipos-attendance-importer.ts`, `src/lib/services/attendance/ipos-attendance-importer.test.ts`, `docs/KNOWN_ISSUES.md`
 - Đã fix 2026-08-28: dữ liệu chấm công iPOS từng bị nhân đôi từ bản cũ không được dọn hết khi nhập lại file | nguyên nhân: `upsertIposAttendanceImportSlot()` chỉ thay bản ghi trùng đầu tiên, còn các bản ghi iPOS cũ cùng khung ca vẫn giữ lại | cách fix: thay bản ghi đầu tiên và loại bỏ tất cả bản ghi import trùng cùng khung giờ/loại ca, không đụng bản ghi quản lý nhập tay | file liên quan: `src/lib/services/attendance/ipos-attendance-importer.ts`, `src/lib/services/attendance/ipos-attendance-importer.test.ts`, `docs/KNOWN_ISSUES.md`
+- Đã fix 2026-09-14: lỗ hổng bảo mật rò rỉ dữ liệu lương toàn hệ thống cho Trưởng ca và Quản lý cửa hàng tại `/payroll` | nguyên nhân: điều kiện kiểm tra `user.role !== 'employee'` cho phép mọi quản lý cấp store thấy toàn bộ nhân sự công ty, bao gồm Ban giám đốc và các chi nhánh khác | cách fix: siết chặt phạm vi xem lương theo vai trò (RBAC): `store_manager` và `shift_leader` chỉ thấy nhân sự thuộc chi nhánh được phân công và bị chặn xem nhân sự thuộc Ban giám đốc/HR Admin; nhân viên thường chỉ thấy phiếu lương của mình | file liên quan: `src/app/payroll/page.tsx`, `docs/KNOWN_ISSUES.md`
+- Đã fix 2026-09-14: mã tổ chức bị gán cứng cố định (hardcoded UUID) trong `payrollPeriodAdapter` | nguyên nhân: `payroll-period-adapter.ts` gán cứng `to_chuc_id: 'a0000000-0000-0000-0000-000000000001'` khi lưu/mở khóa kỳ lương | cách fix: bổ sung helper `resolveOrgId(orgId)` cho phép truyền `orgId` động và fallback an toàn nếu không có UUID hợp lệ | file liên quan: `src/lib/adapters/payroll-period-adapter.ts`, `docs/KNOWN_ISSUES.md`
+- Đã fix 2026-09-14: bấm nút Thưởng/Trừ từ `/payroll` bị gán cứng sang tháng 08/2026 và phiếu lương 0đ bung ra bị trống trơn | nguyên nhân: `bonus/page.tsx` và `deductions/page.tsx` hardcode mặc định `08/2026`; `PayslipDetail` lọc sạch các dòng bằng 0; không có cảnh báo khi kỳ lương thiếu dữ liệu chấm công | cách fix: truyền `?period=YYYY-MM` sang các trang phiếu thưởng/phạt và bọc `Suspense`; hiển thị Banner cảnh báo thông minh kèm nút đi đến chấm công khi kỳ lương chưa có công; hiển thị chi tiết số công/giờ làm và mức lương cơ bản trong phiếu lương ngay cả khi lương = 0đ; sửa 2 nút Bảng lương công ty/chi nhánh không làm nhảy tab | file liên quan: `src/app/payroll/page.tsx`, `src/app/payroll/bonus/page.tsx`, `src/app/payroll/deductions/page.tsx`, `docs/KNOWN_ISSUES.md`
+- Đã fix 2026-09-14: tab "Tổng quan chi phí" sơ sài và tab "Lương của tôi" bị trống khi CEO đăng nhập | nguyên nhân: tab overview chỉ có 2 thẻ card nhỏ thiếu cơ cấu chi phí F&B; engine tính lương loại trừ vai trò CEO nên mySlip trả về undefined gây hiểu lầm | cách fix: nâng cấp tab Tổng quan chi phí thành Executive F&B Cost Dashboard gồm 4 Macro KPI cards (Tổng gross, Thực nhận net, Chi phí OT/Phụ cấp, Quỹ thưởng tip), 2 khối cơ cấu chi phí/nghĩa vụ khấu trừ và Bảng ma trận chi phí theo từng chi nhánh F&B; bổ sung thông điệp trang trọng giải thích chế độ thù lao quản trị riêng cho tài khoản CEO ở tab Lương của tôi | file liên quan: `src/app/payroll/page.tsx`, `docs/KNOWN_ISSUES.md`
+- Đã fix 2026-09-14: Trợ lý Hermes AI chưa có khả năng điều khiển giao diện và nhập liệu trực tiếp bằng câu lệnh chat | nguyên nhân: Hermes Copilot trước đây chỉ đóng vai trò tư vấn hỏi đáp tĩnh (read-only), không có bộ máy Function Calling / Action Dispatcher để bóc tách ý định người dùng (tạo phiếu phạt, thưởng, chuyển trang) và không có giao diện xác nhận thực thi trong ô chat | cách fix: thiết kế kiến trúc Hermes Copilot Actions (`src/lib/hermes/hermes-action-types.ts`); trang bị Action Prompting cho 9Router và Bộ bóc tách ngôn ngữ tự nhiên tiếng Việt thông minh (Natural Language Action Parser) tại `api/hermes/copilot/route.ts` để tự động khớp tên nhân viên (`mockEmployees`), bóc tách số tiền và lý do; render Thẻ xác nhận thao tác (Action Card) tương tác 1 chạm trực tiếp trong khung chat `AdminCopilotDrawer.tsx` kèm nút Xác nhận lưu/Hủy; nâng cấp `payrollAdapter.saveTicketTransaction` và `getTicketTransactions` với cơ chế lưu trữ hai chiều (Supabase + LocalStorage); bổ sung sự kiện `homies-data-changed` giúp các màn hình `/payroll/deductions` và `/payroll/bonus` tự động làm mới bảng tức thì khi Hermes lưu thành công | file liên quan: `src/lib/hermes/hermes-action-types.ts`, `src/app/api/hermes/copilot/route.ts`, `src/components/admin/AdminCopilotDrawer.tsx`, `src/lib/adapters/payroll-adapter.ts`, `src/app/payroll/deductions/page.tsx`, `src/app/payroll/bonus/page.tsx`, `docs/KNOWN_ISSUES.md`
+

@@ -28,10 +28,22 @@ export interface BSCRevenueTarget {
   is_unlocked: boolean           // Mở thưởng hay không (actual_daily >= profit_threshold_daily)
   cogs_budget?: number           // COGS định mức (đ)
   cogs_actual?: number           // COGS thực tế (đ)
+  waste_percentage?: number      // Tỷ lệ hao hụt (%)
+  operation_error_points?: number   // Tổng điểm lỗi vận hành trong tháng
+  has_critical_op_error?: boolean   // Có lỗi đặc biệt nghiêm trọng (Khóa 0đ vận hành)
+  has_no_qr?: boolean               // Tháng này không triển khai khảo sát QR (Dồn 100% vào Đánh giá CSKH)
+  customer_qr_score?: number        // Điểm khảo sát QR (0-100đ)
+  customer_qr_count?: number        // Số lượt khảo sát QR thu thập (mẫu)
+  customer_review_score?: number    // Điểm đánh giá trực tiếp & CSKH (0-100đ)
+  customer_complaint_count?: number // Số vụ khiếu nại / phản ánh từ khách
   has_attp_foreign_body?: boolean// Cảnh báo dị vật / ATTP khách hàng (Nếu có → ép điểm KH = 1)
   min_hours_threshold?: number   // Mốc giờ tối thiểu nhận BSC (Mặc định 110h)
   retain_deducted_bonus?: boolean// Chế độ giữ lại phần giảm (không chia lại)
+  bsc_coefficient?: number       // Hệ số mở thưởng được duyệt (VD: 0.5 = 50% quỹ nền khuyến khích)
+  store_bonus_pool?: number      // Tổng quỹ thưởng sau khi nhân hệ số
   approval_status?: 'draft' | 'pending_ceo' | 'approved_published' // Trạng thái duyệt của CEO
+  submitted_by?: string
+  submitted_at?: string
   approved_by?: string
   approved_at?: string
 }
@@ -129,6 +141,7 @@ export interface BSCSafetySettings {
   customer_qr_weight_pct: number // VD: 50 (% trọng số cho QR Feedback)
   customer_review_weight_pct: number // VD: 50 (% trọng số cho Đánh giá phản ánh)
   min_qr_feedback_count: number // Mốc số lượng QR tối thiểu/tháng (Mặc định 30)
+  allow_store_manager_view_bonus?: boolean // Cho phép Quản lý cửa hàng xem bảng thưởng & mã VietQR
 }
 
 export interface BSCStoreResult {
@@ -219,6 +232,7 @@ export interface BSCOperationErrorRecord {
   affects_customer_score?: boolean
   affects_personal_multiplier?: boolean
   locks_personal_bonus?: boolean
+  is_critical?: boolean
   approval_status?: BSCApprovalStatus
 }
 
@@ -318,17 +332,24 @@ export interface BSCStoreRawMetrics {
   waste_percentage: number // Tỷ lệ % hao hụt (VD: 2.5)
   operation_error_points: number // Tổng điểm lỗi vận hành (VD: 7)
   customer_qr_score: number // 0-100 (VD: 86)
+  customer_qr_count?: number // Số lượng mẫu phản hồi QR (VD: 45)
   customer_review_score: number // 0-100 (VD: 82)
+  customer_complaint_count?: number // Số vụ khiếu nại của khách (VD: 0)
 }
 
 export interface BSCEmployeePersonalData {
   employee_id: string
   employee_name: string
+  employee_code?: string
   role: string
   store_id: string
   period: BSCPeriod
   work_hours: number
+  total_work_hours?: number
   errors: BSCPersonalErrorRecord[]
+  bank_name?: string
+  bank_account_no?: string
+  bank_account_holder?: string
 }
 
 // ═══════════════════════════════════

@@ -18,6 +18,7 @@ import {
 import { getActivePayrollPolicy, INSURANCE_MAX_BASE } from './services/payroll-policy-service'
 import { AttendanceService, type PayrollAttendanceRecord } from './services/attendance/attendance-service'
 import { employeeAdapter, type PayrollEmployeeDbRow } from './adapters/employee-adapter'
+import { getEffectiveHourlyRate, calculateHourlyEarnings } from './payroll/payroll-calculator'
 
 // ══════════════════════════════════════
 // TYPES
@@ -31,6 +32,9 @@ export interface PayrollInput {
   contractType?: string
   hasInsurance?: boolean
   dependents?: number
+  employee?: Employee
+  position?: Position
+  store?: Store
 }
 
 export interface FnbAllocationBreakdown {
@@ -81,6 +85,7 @@ export interface PayrollResult {
 
   // Attendance
   standard_days: number
+  total_shifts: number
   work_days: number
   leave_days_paid: number
   leave_days_unpaid: number
@@ -89,6 +94,8 @@ export interface PayrollResult {
   soCaChoDuyet: number
   soCaChuaCheckOut: number
   total_hours: number
+  split_shift_days?: number
+  night_shift_shifts?: number
 
   // Earnings
   base_salary: number
@@ -127,9 +134,14 @@ export interface PayrollResult {
   // Final
   gross_salary: number
   net_salary: number
+  kpi_salary?: number
+  union_fee?: number
+  hold_salary?: number
+  return_hold_salary?: number
 
   // Warnings
   anomalies?: PayrollAnomaly[]
+  late_incidents?: LateIncident[]
 }
 
 // ══════════════════════════════════════
@@ -143,6 +155,27 @@ const OT_RATES = {
   weekday: 1.5,
   weekend: 2.0,
   holiday: 3.0,
+}
+
+// Vietnamese Public Holidays
+const VN_HOLIDAYS = [
+  '2026-01-01', // Tết Dương lịch
+  '2026-01-28', '2026-01-29', '2026-01-30', '2026-01-31', '2026-02-01', // Tết Nguyên đán
+  '2026-04-30', // Giải phóng
+  '2026-05-01', // Quốc tế Lao động
+  '2026-09-02', // Quốc khánh
+]
+
+export function isWeekendDay(dateStr?: string): boolean {
+  if (!dateStr) return false
+  const d = new Date(dateStr + 'T00:00:00')
+  const day = d.getDay()
+  return day === 0 || day === 6
+}
+
+export function isHolidayDay(dateStr?: string): boolean {
+  if (!dateStr) return false
+  return VN_HOLIDAYS.includes(dateStr)
 }
 
 // Leave types considered "paid"
@@ -293,7 +326,8 @@ function buildFnbPayrollAllocations(
     const storeRevenueShare = storePoints > 0 ? bucket.totalPoints / storePoints : 0
     const shiftRevenue = Math.round(bucket.storeRevenue * storeRevenueShare)
     const serviceChargePool = Math.round(shiftRevenue * policy.fnb.serviceChargePoolRate)
-    const tipPool = Math.round(serviceChargePool * policy.fnb.tipPoolRate)
+    const isTipEnabled = policy.fnb.tipDistributionEnabled !== false
+    const tipPool = isTipEnabled ? Math.round(serviceChargePool * policy.fnb.tipPoolRate) : 0
     const storeReserve = Math.max(0, serviceChargePool - tipPool)
     const employeeShares = Array.from(bucket.employeePoints.entries()).map(([employeeId, points]) => ({
       employeeId,
@@ -357,10 +391,9 @@ export function getEmployeeBaseSalary(employeeId: string): number {
   const emp = mockEmployees.find(e => e.id === employeeId)
   if (!emp) return 0
   const pos = mockPositions.find(p => p.id === emp.position_id)
-  // Part-time: base_salary là đơn giá giờ (lưu trong pos.base_salary),
-  // KHÔNG dùng policy.grades (grades lưu lương tháng toàn thời gian).
+  // Part-time: đơn giá giờ (ưu tiên hourly_rate riêng, nếu không có thì quy đổi lương tháng chức vụ ra giờ)
   if (emp.contract_type === 'ban_thoi_gian') {
-    return pos?.base_salary ?? 0
+    return getEffectiveHourlyRate(emp, pos, 22000)
   }
   const policyGrade = getActivePayrollPolicy().grades.find(grade => grade.id === emp.position_id)
   return policyGrade?.base_salary ?? pos?.base_salary ?? 0
@@ -370,30 +403,71 @@ export function getEmployeeBaseSalary(employeeId: string): number {
 // 2. GET ATTENDANCE SUMMARY FOR PERIOD
 // ══════════════════════════════════════
 
+export interface LateIncident {
+  date: string
+  minutes: number
+  penalty: number
+  isExempt: boolean
+  tierLabel: string
+}
+
 export interface AttendanceSummaryForPayroll {
-  workDays: number       // on_time + late + early
+  totalShifts: number    // Tổng số ca làm việc hợp lệ
+  workDays: number       // Số ngày làm việc thực tế (distinct dates: on_time + late + early)
   leavePaid: number      // leave with paid leave_type
   leaveUnpaid: number    // unpaid leave
   absentDays: number
   lateCount: number
   overtimeHours: number
+  overtimeHoursWeekday?: number
+  overtimeHoursWeekend?: number
+  overtimeHoursHoliday?: number
   totalHours: number
   soCaChoDuyet: number
   soCaChuaCheckOut: number
   partTimeOvertimeHours?: number
   anomalies: PayrollAnomaly[]
+  lateIncidents?: LateIncident[]
+  totalLatePenalty?: number
+  splitShiftDays?: number
+  nightShiftShifts?: number
+  splitShiftDates?: string[]
+  nightShiftDates?: string[]
+}
+
+export function parseTimeToHours(timeStr?: string): number | null {
+  if (!timeStr) return null
+  let str = timeStr.trim()
+  if (str.includes('T')) {
+    str = str.split('T')[1] || ''
+  } else if (str.includes(' ')) {
+    str = str.split(' ')[1] || ''
+  }
+  const parts = str.split(':')
+  if (parts.length >= 2) {
+    const h = parseInt(parts[0], 10)
+    const m = parseInt(parts[1], 10)
+    if (!isNaN(h) && !isNaN(m)) {
+      return h + m / 60
+    }
+  }
+  return null
 }
 
 function summarizeAttendanceRecords(
   records: PayrollAttendanceRecord[],
   overtimeThresholdHours?: number,
 ): AttendanceSummaryForPayroll {
-  let workDays = 0
+  let totalShifts = 0
+  const workedDates = new Set<string>()
   let leavePaid = 0
   let leaveUnpaid = 0
   let absentDays = 0
   let lateCount = 0
   let overtimeHours = 0
+  let overtimeHoursWeekday = 0
+  let overtimeHoursWeekend = 0
+  let overtimeHoursHoliday = 0
   let totalHours = 0
   let soCaChoDuyet = 0
   let soCaChuaCheckOut = 0
@@ -416,13 +490,20 @@ function summarizeAttendanceRecords(
       continue
     }
 
+    const recHours = r.total_hours || 0
+    const policy = getActivePayrollPolicy()
+    const minShiftHours = policy.shiftRules?.minShiftHours ?? 2
+    const countsAsShift = recHours >= minShiftHours || recHours === 0
+
     switch (r.status) {
       case 'on_time':
       case 'early':
-        workDays++
+        if (countsAsShift) totalShifts++
+        if (r.date) workedDates.add(r.date)
         break
       case 'late':
-        workDays++
+        if (countsAsShift) totalShifts++
+        if (r.date) workedDates.add(r.date)
         lateCount++
         break
       case 'leave':
@@ -436,13 +517,24 @@ function summarizeAttendanceRecords(
         absentDays++
         break
     }
-    overtimeHours += r.overtime_hours || 0
-    const recHours = r.total_hours || 0
+    const otH = r.overtime_hours || 0
+    overtimeHours += otH
+    if (otH > 0) {
+      if (isHolidayDay(r.date)) {
+        overtimeHoursHoliday += otH
+      } else if (isWeekendDay(r.date)) {
+        overtimeHoursWeekend += otH
+      } else {
+        overtimeHoursWeekday += otH
+      }
+    }
     totalHours += recHours
     if (r.date) {
       dailyHoursMap.set(r.date, (dailyHoursMap.get(r.date) ?? 0) + recHours)
     }
   }
+
+  const workDays = workedDates.size > 0 ? workedDates.size : totalShifts
 
   let partTimeOvertimeHours = 0
   if (typeof overtimeThresholdHours === 'number' && Number.isFinite(overtimeThresholdHours) && overtimeThresholdHours > 0) {
@@ -455,18 +547,166 @@ function summarizeAttendanceRecords(
     partTimeOvertimeHours = Math.round(totalPtOt * 100) / 100
   }
 
+  // ── Tính chi tiết phạt đi muộn theo chính sách (Miễn phạt lần đầu & Bậc thang số phút)
+  const policy = getActivePayrollPolicy()
+  const lateRecords = records
+    .filter(r => r.status === 'late' && !r.soCaChoDuyet && r.trang_thai_db !== 'cho_duyet' && (r.check_out_time || !r.chuaCheckOut))
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+
+  const mode = policy.latePenaltyPolicy?.mode ?? 'fixed'
+  const graceCount = policy.latePenaltyPolicy?.graceOccurrences ?? 2
+  const fixedRate = policy.latePenaltyPolicy?.fixedAmount ?? policy.rates?.latePenaltyPerOccurrence ?? 50000
+  const t1Max = policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15
+  const t1Amt = policy.latePenaltyPolicy?.tier1Amount ?? 20000
+  const t2Max = policy.latePenaltyPolicy?.tier2MaxMinutes ?? 30
+  const t2Amt = policy.latePenaltyPolicy?.tier2Amount ?? 50000
+  const t3Amt = policy.latePenaltyPolicy?.tier3Amount ?? 100000
+
+  const lateIncidents: LateIncident[] = []
+  let totalLatePenalty = 0
+
+  lateRecords.forEach((rec, idx) => {
+    const occurrenceIndex = idx + 1
+    const minutes = rec.late_minutes || 0
+    if (occurrenceIndex <= graceCount) {
+      lateIncidents.push({
+        date: rec.date,
+        minutes,
+        penalty: 0,
+        isExempt: true,
+        tierLabel: `Miễn phạt (${occurrenceIndex}/${graceCount})`,
+      })
+    } else {
+      let penalty = fixedRate
+      let tierLabel = 'Phạt cố định'
+      if (mode === 'tiered') {
+        if (minutes <= t1Max) {
+          penalty = t1Amt
+          tierLabel = `Bậc 1 (≤${t1Max}p - Nhắc nhở, 0đ)`
+        } else if (minutes <= t2Max) {
+          penalty = t2Amt
+          tierLabel = `Bậc 2 (${t1Max + 1}-${t2Max}p - Trừ 25k)`
+        } else {
+          if (policy.latePenaltyPolicy?.tier3HalfShiftDeduction) {
+            const shiftHours = policy.shiftRules?.partTimeShiftHours ?? 5.5
+            const empRate = 22000
+            penalty = Math.round(shiftHours * empRate * 0.5)
+            tierLabel = `Bậc 3 (>${t2Max}p - Trừ 50% ca)`
+          } else {
+            penalty = t3Amt
+            tierLabel = `Bậc 3 (>${t2Max}p)`
+          }
+        }
+      }
+      totalLatePenalty += penalty
+      lateIncidents.push({
+        date: rec.date,
+        minutes,
+        penalty,
+        isExempt: false,
+        tierLabel,
+      })
+    }
+  })
+
+  // ── Phân tích Ca gãy & Ca đêm từ dữ liệu chấm công thực tế
+  let splitShiftDays = 0
+  let nightShiftShifts = 0
+  const splitShiftDates: string[] = []
+  const nightShiftDates: string[] = []
+
+  const validWorkRecords = records.filter(r => {
+    const isPending = r.soCaChoDuyet || r.trang_thai_db === 'cho_duyet'
+    const isOpen = r.chuaCheckOut || (!r.check_out_time && (r.status === 'on_time' || r.status === 'late' || r.status === 'early'))
+    return !isPending && !isOpen && ['on_time', 'late', 'early'].includes(r.status) && (r.total_hours || 0) > 0
+  })
+
+  // 1. Nhận diện ca đêm (Night Shift) theo cài đặt nightShiftStartHour
+  const nightStartHour = policy.fnb?.nightShiftStartHour ?? 22
+  validWorkRecords.forEach(r => {
+    const outH = parseTimeToHours(r.check_out_time)
+    const inH = parseTimeToHours(r.check_in_time)
+    let isNight = false
+
+    if (outH !== null) {
+      if (outH >= nightStartHour || outH < 6) {
+        isNight = true
+      }
+    } else if (inH !== null && inH >= nightStartHour) {
+      isNight = true
+    }
+
+    if (isNight) {
+      nightShiftShifts++
+      if (r.date && !nightShiftDates.includes(r.date)) {
+        nightShiftDates.push(r.date)
+      }
+    }
+  })
+
+  // 2. Nhận diện ca gãy (Split Shift) theo cài đặt splitShiftMinBreakHours
+  const recordsByDate = new Map<string, PayrollAttendanceRecord[]>()
+  validWorkRecords.forEach(r => {
+    if (!r.date) return
+    const list = recordsByDate.get(r.date) || []
+    list.push(r)
+    recordsByDate.set(r.date, list)
+  })
+
+  const minBreakHours = policy.fnb?.splitShiftMinBreakHours ?? 2
+  recordsByDate.forEach((dayRecords, dateStr) => {
+    if (dayRecords.length >= 2) {
+      const sortedShifts = [...dayRecords].sort((a, b) => {
+        const timeA = parseTimeToHours(a.check_in_time) ?? 0
+        const timeB = parseTimeToHours(b.check_in_time) ?? 0
+        return timeA - timeB
+      })
+
+      let hasQualifyingBreak = false
+      for (let i = 0; i < sortedShifts.length - 1; i++) {
+        const outPrev = parseTimeToHours(sortedShifts[i].check_out_time)
+        const inNext = parseTimeToHours(sortedShifts[i + 1].check_in_time)
+        if (outPrev !== null && inNext !== null) {
+          const breakDuration = inNext - outPrev
+          if (breakDuration >= minBreakHours) {
+            hasQualifyingBreak = true
+            break
+          }
+        } else {
+          hasQualifyingBreak = true
+          break
+        }
+      }
+
+      if (hasQualifyingBreak) {
+        splitShiftDays++
+        splitShiftDates.push(dateStr)
+      }
+    }
+  })
+
   return {
+    totalShifts,
     workDays,
     leavePaid,
     leaveUnpaid,
     absentDays,
     lateCount,
     overtimeHours,
+    overtimeHoursWeekday,
+    overtimeHoursWeekend,
+    overtimeHoursHoliday,
     totalHours,
     soCaChoDuyet,
     soCaChuaCheckOut,
     partTimeOvertimeHours,
     anomalies,
+    lateIncidents,
+    totalLatePenalty,
+    splitShiftDays,
+    nightShiftShifts,
+    splitShiftDates,
+    nightShiftDates,
   }
 }
 
@@ -514,10 +754,10 @@ export function calculateOvertimeAmount(
     : 8
   const hourlyRate = baseSalary / standardDays / standardHours
   const rate = otType === 'weekday'
-    ? policy.rates.otWeekday
-    : otType === 'holiday'
-      ? policy.rates.otHoliday
-      : OT_RATES[otType]
+    ? (policy.rates.otWeekday || 1.5)
+    : otType === 'weekend'
+      ? (policy.rates.otWeekend || 2.0)
+      : (policy.rates.otHoliday || 3.0)
   return Math.round(overtimeHours * hourlyRate * rate)
 }
 
@@ -572,35 +812,115 @@ function getAllowancesForEmployee(
   employeeId: string,
   _baseSalary: number,
   attendance: AttendanceSummaryForPayroll,
+  employeeRecord?: Employee,
+  isPartTimeEmployee?: boolean,
 ): { name: string; amount: number }[] {
-  const emp = mockEmployees.find(e => e.id === employeeId)
+  const emp = employeeRecord ?? mockEmployees.find(e => e.id === employeeId)
   if (!emp) return []
 
+  const isPartTime = isPartTimeEmployee ?? emp.contract_type === 'ban_thoi_gian'
+  const effectiveDays = attendance.workDays + (attendance.leavePaid || 0)
+
+  // 1. Không đi làm ngày nào (0 ngày công, 0 giờ làm việc và 0 ngày nghỉ phép có lương) -> Không có phụ cấp
+  if (attendance.workDays === 0 && (attendance.totalHours || 0) === 0 && (attendance.leavePaid || 0) === 0) {
+    return []
+  }
+
   const policy = getActivePayrollPolicy()
+
+  // 2. Nhân viên đã thôi việc (inactive): chỉ tính phụ cấp ăn ca nếu có đi làm thực tế trong kỳ
+  if (emp.status === 'inactive') {
+    const mealAllowance = Math.round(attendance.workDays * policy.fnb.mealAllowancePerShift)
+    return mealAllowance > 0 ? [{ name: 'F&B: Cơm ca theo ngày công', amount: mealAllowance }] : []
+  }
+
+  // 3. Nhân viên Bán thời gian (Part-time):
+  // Không hưởng các phụ cấp tháng cố định của Full-time (cơm ca trọn gói, chuyên cần, điện thoại, trách nhiệm).
+  // Chỉ hưởng:
+  // - Cơm ca theo số ca thực tế (30k/ca)
+  // - Hỗ trợ ca đêm/chốt muộn nếu có làm thêm ca đêm
+  if (isPartTime) {
+    const ptResult: { name: string; amount: number }[] = []
+    const mealAllowance = Math.round(attendance.workDays * policy.fnb.mealAllowancePerShift)
+    if (mealAllowance > 0) {
+      ptResult.push({ name: 'F&B: Cơm ca theo ngày công', amount: mealAllowance })
+    }
+
+    const splitShiftRate = policy.fnb.splitShiftAllowance || 0
+    const splitDays = attendance.splitShiftDays || 0
+    if (splitShiftRate > 0 && splitDays > 0) {
+      ptResult.push({ name: `F&B: Phụ cấp ca gãy (${splitDays} ngày)`, amount: splitDays * splitShiftRate })
+    }
+
+    const nightShiftRate = policy.fnb.nightShiftAllowance || 0
+    const nightShifts = attendance.nightShiftShifts || 0
+    if (nightShiftRate > 0 && nightShifts > 0) {
+      ptResult.push({ name: `F&B: Phụ cấp ca đêm (${nightShifts} ca)`, amount: nightShifts * nightShiftRate })
+    } else if (attendance.overtimeHours > 0 && nightShiftRate > 0) {
+      ptResult.push({ name: 'F&B: Hỗ trợ ca đêm/chốt muộn', amount: nightShiftRate })
+    }
+    return ptResult
+  }
+
+  // 4. Nhân viên Toàn thời gian (Full-time):
+  const standardDays = (typeof policy.standardDaysPerMonth === 'number' && policy.standardDaysPerMonth > 0)
+    ? policy.standardDaysPerMonth
+    : STANDARD_WORK_DAYS
   const result: { name: string; amount: number }[] = []
+  const workRatio = Math.min(1, effectiveDays / standardDays)
 
   for (const allowance of policy.allowances) {
     const appliesToManagers = allowance.appliesTo.toLowerCase().includes('quản lý') || allowance.appliesTo.toLowerCase().includes('trưởng ca')
     const isManagerLevel = emp.role !== 'employee'
     if (appliesToManagers && !isManagerLevel) continue
-    result.push({ name: allowance.name, amount: allowance.amount })
+
+    // Thưởng chuyên cần: chỉ hưởng nếu đi làm đủ công chuẩn và không đi muộn / vắng
+    if (allowance.name.includes('chuyên cần') || allowance.name.includes('Chuyên cần')) {
+      const isQualifiedAttendance = attendance.workDays >= standardDays && attendance.lateCount === 0 && attendance.absentDays === 0
+      if (!isQualifiedAttendance) continue
+      result.push({ name: allowance.name, amount: allowance.amount })
+      continue
+    }
+
+    // Phụ cấp cơm ca tháng của full-time: tính theo tỷ lệ ngày công đi làm
+    if (allowance.name.includes('Cơm ca') || allowance.name.includes('cơm ca')) {
+      const mealAmount = Math.round(allowance.amount * (attendance.workDays / standardDays))
+      if (mealAmount > 0) {
+        result.push({ name: allowance.name, amount: mealAmount })
+      }
+      continue
+    }
+
+    // Các phụ cấp cố định khác (trách nhiệm, điện thoại...): nếu đi làm thiếu công thì prorate theo ngày công
+    if (workRatio > 0) {
+      const proratedAmount = Math.round(allowance.amount * workRatio)
+      if (proratedAmount > 0) {
+        result.push({ name: allowance.name, amount: proratedAmount })
+      }
+    }
   }
 
-  const mealAllowance = Math.round(attendance.workDays * policy.fnb.mealAllowancePerShift)
-  if (mealAllowance > 0) {
-    result.push({ name: 'F&B: Cơm ca theo ngày công', amount: mealAllowance })
-  }
-
-  if (emp.role !== 'employee' && policy.fnb.closingShiftAllowance > 0) {
+  // Hỗ trợ ca mở cửa, đóng cửa, ca đêm nếu có phát sinh ngày làm việc thực tế
+  if (emp.role !== 'employee' && policy.fnb.closingShiftAllowance > 0 && attendance.workDays > 0) {
     result.push({ name: 'F&B: Phụ cấp ca đóng cửa', amount: policy.fnb.closingShiftAllowance })
   }
 
-  if (['shift_leader', 'store_manager', 'area_manager'].includes(emp.role) && policy.fnb.openingShiftAllowance > 0) {
+  if (['shift_leader', 'store_manager', 'area_manager'].includes(emp.role) && policy.fnb.openingShiftAllowance > 0 && attendance.workDays > 0) {
     result.push({ name: 'F&B: Phụ cấp ca mở cửa', amount: policy.fnb.openingShiftAllowance })
   }
 
-  if (attendance.overtimeHours > 0 && policy.fnb.nightShiftAllowance > 0) {
-    result.push({ name: 'F&B: Hỗ trợ ca đêm/chốt muộn', amount: policy.fnb.nightShiftAllowance })
+  const splitShiftRate = policy.fnb.splitShiftAllowance || 0
+  const splitDays = attendance.splitShiftDays || 0
+  if (splitShiftRate > 0 && splitDays > 0) {
+    result.push({ name: `F&B: Phụ cấp ca gãy (${splitDays} ngày)`, amount: splitDays * splitShiftRate })
+  }
+
+  const nightShiftRate = policy.fnb.nightShiftAllowance || 0
+  const nightShifts = attendance.nightShiftShifts || 0
+  if (nightShiftRate > 0 && nightShifts > 0) {
+    result.push({ name: `F&B: Phụ cấp ca đêm (${nightShifts} ca)`, amount: nightShifts * nightShiftRate })
+  } else if (attendance.overtimeHours > 0 && nightShiftRate > 0) {
+    result.push({ name: 'F&B: Hỗ trợ ca đêm/chốt muộn', amount: nightShiftRate })
   }
 
   // Manager-level get responsibility allowance, others don't
@@ -608,6 +928,14 @@ function getAllowancesForEmployee(
     return result.filter(r => r.name !== 'Phụ cấp trách nhiệm')
   }
   return result
+}
+
+function matchesPeriod(recordMonth: string | undefined, periodStart: string): boolean {
+  if (!recordMonth) return false
+  const [y, m] = periodStart.split('-')
+  const mmyyyy = `${m}/${y}`
+  const yyyymm = `${y}-${m}`
+  return recordMonth === mmyyyy || recordMonth === yyyymm
 }
 
 function periodToMonth(periodStart: string): string {
@@ -620,9 +948,8 @@ function getBonusesForPeriod(
   employeeId: string,
   periodStart: string,
 ): { name: string; amount: number }[] {
-  const month = periodToMonth(periodStart)
   return mockBonuses
-    .filter(b => b.employee_id === employeeId && b.month === month && b.status === 'approved')
+    .filter(b => b.employee_id === employeeId && matchesPeriod(b.month, periodStart) && b.status === 'approved')
     .map(b => ({ name: b.reason, amount: b.amount }))
 }
 
@@ -630,14 +957,9 @@ function getAdvanceDeduction(
   employeeId: string,
   periodStart: string,
 ): number {
-  const month = periodToMonth(periodStart)
   return mockAdvances
     .filter(a => a.employee_id === employeeId && a.status === 'approved')
-    // Simple: use created_at month match
-    .filter(a => {
-      const [y, m] = a.created_at.split('-')
-      return `${m}/${y}` === month
-    })
+    .filter(a => matchesPeriod(a.created_at?.slice(0, 7), periodStart) || matchesPeriod(periodToMonth(a.created_at?.slice(0, 10)), periodStart))
     .reduce((sum, a) => sum + a.requested_amount, 0)
 }
 
@@ -645,9 +967,8 @@ function getOtherDeductions(
   employeeId: string,
   periodStart: string,
 ): { name: string; amount: number }[] {
-  const month = periodToMonth(periodStart)
   return mockDeductions
-    .filter(d => d.employee_id === employeeId && d.month === month && d.status === 'approved')
+    .filter(d => d.employee_id === employeeId && matchesPeriod(d.month, periodStart) && d.status === 'approved')
     .map(d => ({ name: `${d.type_label}: ${d.reason}`, amount: d.amount }))
 }
 
@@ -663,14 +984,20 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     : STANDARD_WORK_DAYS
 
   // ── Step 1: Employee info
-  const emp = mockEmployees.find(e => e.id === employeeId)
-  const pos = mockPositions.find(p => p.id === emp?.position_id)
+  const emp = input.employee ?? mockEmployees.find(e => e.id === employeeId)
+  const pos = input.position ?? mockPositions.find(p => p.id === emp?.position_id)
   const policyGrade = policy.grades.find(grade => grade.id === pos?.id)
-  const isPartTime = input.contractType === 'ban_thoi_gian'
-  const baseSalary = isPartTime
-    ? (pos?.base_salary ?? 0)
-    : (policyGrade?.base_salary ?? pos?.base_salary ?? 0)
-  const storeName = emp ? getStoreRevenueForPeriod(emp.store_id, periodStart).name : ''
+  const isPartTime = input.contractType === 'ban_thoi_gian' || emp?.contract_type === 'ban_thoi_gian'
+  let baseSalary = 0
+  if (isPartTime) {
+    const fallbackRate = (policy.legal?.minRegionSalary && policy.legal.minRegionSalary < 100000)
+      ? policy.legal.minRegionSalary
+      : 22000
+    baseSalary = getEffectiveHourlyRate(emp, pos, fallbackRate, standardDays, policy.standardHoursPerDay || 8)
+  } else {
+    baseSalary = policyGrade?.base_salary ?? pos?.base_salary ?? 0
+  }
+  const storeName = input.store?.name ?? (emp ? getStoreRevenueForPeriod(emp.store_id, periodStart).name : '')
 
   // ── Step 2: Attendance
   const att = input.attendanceSummary ?? getPayrollAttendanceSummary(employeeId, periodStart, periodEnd)
@@ -698,12 +1025,17 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   if (isPartTime) {
     const hourlyRate = baseSalary > 0 ? baseSalary : 0
     const ptOt = att.partTimeOvertimeHours ?? 0
-    const normalHours = Math.max(0, att.totalHours - ptOt)
-    baseEarned = hourlyRate > 0 ? Math.round(normalHours * hourlyRate) : 0
     const ptMultiplier = (typeof policy.partTimeOvertimeMultiplier === 'number' && policy.partTimeOvertimeMultiplier > 0)
       ? policy.partTimeOvertimeMultiplier
       : 1.5
-    overtimeAmount = hourlyRate > 0 ? Math.round(ptOt * hourlyRate * ptMultiplier) : 0
+    const hourlyCalc = calculateHourlyEarnings({
+      totalHours: att.totalHours,
+      hourlyRate,
+      overtimeHours: ptOt,
+      overtimeMultiplier: ptMultiplier,
+    })
+    baseEarned = hourlyCalc.baseEarned
+    overtimeAmount = hourlyCalc.overtimeAmount
     overtimeHoursToReport = ptOt
     dailyRate = 0
     absentDeduction = 0
@@ -711,8 +1043,14 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     const effectiveDays = att.workDays + att.leavePaid
     baseEarned = Math.round(baseSalary * (effectiveDays / standardDays))
 
-    // ── Step 4: Overtime
-    overtimeAmount = calculateOvertimeAmount(baseSalary, att.overtimeHours)
+    // ── Step 4: Overtime (BUG-G FIX: differentiate weekday, weekend, holiday rates)
+    const otWeekday = att.overtimeHoursWeekday ?? att.overtimeHours
+    const otWeekend = att.overtimeHoursWeekend ?? 0
+    const otHoliday = att.overtimeHoursHoliday ?? 0
+    const otWeekdayAmt = calculateOvertimeAmount(baseSalary, otWeekday, 'weekday')
+    const otWeekendAmt = calculateOvertimeAmount(baseSalary, otWeekend, 'weekend')
+    const otHolidayAmt = calculateOvertimeAmount(baseSalary, otHoliday, 'holiday')
+    overtimeAmount = otWeekdayAmt + otWeekendAmt + otHolidayAmt
     overtimeHoursToReport = att.overtimeHours
 
     dailyRate = Math.round(baseSalary / standardDays)
@@ -720,7 +1058,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   }
 
   // ── Step 5: Allowances
-  const allowances = getAllowancesForEmployee(employeeId, baseSalary, att)
+  const allowances = getAllowancesForEmployee(employeeId, baseSalary, att, emp, isPartTime)
   const totalAllowances = allowances.reduce((sum, a) => sum + a.amount, 0)
 
   // ── Step 6: Bonuses
@@ -733,29 +1071,47 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   const fnbShare = fnbAllocation?.share ?? 0
 
   // ── Step 7: Deductions
-  const lateDeduction = att.lateCount * LATE_PENALTY
+  const latePenaltyRate = (typeof policy.rates?.latePenaltyPerOccurrence === 'number' && policy.rates.latePenaltyPerOccurrence >= 0)
+    ? policy.rates.latePenaltyPerOccurrence
+    : LATE_PENALTY
+  const lateDeduction = att.totalLatePenalty !== undefined
+    ? att.totalLatePenalty
+    : att.lateCount * latePenaltyRate
   const advanceDeduction = getAdvanceDeduction(employeeId, periodStart)
   const otherDeductions = getOtherDeductions(employeeId, periodStart)
   const totalOtherDeductions = otherDeductions.reduce((sum, d) => sum + d.amount, 0)
-  const totalDeductions = lateDeduction + absentDeduction + advanceDeduction + totalOtherDeductions
+  // BUG FIX: absentDeduction is kept for reporting loss of workdays, but NOT added to totalDeductions
+  // because baseEarned was already prorated by effectiveDays / standardDays (prevents double penalty)
+  const totalDeductions = lateDeduction + advanceDeduction + totalOtherDeductions
 
-  // ── Step 8: Total earnings
+  // ── Step 8: Total earnings (Gross Salary)
   const totalEarnings = baseEarned + overtimeAmount + totalAllowances + totalBonuses + fnbShare
 
   // ── Step 9: Insurance
-  const insuranceBase = isPartTime ? (baseEarned + overtimeAmount) : baseSalary
-  const shouldCalculateInsurance = input.hasInsurance ?? true
+  // BUG-F FIX: Under VN law, statutory insurance base excludes OT. Part-time base uses baseEarned only.
+  const insuranceBase = isPartTime ? baseEarned : baseSalary
+  // Theo Khoản 3 Điều 85 Luật BHXH: Người lao động không làm việc và không hưởng tiền lương từ 14 ngày làm việc trở lên trong tháng
+  // (hoặc không đi làm ngày nào trong tháng: effectiveDays === 0), tháng đó không đóng BHXH.
+  const effectiveDaysForInsurance = isPartTime ? att.workDays : (att.workDays + att.leavePaid)
+  const isUnpaidExempt = !isPartTime && (effectiveDaysForInsurance === 0 || effectiveDaysForInsurance <= standardDays - 14)
+  const shouldCalculateInsurance = (input.hasInsurance ?? (!isPartTime)) && !isUnpaidExempt
   const insurance = shouldCalculateInsurance
     ? calculateInsurance(insuranceBase)
     : { bhxh: 0, bhyt: 0, bhtn: 0, total: 0 }
 
-  // ── Step 10: Tax
-  const grossSalary = totalEarnings - totalDeductions
-  const taxableIncome = Math.max(0, grossSalary - insurance.total)
+  // ── Step 10: Tax & Gross definition
+  // Standard Gross Salary = Total earnings before any statutory or disciplinary deductions
+  // BUG-L FIX: Khấu trừ phụ cấp cơm ca không chịu thuế theo luật Thuế TNCN
+  const nonTaxableAllowances = allowances
+    .filter(a => a.name.includes('Cơm ca') || a.name.includes('cơm ca'))
+    .reduce((sum, a) => sum + a.amount, 0)
+  const grossSalary = totalEarnings
+  const taxableIncome = Math.max(0, grossSalary - insurance.total - nonTaxableAllowances)
   const tax = calculateTax(taxableIncome, input.dependents ?? 0)
 
-  // ── Step 11: Net
-  const netSalary = grossSalary - insurance.total - tax
+  // ── Step 11: Net Salary
+  // Advance payment is deducted from net payout, NOT from taxable income
+  const netSalary = grossSalary - insurance.total - tax - lateDeduction - totalOtherDeductions - advanceDeduction
 
   return {
     employee_id: employeeId,
@@ -767,6 +1123,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     store: storeName,
     period: `${periodStart.slice(0, 7)}`,
     standard_days: standardDays,
+    total_shifts: att.totalShifts ?? att.workDays,
     work_days: att.workDays,
     leave_days_paid: att.leavePaid,
     leave_days_unpaid: att.leaveUnpaid,
@@ -775,6 +1132,8 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     soCaChoDuyet: att.soCaChoDuyet,
     soCaChuaCheckOut: att.soCaChuaCheckOut,
     total_hours: att.totalHours,
+    split_shift_days: att.splitShiftDays || 0,
+    night_shift_shifts: att.nightShiftShifts || 0,
     base_salary: baseSalary,
     base_earned: baseEarned,
     overtime_hours: overtimeHoursToReport,
@@ -808,7 +1167,12 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
 
     gross_salary: grossSalary,
     net_salary: netSalary,
+    kpi_salary: 0,
+    union_fee: 0,
+    hold_salary: 0,
+    return_hold_salary: 0,
     anomalies,
+    late_incidents: att.lateIncidents || [],
   }
 }
 
@@ -868,6 +1232,7 @@ export async function calculatePayrollBatchAsync(
         periodStart,
         periodEnd,
         fnbAllocations,
+        contractType: emp.contract_type,
         attendanceSummary: summarizeAttendanceRecords(
           attendanceRecords.filter(record => record.employee_id === emp.id),
           otThreshold,
@@ -914,7 +1279,14 @@ export async function calculatePayrollBatchAsync(
   }
   const getBaseSalary = (employee: PayrollEmployeeDbRow) => {
     if (employee.loai_hop_dong === 'ban_thoi_gian') {
-      return employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : 0
+      if (employee.muc_luong_co_ban > 0) {
+        return employee.muc_luong_co_ban >= 1000000
+          ? Math.round(employee.muc_luong_co_ban / 26 / 8)
+          : employee.muc_luong_co_ban
+      }
+      return employee.chuc_vu_luong_co_ban > 0
+        ? Math.round(employee.chuc_vu_luong_co_ban / 26 / 8)
+        : 22500
     }
     return employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : employee.chuc_vu_luong_co_ban
   }
@@ -934,6 +1306,8 @@ export async function calculatePayrollBatchAsync(
       address: '',
       role: mapDbRole(employee.vai_tro),
       status: employee.trang_thai === 'thu_viec' ? 'probation' : employee.trang_thai === 'da_nghi_viec' ? 'inactive' : 'active',
+      contract_type: employee.loai_hop_dong === 'ban_thoi_gian' ? 'ban_thoi_gian' : 'toan_thoi_gian',
+      hourly_rate: employee.loai_hop_dong === 'ban_thoi_gian' ? getBaseSalary(employee) : undefined,
       hire_date: '',
       total_points: 0,
       gamification_level: 'bronze',
@@ -957,15 +1331,6 @@ export async function calculatePayrollBatchAsync(
     checkin_radius_meters: 0,
     is_active: true,
   }))
-  const originalEmployeeCount = mockEmployees.length
-  const originalPositionCount = mockPositions.length
-  const originalStoreCount = mockStores.length
-
-  mockEmployees.push(...dbEmployees)
-  mockPositions.push(...dbPositions)
-  mockStores.push(...dbStores)
-
-  try {
     const policy = getActivePayrollPolicy()
     const otThreshold = policy.partTimeOvertimeEnabled === true
       ? ((typeof policy.partTimeOvertimeThresholdHours === 'number' && policy.partTimeOvertimeThresholdHours > 0) ? policy.partTimeOvertimeThresholdHours : 8)
@@ -974,6 +1339,8 @@ export async function calculatePayrollBatchAsync(
 
     return dbEmployees.map(emp => {
       const payrollEmp = payrollEmployees.find(employee => employee.id === emp.id)
+      const empPos = dbPositions.find(p => p.id === emp.position_id)
+      const empStore = dbStores.find(s => s.id === emp.store_id)
       const result = calculatePayroll({
         employeeId: emp.id,
         periodStart,
@@ -982,6 +1349,9 @@ export async function calculatePayrollBatchAsync(
         contractType: payrollEmp?.loai_hop_dong,
         hasInsurance: payrollEmp?.tham_gia_bao_hiem ?? undefined,
         dependents: payrollEmp?.so_nguoi_phu_thuoc ?? undefined,
+        employee: emp,
+        position: empPos,
+        store: empStore,
         attendanceSummary: summarizeAttendanceRecords(
           attendanceRecords.filter(record => record.employee_id === emp.id),
           otThreshold,
@@ -992,11 +1362,6 @@ export async function calculatePayrollBatchAsync(
         is_resigned_employee: emp.status === 'inactive',
       }
     })
-  } finally {
-    mockEmployees.splice(originalEmployeeCount)
-    mockPositions.splice(originalPositionCount)
-    mockStores.splice(originalStoreCount)
-  }
 }
 
 // ══════════════════════════════════════
@@ -1031,7 +1396,7 @@ export function generateSalarySlip(result: PayrollResult): SalarySlipData {
     bhyt: result.bhyt,
     bhtn: result.bhtn,
     tax: result.tax,
-    other_deduction: result.absent_deduction + result.total_other_deductions,
+    other_deduction: result.total_other_deductions,
     total_deductions: result.total_deductions + result.total_insurance + result.tax,
     net_salary: result.net_salary,
   }

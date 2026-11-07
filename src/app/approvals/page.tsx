@@ -16,6 +16,8 @@ import {
   getStoreById,
   getPositionById,
   isStoreMatch,
+  swapSchedulesBetweenEmployees,
+  checkRestPeriodViolation,
 } from '@/lib/mock-data'
 import { formatDate } from '@/lib/utils'
 import {
@@ -76,28 +78,78 @@ function timeAgo(dateStr: string): string {
 
 const emptySubscribe = () => () => {}
 
+// Chuyển đổi ServerRequest từ API sang ApprovalItem
+function mapServerRequestToApprovalItem(r: {
+  id: string
+  employee_id: string
+  employee_name?: string
+  store_id?: string
+  type: string
+  title: string
+  reason: string
+  amount?: number
+  date?: string
+  status: string
+  created_at: string
+  approved_by?: string
+  approved_at?: string
+  notes?: string
+}): ApprovalItem {
+  let category: ApprovalCategory = 'leave'
+  if (r.type === 'shift_swap' || r.type === 'swap') category = 'swap'
+  else if (r.type === 'salary_advance') category = 'salary_advance'
+  else if (r.type === 'missed_checkin' || r.type === 'attendance_fix' || r.type === 'learning_shift') category = 'attendance_fix'
+  else if (r.type === 'late_early') category = 'late_early'
+  else if (r.type === 'kpi_review') category = 'kpi_review'
+  else if (r.type === 'new_employee') category = 'new_employee'
+  else if (r.type === 'leave') category = 'leave'
+
+  const rawStatus = (r.status || 'pending').toLowerCase()
+  const status: ApprovalStatus = rawStatus === 'approved' ? 'approved' : rawStatus === 'rejected' ? 'rejected' : 'pending'
+
+  return {
+    id: r.id,
+    employee_id: r.employee_id,
+    store_id: r.store_id || 'store-001',
+    category,
+    priority: (r.title?.toLowerCase().includes('gấp') || r.reason?.toLowerCase().includes('gấp')) ? 'high' : 'medium',
+    status,
+    title: r.title,
+    description: r.reason || r.title,
+    target_date: r.date,
+    amount: r.amount,
+    reason: r.reason,
+    created_at: r.created_at,
+    reviewed_by: r.approved_by,
+    reviewed_at: r.approved_at,
+    review_notes: r.notes,
+  }
+}
+
 export default function ApprovalsPage() {
   const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
 
-  // Danh sách items động có thể cập nhật trạng thái (nạp từ localStorage nếu có)
-  const [approvalList, setApprovalList] = useState<ApprovalItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('homies_approvals_data')
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as ApprovalItem[]
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed
-          }
-        } catch {
-          // fallback to mock
+  // Danh sách items động kết nối API máy chủ backend
+  const [approvalList, setApprovalList] = useState<ApprovalItem[]>(() => [...mockApprovalItems])
+
+  // Nạp danh sách đơn từ API backend máy chủ
+  useEffect(() => {
+    fetch('/api/requests')
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          const serverItems = json.data.map(mapServerRequestToApprovalItem)
+          const serverIds = new Set(serverItems.map((i: ApprovalItem) => i.id))
+          const remainingMocks = mockApprovalItems.filter(m => !serverIds.has(m.id))
+          setApprovalList([...serverItems, ...remainingMocks])
         }
-      }
-    }
-    return [...mockApprovalItems]
-  })
+      })
+      .catch(err => {
+        console.warn('[ApprovalsPage] Không thể kết nối /api/requests:', err)
+      })
+  }, [])
 
   // Filters & View Mode (Mặc định là 'table' để tinh gọn, hạn chế cuộn chuột)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
@@ -187,20 +239,39 @@ export default function ApprovalsPage() {
     return items
   }, [approvalList, activeCategory, statusFilter, selectedStoreId, searchQuery])
 
-  // Helper lưu dữ liệu vào localStorage
-  const persistApprovals = (items: ApprovalItem[]) => {
-    setApprovalList(items)
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('homies_approvals_data', JSON.stringify(items))
-      } catch {
-        // ignore
-      }
-    }
-  }
-
   // ── Handlers Phê duyệt & Từ chối ──
   const handleApprove = (id: string, notes?: string) => {
+    let swapNotice = ''
+    const targetItem = approvalList.find(item => item.id === id)
+
+    // Nếu là yêu cầu đổi ca, kiểm tra vi phạm nghỉ ngơi và tự động hoán đổi lịch trên bảng phân ca tuần
+    if (targetItem && targetItem.category === 'swap' && targetItem.swap_with_employee_id) {
+      const restCheck = checkRestPeriodViolation(
+        targetItem.swap_with_employee_id,
+        targetItem.target_date,
+        targetItem.shift_name
+      )
+      if (restCheck.hasViolation && !notes?.includes('confirmed')) {
+        const ok = window.confirm(
+          `Cảnh báo: ${restCheck.warning || 'Nhân viên chưa đủ 8 tiếng nghỉ ngơi giữa 2 ca'}.\n\nBạn có chắc chắn muốn duyệt đổi ca này không?`
+        )
+        if (!ok) return
+      }
+
+      const swapRes = swapSchedulesBetweenEmployees(
+        targetItem.employee_id,
+        targetItem.swap_with_employee_id,
+        targetItem.target_date,
+        targetItem.shift_name
+      )
+      if (swapRes.success) {
+        swapNotice = ` · ${swapRes.message}`
+        if (swapRes.restWarning) {
+          swapNotice += ` (⚠️ ${swapRes.restWarning})`
+        }
+      }
+    }
+
     const updated = approvalList.map(item => {
       if (item.id === id) {
         return {
@@ -213,12 +284,27 @@ export default function ApprovalsPage() {
       }
       return item
     })
-    persistApprovals(updated)
+    setApprovalList(updated)
+
+    // Gửi cập nhật trạng thái đơn lên máy chủ Backend
+    fetch('/api/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        action: 'approve',
+        status: 'APPROVED',
+        approved_by: user?.full_name || 'Quản lý',
+        notes: notes || 'Đã duyệt qua hệ thống HRM',
+      }),
+    }).catch(err => {
+      console.warn('[ApprovalsPage] Lỗi gửi phê duyệt lên máy chủ:', err)
+    })
 
     setActionFeedback({ id, action: 'approved' })
-    setToastBanner('Đã phê duyệt yêu cầu thành công!')
+    setToastBanner(`Đã phê duyệt yêu cầu thành công!${swapNotice}`)
     setTimeout(() => setActionFeedback(null), 1500)
-    setTimeout(() => setToastBanner(''), 3000)
+    setTimeout(() => setToastBanner(''), 3500)
   }
 
   const handleReject = (id: string, notes?: string) => {
@@ -234,7 +320,22 @@ export default function ApprovalsPage() {
       }
       return item
     })
-    persistApprovals(updated)
+    setApprovalList(updated)
+
+    // Gửi cập nhật trạng thái từ chối lên máy chủ Backend
+    fetch('/api/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        action: 'reject',
+        status: 'REJECTED',
+        approved_by: user?.full_name || 'Quản lý',
+        notes: notes || 'Không đồng ý yêu cầu này',
+      }),
+    }).catch(err => {
+      console.warn('[ApprovalsPage] Lỗi gửi từ chối lên máy chủ:', err)
+    })
 
     setActionFeedback({ id, action: 'rejected' })
     setToastBanner('Đã từ chối yêu cầu.')
@@ -245,6 +346,20 @@ export default function ApprovalsPage() {
   const handleBulkApprove = () => {
     if (selectedIds.size === 0) return
     const count = selectedIds.size
+    let swapSuccessCount = 0
+
+    // Xử lý tự động đổi ca cho các đơn đổi ca trong danh sách chọn
+    approvalList.forEach(item => {
+      if (selectedIds.has(item.id) && item.category === 'swap' && item.swap_with_employee_id) {
+        const res = swapSchedulesBetweenEmployees(
+          item.employee_id,
+          item.swap_with_employee_id,
+          item.target_date,
+          item.shift_name
+        )
+        if (res.success) swapSuccessCount++
+      }
+    })
 
     const updated = approvalList.map(item => {
       if (selectedIds.has(item.id)) {
@@ -258,11 +373,29 @@ export default function ApprovalsPage() {
       }
       return item
     })
-    persistApprovals(updated)
+    setApprovalList(updated)
+
+    // Gửi cập nhật từng đơn được chọn lên máy chủ Backend
+    selectedIds.forEach(id => {
+      fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          action: 'approve',
+          status: 'APPROVED',
+          approved_by: user?.full_name || 'Quản lý',
+          notes: 'Duyệt hàng loạt qua hệ thống HRM',
+        }),
+      }).catch(err => {
+        console.warn(`[ApprovalsPage] Lỗi gửi duyệt đơn ${id} lên máy chủ:`, err)
+      })
+    })
 
     setSelectedIds(new Set())
-    setToastBanner(`Đã phê duyệt thành công ${count} yêu cầu!`)
-    setTimeout(() => setToastBanner(''), 3000)
+    const swapMsg = swapSuccessCount > 0 ? ` (Đã tự động hoán đổi ${swapSuccessCount} ca làm trên bảng tuần)` : ''
+    setToastBanner(`Đã phê duyệt thành công ${count} yêu cầu!${swapMsg}`)
+    setTimeout(() => setToastBanner(''), 3500)
   }
 
   const handleExportExcel = () => {
@@ -612,6 +745,11 @@ export default function ApprovalsPage() {
                                   {item.shift_name && (
                                     <span className="text-[10px] text-[#2F6FA8] font-bold block">{item.shift_name}</span>
                                   )}
+                                  {item.category === 'swap' && item.swap_with_employee_id && item.status === 'pending' && checkRestPeriodViolation(item.swap_with_employee_id, item.target_date, item.shift_name).hasViolation && (
+                                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1 py-0.2 rounded block mt-0.5" title="Nhân viên chưa đủ 8 tiếng nghỉ ngơi giữa 2 ca">
+                                      ⚠️ Nghỉ &lt; 8h
+                                    </span>
+                                  )}
                                 </div>
                               ) : item.amount ? (
                                 <span className="font-mono font-bold text-emerald-700 text-xs">
@@ -867,6 +1005,11 @@ function ApprovalItemCard({
               {isUrgent && item.status === 'pending' && (
                 <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded">
                   GẤP
+                </span>
+              )}
+              {item.category === 'swap' && item.swap_with_employee_id && item.status === 'pending' && checkRestPeriodViolation(item.swap_with_employee_id, item.target_date, item.shift_name).hasViolation && (
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded" title="Nhân viên chưa đủ 8 tiếng nghỉ ngơi giữa 2 ca">
+                  ⚠️ Nghỉ &lt; 8h
                 </span>
               )}
             </div>

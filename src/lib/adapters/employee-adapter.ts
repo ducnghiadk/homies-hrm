@@ -423,6 +423,39 @@ export interface EmployeeAdapter {
 
 export const employeeAdapter: EmployeeAdapter = {
   async getAllEmployees(currentUser?: AuthUser): Promise<AuthUser[]> {
+    // 1. Ưu tiên đọc trực tiếp từ Database máy chủ (/api/employees)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/employees')
+        if (res.ok) {
+          const json = await res.json()
+          if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
+            const mapped: AuthUser[] = json.data.map((item: Record<string, unknown>) => ({
+              id: String(item.id || ''),
+              full_name: String(item.full_name || ''),
+              email: String(item.email || ''),
+              role: (item.role || 'employee') as AuthUser['role'],
+              store_id: String(item.store_id || 'store-001'),
+              position_id: String(item.position_id || 'pos-001'),
+              phone: String(item.phone || ''),
+              employee_code: String(item.employee_code || ''),
+              status: (item.status || 'active') as AuthUser['status'],
+              account_status: (item.account_status || 'dang_hoat_dong') as AuthUser['account_status'],
+              department_name: String(item.department_name || ''),
+              official_salary: Number(item.base_salary || item.official_salary || 0),
+              hourly_rate: Number(item.hourly_rate || 0),
+              hire_date: String(item.hire_date || ''),
+              secondary_store_ids: Array.isArray(item.secondary_store_ids) ? item.secondary_store_ids as string[] : undefined,
+            }))
+            EmployeeService.syncEmployeesFromAdapter(mapped)
+            return currentUser ? EmployeeService.getEmployees(currentUser) : mapped
+          }
+        }
+      } catch (err) {
+        console.warn('[EmployeeAdapter] API /api/employees fetch fallback:', err)
+      }
+    }
+
     if (isSupabaseConfigured && isRealDbMode()) {
       try {
         const { data, error } = await supabase
@@ -446,6 +479,10 @@ export const employeeAdapter: EmployeeAdapter = {
   },
 
   async getEmployeeById(id: string, currentUser?: AuthUser): Promise<AuthUser | null> {
+    const all = await this.getAllEmployees(currentUser)
+    const found = all.find(e => e.id === id || e.employee_code === id || (e.email && e.email.toLowerCase() === id.toLowerCase()))
+    if (found) return found
+
     if (isSupabaseConfigured && isRealDbMode()) {
       try {
         const query = supabase.from('nhan_vien').select('*')
@@ -549,7 +586,34 @@ export const employeeAdapter: EmployeeAdapter = {
       department_name: empData.department_name,
     })
 
-    // 2. Sync to Supabase
+    // 2. Sync to Server DB via /api/employees
+    if (typeof window !== 'undefined') {
+      try {
+        fetch('/api/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: localEmployee.id,
+            full_name: localEmployee.full_name,
+            email: localEmployee.email,
+            role: localEmployee.role,
+            store_id: localEmployee.store_id,
+            position_id: localEmployee.position_id,
+            phone: localEmployee.phone,
+            employee_code: localEmployee.employee_code,
+            status: localEmployee.status,
+            account_status: localEmployee.account_status,
+            department_name: localEmployee.department_name,
+            base_salary: localEmployee.official_salary,
+            hire_date: localEmployee.hire_date,
+          }),
+        }).catch(err => console.warn('[EmployeeAdapter] API sync error:', err))
+      } catch (err) {
+        console.warn('[EmployeeAdapter] Server DB API error:', err)
+      }
+    }
+
+    // 3. Sync to Supabase
     if (isSupabaseConfigured && isRealDbMode()) {
       try {
         const payload = mapAuthUserToDbPayload({
@@ -722,6 +786,24 @@ export const employeeAdapter: EmployeeAdapter = {
         if (localUpdated) {
           localUpdated._dbSyncError = exceptionMessage
         }
+      }
+    }
+
+    // Sync to Server DB via /api/employees
+    if (typeof window !== 'undefined' && localUpdated) {
+      try {
+        fetch('/api/employees', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: localUpdated.id,
+            ...empData,
+            full_name: localUpdated.full_name,
+            email: localUpdated.email,
+          }),
+        }).catch(err => console.warn('[EmployeeAdapter] API update error:', err))
+      } catch (err) {
+        console.warn('[EmployeeAdapter] Server DB API update error:', err)
       }
     }
 

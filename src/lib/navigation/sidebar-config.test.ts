@@ -41,4 +41,17 @@ describe('desktop sidebar KPI information architecture', () => {
     assert.ok(!hrefs.includes('/kpi/periods'))
     assert.ok(!hrefs.includes('/kpi/violations/appeals'))
   })
+
+  it('allows employee role to access my-schedule and self-service destinations', () => {
+    const entries = getDesktopSidebarEntries('employee')
+    const hrefs = entries.flatMap((entry) =>
+      entry.items?.map((item) => item.href) ?? (entry.href ? [entry.href] : [])
+    )
+
+    assert.ok(hrefs.includes('/my-schedule'))
+    assert.ok(hrefs.includes('/leave'))
+    assert.ok(hrefs.includes('/checkin'))
+    assert.ok(!hrefs.includes('/schedule/history'))
+    assert.ok(!hrefs.includes('/payroll'))
+  })
 })
