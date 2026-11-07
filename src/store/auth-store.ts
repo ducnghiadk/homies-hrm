@@ -79,38 +79,32 @@ const authStorage: StateStorage = {
   getItem: (name) => {
     if (typeof window === 'undefined') return null
 
+    // Ưu tiên đọc từ localStorage để đồng bộ phiên làm việc trên tất cả các tab
     const localValue = localStorage.getItem(name)
-    if (localValue) {
-      try {
-        const parsed = JSON.parse(localValue)
-        if (parsed?.state?.rememberMe) {
-          return localValue
-        }
-      } catch {}
-    }
+    if (localValue) return localValue
 
-    return sessionStorage.getItem(name) ?? localValue
+    return sessionStorage.getItem(name)
   },
   setItem: (name, value) => {
     if (typeof window === 'undefined') return
 
-    let shouldRemember = false
+    // Luôn lưu vào cả localStorage (dùng chung mọi tab) và sessionStorage
     try {
-      const parsed = JSON.parse(value)
-      shouldRemember = Boolean(parsed?.state?.rememberMe)
+      localStorage.setItem(name, value)
     } catch {}
-
-    const primaryStorage = shouldRemember ? localStorage : sessionStorage
-    const secondaryStorage = shouldRemember ? sessionStorage : localStorage
-
-    primaryStorage.setItem(name, value)
-    secondaryStorage.removeItem(name)
+    try {
+      sessionStorage.setItem(name, value)
+    } catch {}
   },
   removeItem: (name) => {
     if (typeof window === 'undefined') return
 
-    localStorage.removeItem(name)
-    sessionStorage.removeItem(name)
+    try {
+      localStorage.removeItem(name)
+    } catch {}
+    try {
+      sessionStorage.removeItem(name)
+    } catch {}
   },
 }
 
@@ -234,7 +228,7 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       ...getInitialAuthState(),
       isLoading: false,
-      rememberMe: false,
+      rememberMe: true,
       loginError: null,
 
       setHasHydrated: (val: boolean) => {
