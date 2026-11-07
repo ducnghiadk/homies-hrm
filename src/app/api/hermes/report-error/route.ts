@@ -74,12 +74,13 @@ export async function GET(req: NextRequest) {
     const stores = (db.stores || []).map(s => ({
       id: s.id,
       name: s.name,
-      code: s.code || s.id,
+      code: s.id,
     }))
 
     const employees = (db.employees || []).map(e => ({
       id: e.id,
-      name: e.name,
+      name: e.full_name,
+      employee_code: e.employee_code,
       store_id: e.store_id,
       role: e.role,
     }))
@@ -161,10 +162,10 @@ export async function POST(req: NextRequest) {
 
     // Tự động rà tên nhân viên trong danh sách nếu có
     if (logType === 'personal' && !employeeId && employeeName && db.employees) {
-      const foundEmp = db.employees.find(e => e?.name && e.name.toLowerCase() === employeeName.toLowerCase())
+      const foundEmp = db.employees.find(e => e?.full_name && e.full_name.toLowerCase() === employeeName.toLowerCase())
       if (foundEmp) {
         employeeId = foundEmp.id
-        employeeName = foundEmp.name
+        employeeName = foundEmp.full_name
       }
     }
 
