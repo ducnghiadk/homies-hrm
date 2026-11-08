@@ -108,6 +108,54 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
     void loadLogs()
   }, [loadLogs])
 
+  // ── Hỗ trợ Chụp màn hình rồi Paste (Ctrl + V) trực tiếp ảnh vào Biên bản ──
+  useEffect(() => {
+    if (!viewingProofItem) return
+
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (!file) continue
+
+          const reader = new FileReader()
+          reader.onload = async (event) => {
+            const dataUrl = event.target?.result as string
+            if (dataUrl) {
+              toast.info('Đang lưu ảnh chụp màn hình vừa dán...')
+              try {
+                const ok = await bscAdapter.updateProof(
+                  viewingProofItem.id,
+                  dataUrl,
+                  viewingProofItem.evidence_note
+                )
+                if (ok) {
+                  toast.success('Đã dán và lưu ảnh chụp màn hình thành công!')
+                  setViewingProofItem(prev => (prev ? { ...prev, evidence_url: dataUrl } : null))
+                  void loadLogs()
+                } else {
+                  toast.error('Không thể lưu ảnh vừa dán, vui lòng thử lại!')
+                }
+              } catch {
+                toast.error('Lỗi khi lưu ảnh chụp màn hình')
+              }
+            }
+          }
+          reader.readAsDataURL(file)
+          e.preventDefault()
+          break
+        }
+      }
+    }
+
+    window.addEventListener('paste', handleWindowPaste)
+    return () => window.removeEventListener('paste', handleWindowPaste)
+  }, [viewingProofItem, loadLogs])
+
   // Stores catalog
   const storesCatalog = [
     { id: 'all', name: 'Tất cả chi nhánh' },
@@ -1099,6 +1147,17 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                   )}
                 </div>
               )}
+
+              {/* Thanh hướng dẫn dán ảnh chụp màn hình nhanh */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/70 text-[11px] text-blue-900 font-medium">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-[#2F6FA8] shrink-0" />
+                  <span>Mẹo: Chụp màn hình xong bấm <strong>Ctrl + V</strong> ở bất kỳ đâu để dán ảnh tức thì!</span>
+                </div>
+                <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded-md border border-blue-200 text-blue-800 font-bold shrink-0">
+                  Ctrl + V
+                </span>
+              </div>
             </div>
 
             {/* Footer hành động */}
