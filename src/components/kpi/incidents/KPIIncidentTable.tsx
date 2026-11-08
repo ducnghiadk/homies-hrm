@@ -20,7 +20,7 @@ interface KPIIncidentTableProps {
 }
 
 export default function KPIIncidentTable({ rows, onSelect, onEdit }: KPIIncidentTableProps) {
-  const pendingConfirmation = rows.filter((row) => row.incident.status === 'proposed').length
+  const pendingConfirmation = rows.filter((row) => row.incident.status === 'proposed' || (row.incident.status as string) === 'pending').length
   const appealedCount = rows.filter((row) => row.incident.status === 'appealed').length
   const severeCount = rows.filter((row) => row.severity === 'serious').length
 
@@ -113,18 +113,21 @@ export default function KPIIncidentTable({ rows, onSelect, onEdit }: KPIIncident
 }
 
 function StatusBadge({ status }: { status: KpiIncident['status'] }) {
-  const map: Record<KpiIncident['status'], string> = {
-    proposed: 'bg-amber-100 text-amber-800',
-    confirmed: 'bg-blue-100 text-[#2F6FA8]',
-    acknowledged: 'bg-emerald-100 text-emerald-700',
-    appealed: 'bg-purple-100 text-purple-700',
-    finalized: 'bg-gray-200 text-gray-700',
-    cancelled: 'bg-rose-100 text-rose-700',
+  const map: Record<string, { label: string; cls: string }> = {
+    proposed: { label: 'Chờ duyệt', cls: 'bg-amber-100 text-amber-800 border border-amber-200' },
+    pending: { label: 'Chờ duyệt', cls: 'bg-amber-100 text-amber-800 border border-amber-200' },
+    confirmed: { label: 'Đã duyệt', cls: 'bg-blue-100 text-[#2F6FA8] border border-blue-200' },
+    acknowledged: { label: 'Đã xác nhận', cls: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
+    appealed: { label: 'Đang khiếu nại', cls: 'bg-purple-100 text-purple-700 border border-purple-200' },
+    finalized: { label: 'Đã chốt', cls: 'bg-gray-100 text-gray-700 border border-gray-200' },
+    cancelled: { label: 'Đã hủy', cls: 'bg-rose-100 text-rose-700 border border-rose-200' },
   }
 
+  const badge = map[status] || { label: status, cls: 'bg-gray-100 text-gray-700' }
+
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${map[status]}`}>
-      {status}
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ${badge.cls}`}>
+      {badge.label}
     </span>
   )
 }

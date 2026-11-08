@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   ChevronDown,
   ChevronRight,
+  Clock3,
   Filter,
   MessageSquare,
   Plus,
@@ -193,7 +194,14 @@ export default function KpiViolationsPage() {
 
     return database.incidents.filter((incident) => {
       if (!incident.occurred_at.startsWith(selectedMonth)) return false
-      if (selectedStatus !== 'all' && incident.status !== selectedStatus) return false
+      if (selectedStatus !== 'all') {
+        const incStatus = incident.status as string
+        if (selectedStatus === 'proposed') {
+          if (incStatus !== 'proposed' && incStatus !== 'pending') return false
+        } else if (incident.status !== selectedStatus) {
+          return false
+        }
+      }
 
       if (actor.role === 'ceo' || actor.role === 'area_manager' || actor.role === 'hr_admin') {
         return selectedStoreId === 'all' ? true : incident.store_id === selectedStoreId
@@ -542,6 +550,27 @@ export default function KpiViolationsPage() {
             {errorMessage}
           </div>
         ) : null}
+
+        {incidentRows.length === 0 && database && database.incidents.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <Clock3 size={16} className="text-amber-700 shrink-0" />
+              <span>
+                Không có sự cố nào trong <strong>{formatMonth(selectedMonth)}</strong>. Hệ thống đang có{' '}
+                <strong>{database.incidents.length} sự cố</strong> trong các kỳ khác.
+              </span>
+            </div>
+            {database.incidents.some((i) => i.occurred_at.startsWith('2026-11')) && selectedMonth !== '2026-11' && (
+              <button
+                type="button"
+                onClick={() => setSelectedMonth('2026-11')}
+                className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition cursor-pointer shrink-0 shadow-2xs"
+              >
+                Chuyển xem Tháng 11/2026 (Kỳ Bot vừa ghi)
+              </button>
+            )}
+          </div>
+        )}
 
         <KPIIncidentTable
           rows={incidentRows}

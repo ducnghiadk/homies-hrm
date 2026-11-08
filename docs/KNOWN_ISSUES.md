@@ -1,5 +1,23 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-08 (Nâng cấp Modal xem bằng chứng với mộc kiểm định thời gian chuẩn và đồng bộ trạng thái duyệt BSC/KPI):
+  1) Nguyên nhân & Nhu cầu:
+     - Giao diện xem bằng chứng sự cố tại `/bsc-bonus` trước đây chỉ là khung placeholder mô phỏng, chưa hiển thị ảnh bằng chứng thực tế, chưa hỗ trợ phóng to (lightbox) và chưa có mộc thời gian xác thực (Timestamp Watermark) để đối soát lịch sử nhiều tháng sau.
+     - Trên trang `/kpi/violations`, các sự cố từ Hermes Bot có trạng thái `pending` chưa được map đồng bộ với bộ lọc `proposed` (Chờ duyệt) và bộ chọn kỳ hiển thị chưa có chỉ dẫn thông minh khi người dùng chọn nhầm tháng chưa có sự cố.
+  2) Cách giải quyết:
+     - Nâng cấp `BSCLogsTab.tsx`:
+       + Tích hợp hình ảnh bằng chứng thực tế với tính năng phóng to toàn màn hình (Lightbox).
+       + Đóng trực tiếp Mộc kiểm định thời gian điện tử (Timestamp Watermark Seal) lên ảnh và thẻ xác thực: ghi nhận chính xác ngày giờ chi tiết, chi nhánh, ca làm, nhân sự và mã hồ sơ.
+       + Bổ sung thẻ xác thực trích xuất tin nhắn Zalo kèm tính năng đính kèm / cập nhật link ảnh bằng chứng trực tiếp từ giao diện.
+     - Cập nhật `KPIIncidentTable.tsx` & `kpi-adapter.ts`:
+       + Chuẩn hóa trạng thái `pending` sang `proposed` (Chờ duyệt) đồng bộ trên toàn bộ hệ thống.
+       + Hiển thị nhãn tiếng Việt rõ ràng cho huy hiệu trạng thái: Chờ duyệt, Đã duyệt, Đang khiếu nại, Đã chốt, Đã hủy.
+     - Cập nhật `src/app/kpi/violations/page.tsx`:
+       + Tự động chọn kỳ có dữ liệu gần nhất (Tháng 11/2026) và bổ sung thanh thông báo chuyển nhanh kỳ nếu người dùng chọn tháng trống.
+  3) Kết quả:
+     - Toàn bộ hồ sơ sự cố hiển thị chuẩn xác, có mộc thời gian và bằng chứng chống tranh cãi cho CEO và Quản lý.
+     - File liên quan: `src/components/bsc-bonus/BSCLogsTab.tsx`, `src/lib/adapters/bsc-adapter.ts`, `src/app/api/bsc/logs/route.ts`, `src/lib/server/db.ts`, `src/lib/adapters/kpi-adapter.ts`, `src/components/kpi/incidents/KPIIncidentTable.tsx`, `src/app/kpi/violations/page.tsx`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-08 (Fix lỗi crash TypeError: Cannot read properties of undefined (reading 'trim') trên /bsc-bonus):
   1) Nguyên nhân:
      - Khi trang `/bsc-bonus` nạp dữ liệu từ `/api/bsc/logs`, các hàm xử lý chuỗi trong `bsc-adapter.ts`, `BSCLogsTab.tsx`, `BSCTeamTable.tsx` và `BSCLogEditorModal.tsx` gọi `.trim()` trực tiếp trên `emp.full_name`, `emp.employee_name`, `slip.employee_name`, hoặc `searchTerm` mà không kiểm tra giá trị `undefined`/`null`, dẫn đến crash component React (`TypeError: Cannot read properties of undefined (reading 'trim')`).

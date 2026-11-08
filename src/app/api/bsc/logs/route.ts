@@ -127,6 +127,34 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Hỗ trợ cập nhật bằng chứng / ảnh đối soát trực tiếp từ modal
+    if (body.action === 'update_proof' || (body.id && body.evidence_url !== undefined && !body.group_key)) {
+      const logId = String(body.id || body.log_id || '')
+      if (logId) {
+        const db = await getServerDb()
+        let found = false
+        if (db.bsc_logs) {
+          const idx = db.bsc_logs.findIndex(l => l.id === logId || l.event_id === logId)
+          if (idx >= 0) {
+            if (body.evidence_url !== undefined) db.bsc_logs[idx].evidence_url = body.evidence_url
+            if (body.evidence_note !== undefined) db.bsc_logs[idx].evidence_note = body.evidence_note
+            found = true
+          }
+        }
+        if (db.incidents) {
+          const incIdx = db.incidents.findIndex(i => i.id === logId || i.id === `inc-${logId}`)
+          if (incIdx >= 0) {
+            if (body.evidence_url) db.incidents[incIdx].evidence_refs = [body.evidence_url]
+            found = true
+          }
+        }
+        if (found) {
+          await saveServerDb(db)
+          return NextResponse.json({ success: true, message: 'Đã cập nhật bằng chứng đối soát thành công' })
+        }
+      }
+    }
+
     const {
       id,
       event_id,

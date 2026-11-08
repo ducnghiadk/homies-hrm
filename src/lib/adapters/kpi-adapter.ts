@@ -121,33 +121,56 @@ export const kpiAdapter = {
         const res = await fetch('/api/kpi/incidents')
         const json = await res.json()
         if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
-          const serverIncidents: KpiIncident[] = json.data.map((srv: Record<string, unknown>) => ({
-            id: String(srv.id || ''),
-            store_id: String(srv.store_id || 'store-001'),
-            employee_id: String(srv.employee_id || ''),
-            occurred_at: String(srv.occurred_at || ''),
-            source: (srv.source as KpiIncident['source']) || 'attendance',
-            status: (srv.status as KpiIncident['status']) || 'confirmed',
-            violations: [
-              {
-                code: String(srv.violation_code || 'attendance_late'),
-                primary: true,
-                independent_behavior: true,
-                reason: String(srv.reason || 'Lỗi kỷ luật chấm công'),
-                evidence_refs: Array.isArray(srv.evidence_refs) ? srv.evidence_refs.map(String) : [],
-              },
-            ],
-            description: String(srv.description || ''),
-            evidence_refs: Array.isArray(srv.evidence_refs) ? srv.evidence_refs.map(String) : [],
-          }))
-          const existingIds = new Set(current.incidents.map((i) => i.id))
-          const merged = [...current.incidents]
-          for (const inc of serverIncidents) {
-            if (!existingIds.has(inc.id)) {
-              merged.unshift(inc)
-              existingIds.add(inc.id)
+          const serverIncidents: KpiIncident[] = json.data.map((srv: Record<string, unknown>) => {
+            const rawStatus = String(srv.status || srv.approval_status || '')
+            const normalizedStatus: KpiIncident['status'] =
+              rawStatus === 'pending' || rawStatus === 'proposed_manager' || rawStatus === 'proposed'
+                ? 'proposed'
+                : rawStatus === 'confirmed' || rawStatus === 'approved' || rawStatus === 'approved_ceo'
+                ? 'confirmed'
+                : (srv.status as KpiIncident['status']) || 'proposed'
+
+            return {
+              id: String(srv.id || ''),
+              store_id: String(srv.store_id || 'store-001'),
+              employee_id: String(srv.employee_id || ''),
+              occurred_at: String(srv.occurred_at || ''),
+              source: (srv.source as KpiIncident['source']) || 'attendance',
+              status: normalizedStatus,
+              violations: [
+                {
+                  code: String(srv.violation_code || 'attendance_late'),
+                  primary: true,
+                  independent_behavior: true,
+                  reason: String(srv.reason || 'Lỗi kỷ luật chấm công'),
+                  evidence_refs: Array.isArray(srv.evidence_refs) ? srv.evidence_refs.map(String) : [],
+                },
+              ],
+              description: String(srv.description || ''),
+              evidence_refs: Array.isArray(srv.evidence_refs) ? srv.evidence_refs.map(String) : [],
             }
+          })
+
+          const serverMap = new Map<string, KpiIncident>()
+          for (const inc of serverIncidents) {
+            serverMap.set(inc.id, inc)
           }
+
+          // Cập nhật các bản ghi trong local storage nếu máy chủ có cập nhật mới
+          const merged = current.incidents.map((localInc) => {
+            const serverMatch = serverMap.get(localInc.id)
+            if (serverMatch) {
+              serverMap.delete(localInc.id)
+              return { ...localInc, ...serverMatch }
+            }
+            return localInc
+          })
+
+          // Đưa các bản ghi mới từ máy chủ lên đầu danh sách
+          for (const srvInc of serverMap.values()) {
+            merged.unshift(srvInc)
+          }
+
           return { ...current, incidents: merged }
         }
       } catch (err) {

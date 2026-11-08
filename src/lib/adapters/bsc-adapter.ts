@@ -197,6 +197,31 @@ export const bscAdapter = {
     return false
   },
 
+  async updateProof(id: string, evidenceUrl: string, evidenceNote?: string): Promise<boolean> {
+    try {
+      const base = getApiBase()
+      const res = await fetch(`${base}/api/bsc/logs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          action: 'update_proof',
+          evidence_url: evidenceUrl,
+          evidence_note: evidenceNote,
+        }),
+      })
+
+      if (res.ok) {
+        const json = await res.json()
+        return Boolean(json.success)
+      }
+    } catch (err) {
+      console.warn('[BSCAdapter] Error updating proof:', err)
+    }
+
+    return false
+  },
+
   // ═══════════════════════════════════
   // 3. PERSONAL ERRORS & EMPLOYEE DATA
   // ═══════════════════════════════════

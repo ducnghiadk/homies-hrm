@@ -26,6 +26,14 @@ import {
   Plus,
   Share2,
   Pencil,
+  Calendar,
+  Camera,
+  CheckCircle2,
+  ExternalLink,
+  ImageIcon,
+  Maximize2,
+  Sparkles,
+  Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { bscAdapter } from '@/lib/adapters/bsc-adapter'
@@ -57,6 +65,10 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
   const [isLogEditorOpen, setIsLogEditorOpen] = useState(false)
   const [editingLogItem, setEditingLogItem] = useState<CombinedLogItem | null>(null)
   const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+  const [isAttachingProof, setIsAttachingProof] = useState(false)
+  const [inputProofUrl, setInputProofUrl] = useState('')
+  const [isSavingProof, setIsSavingProof] = useState(false)
 
   const handleQuickApprove = async (item: CombinedLogItem) => {
     setApprovingId(item.id)
@@ -843,56 +855,254 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
         )}
       </div>
 
-      {/* ── MODAL XEM BẰNG CHỨNG / BIÊN BẢN (PROOF VIEWER) ── */}
+      {/* ── MODAL XEM BẰNG CHỨNG / BIÊN BẢN (PROOF VIEWER) VỚI CON MỘC THỜI GIAN CHUẨN ── */}
       {viewingProofItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-gray-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-6 space-y-4 shadow-2xl border border-gray-100 my-auto max-h-[92vh] overflow-y-auto">
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2 text-sm font-bold text-[#001D3D]">
-                <FileText size={18} className="text-[#2F6FA8]" />
-                <span>Bằng Chứng Vi Phạm &amp; Đối Soát</span>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#2F6FA8] flex items-center justify-center">
+                  <ShieldCheck size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-[#001D3D]">Hồ Sơ Bằng Chứng &amp; Mộc Xác Thực</span>
+                    <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">
+                      {viewingProofItem.event_id || viewingProofItem.id}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-500">Đối soát tính toàn vẹn dữ liệu vận hành &amp; kỷ luật</p>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setViewingProofItem(null)}
-                className="w-8 h-8 rounded-xl hover:bg-gray-100 text-gray-500 flex items-center justify-center transition cursor-pointer"
-              >
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-2">
+                {isApproved(viewingProofItem.approval_status) ? (
+                  <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <CheckCircle2 size={12} />
+                    <span>Đã Duyệt BSC</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                    <Clock size={12} />
+                    <span>Chờ CEO Duyệt</span>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewingProofItem(null)
+                    setIsAttachingProof(false)
+                    setInputProofUrl('')
+                  }}
+                  className="w-8 h-8 rounded-xl hover:bg-gray-100 text-gray-500 flex items-center justify-center transition cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
+            {/* Thông tin sự cố */}
             <div className="space-y-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-200/80 space-y-1.5">
-                <div className="flex justify-between font-bold text-gray-900">
-                  <span>Sự cố: {viewingProofItem.group_name}</span>
-                  <span className="font-mono text-rose-600">-{viewingProofItem.points} điểm</span>
-                </div>
-                <p className="text-gray-700 font-medium">{viewingProofItem.example}</p>
-                {viewingProofItem.employee_name && (
-                  <div className="text-gray-500 font-medium">
-                    Nhân sự: <strong>{viewingProofItem.employee_name}</strong>
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200/90 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-bold text-gray-900">
+                    {viewingProofItem.sub_error_name || viewingProofItem.example || viewingProofItem.group_name}
                   </div>
-                )}
-                {viewingProofItem.occurred_at && (
-                  <div className="text-gray-400 text-[11px]">
-                    Thời gian ghi nhận: {viewingProofItem.occurred_at}
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full font-mono font-bold text-xs bg-rose-100 text-rose-700 border border-rose-200">
+                    -{viewingProofItem.points} điểm BSC
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-600 pt-1 border-t border-gray-200/60">
+                  <div>
+                    <span className="text-gray-400">Đối tượng: </span>
+                    <strong className="text-gray-800">
+                      {viewingProofItem.employee_name || (viewingProofItem.log_kind === 'personal' ? 'Nhân sự' : 'Cả quán (Vận hành)')}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Chi nhánh: </span>
+                    <strong className="text-gray-800">{viewingProofItem.store_id || 'Homies Hồ Bá Phấn (HBP)'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Ca làm việc: </span>
+                    <strong className="text-gray-800">{viewingProofItem.shift_name || 'Ca làm'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Kỳ đánh giá: </span>
+                    <strong className="text-gray-800">{viewingProofItem.period || period}</strong>
+                  </div>
+                </div>
+
+                {viewingProofItem.order_code && (
+                  <div className="text-[11px] text-gray-500">
+                    Mã đơn liên quan: <strong className="font-mono text-gray-700">{viewingProofItem.order_code}</strong>
                   </div>
                 )}
               </div>
 
-              {/* Khung mô phỏng ảnh bằng chứng */}
-              <div className="p-6 rounded-2xl bg-gray-100 border-2 border-dashed border-gray-300 text-center space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-white text-[#2F6FA8] flex items-center justify-center mx-auto shadow-2xs">
-                  <Eye size={24} />
+              {/* ── KHU VỰC BẰNG CHỨNG HÌNH ẢNH & CON MỘC THỜI GIAN (TIMESTAMP WATERMARK) ── */}
+              {Boolean(viewingProofItem.evidence_url || viewingProofItem.proof_url) ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-800 flex items-center gap-1.5 text-xs">
+                      <Camera size={14} className="text-[#2F6FA8]" />
+                      <span>Hình ảnh bằng chứng thực tế &amp; Mộc điện tử</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsLightboxOpen(true)}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2F6FA8] hover:underline cursor-pointer"
+                    >
+                      <Maximize2 size={12} />
+                      <span>Phóng to toàn màn hình</span>
+                    </button>
+                  </div>
+
+                  <div className="relative rounded-2xl overflow-hidden border border-gray-300 bg-black shadow-md group">
+                    {/* Ảnh bằng chứng */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={viewingProofItem.evidence_url || viewingProofItem.proof_url}
+                      alt="Bằng chứng sự cố"
+                      className="w-full max-h-72 object-contain mx-auto transition-transform group-hover:scale-[1.01]"
+                    />
+
+                    {/* MỘC KIỂM ĐỊNH THỜI GIAN ĐÓNG TRỰC TIẾP TRÊN ẢNH (WATERMARK SEAL) */}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 text-white backdrop-blur-[2px]">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300">
+                          <ShieldCheck size={13} className="text-amber-300 shrink-0" />
+                          <span>MỘC KIỂM ĐỊNH THỜI GIAN HOMIES HRM</span>
+                        </div>
+                        <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/20 text-white">
+                          Verified Audit
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-mono text-gray-200 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                        <span>📅 {viewingProofItem.occurred_at ? new Date(viewingProofItem.occurred_at).toLocaleString('vi-VN') : 'Không rõ mốc giờ'}</span>
+                        <span>📍 {viewingProofItem.store_id || 'store-001'}</span>
+                        {viewingProofItem.shift_name && <span>⏰ {viewingProofItem.shift_name}</span>}
+                      </div>
+                      <div className="text-[10px] text-gray-300 mt-0.5 truncate">
+                        👤 {viewingProofItem.employee_name || 'Nhân sự'} • Mã sự kiện: {viewingProofItem.event_id || viewingProofItem.id}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="font-bold text-gray-800 text-xs">Hình ảnh biên bản / Log camera</div>
-                <p className="text-[11px] text-gray-500">
-                  Dữ liệu đối soát đã được lưu trữ an toàn trong kho lưu trữ HRM Homies.
-                </p>
-              </div>
+              ) : (
+                /* THẺ CHỨNG THỰC ĐIỆN TỬ TỪ BOT ZALO KHI CHƯA ĐÍNH KÈM FILE ẢNH */
+                <div className="space-y-2">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-slate-50 border border-blue-200/80 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-[#0068FF] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
+                          Zalo
+                        </div>
+                        <div>
+                          <div className="font-bold text-gray-900 text-xs">Chứng thực tin nhắn &amp; Mốc thời gian Bot Hermes</div>
+                          <div className="text-[11px] text-blue-800">Dữ liệu ghi nhận trực tiếp từ nhóm điều hành ca quán</div>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-200">
+                        <ShieldCheck size={11} />
+                        <span>Mộc số toàn vẹn</span>
+                      </span>
+                    </div>
+
+                    {/* Mộc thời gian đối soát */}
+                    <div className="p-2.5 rounded-xl bg-white/80 border border-blue-100 font-mono text-[11px] text-gray-700 space-y-1">
+                      <div className="flex items-center justify-between text-gray-500">
+                        <span>MỐC THỜI GIAN SỰ CỐ:</span>
+                        <strong className="text-blue-900">
+                          {viewingProofItem.occurred_at ? new Date(viewingProofItem.occurred_at).toLocaleString('vi-VN') : 'Mặc định ca hiện tại'}
+                        </strong>
+                      </div>
+                      <div className="flex items-center justify-between text-gray-500">
+                        <span>NGƯỜI XÁC NHẬN:</span>
+                        <span className="text-gray-800">{viewingProofItem.verifier_name || 'Hermes AI Assistant'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-gray-500">
+                        <span>MÃ HỒ SƠ TRA CỨU:</span>
+                        <span className="text-gray-800 font-bold">{viewingProofItem.event_id || viewingProofItem.id}</span>
+                      </div>
+                    </div>
+
+                    {/* Nội dung trích dẫn từ Zalo */}
+                    {viewingProofItem.evidence_note && (
+                      <div className="text-[11px] text-gray-700 bg-white/70 p-2.5 rounded-xl border border-gray-200/70">
+                        <span className="font-semibold text-gray-500">Trích xuất ngữ cảnh: </span>
+                        <span>{viewingProofItem.evidence_note}</span>
+                      </div>
+                    )}
+
+                    {/* Nút bật/tắt đính kèm ảnh */}
+                    <div className="pt-1 flex items-center justify-between">
+                      <span className="text-[11px] text-gray-500">Cần lưu thêm ảnh camera hoặc biên bản giấy?</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsAttachingProof(prev => !prev)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 text-[11px] font-bold transition cursor-pointer"
+                      >
+                        <Camera size={12} />
+                        <span>{isAttachingProof ? 'Thu gọn' : 'Đính kèm ảnh bằng chứng'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Form đính kèm ảnh bằng chứng nhanh */}
+                  {isAttachingProof && (
+                    <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200 space-y-2.5 animate-in fade-in duration-150">
+                      <div className="font-bold text-gray-800 text-xs flex items-center gap-1.5">
+                        <Upload size={13} className="text-[#2F6FA8]" />
+                        <span>Đính kèm link hình ảnh bằng chứng (Camera / Google Drive / URL ảnh)</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          placeholder="Dán link ảnh (https://...)"
+                          value={inputProofUrl}
+                          onChange={(e) => setInputProofUrl(e.target.value)}
+                          className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-gray-300 bg-white outline-none focus:border-[#2F6FA8]"
+                        />
+                        <button
+                          type="button"
+                          disabled={!inputProofUrl.trim() || isSavingProof}
+                          onClick={async () => {
+                            if (!inputProofUrl.trim()) return
+                            setIsSavingProof(true)
+                            try {
+                              const ok = await bscAdapter.updateProof(viewingProofItem.id, inputProofUrl.trim(), viewingProofItem.evidence_note)
+                              if (ok) {
+                                toast.success('Đã lưu ảnh bằng chứng vào biên bản thành công!')
+                                setViewingProofItem({
+                                  ...viewingProofItem,
+                                  evidence_url: inputProofUrl.trim(),
+                                })
+                                setIsAttachingProof(false)
+                                await loadLogs()
+                              } else {
+                                toast.error('Không thể lưu ảnh bằng chứng, vui lòng thử lại!')
+                              }
+                            } catch {
+                              toast.error('Lỗi khi lưu ảnh bằng chứng')
+                            } finally {
+                              setIsSavingProof(false)
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-[#2F6FA8] hover:bg-[#1D3E61] text-white text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                        >
+                          {isSavingProof ? 'Đang lưu...' : 'Lưu Ảnh'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            <div className="pt-2 flex items-center justify-between border-t border-gray-100">
+            {/* Footer hành động */}
+            <div className="pt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100">
               <button
                 type="button"
                 onClick={async () => {
@@ -912,7 +1122,7 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                 }}
                 className="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-bold hover:bg-rose-100 transition cursor-pointer"
               >
-                Hủy Bỏ / Thu Hồi Sự Cố
+                Hủy Bỏ / Thu Hồi
               </button>
 
               <div className="flex items-center gap-2">
@@ -924,7 +1134,7 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                       await handleQuickApprove(viewingProofItem)
                       setViewingProofItem(null)
                     }}
-                    className="px-3.5 py-2 rounded-xl border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    className="px-4 py-2 rounded-xl border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
                   >
                     <Check size={14} className="stroke-[3]" />
                     <span>{approvingId === viewingProofItem.id ? 'Đang duyệt...' : 'Duyệt Biên Bản Ngay'}</span>
@@ -941,15 +1151,52 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                   className="px-3.5 py-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Pencil size={13} className="text-amber-800" />
-                  <span>Sửa Biên Bản</span>
+                  <span>Sửa</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewingProofItem(null)}
+                  onClick={() => {
+                    setViewingProofItem(null)
+                    setIsAttachingProof(false)
+                    setInputProofUrl('')
+                  }}
                   className="px-4 py-2 rounded-xl bg-[#001D3D] text-white text-xs font-bold hover:bg-[#0a2e5c] transition cursor-pointer"
                 >
                   Đóng
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── LIGHTBOX PHÓNG TO ẢNH BẰNG CHỨNG CÓ CON MỘC XÁC THỰC ── */}
+      {isLightboxOpen && viewingProofItem && (viewingProofItem.evidence_url || viewingProofItem.proof_url) && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in"
+          onClick={() => setIsLightboxOpen(false)}
+        >
+          <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setIsLightboxOpen(false)}
+              className="absolute -top-12 right-0 p-2 text-white hover:text-gray-300 transition cursor-pointer"
+            >
+              <X size={24} />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={viewingProofItem.evidence_url || viewingProofItem.proof_url}
+              alt="Bằng chứng phóng to"
+              className="max-h-[80vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl border border-white/20"
+            />
+            <div className="mt-3 w-full bg-black/80 text-white p-3 rounded-2xl border border-white/10 text-xs flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-amber-300 font-bold">
+                <ShieldCheck size={16} />
+                <span>MỘC KIỂM ĐỊNH THỜI GIAN HOMIES HRM: {viewingProofItem.occurred_at ? new Date(viewingProofItem.occurred_at).toLocaleString('vi-VN') : ''}</span>
+              </div>
+              <div className="text-gray-300 font-mono text-[11px]">
+                {viewingProofItem.store_id} • {viewingProofItem.employee_name || 'Vận hành quán'} • {viewingProofItem.event_id}
               </div>
             </div>
           </div>

@@ -1915,6 +1915,11 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
       if (!inMemoryCache.incidents || inMemoryCache.incidents.length === 0) {
         inMemoryCache.incidents = getInitialIncidentsSeed()
       }
+      inMemoryCache.incidents.forEach((inc) => {
+        if ((inc.status as string) === 'pending') {
+          inc.status = 'proposed'
+        }
+      })
       return inMemoryCache
     }
 
@@ -1937,6 +1942,15 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     }
     if (!inMemoryCache!.incidents || inMemoryCache!.incidents.length === 0) {
       inMemoryCache!.incidents = getInitialIncidentsSeed()
+    }
+
+    // Chuẩn hóa trạng thái chờ duyệt của sự cố (pending -> proposed)
+    if (inMemoryCache?.incidents) {
+      inMemoryCache.incidents.forEach((inc) => {
+        if ((inc.status as string) === 'pending') {
+          inc.status = 'proposed'
+        }
+      })
     }
 
     // Tự động nâng cấp mật khẩu còn ở dạng thường sang chuẩn mã hóa an toàn PBKDF2
