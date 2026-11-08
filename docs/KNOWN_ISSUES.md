@@ -1,5 +1,16 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-08 (Fix lỗi crash TypeError: Cannot read properties of undefined (reading 'trim') trên /bsc-bonus):
+  1) Nguyên nhân:
+     - Khi trang `/bsc-bonus` nạp dữ liệu từ `/api/bsc/logs`, các hàm xử lý chuỗi trong `bsc-adapter.ts`, `BSCLogsTab.tsx`, `BSCTeamTable.tsx` và `BSCLogEditorModal.tsx` gọi `.trim()` trực tiếp trên `emp.full_name`, `emp.employee_name`, `slip.employee_name`, hoặc `searchTerm` mà không kiểm tra giá trị `undefined`/`null`, dẫn đến crash component React (`TypeError: Cannot read properties of undefined (reading 'trim')`).
+  2) Cách giải quyết:
+     - Bổ sung fallback an toàn `(name || '').trim()` và Optional Chaining `?.trim()` cho toàn bộ các trường tên nhân viên, ghi chú, mã đơn hàng, và từ khóa tìm kiếm.
+     - Kiểm tra kiểu dữ liệu `typeof string` trước khi gọi các hàm xử lý chuỗi trên toàn bộ bảng điểm BSC và danh sách nhân sự.
+  3) Kết quả:
+     - Trang `/bsc-bonus` render mượt mà 100%, không còn bị crash hay đứng trang khi có bản ghi chứa trường rỗng.
+     - `npx tsc --noEmit`: PASS 100% (0 errors, exit code 0).
+     - File liên quan: `src/lib/adapters/bsc-adapter.ts`, `src/components/bsc-bonus/BSCLogsTab.tsx`, `src/components/bsc-bonus/BSCTeamTable.tsx`, `src/components/bsc-bonus/BSCLogEditorModal.tsx`, `src/components/bsc-bonus/BSCIndividualDetailModal.tsx`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-08 (TASK BUG-HRM-01: Fix lỗi không lưu và không hiển thị biên bản từ API /api/hermes/report-error lên giao diện /bsc-bonus & /kpi/violations):
   1) Hiện trạng & Nguyên nhân:
      - Bot Hermes gửi webhook ghi nhận lỗi vận hành qua `POST https://homies-hrm.vercel.app/api/hermes/report-error` nhận về HTTP 200 OK nhưng trên giao diện `/bsc-bonus` và `/kpi/violations` dữ liệu hoàn toàn trống trơn (0 sự cố).

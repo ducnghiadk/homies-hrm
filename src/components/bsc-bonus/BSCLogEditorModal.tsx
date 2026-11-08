@@ -182,7 +182,7 @@ export default function BSCLogEditorModal({
     const subObj = bscSubErrorCatalog.find(s => s.id === selectedSubErrorId)
     const formattedOccurred = `${occurredDate} ${occurredTime}`
 
-    const finalStatus: BSCApprovalStatus = (!evidenceNote.trim() && !orderCode.trim())
+    const finalStatus: BSCApprovalStatus = (!evidenceNote?.trim() && !orderCode?.trim())
       ? 'pending_proof'
       : approvalStatus
 
@@ -200,18 +200,18 @@ export default function BSCLogEditorModal({
         group_name: groupObj?.name || 'Lỗi cá nhân',
         sub_error_id: selectedSubErrorId,
         sub_error_name: subObj?.name,
-        example: description.trim() || subObj?.name || 'Ghi nhận sự kiện lỗi cá nhân',
+        example: description?.trim() || subObj?.name || 'Ghi nhận sự kiện lỗi cá nhân',
         impact: isSerious ? 'Lỗi đặc biệt nghiêm trọng (Khóa 0đ)' : `Ảnh hưởng hệ số cá nhân (Trừ ${errorPoints}đ lỗi)`,
         points: errorPoints,
         is_serious: isSerious,
         occurred_at: formattedOccurred,
         source_type: sourceType,
-        order_code: orderCode.trim() || undefined,
+        order_code: orderCode?.trim() || undefined,
         evidence_type: evidenceType,
-        evidence_url: evidenceUrl.trim() || undefined,
-        evidence_note: evidenceNote.trim() || undefined,
-        verifier_name: verifierName.trim() || undefined,
-        scope_reason: activeScopesCount > 1 ? scopeReason.trim() : undefined,
+        evidence_url: evidenceUrl?.trim() || undefined,
+        evidence_note: evidenceNote?.trim() || undefined,
+        verifier_name: verifierName?.trim() || undefined,
+        scope_reason: activeScopesCount > 1 ? scopeReason?.trim() : undefined,
         affects_op_score: affectsOpScore,
         affects_personal_multiplier: affectsPersonalMultiplier,
         affects_customer_score: affectsCustomerScore,
@@ -234,16 +234,16 @@ export default function BSCLogEditorModal({
         group_name: groupObj?.name || 'Lỗi vận hành',
         sub_error_id: selectedSubErrorId,
         sub_error_name: subObj?.name,
-        example: description.trim() || subObj?.name || 'Ghi nhận sự kiện lỗi vận hành ca',
+        example: description?.trim() || subObj?.name || 'Ghi nhận sự kiện lỗi vận hành ca',
         points: errorPoints,
         occurred_at: formattedOccurred,
         source_type: sourceType,
-        order_code: orderCode.trim() || undefined,
+        order_code: orderCode?.trim() || undefined,
         evidence_type: evidenceType,
-        evidence_url: evidenceUrl.trim() || undefined,
-        evidence_note: evidenceNote.trim() || undefined,
-        verifier_name: verifierName.trim() || undefined,
-        scope_reason: activeScopesCount > 1 ? scopeReason.trim() : undefined,
+        evidence_url: evidenceUrl?.trim() || undefined,
+        evidence_note: evidenceNote?.trim() || undefined,
+        verifier_name: verifierName?.trim() || undefined,
+        scope_reason: activeScopesCount > 1 ? scopeReason?.trim() : undefined,
         affects_op_score: affectsOpScore,
         affects_personal_multiplier: affectsPersonalMultiplier,
         affects_customer_score: affectsCustomerScore,
@@ -270,13 +270,13 @@ export default function BSCLogEditorModal({
             code: kpiCode,
             primary: true,
             independent_behavior: true,
-            reason: description.trim() || subObj?.name || 'Sự cố vận hành từ BSC',
-            evidence_refs: evidenceUrl.trim() ? [evidenceUrl.trim()] : [],
+            reason: description?.trim() || subObj?.name || 'Sự cố vận hành từ BSC',
+            evidence_refs: evidenceUrl?.trim() ? [evidenceUrl.trim()] : [],
           },
         ],
-        description: description.trim() || subObj?.name || 'Ghi nhận sự cố từ BSC Log',
-        evidence_refs: evidenceUrl.trim() ? [evidenceUrl.trim()] : [],
-      }, verifierName.trim() || 'manager')
+        description: description?.trim() || subObj?.name || 'Ghi nhận sự cố từ BSC Log',
+        evidence_refs: evidenceUrl?.trim() ? [evidenceUrl.trim()] : [],
+      }, verifierName?.trim() || 'manager')
     } catch (kpiErr) {
       console.warn('[BSCLogEditorModal] Error syncing incident to KPI:', kpiErr)
     }

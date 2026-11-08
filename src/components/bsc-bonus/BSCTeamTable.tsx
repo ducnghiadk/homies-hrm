@@ -104,10 +104,10 @@ export default function BSCTeamTable({
   const filteredResults = summary.individual_results
     .filter(emp => {
       // Tìm kiếm
-      if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase()
-        const matchName = emp.employee_name.toLowerCase().includes(term)
-        const matchId = emp.employee_id.toLowerCase().includes(term)
+      const term = (searchTerm || '').trim().toLowerCase()
+      if (term) {
+        const matchName = String(emp.employee_name || '').toLowerCase().includes(term)
+        const matchId = String(emp.employee_id || '').toLowerCase().includes(term)
         if (!matchName && !matchId) return false
       }
 
@@ -131,7 +131,7 @@ export default function BSCTeamTable({
         case 'error_desc':
           return b.personal_error_count - a.personal_error_count
         case 'name_asc':
-          return a.employee_name.localeCompare(b.employee_name)
+          return String(a.employee_name || '').localeCompare(String(b.employee_name || ''))
         default:
           return 0
       }

@@ -36,10 +36,12 @@ const BANK_BIN_BY_NAME: Record<string, string> = {
   msb: '970426',
 }
 
-function resolveBankBin(bankName: string): string {
+function resolveBankBin(bankName?: string): string {
   if (!bankName) return '970436'
-  if (/^\d{6}$/.test(bankName)) return bankName
-  const normalizedName = bankName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const cleanBankName = String(bankName || '').trim()
+  if (!cleanBankName) return '970436'
+  if (/^\d{6}$/.test(cleanBankName)) return cleanBankName
+  const normalizedName = cleanBankName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
   const matchedAlias = Object.keys(BANK_BIN_BY_NAME).find(alias => normalizedName.includes(alias))
   return matchedAlias ? BANK_BIN_BY_NAME[matchedAlias] : '970436'
 }

@@ -129,19 +129,19 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
     if (filterCategory === 'operation' && item.log_kind !== 'operation') return false
     if (filterStatus !== 'all' && item.approval_status !== filterStatus) return false
 
-    if (!searchTerm.trim()) return true
-    const term = searchTerm.toLowerCase()
-    const name = item.employee_name || ''
-    const eventId = item.event_id || ''
-    const orderCode = item.order_code || ''
-    const groupName = item.group_name || ''
-    const ex = item.example || ''
+    const term = (searchTerm || '').trim().toLowerCase()
+    if (!term) return true
+    const name = String(item.employee_name || '').toLowerCase()
+    const eventId = String(item.event_id || '').toLowerCase()
+    const orderCode = String(item.order_code || '').toLowerCase()
+    const groupName = String(item.group_name || '').toLowerCase()
+    const ex = String(item.example || '').toLowerCase()
     return (
-      name.toLowerCase().includes(term) ||
-      eventId.toLowerCase().includes(term) ||
-      orderCode.toLowerCase().includes(term) ||
-      groupName.toLowerCase().includes(term) ||
-      ex.toLowerCase().includes(term)
+      name.includes(term) ||
+      eventId.includes(term) ||
+      orderCode.includes(term) ||
+      groupName.includes(term) ||
+      ex.includes(term)
     )
   })
 
@@ -149,14 +149,15 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
   const filteredEmployees = empLogsData
     .filter(emp => selectedStoreFilter === 'all' || emp.store_id === selectedStoreFilter)
     .filter(emp => {
-      const errorCount = emp.errors.length
+      const errorCount = (emp.errors || []).length
       if (employeeFilterMode === 'has_errors') return errorCount > 0
       if (employeeFilterMode === 'clean') return errorCount === 0
       return true
     })
     .filter(emp => {
-      if (!searchTerm.trim()) return true
-      return emp.employee_name.toLowerCase().includes(searchTerm.toLowerCase())
+      const term = (searchTerm || '').trim().toLowerCase()
+      if (!term) return true
+      return String(emp.employee_name || '').toLowerCase().includes(term)
     })
 
   const toggleExpand = (empId: string) => {

@@ -225,13 +225,14 @@ export const bscAdapter = {
         const json = await res.json()
         if (json.success && Array.isArray(json.data)) {
           json.data.forEach((item: Record<string, unknown>) => {
-            let empId = String(item.employee_id || '')
-            const empName = String(item.employee_name || '')
+            let empId = String(item.employee_id || '').trim()
+            const rawEmpName = typeof item.employee_name === 'string' ? item.employee_name : (item.employee_name ? String(item.employee_name) : '')
+            const empName = (rawEmpName || '').trim()
             if (!empId && empName) {
-              const q = empName.trim().toLowerCase()
+              const q = empName.toLowerCase()
               const found = mockEmployees.find(e => {
                 if (!e?.full_name) return false
-                const fn = e.full_name.toLowerCase()
+                const fn = (typeof e.full_name === 'string' ? e.full_name : String(e.full_name || '')).trim().toLowerCase()
                 return fn === q || fn.includes(q) || q.includes(fn)
               })
               if (found) {
@@ -298,10 +299,11 @@ export const bscAdapter = {
             if (payrollData?.success && Array.isArray(payrollData.salary_slips)) {
               for (const slip of payrollData.salary_slips) {
                 const hours = Number(slip.total_hours || (slip.work_days ? slip.work_days * 5.5 : 0))
-                const empId = slip.employee_id
-                const empCode = slip.employee_code
-                const empName = slip.employee_name ? slip.employee_name.trim().toLowerCase() : ''
-                const sId = slip.store_id
+                const empId = slip.employee_id ? String(slip.employee_id).trim() : ''
+                const empCode = slip.employee_code ? String(slip.employee_code).trim() : ''
+                const rawSlipName = typeof slip.employee_name === 'string' ? slip.employee_name : (slip.employee_name ? String(slip.employee_name) : '')
+                const empName = (rawSlipName || '').trim().toLowerCase()
+                const sId = slip.store_id ? String(slip.store_id).trim() : ''
 
                 if (empId) {
                   payrollTotalHoursByEmp[empId] = (payrollTotalHoursByEmp[empId] || 0) + hours
@@ -325,14 +327,20 @@ export const bscAdapter = {
         // Map danh sách nhân sự thực và gán giờ công, lỗi cá nhân
         const matchedKeys = new Set<string>()
         const result: BSCEmployeePersonalData[] = storeEmployees.map(emp => {
-          let errors = dbPersonalErrors[emp.id] || dbPersonalErrors[emp.employee_code] || []
-          if (dbPersonalErrors[emp.id]) matchedKeys.add(emp.id)
-          if (dbPersonalErrors[emp.employee_code]) matchedKeys.add(emp.employee_code)
-          if (errors.length === 0 && emp.full_name) {
-            const fnLower = emp.full_name.trim().toLowerCase()
+          const empId = String(emp.id || '').trim()
+          const empCode = String(emp.employee_code || '').trim()
+          const rawFullName = typeof emp.full_name === 'string' ? emp.full_name : (emp.full_name ? String(emp.full_name) : '')
+          const fnClean = (rawFullName || '').trim()
+          const fnLower = fnClean.toLowerCase()
+
+          let errors = dbPersonalErrors[empId] || (empCode ? dbPersonalErrors[empCode] : undefined) || []
+          if (empId && dbPersonalErrors[empId]) matchedKeys.add(empId)
+          if (empCode && dbPersonalErrors[empCode]) matchedKeys.add(empCode)
+          if (errors.length === 0 && fnLower) {
             for (const [k, v] of Object.entries(dbPersonalErrors)) {
               if (!matchedKeys.has(k)) {
-                const knownName = (empNameById[k] || '').trim().toLowerCase()
+                const rawKnownName = typeof empNameById[k] === 'string' ? empNameById[k] : (empNameById[k] ? String(empNameById[k]) : '')
+                const knownName = (rawKnownName || '').trim().toLowerCase()
                 if (knownName && (knownName.includes(fnLower) || fnLower.includes(knownName))) {
                   errors = v
                   matchedKeys.add(k)
@@ -345,20 +353,20 @@ export const bscAdapter = {
 
           let payrollHours: number
           if (!isAllStores && storeId) {
-            payrollHours = payrollHoursByEmpStore[`${emp.id}__${storeId}`] ??
-                           payrollHoursByEmpStore[`${emp.employee_code}__${storeId}`] ??
-                           (emp.full_name ? payrollHoursByEmpStore[`${emp.full_name.trim().toLowerCase()}__${storeId}`] : undefined) ??
-                           (emp.store_id === storeId ? (payrollTotalHoursByEmp[emp.id] ?? 0) : 0)
+            payrollHours = (empId ? payrollHoursByEmpStore[`${empId}__${storeId}`] : undefined) ??
+                           (empCode ? payrollHoursByEmpStore[`${empCode}__${storeId}`] : undefined) ??
+                           (fnLower ? payrollHoursByEmpStore[`${fnLower}__${storeId}`] : undefined) ??
+                           (emp.store_id === storeId && empId ? (payrollTotalHoursByEmp[empId] ?? 0) : 0)
           } else {
-            payrollHours = payrollTotalHoursByEmp[emp.id] ??
-                           payrollTotalHoursByEmp[emp.employee_code] ??
-                           (emp.full_name ? payrollTotalHoursByEmp[emp.full_name.trim().toLowerCase()] : undefined) ??
+            payrollHours = (empId ? payrollTotalHoursByEmp[empId] : undefined) ??
+                           (empCode ? payrollTotalHoursByEmp[empCode] : undefined) ??
+                           (fnLower ? payrollTotalHoursByEmp[fnLower] : undefined) ??
                            0
           }
 
-          const totalHours = payrollTotalHoursByEmp[emp.id] ??
-                             payrollTotalHoursByEmp[emp.employee_code] ??
-                             (emp.full_name ? payrollTotalHoursByEmp[emp.full_name.trim().toLowerCase()] : undefined) ??
+          const totalHours = (empId ? payrollTotalHoursByEmp[empId] : undefined) ??
+                             (empCode ? payrollTotalHoursByEmp[empCode] : undefined) ??
+                             (fnLower ? payrollTotalHoursByEmp[fnLower] : undefined) ??
                              payrollHours
 
           const effectiveRole = emp.role === 'store_manager'
@@ -368,9 +376,9 @@ export const bscAdapter = {
               : 'full_time'
 
           return {
-            employee_id: emp.id,
-            employee_name: emp.full_name,
-            employee_code: emp.employee_code,
+            employee_id: empId || empCode || `emp-${Math.random().toString(36).slice(2, 6)}`,
+            employee_name: fnClean || empCode || 'Nhân sự',
+            employee_code: empCode || empId,
             role: effectiveRole,
             store_id: targetStoreId,
             period: targetPeriod,
@@ -388,9 +396,11 @@ export const bscAdapter = {
           if (!matchedKeys.has(k) && errList.length > 0) {
             const itemStoreId = empStoreById[k] || 'store-001'
             if (isAllStores || itemStoreId === storeId) {
+              const rawName = typeof empNameById[k] === 'string' ? empNameById[k] : (empNameById[k] ? String(empNameById[k]) : '')
+              const cleanName = (rawName || '').trim()
               result.push({
                 employee_id: k,
-                employee_name: empNameById[k] || 'Nhân sự',
+                employee_name: cleanName || 'Nhân sự',
                 employee_code: k,
                 role: 'full_time',
                 store_id: itemStoreId,
@@ -411,10 +421,10 @@ export const bscAdapter = {
 
     // 3. Fallback mock employees nếu chưa có master data
     return mockEmployees
-      .filter(emp => emp.role !== 'ceo' && emp.role !== 'hr_admin' && (isAllStores || emp.store_id === storeId))
+      .filter(emp => emp && emp.role !== 'ceo' && emp.role !== 'hr_admin' && (isAllStores || emp.store_id === storeId))
       .map(emp => ({
         employee_id: emp.id,
-        employee_name: emp.full_name,
+        employee_name: (typeof emp.full_name === 'string' ? emp.full_name : String(emp.full_name || '')).trim() || 'Nhân sự',
         role: (emp.role as 'store_manager' | 'shift_leader' | 'full_time' | 'part_time') || 'full_time',
         store_id: emp.store_id || 'store-001',
         period: targetPeriod,
