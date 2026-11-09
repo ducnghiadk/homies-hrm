@@ -107,9 +107,10 @@ export async function GET(req: NextRequest) {
         stores,
         employees,
         instructions: {
-          flow: 'Bot tra cứu danh mục để lấy mã (code) hoặc tên chuẩn. Khi người dùng báo lỗi trong nhóm, bot gọi POST với mã lỗi hoặc tên lỗi để HRM tự động khớp điểm trừ.',
+          flow: 'Bot tra cứu danh mục để lấy mã (code) hoặc tên chuẩn. Khi người dùng báo lỗi trong nhóm Zalo, bot chụp màn hình cửa sổ Zalo (hoặc lấy ảnh vi phạm) mã hóa Base64 gửi kèm trường screenshot_base64 hoặc evidence_url để HRM lưu làm bằng chứng kèm mộc thời gian.',
           report_endpoint: '/api/hermes/report-error',
           method: 'POST',
+          screenshot_fields: ['screenshot_base64', 'evidence_base64', 'evidence_url'],
         },
       },
     })
@@ -199,6 +200,56 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join(' ')
 
+    // Chuẩn hóa ảnh chụp màn hình từ Bot gửi sang (nhận cả link ảnh hoặc chuỗi Base64 trực tiếp)
+    let resolvedEvidenceUrl: string | undefined =
+      body.evidence_url || body.screenshot_url || body.screenshot_base64 || body.evidence_base64 || body.image_base64
+    if (resolvedEvidenceUrl && typeof resolvedEvidenceUrl === 'string') {
+      const trimmed = resolvedEvidenceUrl.trim()
+      if (
+        trimmed &&
+        !trimmed.startsWith('http://') &&
+        !trimmed.startsWith('https://') &&
+        !trimmed.startsWith('data:image/') &&
+        !trimmed.startsWith('/')
+      ) {
+        resolvedEvidenceUrl = `data:image/jpeg;base64,${trimmed}`
+      } else {
+        resolvedEvidenceUrl = trimmed
+      }
+    }
+
+    // Nếu Bot gửi lệnh cập nhật ảnh chụp màn hình vào một biên bản đã tạo trước đó (theo event_id hoặc id)
+    if (body.action === 'attach_screenshot' && (body.event_id || body.id) && resolvedEvidenceUrl) {
+      const targetId = String(body.event_id || body.id).trim()
+      let updated = false
+      if (db.bsc_logs) {
+        const idx = db.bsc_logs.findIndex(l => l.id === targetId || l.event_id === targetId)
+        if (idx >= 0) {
+          db.bsc_logs[idx].evidence_url = resolvedEvidenceUrl
+          db.bsc_logs[idx].evidence_type = 'image'
+          updated = true
+        }
+      }
+      if (db.incidents) {
+        const incIdx = db.incidents.findIndex(
+          i => i.id === targetId || i.id === `inc-${targetId}` || i.id === `inc-bot-${targetId.replace('BOT-', '')}`
+        )
+        if (incIdx >= 0) {
+          db.incidents[incIdx].evidence_refs = [resolvedEvidenceUrl]
+          updated = true
+        }
+      }
+      if (updated) {
+        await saveServerDb(db)
+        return NextResponse.json({
+          success: true,
+          message: `Đã đính kèm ảnh chụp màn hình Zalo vào biên bản ${targetId}`,
+          target_id: targetId,
+          has_screenshot: true,
+        })
+      }
+    }
+
     const id = `bsc-log-bot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
     const newLog: ServerBscLog = {
       id,
@@ -216,8 +267,8 @@ export async function POST(req: NextRequest) {
       occurred_at: body.occurred_at || new Date().toISOString(),
       shift_name: body.shift_name,
       order_code: body.order_code,
-      evidence_type: body.evidence_url ? body.evidence_type || 'image' : body.evidence_type,
-      evidence_url: body.evidence_url,
+      evidence_type: resolvedEvidenceUrl ? body.evidence_type || 'image' : body.evidence_type,
+      evidence_url: resolvedEvidenceUrl,
       evidence_note: note,
       verifier_name: 'Hermes Bot',
       affects_op_score: logType === 'operation',
@@ -253,7 +304,7 @@ export async function POST(req: NextRequest) {
       reason: subErrorName,
       description: note,
       penalty_amount: points * 50000,
-      evidence_refs: body.evidence_url ? [body.evidence_url] : [],
+      evidence_refs: resolvedEvidenceUrl ? [resolvedEvidenceUrl] : [],
       created_at: new Date().toISOString(),
     }
     if (!db.incidents) db.incidents = []
