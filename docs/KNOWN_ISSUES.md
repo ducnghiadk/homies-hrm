@@ -1,5 +1,18 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-13 (Sửa lỗi ẩn ảnh bằng chứng ở tab Lỗi Theo Nhân Viên và bổ sung nhãn "Có ảnh" nhận biết ngay):
+  1) Nguyên nhân:
+     - Trong `src/lib/adapters/bsc-adapter.ts`, hàm `getEmployeePersonalData()` khi map dữ liệu lỗi cá nhân từ `/api/bsc/logs` chưa truyền lại các trường `evidence_url`, `evidence_note`, `evidence_type`, `shift_name`, `verifier_name`, khiến ảnh Bot gửi lên không hiển thị trong tab "1. Lỗi Theo Từng Nhân Viên".
+     - Nút xem bằng chứng trên bảng chỉ hiển thị chữ "Bằng chứng"/"Xem" giống nhau dù có hay chưa có ảnh, khiến CEO khó nhận biết nhanh Bot đã gửi ảnh lên chưa.
+     - API `/api/hermes/report-error` khi nhận lệnh `attach_screenshot` chưa đồng bộ trường ảnh lên Supabase và cần hiển thị trạng thái ảnh gọn gàng trong `telegram_card`.
+  2) Cách giải quyết:
+     - Cập nhật `bsc-adapter.ts`: giữ nguyên đầy đủ thông tin `evidence_url`, `evidence_note`, `evidence_type`, `shift_name`, `order_code`, `verifier_name`.
+     - Cập nhật `BSCLogsTab.tsx`: bổ sung helper `renderProofButton()` đổi nút sang màu xanh kèm nhãn **"Có ảnh"** ngay trên danh sách khi bản ghi đã có ảnh chụp.
+     - Cập nhật `src/app/api/hermes/report-error/route.ts`: đồng bộ ảnh lên Supabase khi chạy `attach_screenshot` và hiển thị thông báo đã đính kèm ảnh trong `telegram_card`.
+  3) Kết quả:
+     - CEO có thể nhìn thấy ngay nút xanh **"Có ảnh"** ngoài danh sách để biết Bot đã gửi ảnh thành công hay chưa mà không cần bấm kiểm tra từng dòng.
+     - File liên quan: `src/lib/adapters/bsc-adapter.ts`, `src/components/bsc-bonus/BSCLogsTab.tsx`, `src/app/api/hermes/report-error/route.ts`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-08 (Nâng cấp Modal xem bằng chứng với mộc kiểm định thời gian chuẩn và đồng bộ trạng thái duyệt BSC/KPI):
   1) Nguyên nhân & Nhu cầu:
      - Giao diện xem bằng chứng sự cố tại `/bsc-bonus` trước đây chỉ là khung placeholder mô phỏng, chưa hiển thị ảnh bằng chứng thực tế, chưa hỗ trợ phóng to (lightbox) và chưa có mộc thời gian xác thực (Timestamp Watermark) để đối soát lịch sử nhiều tháng sau.

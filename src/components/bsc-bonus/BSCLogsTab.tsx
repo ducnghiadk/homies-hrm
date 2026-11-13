@@ -267,6 +267,29 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
 
   const isApproved = (status?: string) => status === 'approved_ceo' || status === 'confirmed'
 
+  const renderProofButton = (item: CombinedLogItem, defaultLabel: string = 'Bằng chứng') => {
+    const hasPhoto = Boolean(item.evidence_url || item.proof_url)
+    return (
+      <button
+        type="button"
+        onClick={() => setViewingProofItem(item)}
+        className={`px-2.5 py-1 rounded-lg border text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer ${
+          hasPhoto
+            ? 'border-blue-300 bg-blue-50 hover:bg-blue-100 text-[#1D3E61] shadow-2xs'
+            : 'border-gray-200 hover:bg-gray-100 text-gray-700'
+        }`}
+        title={hasPhoto ? 'Đã có ảnh bằng chứng — bấm để xem' : 'Xem chi tiết & bằng chứng'}
+      >
+        {hasPhoto ? (
+          <Camera size={13} className="text-[#2F6FA8]" />
+        ) : (
+          <Eye size={13} className="text-[#2F6FA8]" />
+        )}
+        <span>{hasPhoto ? 'Có ảnh' : defaultLabel}</span>
+      </button>
+    )
+  }
+
   const getPersonalMultiplierBadge = (points: number) => {
     if (points <= 1) {
       return (
@@ -614,20 +637,13 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                                       <span>{approvingId === err.id ? 'Đang duyệt...' : 'Duyệt'}</span>
                                     </button>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() => setViewingProofItem({
-                                      ...err,
-                                      employee_name: emp.employee_name,
-                                      store_id: emp.store_id,
-                                      period: emp.period,
-                                      log_kind: 'personal',
-                                    })}
-                                    className="px-2.5 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
-                                  >
-                                    <Eye size={13} className="text-[#2F6FA8]" />
-                                    <span>Bằng chứng</span>
-                                  </button>
+                                  {renderProofButton({
+                                    ...err,
+                                    employee_name: emp.employee_name,
+                                    store_id: emp.store_id,
+                                    period: emp.period,
+                                    log_kind: 'personal',
+                                  }, 'Bằng chứng')}
                                 </div>
                               </div>
                             ))}
@@ -710,14 +726,7 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                                 <span>{approvingId === item.id ? '...' : 'Duyệt'}</span>
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => setViewingProofItem(item)}
-                              className="px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer"
-                            >
-                              <Eye size={13} className="text-[#2F6FA8]" />
-                              <span>Xem</span>
-                            </button>
+                            {renderProofButton(item, 'Xem')}
                           </div>
                         </td>
                       </tr>
@@ -871,15 +880,7 @@ export default function BSCLogsTab({ storeId, period }: BSCLogsTabProps) {
                               <span>{approvingId === item.id ? '...' : 'Duyệt'}</span>
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => setViewingProofItem(item)}
-                            className="px-2 py-1 rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs font-bold inline-flex items-center gap-1 transition cursor-pointer"
-                            title="Xem chi tiết & bằng chứng"
-                          >
-                            <Eye size={13} className="text-[#2F6FA8]" />
-                            <span>Xem</span>
-                          </button>
+                          {renderProofButton(item, 'Xem')}
                           <button
                             type="button"
                             onClick={() => {

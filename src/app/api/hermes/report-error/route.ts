@@ -241,6 +241,19 @@ export async function POST(req: NextRequest) {
       }
       if (updated) {
         await saveServerDb(db)
+        if (isRealDbMode()) {
+          try {
+            const matchedLog = db.bsc_logs?.find(l => l.id === targetId || l.event_id === targetId)
+            if (matchedLog) {
+              await supabase
+                .from('bsc_loi_van_hanh')
+                .update({ evidence_url: resolvedEvidenceUrl, evidence_type: 'image' })
+                .eq('id', matchedLog.id)
+            }
+          } catch (err) {
+            console.warn('[Hermes Bot] Supabase attach_screenshot warning:', err)
+          }
+        }
         return NextResponse.json({
           success: true,
           message: `Đã đính kèm ảnh chụp màn hình Zalo vào biên bản ${targetId}`,
@@ -352,7 +365,9 @@ export async function POST(req: NextRequest) {
       `• Điểm trừ đề xuất: -${points} điểm`,
       body.shift_name ? `• Ca làm: ${body.shift_name}` : null,
       body.order_code ? `• Mã đơn: ${body.order_code}` : null,
-      body.evidence_url ? `• Bằng chứng ảnh: ${body.evidence_url}` : null,
+      resolvedEvidenceUrl
+        ? `• 📸 Bằng chứng ảnh: ${resolvedEvidenceUrl.startsWith('data:image/') ? 'Đã đính kèm ảnh chụp (xem trên HRM)' : resolvedEvidenceUrl}`
+        : null,
       `⏳ Trạng thái: Chờ CEO duyệt cuối`,
       `🔗 Xem trên HRM: /bsc-bonus`,
     ]
