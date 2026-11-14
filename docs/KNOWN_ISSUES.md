@@ -1,5 +1,21 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-14 (Fix lỗi kẹt màn hình "Đang chuyển đến màn hình chính..." khi truy cập Lịch làm việc /schedule trên Vercel):
+  1) Nguyên nhân:
+     - Trong `src/proxy.ts`, có điều kiện chặn khắt khe `else if (process.env.NODE_ENV === 'production' && !sessionToken)`: khi chạy trên môi trường Vercel production, nếu người dùng đăng nhập bằng mock/client-side storage mà chưa có cookie `homies_session` từ serverless, proxy tự động chuyển hướng về `/login?redirect=%2Fschedule`.
+     - Phía client, `src/app/login/page.tsx` thấy tài khoản vẫn đang lưu trong `localStorage` nên hiển thị màn hình chờ và lập tức gọi `window.location.replace('/schedule')`.
+     - Hai bên liên tục redirect qua lại tạo thành vòng lặp vô hạn (Infinite Redirect Loop), khiến người dùng bị kẹt cứng ở màn hình loading *"Đang chuyển đến màn hình chính..."*.
+  2) Cách giải quyết:
+     - Cập nhật `src/proxy.ts`: Bỏ điều kiện ép buộc `sessionToken` ở middleware để các tài khoản quản lý hợp lệ (`authCookie === '1'` kèm vai trò hợp lệ) truy cập thẳng vào trang Lịch làm việc `/schedule`.
+     - Cập nhật `src/store/auth-store.ts`: Hàm `syncAuthCookie` đồng bộ đầy đủ cả `homies_session` và `hrm-user-id` vào cookie của trình duyệt.
+     - Cập nhật `src/app/login/page.tsx`:
+       + Tự động gọi `syncAuthCookie(user)` trước khi chuyển hướng để đảm bảo cookie luôn sẵn sàng.
+       + Bắt tham số `denied` để reset phiên khi máy chủ từ chối, tránh bị vòng lặp vô hạn.
+       + Bổ sung 2 nút bấm dự phòng: "Vào ngay" và "Đổi tài khoản khác" trên màn hình chờ.
+  3) Kết quả:
+     - Truy cập vào `/schedule` mượt mà, chuyển trang tức thì, không còn bị treo ở màn hình login.
+     - File liên quan: `src/proxy.ts`, `src/store/auth-store.ts`, `src/app/login/page.tsx`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-13 (Sửa lỗi ẩn ảnh bằng chứng ở tab Lỗi Theo Nhân Viên và bổ sung nhãn "Có ảnh" nhận biết ngay):
   1) Nguyên nhân:
      - Trong `src/lib/adapters/bsc-adapter.ts`, hàm `getEmployeePersonalData()` khi map dữ liệu lỗi cá nhân từ `/api/bsc/logs` chưa truyền lại các trường `evidence_url`, `evidence_note`, `evidence_type`, `shift_name`, `verifier_name`, khiến ảnh Bot gửi lên không hiển thị trong tab "1. Lỗi Theo Từng Nhân Viên".

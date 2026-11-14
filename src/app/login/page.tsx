@@ -4,12 +4,12 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth-store'
+import { useAuthStore, syncAuthCookie } from '@/store/auth-store'
 import { Eye, EyeOff, Lock, Mail, ArrowRight, Loader2, AlertCircle, PhoneCall } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, user, isLoading, hasHydrated, rememberMe, setRememberMe } = useAuthStore()
+  const { login, logout, user, isLoading, hasHydrated, rememberMe, setRememberMe } = useAuthStore()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -32,8 +32,24 @@ export default function LoginPage() {
 
   // ─── BƯỚC 2: Nếu đã đăng nhập → redirect ─────────────────────────────────
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const searchParams = new URLSearchParams(window.location.search)
+    const denied = searchParams.get('denied')
+
+    // Nếu máy chủ từ chối phiên / quyền truy cập: hủy phiên cũ và hiển thị thông báo
+    if (denied) {
+      logout()
+      if (denied === 'signature_invalid') {
+        setError('Phiên làm việc hoặc chữ ký vai trò không hợp lệ. Vui lòng đăng nhập lại.')
+      } else {
+        setError('Bạn chưa có quyền truy cập trang này. Vui lòng đăng nhập bằng tài khoản quản lý.')
+      }
+      return
+    }
+
     if (hasHydrated && !isLoading && user) {
-      const searchParams = new URLSearchParams(window.location.search)
+      // Đảm bảo đồng bộ đầy đủ cookie xác thực trước khi chuyển hướng
+      syncAuthCookie(user)
       const redirectParam = searchParams.get('redirect')
       const target =
         redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
@@ -41,7 +57,7 @@ export default function LoginPage() {
           : '/'
       window.location.replace(target)
     }
-  }, [hasHydrated, isLoading, user])
+  }, [hasHydrated, isLoading, user, logout])
 
   // ─── HANDLER ĐĂNG NHẬP ───────────────────────────────────────────────────
   const handleLogin = async (e?: React.FormEvent | React.MouseEvent) => {
@@ -83,9 +99,35 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center px-6"
            style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
-        <div className="flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 text-sm font-semibold text-gray-600 shadow-lg border border-gray-100">
-          <Loader2 size={18} className="animate-spin text-primary-500" />
-          Đang chuyển đến màn hình chính...
+        <div className="flex flex-col items-center gap-3 rounded-[20px] bg-white px-6 py-5 text-sm font-semibold text-gray-700 shadow-lg border border-gray-100 max-w-sm text-center">
+          <div className="flex items-center gap-2 text-gray-800">
+            <Loader2 size={18} className="animate-spin text-primary-500" />
+            <span>Đang chuyển đến màn hình chính...</span>
+          </div>
+          <p className="text-xs text-gray-400 font-normal">Đang đăng nhập với: <span className="font-semibold text-gray-600">{user.full_name}</span></p>
+          <div className="flex items-center gap-3 pt-2 border-t border-gray-100 w-full justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                syncAuthCookie(user)
+                const searchParams = new URLSearchParams(window.location.search)
+                const redirectParam = searchParams.get('redirect')
+                const target = redirectParam && redirectParam.startsWith('/') ? redirectParam : '/'
+                window.location.replace(target)
+              }}
+              className="text-xs text-primary-600 hover:text-primary-700 underline font-medium cursor-pointer"
+            >
+              Vào ngay
+            </button>
+            <span className="text-gray-300">|</span>
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="text-xs text-red-500 hover:text-red-600 underline font-medium cursor-pointer"
+            >
+              Đổi tài khoản khác
+            </button>
+          </div>
         </div>
       </div>
     )

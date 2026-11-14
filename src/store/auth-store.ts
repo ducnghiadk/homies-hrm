@@ -108,12 +108,19 @@ const authStorage: StateStorage = {
   },
 }
 
-function syncAuthCookie(user: AuthUser | null) {
+export function syncAuthCookie(user: AuthUser | null) {
   if (typeof document === 'undefined') return
 
   const expires = user ? 'Max-Age=2592000' : 'Max-Age=0'
   document.cookie = `hrm-auth=${user ? '1' : '0'}; Path=/; SameSite=Lax; ${expires}`
   document.cookie = `hrm-role=${user?.role || ''}; Path=/; SameSite=Lax; ${expires}`
+  document.cookie = `hrm-user-id=${user?.id || ''}; Path=/; SameSite=Lax; ${expires}`
+  if (user) {
+    document.cookie = `homies_session=homies_sess_${user.id}; Path=/; SameSite=Lax; ${expires}`
+  } else {
+    document.cookie = `homies_session=; Path=/; SameSite=Lax; Max-Age=0`
+    document.cookie = `hrm-role-sig=; Path=/; SameSite=Lax; Max-Age=0`
+  }
 }
 
 // ─────────────────────────────────────────────

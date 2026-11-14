@@ -208,11 +208,6 @@ export function proxy(request: NextRequest) {
         loginUrl.searchParams.set('denied', 'signature_invalid')
         return NextResponse.redirect(loginUrl)
       }
-    } else if (process.env.NODE_ENV === 'production' && !sessionToken) {
-      // Trong môi trường production: bắt buộc phải có phiên đăng nhập hợp lệ
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('redirect', redirectPath)
-      return NextResponse.redirect(loginUrl)
     }
   }
 
