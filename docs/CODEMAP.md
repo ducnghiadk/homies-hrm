@@ -217,8 +217,8 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 
 ### Tích hợp Bên thứ 3 & Cổng iPOS Private Cloud (iPOS HRM Integration)
 - Mo ta: trung tam quan ly ket noi he sinh thai iPOS (Cổng 1: iPOS HRM cham cong, phan ca, tinh luong; Cổng 2: FABi POS Doanh thu & iPOS IVT Hao hut kho). Tich hop Backend Cloud Worker kiem tra ket noi mang that, chan tuyet doi tai khoan mau/mock data, co che bao ve an toan chan dong bo khi chua xac thuc that, va bo Schema Detector doi soat 14 truong du lieu F&B thuc te kem de xuat truong thieu tu dong.
-- File chinh: `src/app/settings/integrations/ipos/page.tsx`, `src/app/api/ipos/cloud-worker/route.ts`, `src/lib/services/ipos/ipos-schema-detector.ts`, `src/lib/services/ipos/ipos-normalizer.ts`, `src/lib/server/db.ts`, `scripts/test_ipos_cloud_worker.mjs`, `scripts/test_ipos_schema_detector.mjs`
-- Dung khi: cau hinh ket noi iPOS, kiem tra ket noi mang thuc te toi hrm.ipos.vn, bat tay Tien ich Chrome Bridge, xem nhat ky dong bo ngam, doi soat danh ba truong du lieu va ap dung de xuat bo sung vao Homies HRM.
+- File chinh: `src/app/settings/integrations/ipos/page.tsx`, `src/app/api/ipos/cloud-worker/route.ts`, `src/app/api/notifications/route.ts`, `src/lib/services/ipos/ipos-notifier.ts`, `src/lib/services/ipos/ipos-schema-detector.ts`, `src/lib/services/ipos/ipos-normalizer.ts`, `src/lib/server/db.ts`, `scripts/test_ipos_cloud_worker.mjs`, `scripts/test_ipos_schema_detector.mjs`
+- Dung khi: cau hinh ket noi iPOS, kiem tra ket noi mang thuc te toi hrm.ipos.vn, bat tay Tien ich Chrome Bridge, xem nhat ky dong bo ngam, doi soat danh ba truong du lieu, cau hinh thong bao da kenh Telegram/Zalo/Qua chuong va ap dung de xuat bo sung vao Homies HRM.
 
 ## Attendance va check-in
 - Dung khi: sua dieu huong xep lich, board tuan theo ca, board tuan theo nhan vien, setting ca, quy tac xep ca, nhu cau tuan, assignment, publish, smart mapping mẫu ca và bộ nhớ tự học (Smart Memory)

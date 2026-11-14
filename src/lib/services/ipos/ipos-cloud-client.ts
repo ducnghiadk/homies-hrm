@@ -606,6 +606,13 @@ export async function fetchIposTimesheet(params: {
       data: finalResponse,
     })
 
+    // Cập nhật thông tin lần đồng bộ gần nhất
+    updateIposAutoSyncMeta({
+      lastSyncedAt: new Date().toISOString(),
+      lastRecordCount: allMapped.length,
+      status: 'connected',
+    })
+
     return finalResponse
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error)
@@ -619,3 +626,72 @@ export async function fetchIposTimesheet(params: {
     }
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// 4. BỘ ĐỒNG BỘ NGẦM TỰ ĐỘNG ĐỊNH KỲ (10 PHÚT / LẦN)
+// ─────────────────────────────────────────────────────────────
+export const IPOS_AUTO_SYNC_INTERVAL_MS = 10 * 60 * 1000 // 10 phút
+
+export interface IposAutoSyncMeta {
+  isRunning: boolean
+  intervalMinutes: number
+  lastSyncedAt: string | null
+  lastRecordCount: number
+  status: 'connected' | 'fallback' | 'idle'
+}
+
+const globalForIposSync = globalThis as unknown as {
+  __homiesIposSyncTimer?: ReturnType<typeof setInterval>
+  __homiesIposSyncMeta?: IposAutoSyncMeta
+}
+
+function getOrInitSyncMeta(): IposAutoSyncMeta {
+  if (!globalForIposSync.__homiesIposSyncMeta) {
+    globalForIposSync.__homiesIposSyncMeta = {
+      isRunning: false,
+      intervalMinutes: 10,
+      lastSyncedAt: null,
+      lastRecordCount: 0,
+      status: isIposCloudConfigured() ? 'connected' : 'fallback',
+    }
+  }
+  return globalForIposSync.__homiesIposSyncMeta
+}
+
+export function updateIposAutoSyncMeta(partial: Partial<IposAutoSyncMeta>): void {
+  const meta = getOrInitSyncMeta()
+  globalForIposSync.__homiesIposSyncMeta = {
+    ...meta,
+    ...partial,
+  }
+}
+
+export function getIposAutoSyncStatus(): IposAutoSyncMeta {
+  return getOrInitSyncMeta()
+}
+
+/**
+ * Khởi động bộ đồng bộ ngầm tự động mỗi 10 phút trên máy chủ (Singleton).
+ * Tự động hút dữ liệu chấm công từ App iPOS HRM về lưu vào CSDL nội bộ.
+ */
+export function ensureIposBackgroundSyncDaemon(
+  onRunSync: () => Promise<void>
+): IposAutoSyncMeta {
+  const meta = getOrInitSyncMeta()
+  if (!globalForIposSync.__homiesIposSyncTimer) {
+    globalForIposSync.__homiesIposSyncTimer = setInterval(() => {
+      onRunSync().catch((err) => {
+        console.warn('[iPOS Auto-Sync Daemon 10m] Lỗi khi tự động gom dữ liệu:', err)
+      })
+    }, IPOS_AUTO_SYNC_INTERVAL_MS)
+
+    // Không giữ tiến trình Node nếu server đóng
+    if (typeof globalForIposSync.__homiesIposSyncTimer.unref === 'function') {
+      globalForIposSync.__homiesIposSyncTimer.unref()
+    }
+
+    meta.isRunning = true
+  }
+  return meta
+}
+

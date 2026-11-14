@@ -20,6 +20,7 @@ const typeConfig: Record<string, { emoji: string; label: string; color: string; 
   open_shift_claim_rejected: { emoji: '❌', label: 'Bị từ chối', color: '#D9381E', bg: '#FEE2E2' },
   schedule_published:     { emoji: '📅', label: 'Lịch xuất bản', color: '#001D3D', bg: '#EDE9FE' },
   preference_reminder:    { emoji: '🗓️', label: 'Nhắc đăng ký ca', color: '#F6C85F', bg: '#FFF8E8' },
+  ipos_sync:              { emoji: '🔄', label: 'Đồng bộ iPOS', color: '#1E9E57', bg: '#D1FAE5' },
   system:                  { emoji: '⚙️', label: 'Hệ thống', color: '#6B7280', bg: '#F3F4F6' },
 }
 

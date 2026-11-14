@@ -420,6 +420,149 @@ export default function AttendanceTimesheetPage() {
   }>>([])
   const [apiEmployees, setApiEmployees] = useState<Employee[]>([])
   const [isFetchingAttendance, setIsFetchingAttendance] = useState<boolean>(false)
+  const [isSyncingIposInstant, setIsSyncingIposInstant] = useState<boolean>(false)
+  const [lastIposSyncText, setLastIposSyncText] = useState<string>('Tự động 10p/lần')
+  const forceIposRefreshRef = useRef<boolean>(false)
+
+  // ─── STATE MODAL ĐỒNG BỘ IPOS THEO KHOẢNG THỜI GIAN TÙY CHỌN (TỪ NGÀY... ĐẾN NGÀY...) ───
+  const [showIposSyncModal, setShowIposSyncModal] = useState<boolean>(false)
+  const [syncDateFrom, setSyncDateFrom] = useState<string>('')
+  const [syncDateTo, setSyncDateTo] = useState<string>('')
+  const [syncStoreTarget, setSyncStoreTarget] = useState<string>('ALL')
+  const [isSyncingModal, setIsSyncingModal] = useState<boolean>(false)
+  const [syncModalMessage, setSyncModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Tự động kích hoạt đồng bộ iPOS ngầm định kỳ mỗi 10 phút khi mở trang
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      forceIposRefreshRef.current = true
+      setRefreshTrigger(prev => prev + 1)
+    }, 10 * 60 * 1000)
+    return () => clearInterval(intervalId)
+  }, [])
+
+  // Hàm bấm nút "Đồng bộ iPOS tức thì" (cho kỳ đang xem)
+  const handleInstantIposSync = () => {
+    if (isSyncingIposInstant || isFetchingAttendance) return
+    setIsSyncingIposInstant(true)
+    forceIposRefreshRef.current = true
+    setRefreshTrigger(prev => prev + 1)
+  }
+
+  // Mở modal đồng bộ iPOS và điền sẵn khoảng ngày
+  const handleOpenIposSyncModal = () => {
+    const from = viewMode === 'week' ? weekDates[0]?.dateStr : monthDates[0]?.dateStr
+    const to = viewMode === 'week' ? weekDates[6]?.dateStr : monthDates[monthDates.length - 1]?.dateStr
+    const now = new Date()
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+    setSyncDateFrom(from || todayStr)
+    setSyncDateTo(to || todayStr)
+    setSyncStoreTarget(activeStoreId || 'ALL')
+    setSyncModalMessage(null)
+    setShowIposSyncModal(true)
+  }
+
+  // Chọn nhanh khoảng thời gian
+  const applyQuickDatePreset = (preset: 'today' | 'last7days' | 'this_month' | 'last_month' | 'current_view') => {
+    const now = new Date()
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+    if (preset === 'today') {
+      setSyncDateFrom(todayStr)
+      setSyncDateTo(todayStr)
+    } else if (preset === 'last7days') {
+      const d = new Date()
+      d.setDate(d.getDate() - 6)
+      const startStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      setSyncDateFrom(startStr)
+      setSyncDateTo(todayStr)
+    } else if (preset === 'this_month') {
+      const y = now.getFullYear()
+      const m = String(now.getMonth() + 1).padStart(2, '0')
+      const lastDay = new Date(y, now.getMonth() + 1, 0).getDate()
+      setSyncDateFrom(`${y}-${m}-01`)
+      setSyncDateTo(`${y}-${m}-${String(lastDay).padStart(2, '0')}`)
+    } else if (preset === 'last_month') {
+      const lastM = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const y = lastM.getFullYear()
+      const m = String(lastM.getMonth() + 1).padStart(2, '0')
+      const lastDay = new Date(y, lastM.getMonth() + 1, 0).getDate()
+      setSyncDateFrom(`${y}-${m}-01`)
+      setSyncDateTo(`${y}-${m}-${String(lastDay).padStart(2, '0')}`)
+    } else if (preset === 'current_view') {
+      const from = viewMode === 'week' ? weekDates[0]?.dateStr : monthDates[0]?.dateStr
+      const to = viewMode === 'week' ? weekDates[6]?.dateStr : monthDates[monthDates.length - 1]?.dateStr
+      if (from && to) {
+        setSyncDateFrom(from)
+        setSyncDateTo(to)
+      }
+    }
+  }
+
+  // Thực thi đồng bộ iPOS theo khoảng thời gian đã chọn (Từ ngày ... Đến ngày ...)
+  const handleExecuteDateRangeSync = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!syncDateFrom || !syncDateTo) {
+      setSyncModalMessage({ type: 'error', text: 'Vui lòng chọn ngày bắt đầu và ngày kết thúc.' })
+      return
+    }
+    if (syncDateFrom > syncDateTo) {
+      setSyncModalMessage({ type: 'error', text: 'Ngày bắt đầu không được lớn hơn ngày kết thúc.' })
+      return
+    }
+
+    setIsSyncingModal(true)
+    setSyncModalMessage(null)
+
+    try {
+      const params = new URLSearchParams({
+        force: '1',
+        from_date: syncDateFrom,
+        to_date: syncDateTo,
+      })
+      if (syncStoreTarget && syncStoreTarget !== 'ALL') {
+        params.set('store_id', syncStoreTarget)
+      }
+
+      const res = await fetch(`/api/attendance?${params.toString()}`)
+      const json = await res.json()
+
+      if (json.success) {
+        const count = json.synced_from_ipos_count ?? (Array.isArray(json.data) ? json.data.length : 0)
+        const storeName = syncStoreTarget === 'store-001' ? 'Hồ Bá Phấn' : syncStoreTarget === 'store-002' ? 'Đường 429' : 'Cả 2 chi nhánh (HBP + 429)'
+        const msg = `Đã đồng bộ thành công ${count} lượt chấm công (${storeName}) từ ${syncDateFrom} đến ${syncDateTo}!`
+        setSyncModalMessage({ type: 'success', text: msg })
+        setToastMessage(`⚡ ${msg}`)
+        setTimeout(() => setToastMessage(null), 4000)
+
+        // Cập nhật lại nhãn giờ đồng bộ
+        const nowTimeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        setLastIposSyncText(`Đã gom lúc ${nowTimeStr} (Tự động 10p/lần)`)
+
+        // Kích hoạt nạp lại bảng chấm công
+        setRefreshTrigger(prev => prev + 1)
+
+        // Tự động đóng modal sau 1.5 giây
+        setTimeout(() => {
+          setShowIposSyncModal(false)
+          setSyncModalMessage(null)
+        }, 1500)
+      } else {
+        setSyncModalMessage({
+          type: 'error',
+          text: json.error || 'Có lỗi xảy ra khi kết nối máy chủ iPOS Cloud.',
+        })
+      }
+    } catch (err) {
+      setSyncModalMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Lỗi kết nối máy chủ',
+      })
+    } finally {
+      setIsSyncingModal(false)
+    }
+  }
 
   // Nạp danh sách nhân viên từ API máy chủ (/api/employees?status=active)
   useEffect(() => {
@@ -472,12 +615,27 @@ export default function AttendanceTimesheetPage() {
     if (fromDate) params.set('from_date', fromDate)
     if (toDate) params.set('to_date', toDate)
 
+    const wasForced = forceIposRefreshRef.current
+    if (wasForced) {
+      params.set('force', '1')
+      forceIposRefreshRef.current = false
+    }
+
     const url = `/api/attendance?${params.toString()}`
     setIsFetchingAttendance(true)
     fetch(url)
       .then(res => res.ok ? res.json() : null)
       .then(json => {
         if (active && json?.success && Array.isArray(json.data)) {
+          const nowTimeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+          setLastIposSyncText(`Đã gom lúc ${nowTimeStr} (Tự động 10p/lần)`)
+
+          if (wasForced) {
+            const srcLabel = json.source === 'ipos_cloud' ? 'đám mây App iPOS HRM' : 'kho dữ liệu máy chủ'
+            setToastMessage(`⚡ Đồng bộ iPOS tức thì thành công: Đã cập nhật ${json.data.length} lượt chấm công từ ${srcLabel}!`)
+            setTimeout(() => setToastMessage(null), 3500)
+          }
+
           const map: Record<string, Record<string, AttendanceSlot[]>> = {}
           const addToMap = (k: string, d: string, slot: AttendanceSlot) => {
             if (!k || !d) return
@@ -575,7 +733,10 @@ export default function AttendanceTimesheetPage() {
       })
       .catch(e => console.warn('[AttendancePage] fetch attendance error:', e))
       .finally(() => {
-        if (active) setIsFetchingAttendance(false)
+        if (active) {
+          setIsFetchingAttendance(false)
+          setIsSyncingIposInstant(false)
+        }
       })
     return () => { active = false }
   }, [activeStoreId, refreshTrigger, viewMode, weekDates, monthDates, fullEmployeeList])
@@ -1866,6 +2027,14 @@ export default function AttendanceTimesheetPage() {
                   <LinkIcon size={11} />
                   <span>Đã kết nối Lịch phân ca</span>
                 </Link>
+
+                <span
+                  className="px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide border bg-emerald-50/80 text-emerald-800 border-emerald-200 flex items-center gap-1.5"
+                  title="Hệ thống tự động gom dữ liệu chấm công từ App iPOS điện thoại định kỳ mỗi 10 phút"
+                >
+                  <Smartphone size={11} className="text-emerald-600" />
+                  <span>App iPOS: {lastIposSyncText}</span>
+                </span>
               </div>
             </div>
 
@@ -1995,6 +2164,31 @@ export default function AttendanceTimesheetPage() {
                   </option>
                 ))}
               </select>
+
+              {/* Cụm Đồng bộ iPOS: Đồng bộ tức thì + Chọn khoảng ngày */}
+              <div className="flex items-center rounded-xl border border-emerald-200 bg-emerald-50 p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={handleInstantIposSync}
+                  disabled={isSyncingIposInstant || isFetchingAttendance}
+                  className="rounded-lg px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 disabled:opacity-60 transition flex items-center gap-1.5 cursor-pointer"
+                  title="Hút ngay dữ liệu chấm công kỳ hiện tại từ App iPOS HRM"
+                >
+                  <RefreshCw size={13} className={isSyncingIposInstant || isFetchingAttendance ? 'animate-spin text-emerald-600' : 'text-emerald-600'} />
+                  <span>{isSyncingIposInstant ? 'Đang hút iPOS...' : 'Đồng bộ tức thì'}</span>
+                </button>
+                <div className="h-4 w-px bg-emerald-200 mx-0.5" />
+                <button
+                  type="button"
+                  onClick={handleOpenIposSyncModal}
+                  disabled={isSyncingModal}
+                  className="rounded-lg px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition flex items-center gap-1.5 cursor-pointer"
+                  title="Chọn khoảng ngày (Từ ngày... Đến ngày...) để hút dữ liệu từ App iPOS"
+                >
+                  <Calendar size={13} className="text-emerald-700" />
+                  <span>Chọn ngày...</span>
+                </button>
+              </div>
 
               {/* Nút Nhập Excel (Chuẩn giao diện Lịch làm việc) */}
               <button
@@ -3781,6 +3975,191 @@ export default function AttendanceTimesheetPage() {
                 </button>
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {/* ─── MODAL ĐỒNG BỘ CHẤM CÔNG THEO KHOẢNG THỜI GIAN (TỪ NGÀY... ĐẾN NGÀY...) ─── */}
+        {showIposSyncModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-2xs p-4 animate-fade-in">
+            <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-5 sm:p-6 shadow-xl space-y-4 font-sans animate-scale-up">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                    <RefreshCw size={18} className={isSyncingModal ? 'animate-spin' : ''} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#001D3D]">
+                      Đồng bộ chấm công iPOS Cloud
+                    </h3>
+                    <p className="text-[11px] text-gray-500">
+                      Chọn khoảng ngày để hút dữ liệu từ App HRM iPOS
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isSyncingModal) setShowIposSyncModal(false)
+                  }}
+                  disabled={isSyncingModal}
+                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Thông báo kết quả / lỗi */}
+              {syncModalMessage && (
+                <div className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${
+                  syncModalMessage.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-rose-50 border-rose-200 text-rose-900'
+                }`}>
+                  {syncModalMessage.type === 'success' ? (
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
+                  )}
+                  <span className="font-medium leading-relaxed">{syncModalMessage.text}</span>
+                </div>
+              )}
+
+              {/* Phím chọn nhanh khoảng thời gian */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-gray-600 block">
+                  Chọn nhanh khoảng thời gian:
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => applyQuickDatePreset('today')}
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-700 hover:border-[#2F6FA8] hover:text-[#2F6FA8] transition cursor-pointer"
+                  >
+                    Hôm nay
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyQuickDatePreset('last7days')}
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-700 hover:border-[#2F6FA8] hover:text-[#2F6FA8] transition cursor-pointer"
+                  >
+                    7 ngày gần nhất
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyQuickDatePreset('this_month')}
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-700 hover:border-[#2F6FA8] hover:text-[#2F6FA8] transition cursor-pointer"
+                  >
+                    Tháng này
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyQuickDatePreset('last_month')}
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-700 hover:border-[#2F6FA8] hover:text-[#2F6FA8] transition cursor-pointer"
+                  >
+                    Tháng trước
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyQuickDatePreset('current_view')}
+                    className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-bold text-[#2F6FA8] hover:bg-blue-100 transition cursor-pointer"
+                  >
+                    Kỳ đang xem
+                  </button>
+                </div>
+              </div>
+
+              {/* Form chọn Từ ngày - Đến ngày */}
+              <form onSubmit={handleExecuteDateRangeSync} className="space-y-3.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                      <Calendar size={12} className="text-[#2F6FA8]" />
+                      <span>Từ ngày:</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={syncDateFrom}
+                      onChange={e => setSyncDateFrom(e.target.value)}
+                      required
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-800 shadow-2xs focus:border-[#2F6FA8] focus:outline-hidden focus:ring-2 focus:ring-[#2F6FA8]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                      <Calendar size={12} className="text-[#2F6FA8]" />
+                      <span>Đến ngày:</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={syncDateTo}
+                      onChange={e => setSyncDateTo(e.target.value)}
+                      required
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-800 shadow-2xs focus:border-[#2F6FA8] focus:outline-hidden focus:ring-2 focus:ring-[#2F6FA8]/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Chọn Chi nhánh */}
+                <div>
+                  <label className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <Building2 size={12} className="text-[#2F6FA8]" />
+                    <span>Chi nhánh cần lấy:</span>
+                  </label>
+                  <select
+                    value={syncStoreTarget}
+                    onChange={e => setSyncStoreTarget(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-800 shadow-2xs focus:border-[#2F6FA8] focus:outline-hidden focus:ring-2 focus:ring-[#2F6FA8]/20"
+                  >
+                    <option value="ALL">Tất cả chi nhánh (Hồ Bá Phấn + Đường 429)</option>
+                    {getStoresList().map(store => (
+                      <option key={store.id} value={store.id}>
+                        {store.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Ghi chú kết nối */}
+                <div className="rounded-xl bg-slate-50 border border-gray-200/70 p-2.5 text-[11px] text-gray-500 space-y-1">
+                  <div className="flex items-center gap-1 text-gray-700 font-semibold">
+                    <Smartphone size={12} className="text-emerald-600" />
+                    <span>Hút dữ liệu trực tiếp từ đám mây App iPOS:</span>
+                  </div>
+                  <div>Dữ liệu chấm công, giờ vào/ra, phút đi muộn và tọa độ GPS sẽ được lưu vĩnh viễn vào hệ thống Homies HRM.</div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowIposSyncModal(false)}
+                    disabled={isSyncingModal}
+                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSyncingModal}
+                    className="rounded-xl bg-[#2F6FA8] hover:bg-[#1D3E61] px-4 py-2 text-xs font-bold text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  >
+                    {isSyncingModal ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Đang lấy dữ liệu từ iPOS...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={14} />
+                        <span>Bắt đầu đồng bộ</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

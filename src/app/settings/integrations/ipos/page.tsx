@@ -38,6 +38,10 @@ import {
   ExternalLink,
   Landmark,
   Bot,
+  Bell,
+  Send,
+  Smartphone,
+  MessageSquare,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type {
@@ -143,6 +147,15 @@ export default function IposIntegrationPage() {
 
   const [syncLogs, setSyncLogs] = useState<ServerIposSyncLog[]>([])
 
+  // Cài đặt thông báo đa kênh khi có dữ liệu iPOS mới
+  const [enableInAppNotif, setEnableInAppNotif] = useState(true)
+  const [enableTelegramNotif, setEnableTelegramNotif] = useState(false)
+  const [telegramBotToken, setTelegramBotToken] = useState('')
+  const [telegramChatId, setTelegramChatId] = useState('')
+  const [enableZaloWebhook, setEnableZaloWebhook] = useState(false)
+  const [zaloWebhookUrl, setZaloWebhookUrl] = useState('')
+  const [isTestingNotif, setIsTestingNotif] = useState(false)
+
   // 1. Tải cấu hình hiện tại
   const loadConfig = async () => {
     setIsLoading(true)
@@ -195,6 +208,14 @@ export default function IposIntegrationPage() {
           if (json.config.ivt_config) {
             setIvtToken(json.config.ivt_config.token || '')
             setIvtConnected(Boolean(json.config.ivt_config.is_connected))
+          }
+          if (json.config.notification_config) {
+            setEnableInAppNotif(json.config.notification_config.enable_in_app ?? true)
+            setEnableTelegramNotif(Boolean(json.config.notification_config.enable_telegram))
+            setTelegramBotToken(json.config.notification_config.telegram_bot_token || '')
+            setTelegramChatId(json.config.notification_config.telegram_chat_id || '')
+            setEnableZaloWebhook(Boolean(json.config.notification_config.enable_zalo_webhook))
+            setZaloWebhookUrl(json.config.notification_config.zalo_webhook_url || '')
           }
         }
         if (json.schema_status) {
@@ -331,6 +352,14 @@ export default function IposIntegrationPage() {
           token: ivtToken,
           is_connected: ivtConnected,
         },
+        notification_config: {
+          enable_in_app: enableInAppNotif,
+          enable_telegram: enableTelegramNotif,
+          telegram_bot_token: telegramBotToken,
+          telegram_chat_id: telegramChatId,
+          enable_zalo_webhook: enableZaloWebhook,
+          zalo_webhook_url: zaloWebhookUrl,
+        },
       }
 
       const res = await fetch('/api/ipos/cloud-worker', {
@@ -353,6 +382,28 @@ export default function IposIntegrationPage() {
       toast.error('Không thể lưu cấu hình')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  // 3.1 Gửi thông báo thử nghiệm đa kênh (Quả chuông + Telegram/Zalo)
+  const handleTestNotification = async () => {
+    setIsTestingNotif(true)
+    try {
+      const res = await fetch('/api/ipos/cloud-worker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_notification' }),
+      })
+      const json = await res.json()
+      if (res.ok && json.success) {
+        toast.success(json.message)
+      } else {
+        toast.error(json.message || 'Lỗi gửi thông báo thử nghiệm')
+      }
+    } catch {
+      toast.error('Lỗi kết nối máy chủ khi thử thông báo')
+    } finally {
+      setIsTestingNotif(false)
     }
   }
 
@@ -1223,6 +1274,152 @@ export default function IposIntegrationPage() {
                     <span>{isSaving ? 'Đang lưu cấu hình...' : 'Lưu Cài Đặt Tích Hợp'}</span>
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* KHỐI 3.5: CÀI ĐẶT THÔNG BÁO ĐA KÊNH (QUẢ CHUÔNG TRÊN WEB & TELEGRAM / ZALO) */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                    <Bell size={16} />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-[#001D3D]">Cài Đặt Thông Báo Đa Kênh Khi Có Dữ Liệu iPOS</h2>
+                    <p className="text-[11px] text-gray-500">Tự động phát thông báo khi hệ thống lấy được dữ liệu chấm công từ App iPOS</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleTestNotification}
+                  disabled={isTestingNotif}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  title="Gửi thông báo mẫu thử nghiệm tới Quả chuông và Telegram"
+                >
+                  <Send size={12} className={isTestingNotif ? 'animate-spin' : ''} />
+                  <span>{isTestingNotif ? 'Đang gửi thử...' : 'Gửi thử nghiệm'}</span>
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                {/* Kênh 1: Quả chuông Web */}
+                <div className="rounded-xl border border-gray-200 p-3 bg-white space-y-2">
+                  <label className="flex items-start justify-between cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-[#2F6FA8]">
+                        <Bell size={14} />
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900 text-xs">1. Quả chuông thông báo trên Web (In-App)</div>
+                        <div className="text-[11px] text-gray-500">Hiện chấm đỏ và thông báo trên thanh tiêu đề khi hoàn tất đồng bộ</div>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={enableInAppNotif}
+                      onChange={(e) => setEnableInAppNotif(e.target.checked)}
+                      className="rounded text-[#2F6FA8] mt-1"
+                    />
+                  </label>
+                </div>
+
+                {/* Kênh 2: Telegram Bot */}
+                <div className="rounded-xl border border-gray-200 p-3 bg-white space-y-3">
+                  <label className="flex items-start justify-between cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
+                        <Send size={14} />
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900 text-xs">2. Tin nhắn Telegram Bot (Gửi thẳng về điện thoại)</div>
+                        <div className="text-[11px] text-gray-500">Gửi tin nhắn tức thì vào nhóm quản lý hoặc chat riêng khi có dữ liệu mới</div>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={enableTelegramNotif}
+                      onChange={(e) => setEnableTelegramNotif(e.target.checked)}
+                      className="rounded text-[#2F6FA8] mt-1"
+                    />
+                  </label>
+
+                  {enableTelegramNotif && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-700 mb-1 block">
+                          Telegram Bot Token:
+                        </label>
+                        <input
+                          type="password"
+                          value={telegramBotToken}
+                          onChange={(e) => setTelegramBotToken(e.target.value)}
+                          placeholder="Ví dụ: 789123456:AAFlK..."
+                          className="w-full bg-white border border-gray-200 text-xs rounded-xl py-2 px-3 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-700 mb-1 block">
+                          Telegram Chat ID / Group ID:
+                        </label>
+                        <input
+                          type="text"
+                          value={telegramChatId}
+                          onChange={(e) => setTelegramChatId(e.target.value)}
+                          placeholder="Ví dụ: -100192837482"
+                          className="w-full bg-white border border-gray-200 text-xs rounded-xl py-2 px-3 font-mono"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Kênh 3: Zalo Webhook */}
+                <div className="rounded-xl border border-gray-200 p-3 bg-white space-y-3">
+                  <label className="flex items-start justify-between cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-[#2F6FA8]">
+                        <MessageSquare size={14} />
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900 text-xs">3. Webhook Zalo (Tùy chọn)</div>
+                        <div className="text-[11px] text-gray-500">Đẩy thông báo qua Zalo OA hoặc dịch vụ Webhook riêng</div>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={enableZaloWebhook}
+                      onChange={(e) => setEnableZaloWebhook(e.target.checked)}
+                      className="rounded text-[#2F6FA8] mt-1"
+                    />
+                  </label>
+
+                  {enableZaloWebhook && (
+                    <div className="pt-2 border-t border-gray-100">
+                      <label className="text-[11px] font-bold text-gray-700 mb-1 block">
+                        Địa chỉ Webhook Zalo (URL):
+                      </label>
+                      <input
+                        type="url"
+                        value={zaloWebhookUrl}
+                        onChange={(e) => setZaloWebhookUrl(e.target.value)}
+                        placeholder="https://webhook.your-domain.com/zalo"
+                        className="w-full bg-white border border-gray-200 text-xs rounded-xl py-2 px-3 font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Nút lưu cài đặt thông báo */}
+                <button
+                  type="button"
+                  onClick={handleSaveConfig}
+                  disabled={isSaving}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 py-2.5 text-xs font-bold text-white shadow-xs transition cursor-pointer disabled:opacity-60"
+                >
+                  <Save size={14} />
+                  <span>{isSaving ? 'Đang lưu...' : 'Lưu Cài Đặt Thông Báo'}</span>
+                </button>
               </div>
             </div>
 

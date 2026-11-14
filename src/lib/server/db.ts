@@ -225,6 +225,18 @@ export interface ServerPayrollSummary {
   locked_at?: string
 }
 
+export interface ServerNotification {
+  id: string
+  title: string
+  message: string
+  type: string
+  created_at: string
+  is_read: boolean
+  target_role?: string
+  target_user_id?: string
+  metadata?: Record<string, unknown>
+}
+
 export interface ServerRequest {
   id: string
   employee_id: string
@@ -517,6 +529,14 @@ export interface ServerIposIntegrationConfig {
     token?: string
     is_connected: boolean
   }
+  notification_config?: {
+    enable_in_app: boolean
+    enable_telegram: boolean
+    telegram_bot_token?: string
+    telegram_chat_id?: string
+    enable_zalo_webhook?: boolean
+    zalo_webhook_url?: string
+  }
 }
 
 export interface ServerDatabaseSchema {
@@ -540,6 +560,7 @@ export interface ServerDatabaseSchema {
   bsc_logs?: ServerBscLog[]
   bsc_settings?: ServerBscSettings
   ipos_integration?: ServerIposIntegrationConfig
+  notifications?: ServerNotification[]
   sessions: Record<string, { userId: string; role: string; email: string; createdAt: string }>
 }
 

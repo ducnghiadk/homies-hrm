@@ -45,12 +45,61 @@ export default function Header() {
     if (!user) return
 
     const syncNotifications = () => {
-      setNotifications(getNotificationsForUser(user.id))
-      setUnreadCount(getUnreadCount(user.id))
+      const localList = getNotificationsForUser(user.id)
+
+      // Nạp thêm thông báo từ máy chủ (đồng bộ iPOS, thông báo hệ thống)
+      fetch('/api/notifications?limit=20')
+        .then(res => res.ok ? res.json() : null)
+        .then(json => {
+          if (json?.success && Array.isArray(json.data)) {
+            const serverNotifs: Notification[] = json.data.map((item: {
+              id: string
+              type?: string
+              title: string
+              message: string
+              metadata?: Record<string, string>
+              is_read?: boolean
+              created_at: string
+            }) => ({
+              id: item.id,
+              user_id: user.id,
+              type: (item.type || 'system') as Notification['type'],
+              title: item.title,
+              message: item.message,
+              metadata: item.metadata || {},
+              status: item.is_read ? 'read' : 'unread',
+              created_at: item.created_at,
+            }))
+
+            const seen = new Set<string>()
+            const combined: Notification[] = []
+            ;[...serverNotifs, ...localList].forEach(n => {
+              if (!seen.has(n.id)) {
+                seen.add(n.id)
+                combined.push(n)
+              }
+            })
+            combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            setNotifications(combined)
+            setUnreadCount(combined.filter(n => n.status === 'unread').length)
+          } else {
+            setNotifications(localList)
+            setUnreadCount(getUnreadCount(user.id))
+          }
+        })
+        .catch(() => {
+          setNotifications(localList)
+          setUnreadCount(getUnreadCount(user.id))
+        })
     }
 
     syncNotifications()
-    return subscribeNotifications(syncNotifications)
+    const unsubscribe = subscribeNotifications(syncNotifications)
+    const interval = setInterval(syncNotifications, 25000)
+    return () => {
+      unsubscribe()
+      clearInterval(interval)
+    }
   }, [user])
 
   if (!user) return null
@@ -126,9 +175,19 @@ export default function Header() {
               unreadCount={unreadCount}
               onMarkAsRead={(id) => {
                 markAsRead(id)
+                fetch('/api/notifications', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'mark_read', id }),
+                }).catch(() => {})
               }}
               onMarkAllAsRead={() => {
                 markAllAsRead(user.id)
+                fetch('/api/notifications', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'mark_all_read' }),
+                }).catch(() => {})
               }}
               onDelete={(id) => {
                 deleteNotification(id)

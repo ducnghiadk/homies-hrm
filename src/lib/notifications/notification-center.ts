@@ -16,6 +16,7 @@ export type NotificationType =
   | 'schedule_published'  // Lịch tuần mới được xuất bản
   | 'schedule_changed_after_publish' // Ca bị chỉnh sau publish
   | 'preference_reminder' // Nhắc đăng ký ca mong muốn
+  | 'ipos_sync'           // Đồng bộ iPOS Cloud
   | 'system'
 
 export type NotificationStatus = 'unread' | 'read'

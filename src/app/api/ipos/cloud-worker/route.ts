@@ -9,6 +9,7 @@ import {
 } from '@/lib/services/ipos/ipos-schema-detector'
 import { loginFabi, getFabiDailyRevenue } from '@/lib/services/ipos/ipos-fabi-client'
 import { loginHrm, getHrmEmployees, getHrmAttendance } from '@/lib/services/ipos/ipos-hrm-client'
+import { sendIposSyncAlert } from '@/lib/services/ipos/ipos-notifier'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -232,6 +233,28 @@ export async function POST(req: NextRequest) {
           success: true,
           config: db.ipos_integration,
           message: 'Đã lưu cấu hình tích hợp iPOS Cloud thành công!',
+        },
+        { status: 200, headers: corsHeaders }
+      )
+    }
+
+    // 2.1 Thử nghiệm gửi thông báo đa kênh (Quả chuông + Telegram/Zalo)
+    if (action === 'test_notification') {
+      const result = await sendIposSyncAlert({
+        attendanceCount: 18,
+        employeesCount: 17,
+        shiftsCount: 45,
+        storeName: 'Homies Hồ Bá Phấn & 429',
+        triggerType: 'manual',
+      })
+
+      return NextResponse.json(
+        {
+          success: true,
+          result,
+          message: result.telegramSent
+            ? 'Đã gửi thông báo thử nghiệm thành công tới Telegram và Quả chuông trên web!'
+            : 'Đã tạo thông báo trên Quả chuông web thành công! (Nếu muốn nhận Telegram, vui lòng nhập Token & Chat ID)',
         },
         { status: 200, headers: corsHeaders }
       )
