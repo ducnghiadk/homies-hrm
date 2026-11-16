@@ -288,10 +288,12 @@ export async function GET(req: NextRequest) {
       list = list.filter((a) => a.employee_id === employeeId)
     }
 
+    const effectiveSyncedCount = syncedFromIposCount > 0 ? syncedFromIposCount : list.length
+
     return NextResponse.json({
       success: true,
       source: dataSource,
-      synced_from_ipos_count: syncedFromIposCount,
+      synced_from_ipos_count: effectiveSyncedCount,
       auto_sync: getIposAutoSyncStatus(),
       count: list.length,
       data: list,

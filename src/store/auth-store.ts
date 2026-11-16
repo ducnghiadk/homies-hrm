@@ -91,20 +91,20 @@ const authStorage: StateStorage = {
     // Luôn lưu vào cả localStorage (dùng chung mọi tab) và sessionStorage
     try {
       localStorage.setItem(name, value)
-    } catch {}
+    } catch { }
     try {
       sessionStorage.setItem(name, value)
-    } catch {}
+    } catch { }
   },
   removeItem: (name) => {
     if (typeof window === 'undefined') return
 
     try {
       localStorage.removeItem(name)
-    } catch {}
+    } catch { }
     try {
       sessionStorage.removeItem(name)
-    } catch {}
+    } catch { }
   },
 }
 
@@ -398,7 +398,7 @@ export const useAuthStore = create<AuthState>()(
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: user.email, password: '123456' }),
-          }).catch(() => {})
+          }).catch(() => { })
           console.log(`[Auth] loginAsDemo: Switched to ${user.full_name} (${user.role})`)
         }
       },

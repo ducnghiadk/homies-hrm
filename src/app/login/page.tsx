@@ -98,7 +98,7 @@ export default function LoginPage() {
   if (hasHydrated && !isLoading && user) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6"
-           style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
+        style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
         <div className="flex flex-col items-center gap-3 rounded-[20px] bg-white px-6 py-5 text-sm font-semibold text-gray-700 shadow-lg border border-gray-100 max-w-sm text-center">
           <div className="flex items-center gap-2 text-gray-800">
             <Loader2 size={18} className="animate-spin text-primary-500" />
@@ -136,13 +136,13 @@ export default function LoginPage() {
   // ─── FORM ĐĂNG NHẬP ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden"
-         style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
+      style={{ background: 'linear-gradient(160deg, #F5FDF4 0%, #E1EBF6 50%, #F1F6E7 100%)' }}>
 
       {/* Decorative Elements */}
       <div className="absolute top-[-60px] right-[-40px] w-[200px] h-[200px] rounded-full opacity-30"
-           style={{ background: 'radial-gradient(circle, #C8D69B 0%, transparent 70%)' }} />
+        style={{ background: 'radial-gradient(circle, #C8D69B 0%, transparent 70%)' }} />
       <div className="absolute bottom-[-40px] left-[-30px] w-[180px] h-[180px] rounded-full opacity-20"
-           style={{ background: 'radial-gradient(circle, #B8D0EA 0%, transparent 70%)' }} />
+        style={{ background: 'radial-gradient(circle, #B8D0EA 0%, transparent 70%)' }} />
 
       <div className="w-full max-w-[400px] z-10" style={{ animation: 'fadeIn 0.5s ease-out forwards' }}>
 
@@ -157,7 +157,7 @@ export default function LoginPage() {
             priority
           />
           <h1 className="text-[26px] font-black tracking-tight mb-1"
-              style={{ color: '#343B1B', fontFamily: 'Poppins, system-ui, sans-serif' }}>
+            style={{ color: '#343B1B', fontFamily: 'Poppins, system-ui, sans-serif' }}>
             HOMIES MILK TEA
           </h1>
           <p className="text-xs font-bold uppercase tracking-widest text-primary-700 bg-primary-50 px-3 py-0.5 rounded-full border border-primary-100/30">
@@ -167,10 +167,10 @@ export default function LoginPage() {
 
         {/* ===== FORM CARD ===== */}
         <div className="bg-white rounded-[24px] p-7 shadow-xl border border-gray-100"
-             style={{ boxShadow: '0 20px 50px rgba(52, 59, 27, 0.08)' }}>
+          style={{ boxShadow: '0 20px 50px rgba(52, 59, 27, 0.08)' }}>
 
           <h2 className="text-[22px] font-bold mb-6"
-              style={{ color: '#343B1B', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+            style={{ color: '#343B1B', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
             Đăng nhập
           </h2>
 
@@ -183,7 +183,7 @@ export default function LoginPage() {
               </label>
               <div className="relative group">
                 <Mail size={20} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors"
-                      style={{ color: email ? '#3971B8' : '#BDBDBD' }} />
+                  style={{ color: email ? '#3971B8' : '#BDBDBD' }} />
                 <input
                   ref={emailRef}
                   id="login-email"
@@ -220,7 +220,7 @@ export default function LoginPage() {
               </label>
               <div className="relative group">
                 <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors"
-                      style={{ color: password ? '#3971B8' : '#BDBDBD' }} />
+                  style={{ color: password ? '#3971B8' : '#BDBDBD' }} />
                 <input
                   ref={passwordRef}
                   id="login-password"
@@ -271,8 +271,8 @@ export default function LoginPage() {
                     suppressHydrationWarning
                   />
                   <div className="w-5 h-5 rounded-[6px] border-2 transition-all peer-checked:border-transparent peer-checked:bg-primary-600"
-                       style={{ borderColor: rememberMe ? '#3971B8' : '#E0E0E0', backgroundColor: rememberMe ? '#3971B8' : 'transparent' }}
-                       suppressHydrationWarning>
+                    style={{ borderColor: rememberMe ? '#3971B8' : '#E0E0E0', backgroundColor: rememberMe ? '#3971B8' : 'transparent' }}
+                    suppressHydrationWarning>
                     {rememberMe && (
                       <svg className="w-5 h-5 text-white" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -300,7 +300,7 @@ export default function LoginPage() {
             {/* Error Message */}
             {error && (
               <div className="flex items-center gap-3 p-4 rounded-[14px] text-[14px] font-medium"
-                   style={{ backgroundColor: '#FFEBEE', color: '#E57373', animation: 'fadeIn 0.3s ease-out' }}>
+                style={{ backgroundColor: '#FFEBEE', color: '#E57373', animation: 'fadeIn 0.3s ease-out' }}>
                 <AlertCircle size={18} className="shrink-0" />
                 <span>{error}</span>
               </div>

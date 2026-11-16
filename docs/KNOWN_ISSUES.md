@@ -1,5 +1,19 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-16 (Sửa lỗi đồng bộ chấm công báo 0 nội dung và ẩn phần chọn chi nhánh trước khi đăng nhập iPOS HRM):
+  1) Nguyên nhân:
+     - Lỗi 1: `fetchIposTimesheet` trong `src/lib/services/ipos/ipos-cloud-client.ts` chỉ đọc token từ biến môi trường tĩnh `process.env.IPOS_HRM_TOKEN`. Khi người dùng kết nối tài khoản iPOS thật trên giao diện Cài đặt, token được lưu vào `db.ipos_integration.hrm_jwt_token` nhưng client không đọc được, dẫn đến kích hoạt fallback và `synced_from_ipos_count` bị gán 0. Ngoài ra, trong `page.tsx` sử dụng toán tử nullish coalescing `0 ?? ...` khiến số 0 bị giữ nguyên trong thông báo toast.
+     - Lỗi 2: Trong `src/app/settings/integrations/ipos/page.tsx`, mục "Cơ sở đồng bộ tự động" (chọn chi nhánh HBP, 429, LVS) được render cứng mà không kiểm tra trạng thái xác thực, khiến người dùng thấy chi nhánh trước cả khi bấm đăng nhập/kết nối tài khoản.
+  2) Cách giải quyết:
+     - Nâng cấp `getEffectiveIposCloudConfig()`: Ưu tiên đọc Token từ `process.env`, sau đó tự động nạp Token từ `db.ipos_integration.hrm_jwt_token` hoặc tự động đăng nhập lại bằng thông tin tài khoản iPOS đã lưu trong CSDL.
+     - Cập nhật `src/app/api/attendance/route.ts`: Trả về `effectiveSyncedCount` chính xác cho `synced_from_ipos_count`.
+     - Cập nhật `src/app/attendance/page.tsx`: Sửa logic lấy `count`, thông báo rõ ràng nguồn dữ liệu và giải thích chi tiết nếu khoảng ngày chọn chưa có dữ liệu chấm công phát sinh.
+     - Cập nhật `src/app/settings/integrations/ipos/page.tsx`: Chỉ hiển thị "Cơ sở đồng bộ tự động" sau khi `isAuthenticated === true`, cho phép tick chọn linh hoạt và bổ sung nút "Ngắt kết nối".
+     - Thêm link trực tiếp "Tích hợp iPOS Cloud" vào thanh sidebar menu `src/lib/navigation/sidebar-config.ts`.
+  3) Kết quả:
+     - Bấm đồng bộ báo chính xác số ca, giao diện cấu hình iPOS chuẩn flow bảo mật và logic nghiệp vụ.
+     - File liên quan: `src/lib/services/ipos/ipos-cloud-client.ts`, `src/app/api/attendance/route.ts`, `src/app/attendance/page.tsx`, `src/app/settings/integrations/ipos/page.tsx`, `src/lib/navigation/sidebar-config.ts`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-14 (Fix lỗi kẹt màn hình "Đang chuyển đến màn hình chính..." khi truy cập Lịch làm việc /schedule trên Vercel):
   1) Nguyên nhân:
      - Trong `src/proxy.ts`, có điều kiện chặn khắt khe `else if (process.env.NODE_ENV === 'production' && !sessionToken)`: khi chạy trên môi trường Vercel production, nếu người dùng đăng nhập bằng mock/client-side storage mà chưa có cookie `homies_session` từ serverless, proxy tự động chuyển hướng về `/login?redirect=%2Fschedule`.

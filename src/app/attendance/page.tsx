@@ -529,12 +529,22 @@ export default function AttendanceTimesheetPage() {
       const json = await res.json()
 
       if (json.success) {
-        const count = json.synced_from_ipos_count ?? (Array.isArray(json.data) ? json.data.length : 0)
+        const count = (typeof json.synced_from_ipos_count === 'number' && json.synced_from_ipos_count > 0)
+          ? json.synced_from_ipos_count
+          : (json.count || (Array.isArray(json.data) ? json.data.length : 0))
         const storeName = syncStoreTarget === 'store-001' ? 'Hồ Bá Phấn' : syncStoreTarget === 'store-002' ? 'Đường 429' : 'Cả 2 chi nhánh (HBP + 429)'
-        const msg = `Đã đồng bộ thành công ${count} lượt chấm công (${storeName}) từ ${syncDateFrom} đến ${syncDateTo}!`
+        const srcLabel = json.source === 'ipos_cloud' ? 'đám mây App iPOS' : 'kho dữ liệu máy chủ'
+
+        let msg = ''
+        if (count > 0) {
+          msg = `Đã đồng bộ thành công ${count} lượt chấm công từ ${srcLabel} (${storeName}) từ ${syncDateFrom} đến ${syncDateTo}!`
+        } else {
+          msg = `Đã kết nối máy chủ iPOS: Chưa có lượt chấm công nào phát sinh (${storeName}) trong khoảng thời gian từ ${syncDateFrom} đến ${syncDateTo}.`
+        }
+
         setSyncModalMessage({ type: 'success', text: msg })
         setToastMessage(`⚡ ${msg}`)
-        setTimeout(() => setToastMessage(null), 4000)
+        setTimeout(() => setToastMessage(null), 4500)
 
         // Cập nhật lại nhãn giờ đồng bộ
         const nowTimeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
@@ -631,9 +641,16 @@ export default function AttendanceTimesheetPage() {
           setLastIposSyncText(`Đã gom lúc ${nowTimeStr} (Tự động 10p/lần)`)
 
           if (wasForced) {
+            const count = (typeof json.synced_from_ipos_count === 'number' && json.synced_from_ipos_count > 0)
+              ? json.synced_from_ipos_count
+              : (json.count || json.data.length)
             const srcLabel = json.source === 'ipos_cloud' ? 'đám mây App iPOS HRM' : 'kho dữ liệu máy chủ'
-            setToastMessage(`⚡ Đồng bộ iPOS tức thì thành công: Đã cập nhật ${json.data.length} lượt chấm công từ ${srcLabel}!`)
-            setTimeout(() => setToastMessage(null), 3500)
+            if (count > 0) {
+              setToastMessage(`⚡ Đồng bộ iPOS tức thì thành công: Đã cập nhật ${count} lượt chấm công từ ${srcLabel}!`)
+            } else {
+              setToastMessage(`⚡ Kết nối iPOS thành công: Chưa có lượt chấm công nào phát sinh trong kỳ đang xem.`)
+            }
+            setTimeout(() => setToastMessage(null), 4000)
           }
 
           const map: Record<string, Record<string, AttendanceSlot[]>> = {}

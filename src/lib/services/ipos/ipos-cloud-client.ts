@@ -30,6 +30,46 @@ export function getIposCloudConfig(): IposCloudConfig {
 }
 
 /**
+ * Lấy cấu hình iPOS Cloud động: Ưu tiên process.env, sau đó tự động nạp Token từ CSDL server-db (tài khoản đã kết nối)
+ */
+export async function getEffectiveIposCloudConfig(): Promise<IposCloudConfig> {
+  const base = getIposCloudConfig()
+  if (base.token && base.token.length > 5) {
+    return base
+  }
+
+  // Nếu biến môi trường chưa có token, thử đọc từ cấu hình người dùng đã lưu trong server-db
+  try {
+    const { getServerDb } = await import('@/lib/server/db')
+    const db = await getServerDb()
+    const iposConfig = db.ipos_integration
+    if (iposConfig?.hrm_jwt_token && iposConfig.hrm_jwt_token.length > 5) {
+      base.token = iposConfig.hrm_jwt_token.trim()
+    } else if (iposConfig?.username && iposConfig?.token_or_password) {
+      // Tự động đăng nhập lại bằng thông tin tài khoản đã lưu
+      const { loginHrm } = await import('@/lib/services/ipos/ipos-hrm-client')
+      const loginRes = await loginHrm(iposConfig.username, iposConfig.token_or_password, iposConfig.api_endpoint)
+      if (loginRes.success && loginRes.token) {
+        base.token = loginRes.token
+        iposConfig.hrm_jwt_token = loginRes.token
+        iposConfig.is_authenticated = true
+        const { saveServerDb } = await import('@/lib/server/db')
+        await saveServerDb(db)
+      }
+    }
+
+    if (iposConfig?.api_endpoint) {
+      const ep = iposConfig.api_endpoint.trim().replace(/\/+$/, '')
+      base.baseUrl = ep.endsWith('/api/v2') ? ep : `${ep}/api/v2`
+    }
+  } catch (err) {
+    console.warn('[iPOS Cloud Config] Error reading dynamic token from DB:', err)
+  }
+
+  return base
+}
+
+/**
  * Kiểm tra xem token iPOS đã được thiết lập hay chưa
  */
 export function isIposCloudConfigured(): boolean {
@@ -124,9 +164,9 @@ export interface MappedIposEmployee {
 }
 
 export async function fetchIposEmployees(): Promise<IposApiResponse<MappedIposEmployee>> {
-  const config = getIposCloudConfig()
+  const config = await getEffectiveIposCloudConfig()
 
-  if (!isIposCloudConfigured()) {
+  if (!config.token || config.token.length < 5) {
     return {
       success: false,
       isFallback: true,
@@ -274,9 +314,9 @@ export async function fetchIposWorkSchedule(params: {
   fromDate?: string | null
   toDate?: string | null
 }): Promise<IposApiResponse<MappedIposSchedule>> {
-  const config = getIposCloudConfig()
+  const config = await getEffectiveIposCloudConfig()
 
-  if (!isIposCloudConfigured()) {
+  if (!config.token || config.token.length < 5) {
     return {
       success: false,
       isFallback: true,
@@ -430,9 +470,9 @@ export async function fetchIposTimesheet(params: {
   toDate?: string | null
   forceRefresh?: boolean
 }): Promise<IposApiResponse<MappedIposAttendance>> {
-  const config = getIposCloudConfig()
+  const config = await getEffectiveIposCloudConfig()
 
-  if (!isIposCloudConfigured()) {
+  if (!config.token || config.token.length < 5) {
     return {
       success: false,
       isFallback: true,
@@ -476,11 +516,22 @@ export async function fetchIposTimesheet(params: {
           })
 
           const url = `${config.baseUrl}/timekeeping/list?${query.toString()}`
-          const res = await fetch(url, {
+          let res = await fetch(url, {
             method: 'GET',
             headers: buildIposHeaders(config.token),
             signal: AbortSignal.timeout(25000),
           })
+
+          // Dự phòng endpoint /timesheet/list nếu máy chủ iPOS dùng chuẩn cũ
+          if (!res.ok && (res.status === 404 || res.status === 400)) {
+            const altUrl = `${config.baseUrl}/timesheet/list?${query.toString()}`
+            const altRes = await fetch(altUrl, {
+              method: 'GET',
+              headers: buildIposHeaders(config.token),
+              signal: AbortSignal.timeout(25000),
+            })
+            if (altRes.ok) res = altRes
+          }
 
           if (!res.ok) {
             console.warn(`[iPOS Timekeeping] Store ${iposStoreId} HTTP ${res.status}: ${res.statusText}`)

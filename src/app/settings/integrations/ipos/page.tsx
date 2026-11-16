@@ -274,6 +274,32 @@ export default function IposIntegrationPage() {
     }
   }
 
+  // 2.0.1 Ngắt kết nối Cổng 1 (iPOS HRM)
+  const handleDisconnectHrm = async () => {
+    setIsAuthenticated(false)
+    setHrmDetails(null)
+    setSecretKey('')
+    try {
+      await fetch('/api/ipos/cloud-worker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_config',
+          config: {
+            is_authenticated: false,
+            hrm_jwt_token: undefined,
+            hrm_user: undefined,
+            hrm_company: undefined,
+            token_or_password: '',
+          },
+        }),
+      })
+      toast.success('Đã ngắt kết nối tài khoản iPOS HRM.')
+    } catch {
+      toast.error('Lỗi khi ngắt kết nối.')
+    }
+  }
+
   // 2.1 Thử nghiệm kết nối thật Cổng 2 (iPOS FABi POS - Chuẩn ZaloCRM)
   const handleTestFabiConnection = async () => {
     if (!fabiUsername.trim() || !fabiPassword.trim()) {
@@ -324,6 +350,7 @@ export default function IposIntegrationPage() {
         api_endpoint: apiEndpoint,
         username,
         token_or_password: secretKey,
+        store_codes: selectedStoresFilter,
         sync_schedule: syncSchedule,
         sync_attendance: syncAttendance,
         sync_payroll: syncPayroll,
@@ -815,25 +842,48 @@ export default function IposIntegrationPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-bold text-gray-700 mb-1.5 block">
-                    Cơ sở đồng bộ tự động:
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2">
-                      <input type="checkbox" checked readOnly className="rounded text-[#2F6FA8]" />
-                      <span className="font-semibold text-gray-800 text-[11px]">Hồ Bá Phấn (HBP)</span>
+                {/* Cơ sở đồng bộ tự động: CHỈ HIỂN THỊ SAU KHI ĐĂNG NHẬP THÀNH CÔNG */}
+                {isAuthenticated && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-gray-700 block">
+                        Cơ sở đồng bộ tự động:
+                      </label>
+                      <span className="text-[10px] text-emerald-700 font-semibold">
+                        ✓ Đã xác thực • Chọn cơ sở để gom dữ liệu
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2">
-                      <input type="checkbox" checked readOnly className="rounded text-[#2F6FA8]" />
-                      <span className="font-semibold text-gray-800 text-[11px]">Đường 429</span>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2">
-                      <input type="checkbox" checked readOnly className="rounded text-[#2F6FA8]" />
-                      <span className="font-semibold text-gray-800 text-[11px]">Lê Văn Sỹ (LVS)</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2 cursor-pointer hover:bg-gray-100/60 transition">
+                        <input
+                          type="checkbox"
+                          checked={selectedStoresFilter.includes('HBP')}
+                          onChange={() => toggleStoreFilter('HBP')}
+                          className="rounded text-[#2F6FA8]"
+                        />
+                        <span className="font-semibold text-gray-800 text-[11px]">Hồ Bá Phấn (HBP)</span>
+                      </label>
+                      <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2 cursor-pointer hover:bg-gray-100/60 transition">
+                        <input
+                          type="checkbox"
+                          checked={selectedStoresFilter.includes('429')}
+                          onChange={() => toggleStoreFilter('429')}
+                          className="rounded text-[#2F6FA8]"
+                        />
+                        <span className="font-semibold text-gray-800 text-[11px]">Đường 429</span>
+                      </label>
+                      <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2 cursor-pointer hover:bg-gray-100/60 transition">
+                        <input
+                          type="checkbox"
+                          checked={selectedStoresFilter.includes('LVS')}
+                          onChange={() => toggleStoreFilter('LVS')}
+                          className="rounded text-[#2F6FA8]"
+                        />
+                        <span className="font-semibold text-gray-800 text-[11px]">Lê Văn Sỹ (LVS)</span>
+                      </label>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Nút hành động Cổng 1 */}
                 <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">
@@ -855,6 +905,15 @@ export default function IposIntegrationPage() {
                     <Save size={13} />
                     <span>{isSaving ? 'Đang lưu...' : 'Lưu tài khoản'}</span>
                   </button>
+                  {isAuthenticated && (
+                    <button
+                      type="button"
+                      onClick={handleDisconnectHrm}
+                      className="w-full sm:w-auto inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-3.5 py-2 text-xs font-bold transition cursor-pointer"
+                    >
+                      <span>Ngắt kết nối</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

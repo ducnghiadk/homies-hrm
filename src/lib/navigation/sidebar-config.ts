@@ -138,6 +138,7 @@ const SIDEBAR_ENTRIES: SidebarEntry[] = [
       { href: '/settings/organization', label: 'Doanh nghiệp & Chi nhánh', roles: ADMIN_ROLES },
       { href: '/settings/schedule-rules', label: 'Quy tắc ca & Xếp lịch', roles: MANAGER_ROLES },
       { href: '/settings/payroll', label: 'Lương & Phụ cấp', roles: ADMIN_ROLES },
+      { href: '/settings/integrations/ipos', label: 'Tích hợp iPOS Cloud', roles: ADMIN_ROLES },
       { href: '/settings/permissions', label: 'Phân quyền & Bảo mật', roles: ADMIN_ROLES },
     ],
   },
