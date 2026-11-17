@@ -156,9 +156,56 @@ export default function IposIntegrationPage() {
   const [zaloWebhookUrl, setZaloWebhookUrl] = useState('')
   const [isTestingNotif, setIsTestingNotif] = useState(false)
 
+  // Lưu trữ bền vững tài khoản iPOS trên thiết bị, chống mất cấu hình khi F5
+  const IPOS_STORAGE_KEY = 'homies_ipos_integration_config_v2'
+
+  const getCachedIposConfig = () => {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = localStorage.getItem(IPOS_STORAGE_KEY)
+      if (raw) return JSON.parse(raw)
+    } catch {
+      // Ignore parse error
+    }
+    return null
+  }
+
+  const saveCachedIposConfig = (data: Record<string, unknown>) => {
+    if (typeof window === 'undefined') return
+    try {
+      const current = getCachedIposConfig() || {}
+      const updated = { ...current, ...data }
+      localStorage.setItem(IPOS_STORAGE_KEY, JSON.stringify(updated))
+    } catch {
+      // Ignore storage error
+    }
+  }
+
+  const clearCachedIposConfig = () => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.removeItem(IPOS_STORAGE_KEY)
+    } catch {
+      // Ignore
+    }
+  }
+
   // 1. Tải cấu hình hiện tại
   const loadConfig = async () => {
     setIsLoading(true)
+
+    // Khôi phục ngay từ bộ nhớ máy để giao diện không bị giật hay mất thông tin
+    const cached = getCachedIposConfig()
+    if (cached) {
+      if (cached.username) setUsername(cached.username)
+      if (cached.token_or_password) setSecretKey(cached.token_or_password)
+      if (cached.is_authenticated) setIsAuthenticated(true)
+      if (cached.hrm_details) setHrmDetails(cached.hrm_details)
+      if (cached.store_codes && Array.isArray(cached.store_codes) && cached.store_codes.length > 0) {
+        setSelectedStoresFilter(cached.store_codes)
+      }
+    }
+
     try {
       const res = await fetch('/api/ipos/cloud-worker')
       if (res.ok) {
@@ -167,8 +214,8 @@ export default function IposIntegrationPage() {
           setConfig(json.config)
           setIsEnabled(json.config.is_enabled ?? true)
           setApiEndpoint(json.config.api_endpoint || 'https://hrm.ipos.vn')
-          setUsername(json.config.username || '')
-          setSecretKey(json.config.token_or_password || '')
+          if (json.config.username) setUsername(json.config.username)
+          if (json.config.token_or_password) setSecretKey(json.config.token_or_password)
           setSyncSchedule(json.config.sync_schedule || 'daily_midnight')
           setSyncAttendance(json.config.sync_attendance ?? true)
           setSyncPayroll(json.config.sync_payroll ?? true)
@@ -178,7 +225,56 @@ export default function IposIntegrationPage() {
           setSyncInventory(json.config.sync_inventory ?? false)
           setSyncLogs(json.config.sync_logs || [])
           setLatencyMs(json.latency_ms || null)
-          setIsAuthenticated(Boolean(json.config.is_authenticated))
+
+          const isServerAuth = Boolean(json.config.is_authenticated)
+          if (isServerAuth) {
+            setIsAuthenticated(true)
+            if (json.config.hrm_user || json.config.hrm_company) {
+              const details = {
+                user_name: json.config.hrm_user?.name,
+                user_email: json.config.hrm_user?.email,
+                role: json.config.hrm_user?.role,
+                company_name: json.config.hrm_company?.name,
+              }
+              setHrmDetails(details)
+              saveCachedIposConfig({
+                username: json.config.username,
+                token_or_password: json.config.token_or_password,
+                is_authenticated: true,
+                hrm_jwt_token: json.config.hrm_jwt_token,
+                hrm_details: details,
+                store_codes: json.config.store_codes || selectedStoresFilter,
+              })
+            }
+          } else if (cached?.is_authenticated && cached?.username && cached?.token_or_password) {
+            // Máy chủ Serverless vừa cold start -> tự động hydrate lại dữ liệu từ localStorage
+            setIsAuthenticated(true)
+            if (cached.hrm_details) setHrmDetails(cached.hrm_details)
+            fetch('/api/ipos/cloud-worker', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'save_config',
+                config: {
+                  is_authenticated: true,
+                  username: cached.username,
+                  token_or_password: cached.token_or_password,
+                  hrm_jwt_token: cached.hrm_jwt_token || cached.token_or_password,
+                  store_codes: cached.store_codes || ['HBP', '429', 'LVS'],
+                  hrm_user: cached.hrm_details ? {
+                    name: cached.hrm_details.user_name,
+                    email: cached.hrm_details.user_email,
+                    role: cached.hrm_details.role,
+                  } : undefined,
+                  hrm_company: cached.hrm_details ? {
+                    name: cached.hrm_details.company_name,
+                  } : undefined,
+                },
+              }),
+            }).catch(() => {})
+          } else {
+            setIsAuthenticated(false)
+          }
 
           if (json.config.hrm_user || json.config.hrm_company) {
             setHrmDetails({
@@ -252,14 +348,23 @@ export default function IposIntegrationPage() {
       if (res.ok && json.success) {
         setIsAuthenticated(true)
         setLatencyMs(json.latency_ms)
-        if (json.user || json.company) {
-          setHrmDetails({
-            user_name: json.user?.name,
-            user_email: json.user?.email,
-            role: json.user?.role,
-            company_name: json.company?.name,
-          })
+        const details = (json.user || json.company) ? {
+          user_name: json.user?.name,
+          user_email: json.user?.email,
+          role: json.user?.role,
+          company_name: json.company?.name,
+        } : null
+        if (details) {
+          setHrmDetails(details)
         }
+        saveCachedIposConfig({
+          username,
+          token_or_password: secretKey,
+          is_authenticated: true,
+          hrm_jwt_token: json.hrm_jwt_token || secretKey,
+          hrm_details: details,
+          store_codes: selectedStoresFilter,
+        })
         toast.success(json.message)
       } else {
         setIsAuthenticated(false)
@@ -279,6 +384,7 @@ export default function IposIntegrationPage() {
     setIsAuthenticated(false)
     setHrmDetails(null)
     setSecretKey('')
+    clearCachedIposConfig()
     try {
       await fetch('/api/ipos/cloud-worker', {
         method: 'POST',
@@ -400,6 +506,13 @@ export default function IposIntegrationPage() {
 
       const json = await res.json()
       if (res.ok && json.success) {
+        saveCachedIposConfig({
+          username,
+          token_or_password: secretKey,
+          is_authenticated: isAuthenticated,
+          hrm_details: hrmDetails,
+          store_codes: selectedStoresFilter,
+        })
         toast.success('Đã lưu cấu hình tích hợp iPOS Cloud!')
         if (json.config) setConfig(json.config)
       } else {

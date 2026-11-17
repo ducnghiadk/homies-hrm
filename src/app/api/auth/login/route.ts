@@ -89,12 +89,32 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Thiết lập session cookie an toàn
+    // Thiết lập session cookie an toàn (30 ngày bền vững)
+    const thirtyDaysSec = 60 * 60 * 24 * 30
+    const isProd = process.env.NODE_ENV === 'production'
+
     response.cookies.set('homies_session', token, {
       httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProd,
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 ngày
+      maxAge: thirtyDaysSec,
+      path: '/',
+    })
+
+    // Đồng bộ ngay lập tức hrm-auth và hrm-role từ máy chủ để tránh bị đá văng khi F5
+    response.cookies.set('hrm-auth', '1', {
+      httpOnly: false,
+      secure: isProd,
+      sameSite: 'lax',
+      maxAge: thirtyDaysSec,
+      path: '/',
+    })
+
+    response.cookies.set('hrm-role', user.role, {
+      httpOnly: false,
+      secure: isProd,
+      sameSite: 'lax',
+      maxAge: thirtyDaysSec,
       path: '/',
     })
 
@@ -102,17 +122,17 @@ export async function POST(req: NextRequest) {
     const roleSig = signRole(user.role, user.id)
     response.cookies.set('hrm-role-sig', roleSig, {
       httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProd,
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: thirtyDaysSec,
       path: '/',
     })
 
     response.cookies.set('hrm-user-id', user.id, {
       httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProd,
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: thirtyDaysSec,
       path: '/',
     })
 

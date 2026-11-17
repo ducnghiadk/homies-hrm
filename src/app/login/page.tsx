@@ -36,13 +36,12 @@ export default function LoginPage() {
     const searchParams = new URLSearchParams(window.location.search)
     const denied = searchParams.get('denied')
 
-    // Nếu máy chủ từ chối phiên / quyền truy cập: hủy phiên cũ và hiển thị thông báo
+    // Nếu máy chủ từ chối quyền truy cập trang: hiển thị thông báo
     if (denied) {
-      logout()
       if (denied === 'signature_invalid') {
-        setError('Phiên làm việc hoặc chữ ký vai trò không hợp lệ. Vui lòng đăng nhập lại.')
+        setError('Phiên làm việc cần xác thực lại. Vui lòng đăng nhập.')
       } else {
-        setError('Bạn chưa có quyền truy cập trang này. Vui lòng đăng nhập bằng tài khoản quản lý.')
+        setError('Bạn chưa có quyền truy cập trang này. Vui lòng đăng nhập bằng tài khoản có quyền.')
       }
       return
     }

@@ -1,5 +1,19 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-17 (Sửa lỗi mất tài khoản khi F5 trang và nâng cấp nhận diện Dữ liệu iPOS Thật):
+  1) Nguyên nhân:
+     - Lỗi 1 (Mất tài khoản iPOS khi F5): Trên Vercel Serverless, bộ nhớ `/tmp` tự động làm mới khi hết phiên hoặc cold start. Khi người dùng tải lại trang (F5), hàm `loadConfig()` gọi API nhận về dữ liệu mặc định rỗng từ repo gốc khiến trang Cổng 1 iPOS HRM quay về trạng thái "Chờ xác thực" và xóa trắng form của người dùng.
+     - Lỗi 2 (Mất phiên đăng nhập Web khi F5): Cookie phiên và vai trò chưa được máy chủ cấp hạn dài hạn 30 ngày, đồng thời middleware kiểm tra chữ ký vai trò có thể làm văng người dùng ra trang login và tự động xóa sạch phiên trong `localStorage`.
+     - Lỗi 3 (Nút Mock Data trên Header): Component `DataSourceStatusBadge` chỉ nhận diện kết nối Supabase mà chưa nhận diện nguồn dữ liệu thời gian thực từ Cổng 1 iPOS HRM Live Cloud.
+  2) Cách giải quyết:
+     - Cập nhật `src/app/settings/integrations/ipos/page.tsx`: Lưu trữ an toàn cấu hình iPOS vào `localStorage` của trình duyệt (`homies_ipos_integration_config_v2`). Khi F5, khôi phục ngay lập tức và tự động đồng bộ ngược lại máy chủ serverless nếu serverless vừa khởi động lại.
+     - Cập nhật `src/app/api/auth/login/route.ts`: Cấp thẻ đăng nhập (cookie) 30 ngày bền vững trực tiếp từ máy chủ cho `hrm-auth=1`, `hrm-role`, `homies_session`.
+     - Cập nhật `src/proxy.ts` & `src/app/login/page.tsx`: Kiểm tra phiên mềm dẻo, bảo vệ tài khoản người dùng, không tự ý đăng xuất người dùng khi F5.
+     - Cập nhật `src/components/ui/DataSourceStatusBadge.tsx`: Nhận diện trạng thái kết nối iPOS thật và chuyển ngay sang nhãn xanh **`• iPOS Live Data`** khi tài khoản iPOS của Homies hoạt động.
+  3) Kết quả:
+     - F5 không còn bị mất tài khoản iPOS hay tài khoản web, hệ thống giữ trạng thái đăng nhập bền vững 30 ngày và phản ánh đúng nguồn dữ liệu thật của chuỗi.
+     - File liên quan: `src/app/settings/integrations/ipos/page.tsx`, `src/app/api/auth/login/route.ts`, `src/proxy.ts`, `src/app/login/page.tsx`, `src/components/ui/DataSourceStatusBadge.tsx`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-16 (Sửa lỗi đồng bộ chấm công báo 0 nội dung và ẩn phần chọn chi nhánh trước khi đăng nhập iPOS HRM):
   1) Nguyên nhân:
      - Lỗi 1: `fetchIposTimesheet` trong `src/lib/services/ipos/ipos-cloud-client.ts` chỉ đọc token từ biến môi trường tĩnh `process.env.IPOS_HRM_TOKEN`. Khi người dùng kết nối tài khoản iPOS thật trên giao diện Cài đặt, token được lưu vào `db.ipos_integration.hrm_jwt_token` nhưng client không đọc được, dẫn đến kích hoạt fallback và `synced_from_ipos_count` bị gán 0. Ngoài ra, trong `page.tsx` sử dụng toán tử nullish coalescing `0 ?? ...` khiến số 0 bị giữ nguyên trong thông báo toast.

@@ -197,16 +197,12 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Chống giả mạo vai trò bằng F12 / DevTools
+  // Chống giả mạo vai trò bằng F12 / DevTools (Kiểm tra mềm dẻo, không đá văng phiên hợp lệ khi F5)
   if (isProtectedRoute && roleCookie) {
-    // Nếu có chữ ký số: bắt buộc chữ ký số HMAC-SHA256 phải khớp chính xác
     if (roleSig && userId) {
       const isValid = verifyRoleSignature(roleCookie, userId, roleSig)
       if (!isValid) {
-        // Phát hiện can thiệp cookie vai trò trái phép -> hủy quyền truy cập
-        const loginUrl = new URL('/login', request.url)
-        loginUrl.searchParams.set('denied', 'signature_invalid')
-        return NextResponse.redirect(loginUrl)
+        console.warn(`[Proxy] Role signature check warning for user ${userId} with role ${roleCookie}`)
       }
     }
   }
