@@ -1,5 +1,16 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-17 (Loại bỏ hoàn toàn chi nhánh Lê Văn Sỹ - Chuẩn hóa 2 cơ sở vận hành thật HBP & 429):
+  1) Nguyên nhân:
+     - Giao diện Tích hợp iPOS Cloud (`/settings/integrations/ipos`) và worker đồng bộ vẫn hiển thị nút bấm `[Lê Văn Sỹ]`, checkbox `Lê Văn Sỹ (LVS)` và thống kê `3/3 cơ sở (HBP, 429, LVS)`. Đây là chi nhánh mẫu dự kiến cũ không có thật trong chuỗi Homies đang hoạt động của CEO.
+  2) Cách giải quyết:
+     - Cập nhật `src/app/settings/integrations/ipos/page.tsx`: Bỏ nút chi nhánh Lê Văn Sỹ, bỏ checkbox LVS, đổi bộ lọc mặc định thành `['HBP', '429']`, tự động lọc bỏ mã LVS cũ trong cache trình duyệt và cập nhật nhãn `2/2 cơ sở (HBP & 429)`.
+     - Cập nhật `src/app/api/ipos/cloud-worker/route.ts`: Xóa toàn bộ dữ liệu mẫu chi nhánh LVS, cấu hình mặc định chỉ đồng bộ 2 cơ sở `['HBP', '429']`.
+     - Cập nhật `src/lib/server/db.ts` & `data/server-db.json`: Đặt `is_active: false` cho `store-003` (Lê Văn Sỹ - Tạm ngưng) để toàn bộ hệ thống chỉ nhận diện 2 cửa hàng thật.
+  3) Kết quả:
+     - Giao diện và API iPOS sạch sẽ 100%, chuẩn xác tuyệt đối với 2 cơ sở thực tế Hồ Bá Phấn và Đường 429.
+     - File liên quan: `src/app/settings/integrations/ipos/page.tsx`, `src/app/api/ipos/cloud-worker/route.ts`, `src/lib/server/db.ts`, `data/server-db.json`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-17 (Sửa lỗi mất tài khoản khi F5 trang và nâng cấp nhận diện Dữ liệu iPOS Thật):
   1) Nguyên nhân:
      - Lỗi 1 (Mất tài khoản iPOS khi F5): Trên Vercel Serverless, bộ nhớ `/tmp` tự động làm mới khi hết phiên hoặc cold start. Khi người dùng tải lại trang (F5), hàm `loadConfig()` gọi API nhận về dữ liệu mặc định rỗng từ repo gốc khiến trang Cổng 1 iPOS HRM quay về trạng thái "Chờ xác thực" và xóa trắng form của người dùng.

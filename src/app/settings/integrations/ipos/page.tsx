@@ -99,7 +99,7 @@ export default function IposIntegrationPage() {
   // Modal xem chi tiết gói tin với 3 góc nhìn đối soát chuyên sâu
   const [selectedLog, setSelectedLog] = useState<ServerIposSyncLog | null>(null)
   const [inspectorTab, setInspectorTab] = useState<'payroll' | 'attendance' | 'bank' | 'raw'>('payroll')
-  const [selectedStoresFilter, setSelectedStoresFilter] = useState<string[]>(['HBP', '429', 'LVS'])
+  const [selectedStoresFilter, setSelectedStoresFilter] = useState<string[]>(['HBP', '429'])
 
   const toggleStoreFilter = (code: string) => {
     setSelectedStoresFilter((prev) =>
@@ -202,7 +202,9 @@ export default function IposIntegrationPage() {
       if (cached.is_authenticated) setIsAuthenticated(true)
       if (cached.hrm_details) setHrmDetails(cached.hrm_details)
       if (cached.store_codes && Array.isArray(cached.store_codes) && cached.store_codes.length > 0) {
-        setSelectedStoresFilter(cached.store_codes)
+        // Lọc bỏ mã LVS cũ nếu còn sót lại trong cache
+        const cleanCodes = cached.store_codes.filter((c: string) => c !== 'LVS')
+        setSelectedStoresFilter(cleanCodes.length > 0 ? cleanCodes : ['HBP', '429'])
       }
     }
 
@@ -260,7 +262,7 @@ export default function IposIntegrationPage() {
                   username: cached.username,
                   token_or_password: cached.token_or_password,
                   hrm_jwt_token: cached.hrm_jwt_token || cached.token_or_password,
-                  store_codes: cached.store_codes || ['HBP', '429', 'LVS'],
+                  store_codes: (cached.store_codes || ['HBP', '429']).filter((c: string) => c !== 'LVS'),
                   hrm_user: cached.hrm_details ? {
                     name: cached.hrm_details.user_name,
                     email: cached.hrm_details.user_email,
@@ -691,13 +693,12 @@ export default function IposIntegrationPage() {
               </select>
             </div>
 
-            {/* Bộ chọn chi nhánh cần đồng bộ */}
+            {/* Bộ chọn chi nhánh cần đồng bộ (Chuẩn 2 cơ sở Homies) */}
             <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-1 shadow-2xs">
               <Building2 size={13} className="text-gray-400 mr-0.5" />
               {[
                 { code: 'HBP', label: 'Hồ Bá Phấn' },
                 { code: '429', label: 'Đường 429' },
-                { code: 'LVS', label: 'Lê Văn Sỹ' },
               ].map((st) => (
                 <button
                   key={st.code}
@@ -780,7 +781,7 @@ export default function IposIntegrationPage() {
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded ml-1">100%</span>
               </div>
               <span className="text-[10px] text-gray-400 font-medium block truncate max-w-[190px]">
-                {auditChecksum?.matched_stores_label || '3/3 cơ sở (HBP, 429, LVS)'}
+                {auditChecksum?.matched_stores_label || '2/2 cơ sở (HBP & 429)'}
               </span>
             </div>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-700">
@@ -984,15 +985,6 @@ export default function IposIntegrationPage() {
                           className="rounded text-[#2F6FA8]"
                         />
                         <span className="font-semibold text-gray-800 text-[11px]">Đường 429</span>
-                      </label>
-                      <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-2 cursor-pointer hover:bg-gray-100/60 transition">
-                        <input
-                          type="checkbox"
-                          checked={selectedStoresFilter.includes('LVS')}
-                          onChange={() => toggleStoreFilter('LVS')}
-                          className="rounded text-[#2F6FA8]"
-                        />
-                        <span className="font-semibold text-gray-800 text-[11px]">Lê Văn Sỹ (LVS)</span>
                       </label>
                     </div>
                   </div>
