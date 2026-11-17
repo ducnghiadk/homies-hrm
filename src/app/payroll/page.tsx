@@ -233,7 +233,7 @@ export default function PayrollPage() {
   const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const isCeo = Boolean(user && (user.id === 'emp-001' || user.role === 'ceo'))
   const router = useRouter()
-  const [selectedPeriod, setSelectedPeriod] = useState('2026-08')
+  const [selectedPeriod, setSelectedPeriod] = useState('2026-11')
   const [tab, setTab] = useState<'table'|'overview'|'payslips'|'my'>('table')
 
   // Table filters

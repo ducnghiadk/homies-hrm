@@ -442,11 +442,10 @@ export default function PublicViolationLogPage() {
     return []
   }
 
-  // Database States
+  // Database States (2 cơ sở vận hành thật của Homies)
   const [dbStores, setDbStores] = useState<Array<{ id: string; name: string; pin_code?: string }>>([
     { id: 'store-001', name: 'Homies Milk Tea - Hồ Bá Phấn', pin_code: '3535' },
     { id: 'store-002', name: 'Homies Milk Tea - Chi Nhánh 429', pin_code: '4290' },
-    { id: 'store-003', name: 'Homies Milk Tea - Lê Văn Sỹ', pin_code: '8888' },
   ])
   const [dbEmployees, setDbEmployees] = useState<Array<{ id: string; employee_code: string; full_name: string; store_id: string }>>(getInitialEmployees)
   const [authorizedVerifiers, setAuthorizedVerifiers] = useState<AuthorizedVerifier[]>(() => violationPermissionService.getVerifiers())

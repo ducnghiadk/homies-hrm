@@ -279,7 +279,8 @@ export async function POST(req: NextRequest) {
 
       const now = new Date().toISOString()
       const currentPeriod = body.period && typeof body.period === 'string' ? body.period.trim() : new Date().toISOString().slice(0, 7)
-      const periodLabel = currentPeriod === '2026-07' ? 'Tháng 07/2026' : currentPeriod === '2026-08' ? 'Tháng 08/2026' : currentPeriod === '2026-09' ? 'Tháng 09/2026' : `Chu kỳ ${currentPeriod}`
+      const periodParts = currentPeriod.split('-')
+      const periodLabel = periodParts.length === 2 ? `Tháng ${periodParts[1]}/${periodParts[0]}` : `Chu kỳ ${currentPeriod}`
 
       // Dữ liệu lưu trữ thực tế từ iPOS HRM cho TOÀN BỘ CÁC CỬA HÀNG CỦA CHUỖI
       const syncPayrollPayload = {

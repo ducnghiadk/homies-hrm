@@ -50,16 +50,16 @@ const DEFAULT_STORES: StoreItem[] = [
   },
   {
     id: 'store-003',
-    name: 'Homies Milk Tea - Lê Văn Sỹ',
+    name: 'Homies Milk Tea - Lê Văn Sỹ (Tạm ngưng)',
     code: 'LVS',
     address: '350 Lê Văn Sỹ, Phường 14, Quận 3, TP.HCM',
     latitude: 10.7892,
     longitude: 106.6781,
     radius_meters: 100,
     phone: '0901 234 569',
-    manager_name: 'Đang bổ nhiệm',
+    manager_name: 'Chưa kích hoạt',
     active_staff_count: 0,
-    is_active: true,
+    is_active: false,
   },
 ]
 
@@ -123,7 +123,9 @@ export default function StoresPage() {
                       <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary-50 text-primary-700 font-bold border border-primary-200">
                         {store.code}
                       </span>
-                      <Badge variant="success" className="text-xs">Đang hoạt động</Badge>
+                      <Badge variant={store.is_active ? "success" : "neutral"} className="text-xs">
+                        {store.is_active ? "Đang hoạt động" : "Tạm ngưng / Dự kiến"}
+                      </Badge>
                     </div>
                     <h2 className="text-lg font-bold text-gray-900 font-['Poppins']">{store.name}</h2>
                   </div>

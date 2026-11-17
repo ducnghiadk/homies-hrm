@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 export default function ViolationLogPage() {
   const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
-  const [period, setPeriod] = useState('2026-09')
+  const [period, setPeriod] = useState('2026-11')
   const [isVerifiersModalOpen, setIsVerifiersModalOpen] = useState(false)
 
   useEffect(() => {
@@ -62,10 +62,11 @@ export default function ViolationLogPage() {
                 aria-label="Chọn kỳ tháng"
                 className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer"
               >
+                <option value="2026-11">Tháng 11/2026 (Hiện tại)</option>
+                <option value="2026-10">Tháng 10/2026</option>
                 <option value="2026-09">Tháng 09/2026</option>
                 <option value="2026-08">Tháng 08/2026</option>
                 <option value="2026-07">Tháng 07/2026</option>
-                <option value="2026-06">Tháng 06/2026</option>
               </select>
             </div>
 

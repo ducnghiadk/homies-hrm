@@ -30,11 +30,10 @@ interface ServerReportData {
   }
 }
 
-// 2 Cơ sở thật vận hành & 1 cơ sở dự kiến của Homies Milk Tea
+// 2 Cơ sở thật vận hành của Homies Milk Tea
 const STORE_REVENUES = [
   { store_id: 'store-001', name: 'Homies Milk Tea - Hồ Bá Phấn', revenue: 78000000, orders: 2150, avg_ticket: 36279 },
   { store_id: 'store-002', name: 'Homies Milk Tea - Đường 429', revenue: 74000000, orders: 2020, avg_ticket: 36633 },
-  { store_id: 'store-003', name: 'Homies Milk Tea - Lê Văn Sỹ (Dự kiến)', revenue: 0, orders: 0, avg_ticket: 0 },
 ]
 
 export default function ReportsPage() {
@@ -42,7 +41,7 @@ export default function ReportsPage() {
   const router = useRouter()
   const [tab, setTab] = useState<'revenue' | 'labor' | 'products'>('labor')
   const [reportData, setReportData] = useState<ServerReportData | null>(null)
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('2026-08')
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('2026-11')
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/reports')
@@ -106,8 +105,10 @@ export default function ReportsPage() {
               onChange={(e) => setSelectedPeriod(e.target.value)}
               className="text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 text-gray-800"
             >
-              <option value="2026-08">Tháng 08/2026 (Chính thức)</option>
-              <option value="2026-09">Tháng 09/2026 (Hiện tại)</option>
+              <option value="2026-08">Tháng 08/2026</option>
+              <option value="2026-09">Tháng 09/2026</option>
+              <option value="2026-10">Tháng 10/2026</option>
+              <option value="2026-11">Tháng 11/2026 (Hiện tại)</option>
             </select>
           </div>
           <span className="text-[11px] font-medium text-gray-400">Chuỗi Homies Milk Tea</span>

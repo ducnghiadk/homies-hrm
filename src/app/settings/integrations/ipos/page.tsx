@@ -67,8 +67,8 @@ export default function IposIntegrationPage() {
     company_name?: string
   } | null>(null)
 
-  // Chu kỳ đồng bộ (Tháng 7, Tháng 8, Tháng 9, Hiện tại) & Kiểm toán đối soát 100%
-  const [selectedPeriod, setSelectedPeriod] = useState('2026-08')
+  // Chu kỳ đồng bộ (Tháng 7, Tháng 8, Tháng 9, Tháng 10, Tháng 11 Hiện tại) & Kiểm toán đối soát 100%
+  const [selectedPeriod, setSelectedPeriod] = useState('2026-11')
   const [auditChecksum, setAuditChecksum] = useState<{
     status: string
     period: string
@@ -689,7 +689,8 @@ export default function IposIntegrationPage() {
                 <option value="2026-07">Tháng 07/2026</option>
                 <option value="2026-08">Tháng 08/2026</option>
                 <option value="2026-09">Tháng 09/2026</option>
-                <option value="2026-10">Tháng 10/2026 (Hiện tại)</option>
+                <option value="2026-10">Tháng 10/2026</option>
+                <option value="2026-11">Tháng 11/2026 (Hiện tại)</option>
               </select>
             </div>
 
@@ -812,7 +813,7 @@ export default function IposIntegrationPage() {
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-xs flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-semibold text-gray-500 block">
-                Tổng Lương Chu Kỳ {selectedPeriod === '2026-07' ? 'T7/2026' : selectedPeriod === '2026-08' ? 'T8/2026' : selectedPeriod}
+                Tổng Lương Chu Kỳ {selectedPeriod.includes('-') ? `T${selectedPeriod.split('-')[1]}/${selectedPeriod.split('-')[0]}` : selectedPeriod}
               </span>
               <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-bold font-mono tabular-nums text-emerald-700">

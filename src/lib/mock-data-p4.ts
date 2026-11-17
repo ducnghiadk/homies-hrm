@@ -14,6 +14,8 @@ export const mockPayrollPeriods: Array<{
   total_net: number
   employee_count: number
 }> = [
+  { id: 'pr-2026-11', period: '2026-11', status: PAYROLL_PERIOD_STATUS.DRAFT, total_gross: 94500000, total_net: 85200000, employee_count: 14 },
+  { id: 'pr-2026-10', period: '2026-10', status: PAYROLL_PERIOD_STATUS.CONFIRMED, total_gross: 89000000, total_net: 80100000, employee_count: 14 },
   { id: 'pr-2026-09', period: '2026-09', status: PAYROLL_PERIOD_STATUS.DRAFT, total_gross: 90000000, total_net: 81000000, employee_count: 14 },
   { id: 'pr-2026-08', period: '2026-08', status: PAYROLL_PERIOD_STATUS.CONFIRMED, total_gross: 44280000, total_net: 43480000, employee_count: 14 },
   { id: 'pr-2026-02', period: '2026-02', status: PAYROLL_PERIOD_STATUS.DRAFT, total_gross: 87500000, total_net: 78750000, employee_count: 12 },

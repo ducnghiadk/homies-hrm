@@ -1,5 +1,21 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-17 (Đồng bộ toàn diện kỳ hiện tại Tháng 11/2026 và dọn sạch chi nhánh Lê Văn Sỹ trên toàn hệ thống):
+  1) Nguyên nhân:
+     - Tại trang Tích hợp iPOS Cloud (`/settings/integrations/ipos`), trang Báo cáo (`/reports`), trang Bảng lương (`/payroll`) và trang Nhật ký Sự cố (`/kpi/violations/log`), các dropdown chọn kỳ bị hardcode dừng lại ở Tháng 09/2026 hoặc ghi nhầm *"Tháng 10/2026 (Hiện tại)"*, thiếu mất chu kỳ vận hành thực tế Tháng 11/2026.
+     - Chi nhánh Lê Văn Sỹ (LVS) vẫn còn xuất hiện ở trang Báo cáo doanh thu (`/reports`), Quản lý Cửa hàng (`/stores`) và Form Quản lý nhập sự cố công khai (`/kpi/violations/public`).
+  2) Cách giải quyết:
+     - Cập nhật `src/app/settings/integrations/ipos/page.tsx`: Mặc định mở kỳ `2026-11`, thêm tùy chọn `Tháng 11/2026 (Hiện tại)`.
+     - Cập nhật `src/app/api/ipos/cloud-worker/route.ts`: Bộ định dạng chu kỳ động theo đúng tháng hiện tại.
+     - Cập nhật `src/lib/mock-data-p4.ts` & `src/app/payroll/page.tsx`: Bổ sung kỳ lương Tháng 10 và Tháng 11/2026, mặc định mở kỳ `2026-11`.
+     - Cập nhật `src/app/reports/page.tsx`: Bổ sung kỳ `2026-11 (Hiện tại)`, gỡ bỏ cơ sở Lê Văn Sỹ khỏi bảng phân bổ doanh thu.
+     - Cập nhật `src/app/kpi/violations/log/page.tsx`: Bổ sung kỳ `2026-11 (Hiện tại)` vào bộ lọc nhật ký vi phạm.
+     - Cập nhật `src/app/kpi/violations/public/page.tsx`: Gỡ bỏ chi nhánh Lê Văn Sỹ khỏi form chọn cơ sở công khai.
+     - Cập nhật `src/app/stores/page.tsx`: Đánh dấu chi nhánh Lê Văn Sỹ `is_active: false` (Tạm ngưng / Dự kiến) để trang cửa hàng tập trung vào 2 cơ sở đang hoạt động thật.
+  3) Kết quả:
+     - Toàn bộ các trang nghiệp vụ đều đồng bộ chuẩn xác thời gian thực **Tháng 11/2026 (Hiện tại)** và mạng lưới cơ sở chỉ gồm 2 quán thật (Hồ Bá Phấn & Đường 429).
+     - File liên quan: `src/app/settings/integrations/ipos/page.tsx`, `src/app/api/ipos/cloud-worker/route.ts`, `src/lib/mock-data-p4.ts`, `src/app/payroll/page.tsx`, `src/app/reports/page.tsx`, `src/app/kpi/violations/log/page.tsx`, `src/app/kpi/violations/public/page.tsx`, `src/app/stores/page.tsx`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-17 (Loại bỏ hoàn toàn chi nhánh Lê Văn Sỹ - Chuẩn hóa 2 cơ sở vận hành thật HBP & 429):
   1) Nguyên nhân:
      - Giao diện Tích hợp iPOS Cloud (`/settings/integrations/ipos`) và worker đồng bộ vẫn hiển thị nút bấm `[Lê Văn Sỹ]`, checkbox `Lê Văn Sỹ (LVS)` và thống kê `3/3 cơ sở (HBP, 429, LVS)`. Đây là chi nhánh mẫu dự kiến cũ không có thật trong chuỗi Homies đang hoạt động của CEO.
