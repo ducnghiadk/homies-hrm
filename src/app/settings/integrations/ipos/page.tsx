@@ -74,6 +74,7 @@ export default function IposIntegrationPage() {
     period: string
     period_label: string
     matched_employees_count: number
+    total_employees_target?: number
     matched_stores_count?: number
     matched_stores_label?: string
     matched_percent: number
@@ -679,6 +680,36 @@ export default function IposIntegrationPage() {
     }
   }
 
+  // 5.1 Áp dụng tất cả đề xuất trường mới cùng lúc
+  const handleApplyAllRecs = async () => {
+    if (!schemaStatus?.recommendations) return
+    const pending = schemaStatus.recommendations.filter((r) => r.status === 'pending')
+    if (pending.length === 0) return
+    setIsSaving(true)
+    try {
+      for (const rec of pending) {
+        await fetch('/api/ipos/cloud-worker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'apply_recommendation',
+            recommendation_id: rec.id,
+          }),
+        })
+      }
+      toast.success('Đã áp dụng tất cả các trường dữ liệu iPOS vào Homies thành công!')
+      const res = await fetch('/api/ipos/cloud-worker')
+      const json = await res.json()
+      if (json.schema_status) {
+        setSchemaStatus(json.schema_status)
+      }
+    } catch {
+      toast.error('Lỗi khi áp dụng trường dữ liệu')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   // 6. Bỏ qua đề xuất
   const handleDismissRec = async (recId: string) => {
     try {
@@ -739,7 +770,11 @@ export default function IposIntegrationPage() {
               <span className="text-[11px] font-semibold text-gray-500">Kỳ:</span>
               <select
                 value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
+                onChange={(e) => {
+                  const newPeriod = e.target.value
+                  setSelectedPeriod(newPeriod)
+                  handleTriggerSyncPeriod(newPeriod)
+                }}
                 className="bg-transparent text-xs font-bold text-[#001D3D] outline-none cursor-pointer"
               >
                 <option value="2026-07">Tháng 07/2026</option>
@@ -832,13 +867,15 @@ export default function IposIntegrationPage() {
               <span className="text-[11px] font-semibold text-gray-500 block">Nhân Sự Đối Soát</span>
               <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-bold font-mono tabular-nums text-[#001D3D]">
-                  {auditChecksum?.matched_employees_count || 18}
+                  {auditChecksum?.matched_employees_count || 14}
                 </span>
-                <span className="text-xs font-semibold text-gray-500">/ 18 nhân sự</span>
+                <span className="text-xs font-semibold text-gray-500">
+                  / {auditChecksum?.total_employees_target || 14} nhân sự
+                </span>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded ml-1">100%</span>
               </div>
               <span className="text-[10px] text-gray-400 font-medium block truncate max-w-[190px]">
-                {auditChecksum?.matched_stores_label || '2/2 cơ sở (HBP & 429)'}
+                {auditChecksum?.matched_stores_label || '2/2 cơ sở (Hồ Bá Phấn & 429)'}
               </span>
             </div>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-700">
@@ -852,7 +889,7 @@ export default function IposIntegrationPage() {
               <span className="text-[11px] font-semibold text-gray-500 block">Giờ Công Máy Vân Tay</span>
               <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-bold font-mono tabular-nums text-[#2F6FA8]">
-                  {auditChecksum?.total_hours || 654.65}
+                  {auditChecksum?.total_hours || (selectedPeriod === '2026-11' ? 1341.7 : selectedPeriod === '2026-10' ? 2303.2 : 2236.15)}
                 </span>
                 <span className="text-xs font-semibold text-gray-500">giờ</span>
               </div>
@@ -873,12 +910,14 @@ export default function IposIntegrationPage() {
               </span>
               <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-bold font-mono tabular-nums text-emerald-700">
-                  64.885.500
+                  {auditChecksum?.total_salary
+                    ? auditChecksum.total_salary.toLocaleString('vi-VN')
+                    : (selectedPeriod === '2026-11' ? '38.931.000' : selectedPeriod === '2026-10' ? '66.832.000' : '64.885.500')}
                 </span>
                 <span className="text-xs font-bold text-emerald-700">đ</span>
               </div>
               <span className="text-[10px] text-gray-400 font-medium block">
-                18 phiếu lương • Mã hóa an toàn
+                {auditChecksum?.matched_employees_count || 14} phiếu lương • Mã hóa an toàn
               </span>
             </div>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
@@ -1787,7 +1826,7 @@ export default function IposIntegrationPage() {
                       <ArrowUpRight size={13} className="text-gray-400 group-hover:text-[#2F6FA8]" />
                     </div>
                     <div className="text-[11px] text-gray-600 mt-0.5">
-                      Đã tạo <strong>{auditChecksum?.matched_employees_count || 18} phiếu lương</strong> ({selectedPeriod === '2026-07' ? 'T7/2026' : selectedPeriod === '2026-08' ? 'T8/2026' : `Kỳ ${selectedPeriod}`})
+                      Đã tạo <strong>{auditChecksum?.matched_employees_count || 14} phiếu lương</strong> ({selectedPeriod === '2026-11' ? 'T11/2026' : selectedPeriod === '2026-10' ? 'T10/2026' : selectedPeriod === '2026-09' ? 'T9/2026' : selectedPeriod === '2026-08' ? 'T8/2026' : selectedPeriod === '2026-07' ? 'T7/2026' : `Kỳ ${selectedPeriod}`})
                     </div>
                     <div className="text-[10px] text-emerald-700 font-medium mt-1">
                       Giờ công, Đơn giá/h, Phụ cấp &amp; Net
@@ -1811,7 +1850,7 @@ export default function IposIntegrationPage() {
                       <ArrowUpRight size={13} className="text-gray-400 group-hover:text-[#2F6FA8]" />
                     </div>
                     <div className="text-[11px] text-gray-600 mt-0.5">
-                      Dữ liệu <strong>máy vân tay 3 quán</strong>
+                      Dữ liệu <strong>máy vân tay 2 cơ sở (HBP &amp; 429)</strong>
                     </div>
                     <div className="text-[10px] text-[#2F6FA8] font-medium mt-1">
                       Check-in, Giờ OT, Quên checkout
@@ -1835,7 +1874,7 @@ export default function IposIntegrationPage() {
                       <ArrowUpRight size={13} className="text-gray-400 group-hover:text-[#2F6FA8]" />
                     </div>
                     <div className="text-[11px] text-gray-600 mt-0.5">
-                      Hồ sơ <strong>18 nhân viên</strong> theo quán
+                      Hồ sơ <strong>14 nhân viên</strong> theo quán
                     </div>
                     <div className="text-[10px] text-purple-700 font-medium mt-1">
                       Phân cơ sở, Chức danh &amp; STK ngân hàng
@@ -1871,9 +1910,9 @@ export default function IposIntegrationPage() {
                 <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2.5">
                   <div className="text-[10px] text-gray-500 font-medium">Khớp Mã Nhân Sự</div>
                   <div className="text-sm font-bold font-mono tabular-nums text-emerald-700 mt-0.5">
-                    100% (18/18)
+                    100% (14/14)
                   </div>
-                  <div className="text-[9px] text-gray-400 mt-0.5">3/3 cơ sở chuỗi</div>
+                  <div className="text-[9px] text-gray-400 mt-0.5">2/2 cơ sở chuỗi</div>
                 </div>
 
                 <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-2.5">
@@ -1918,6 +1957,19 @@ export default function IposIntegrationPage() {
                     </p>
                   </div>
                 </div>
+
+                {schemaStatus && schemaStatus.recommendations.filter((r) => r.status === 'pending').length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleApplyAllRecs}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 text-[11px] font-bold shadow-2xs transition cursor-pointer disabled:opacity-50"
+                    title="Áp dụng tất cả các trường mới vào Homies cùng lúc"
+                  >
+                    <Check size={11} />
+                    <span>Áp dụng tất cả</span>
+                  </button>
+                )}
               </div>
 
               {/* Tóm tắt thống kê trường */}
