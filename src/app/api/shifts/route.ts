@@ -48,13 +48,7 @@ export async function GET(req: NextRequest) {
     if (iposRes.success && !iposRes.isFallback && iposRes.data.length > 0) {
       list = iposRes.data
     } else {
-      // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ
-      if (!db.shifts || db.shifts.length < 20 || !db.shifts.some(s => s.date && s.date.startsWith('2026-11'))) {
-        const seed = getInitialShiftsSeed()
-        const nonNov = (db.shifts || []).filter(s => !s.date || !s.date.startsWith('2026-11'))
-        db.shifts = [...nonNov, ...seed]
-        await saveServerDb(db)
-      }
+      // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ đã đồng bộ từ iPOS
       list = db.shifts || []
       dataSource = 'internal_db'
     }

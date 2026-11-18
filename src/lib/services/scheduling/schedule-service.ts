@@ -1338,67 +1338,6 @@ export class ScheduleService {
     }
 
     const schedules = getSchedulesByStoreWeek(storeId, weekDates)
-
-    // Đảm bảo tất cả nhân viên của chi nhánh có lịch phân ca tuần chính thức
-    if (weekDates.length >= 7) {
-      const isStore1 = isStoreMatch(storeId, 'store-001')
-      const targetEmployees = isStore1
-        ? [
-            { id: 'emp-bh9852', name: 'Huỳnh Lê Kiều Linh', shift: 'Ca Sáng [08:00 - 12:00]', shiftId: 'shift-001', in: '08:00', out: '12:00' },
-            { id: 'emp-nv0008', name: 'Nguyễn Thị Phương Thảo', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002', in: '12:00', out: '17:00' },
-            { id: 'emp-nv0013', name: 'Nguyễn Thị Tú Trinh', shift: 'Ca Sáng [08:30 - 12:00]', shiftId: 'shift-001', in: '08:30', out: '12:00' },
-            { id: 'emp-nv0024', name: 'Tấn Hiếu', shift: 'Ca Tối [17:00 - 22:00]', shiftId: 'shift-003', in: '17:00', out: '22:00' },
-            { id: 'emp-nv0028', name: 'Phạm Nguyễn Đông Duy', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002', in: '12:00', out: '17:00' },
-            { id: 'emp-nv0030', name: 'Quách Thị Kim Chi', shift: 'Ca Tối [17:00 - 22:00]', shiftId: 'shift-003', in: '17:00', out: '22:00' },
-            { id: 'emp-nv0027', name: 'Trần Công Huy', shift: 'Ca Sáng [08:00 - 12:00]', shiftId: 'shift-001', in: '08:00', out: '12:00' },
-            { id: 'emp-nv0020', name: 'Lê Minh Lộc', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002', in: '12:00', out: '17:00' },
-            { id: 'emp-nv0031', name: 'Cao Văn Thắng', shift: 'Ca Sáng [08:00 - 12:00]', shiftId: 'shift-001', in: '08:00', out: '12:00' },
-            { id: 'emp-nv0033', name: 'Nguyễn Hoài Ân', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002', in: '12:00', out: '17:00' },
-            { id: 'emp-nv0034', name: 'Nguyễn Thị Thu', shift: 'Ca Sáng [08:30 - 12:00]', shiftId: 'shift-001', in: '08:30', out: '12:00' },
-            { id: 'emp-nv0035', name: 'Nguyễn Mạnh Duy', shift: 'Ca Tối [17:00 - 22:00]', shiftId: 'shift-003', in: '17:00', out: '22:00' },
-            { id: 'emp-001', name: 'Nguyễn Đức Nghĩa', shift: 'Ca Sáng [08:30 - 12:00]', shiftId: 'shift-001', in: '08:30', out: '12:00' },
-          ]
-        : [
-            { id: 'emp-nv0016', name: 'Nguyễn Thị Kiều Ý', shift: 'Ca Sáng [08:00 - 12:00]', shiftId: 'shift-001', in: '08:00', out: '12:00' },
-            { id: 'emp-nv0017', name: 'Nguyễn Thanh Thiện', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002', in: '12:00', out: '17:00' },
-            { id: 'emp-nv0020', name: 'Lê Minh Lộc', shift: 'Ca Tối [17:00 - 22:00]', shiftId: 'shift-003', in: '17:00', out: '22:00' },
-            { id: 'emp-nv0027', name: 'Trần Công Huy', shift: 'Ca Sáng [08:00 - 12:00]', shiftId: 'shift-001', in: '08:00', out: '12:00' },
-            { id: 'emp-nv0031', name: 'Cao Văn Thắng', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002', in: '12:00', out: '17:00' },
-            { id: 'emp-nv0033', name: 'Nguyễn Hoài An', shift: 'Ca Sáng [08:30 - 12:00]', shiftId: 'shift-001', in: '08:30', out: '12:00' },
-            { id: 'emp-nv0034', name: 'Nguyễn Thị Thu', shift: 'Ca Tối [17:00 - 22:00]', shiftId: 'shift-003', in: '17:00', out: '22:00' },
-            { id: 'emp-nv0035', name: 'Nguyễn Mạnh Duy', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002', in: '12:00', out: '17:00' },
-          ]
-
-      targetEmployees.forEach((emp, empIdx) => {
-        const hasEmpShifts = schedules.some(s => s.employee_id === emp.id)
-        if (!hasEmpShifts) {
-          weekDates.forEach((date, dayIdx) => {
-            if (emp.id === 'emp-001') {
-              if (dayIdx !== 0 && dayIdx !== 2) return // CEO chỉ T2, T4
-            } else {
-              if ((empIdx + dayIdx) % 7 === 0) return // ngày nghỉ
-            }
-            if (date) {
-              const schShift: Schedule = {
-                id: `sch-seed-${emp.id}-${date}-${emp.shiftId}`,
-                org_id: 'org-001',
-                store_id: storeId,
-                employee_id: emp.id,
-                employee_name: emp.name,
-                shift_id: emp.shiftId,
-                date,
-                notes: `${emp.shift} (Đã xếp)`,
-                status: 'published',
-                updated_at: new Date().toISOString(),
-              }
-              mockSchedules.push(schShift)
-              schedules.push(schShift)
-            }
-          })
-        }
-      })
-    }
-
     return schedules
   }
 

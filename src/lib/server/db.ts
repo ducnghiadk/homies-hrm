@@ -574,164 +574,11 @@ const DB_FILE = path.join(DATA_DIR, 'server-db.json')
 const DEFAULT_SEED_PASSWORD = hashPassword('123456')
 
 export function getInitialShiftsSeed(): ServerShiftRegistration[] {
-  const shifts: ServerShiftRegistration[] = []
-  const weekStart = '2026-11-16' // T2 Tuần 47
-  const weekDates = [
-    '2026-11-16', // T2
-    '2026-11-17', // T3
-    '2026-11-18', // T4
-    '2026-11-19', // T5
-    '2026-11-20', // T6
-    '2026-11-21', // T7
-    '2026-11-22', // CN
-  ]
-
-  const hbpEmployees = [
-    { id: 'emp-nv0008', code: 'NV0008', name: 'Nguyễn Thị Phương Thảo', store: 'store-001', pos: 'pos-004' },
-    { id: 'emp-nv0013', code: 'NV0013', name: 'Nguyễn Thị Tú Trinh', store: 'store-001', pos: 'pos-002' },
-    { id: 'emp-nv0028', code: 'NV0028', name: 'Phạm Nguyễn Đông Duy', store: 'store-001', pos: 'pos-001' },
-    { id: 'emp-nv0030', code: 'NV0030', name: 'Quách Thị Kim Chi', store: 'store-001', pos: 'pos-001' },
-    { id: 'emp-nv0027', code: 'NV0027', name: 'Trần Công Huy', store: 'store-001', pos: 'pos-sm' },
-    { id: 'emp-nv0020', code: 'NV0020', name: 'Lê Minh Lộc', store: 'store-001', pos: 'pos-004' },
-    { id: 'emp-nv0031', code: 'NV0031', name: 'Cao Văn Thắng', store: 'store-001', pos: 'pos-001' },
-    { id: 'emp-nv0033', code: 'NV0033', name: 'Nguyễn Hoài Ân', store: 'store-001', pos: 'pos-001' },
-    { id: 'emp-nv0034', code: 'NV0034', name: 'Nguyễn Thị Thu', store: 'store-001', pos: 'pos-002' },
-    { id: 'emp-001', code: 'BH-001', name: 'Nguyễn Đức Nghĩa', store: 'store-001', pos: 'pos-ceo' },
-  ]
-
-  const store429Employees = [
-    { id: 'emp-nv0016', code: 'NV0016', name: 'Nguyễn Thị Kiều Ý', store: 'store-002', pos: 'pos-sm' },
-    { id: 'emp-nv0017', code: 'NV0017', name: 'Nguyễn Thanh Thiện', store: 'store-002', pos: 'pos-001' },
-    { id: 'emp-nv0020', code: 'NV0020', name: 'Lê Minh Lộc', store: 'store-002', pos: 'pos-004' },
-    { id: 'emp-nv0027', code: 'NV0027', name: 'Trần Công Huy', store: 'store-002', pos: 'pos-sm' },
-    { id: 'emp-nv0031', code: 'NV0031', name: 'Cao Văn Thắng', store: 'store-002', pos: 'pos-001' },
-    { id: 'emp-nv0033', code: 'NV0033', name: 'Nguyễn Hoài An', store: 'store-002', pos: 'pos-001' },
-    { id: 'emp-nv0034', code: 'NV0034', name: 'Nguyễn Thị Thu', store: 'store-002', pos: 'pos-002' },
-  ]
-
-  const shiftTemplates = [
-    { shiftId: 'shift-001', name: 'Ca Sáng (08:00 - 12:00)' },
-    { shiftId: 'shift-002', name: 'Ca Chiều (12:00 - 17:00)' },
-    { shiftId: 'shift-003', name: 'Ca Tối (17:00 - 22:00)' },
-  ]
-
-  const allStaff = [...hbpEmployees, ...store429Employees]
-
-  allStaff.forEach((emp, empIdx) => {
-    weekDates.forEach((date, dayIdx) => {
-      if (emp.code === 'BH-001') {
-        if (dayIdx !== 0 && dayIdx !== 2) return
-      } else {
-        if ((empIdx + dayIdx) % 7 === 0) return
-      }
-
-      const sTpl = shiftTemplates[(empIdx + dayIdx) % 3]
-
-      shifts.push({
-        id: `shift-reg-${emp.code.toLowerCase()}-${emp.store}-${date}-${sTpl.shiftId}`,
-        employee_id: emp.id,
-        employee_name: emp.name,
-        store_id: emp.store,
-        week_start_date: weekStart,
-        date,
-        shift_id: sTpl.shiftId,
-        shift_name: sTpl.name,
-        position_id: emp.pos,
-        status: 'APPROVED',
-        created_at: `${date}T00:00:00.000Z`,
-        approved_by: 'emp-001',
-        approved_at: `${date}T00:30:00.000Z`,
-      })
-    })
-  })
-
-  return shifts
+  return []
 }
 
 export function getInitialAttendanceSeed(): ServerAttendanceLog[] {
-  const logs: ServerAttendanceLog[] = []
-
-  const hbpEmployees = [
-    { id: 'emp-nv0008', code: 'NV0008', name: 'Nguyễn Thị Phương Thảo', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
-    { id: 'emp-nv0013', code: 'NV0013', name: 'Nguyễn Thị Tú Trinh', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
-    { id: 'emp-nv0028', code: 'NV0028', name: 'Phạm Nguyễn Đông Duy', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
-    { id: 'emp-nv0030', code: 'NV0030', name: 'Quách Thị Kim Chi', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
-    { id: 'emp-nv0027', code: 'NV0027', name: 'Trần Công Huy', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
-    { id: 'emp-nv0020', code: 'NV0020', name: 'Lê Minh Lộc', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
-    { id: 'emp-nv0031', code: 'NV0031', name: 'Cao Văn Thắng', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
-    { id: 'emp-nv0033', code: 'NV0033', name: 'Nguyễn Hoài Ân', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
-    { id: 'emp-nv0034', code: 'NV0034', name: 'Nguyễn Thị Thu', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
-    { id: 'emp-001', code: 'BH-001', name: 'Nguyễn Đức Nghĩa', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
-  ]
-
-  const store429Employees = [
-    { id: 'emp-nv0016', code: 'NV0016', name: 'Nguyễn Thị Kiều Ý', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
-    { id: 'emp-nv0017', code: 'NV0017', name: 'Nguyễn Thanh Thiện', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
-    { id: 'emp-nv0020', code: 'NV0020', name: 'Lê Minh Lộc', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
-    { id: 'emp-nv0027', code: 'NV0027', name: 'Trần Công Huy', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
-    { id: 'emp-nv0031', code: 'NV0031', name: 'Cao Văn Thắng', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
-    { id: 'emp-nv0033', code: 'NV0033', name: 'Nguyễn Hoài An', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
-    { id: 'emp-nv0034', code: 'NV0034', name: 'Nguyễn Thị Thu', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
-  ]
-
-  const shiftDefs = [
-    { shiftId: 'shift-001', name: 'Ca Sáng (08:00 - 12:00)', inH: '08:00', inMinDef: '07:58', outH: '12:00', outMinDef: '12:03', hours: 4.0 },
-    { shiftId: 'shift-002', name: 'Ca Chiều (12:00 - 17:00)', inH: '12:00', inMinDef: '11:58', outH: '17:00', outMinDef: '17:04', hours: 5.0 },
-    { shiftId: 'shift-003', name: 'Ca Tối (17:00 - 22:00)', inH: '17:00', inMinDef: '16:57', outH: '22:00', outMinDef: '22:02', hours: 5.0 },
-  ]
-
-  const allEmpStores = [
-    ...hbpEmployees.map(e => ({ ...e, group: 'hbp' })),
-    ...store429Employees.map(e => ({ ...e, group: '429' })),
-  ]
-
-  // Sinh log chấm công chi tiết từ ngày 01/11/2026 đến 18/11/2026 (hôm nay)
-  for (let day = 1; day <= 18; day++) {
-    const dayStr = day < 10 ? '0' + day : '' + day
-    const date = `2026-11-${dayStr}`
-
-    allEmpStores.forEach((emp, eIdx) => {
-      if (emp.code === 'BH-001') {
-        const dObj = new Date(`${date}T12:00:00Z`)
-        const dow = dObj.getUTCDay()
-        if (dow !== 1 && dow !== 3 && dow !== 5) return
-      } else {
-        if ((eIdx + day) % 7 === 0) return
-      }
-
-      const sIndex = (eIdx + day) % 3
-      const sDef = shiftDefs[sIndex]
-
-      const isLate = (eIdx * 7 + day) % 19 === 0
-      const inTimeStr = isLate
-        ? `${sDef.inH.split(':')[0]}:06:00`
-        : `${sDef.inMinDef}:20`
-      const outTimeStr = `${sDef.outMinDef}:45`
-
-      logs.push({
-        id: `att-${emp.code.toLowerCase()}-${emp.store}-${date}-${sDef.shiftId}`,
-        employee_id: emp.id,
-        employee_code: emp.code,
-        employee_name: emp.name,
-        store_id: emp.store,
-        store_name: emp.storeName,
-        shift_id: sDef.shiftId,
-        shift_name: sDef.name,
-        date,
-        check_in_time: `${date}T${inTimeStr}.000Z`,
-        check_out_time: `${date}T${outTimeStr}.000Z`,
-        check_in_lat: emp.lat + (Math.sin(eIdx + day) * 0.0001),
-        check_in_lng: emp.lng + (Math.cos(eIdx + day) * 0.0001),
-        check_in_distance_meters: 15 + ((eIdx + day) % 20),
-        status: isLate ? 'late' : 'on_time',
-        is_late: isLate,
-        late_minutes: isLate ? 6 : 0,
-        total_hours: sDef.hours,
-      })
-    })
-  }
-
-  return logs
+  return []
 }
 
 // Seed data chuẩn của Homies F&B
@@ -856,8 +703,8 @@ function getInitialSeedData(): ServerDatabaseSchema {
       position_id: 'pos-sm',
       phone: '0779554540',
       employee_code: 'BH-9852',
-      status: 'resigned',
-      account_status: 'bi_khoa',
+      status: 'active',
+      account_status: 'dang_hoat_dong',
       department_name: 'Quản lý cửa hàng',
       base_salary: 0,
       hourly_rate: 25000,
@@ -2064,15 +1911,11 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
       if (!inMemoryCache.bsc_logs || inMemoryCache.bsc_logs.length === 0) {
         inMemoryCache.bsc_logs = getInitialBscLogsSeed()
       }
-      if (!inMemoryCache.shifts || inMemoryCache.shifts.length < 20 || !inMemoryCache.shifts.some(s => s.date && s.date.startsWith('2026-11'))) {
-        const seed = getInitialShiftsSeed()
-        const nonNov = (inMemoryCache.shifts || []).filter(s => !s.date || !s.date.startsWith('2026-11'))
-        inMemoryCache.shifts = [...nonNov, ...seed]
+      if (!inMemoryCache.shifts) {
+        inMemoryCache.shifts = []
       }
-      if (!inMemoryCache.attendance || inMemoryCache.attendance.length < 50 || !inMemoryCache.attendance.some(a => a.date && a.date.startsWith('2026-11'))) {
-        const seed = getInitialAttendanceSeed()
-        const nonNov = (inMemoryCache.attendance || []).filter(a => !a.date || !a.date.startsWith('2026-11'))
-        inMemoryCache.attendance = [...nonNov, ...seed]
+      if (!inMemoryCache.attendance) {
+        inMemoryCache.attendance = []
       }
       if (!inMemoryCache.bsc_settings) {
         inMemoryCache.bsc_settings = getInitialBscSettingsSeed()
@@ -2085,12 +1928,16 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
           inc.status = 'proposed'
         }
       })
-      const resignedCodesMem = new Set(['BH-9852', 'NV0024', 'NV0035', 'NV0009'])
-      const resignedIdsMem = new Set(['emp-bh9852', 'emp-nv0024', 'emp-nv0035', 'emp-nv0009'])
-      const resignedNamesMem = new Set(['Huỳnh Lê Kiều Linh', 'Tấn Hiếu', 'Nguyễn Mạnh Duy', 'Nguyễn Thị Kiều Trang'])
+      const resignedCodesMem = new Set(['NV0024', 'NV0035', 'NV0009', 'NV0020'])
+      const resignedIdsMem = new Set(['emp-nv0024', 'emp-nv0035', 'emp-nv0009', 'emp-nv0020'])
+      const resignedNamesMem = new Set(['Tấn Hiếu', 'Nguyễn Mạnh Duy', 'Nguyễn Quỳnh', 'Lê Minh Lộc', 'Nguyễn Thị Kiều Trang'])
       if (inMemoryCache.employees) {
         inMemoryCache.employees.forEach((emp) => {
-          if (resignedIdsMem.has(emp.id) || (emp.employee_code && resignedCodesMem.has(emp.employee_code))) {
+          if (emp.id === 'emp-bh9852' || emp.employee_code === 'BH-9852' || emp.full_name === 'Huỳnh Lê Kiều Linh') {
+            emp.status = 'active'
+            emp.account_status = 'dang_hoat_dong'
+            emp.store_id = 'store-001'
+          } else if (resignedIdsMem.has(emp.id) || (emp.employee_code && resignedCodesMem.has(emp.employee_code)) || (emp.full_name && resignedNamesMem.has(emp.full_name))) {
             emp.status = 'resigned'
             emp.account_status = 'bi_khoa'
           }
@@ -2127,17 +1974,11 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     if (!inMemoryCache!.bsc_settings) {
       inMemoryCache!.bsc_settings = getInitialBscSettingsSeed()
     }
-    if (!inMemoryCache!.shifts || inMemoryCache!.shifts.length < 20 || !inMemoryCache!.shifts.some(s => s.date && s.date.startsWith('2026-11'))) {
-      const seed = getInitialShiftsSeed()
-      const nonNov = (inMemoryCache!.shifts || []).filter(s => !s.date || !s.date.startsWith('2026-11'))
-      inMemoryCache!.shifts = [...nonNov, ...seed]
-      needMigrate = true
+    if (!inMemoryCache!.shifts) {
+      inMemoryCache!.shifts = []
     }
-    if (!inMemoryCache!.attendance || inMemoryCache!.attendance.length < 50 || !inMemoryCache!.attendance.some(a => a.date && a.date.startsWith('2026-11'))) {
-      const seed = getInitialAttendanceSeed()
-      const nonNov = (inMemoryCache!.attendance || []).filter(a => !a.date || !a.date.startsWith('2026-11'))
-      inMemoryCache!.attendance = [...nonNov, ...seed]
-      needMigrate = true
+    if (!inMemoryCache!.attendance) {
+      inMemoryCache!.attendance = []
     }
     if (!inMemoryCache!.incidents || inMemoryCache!.incidents.length === 0) {
       inMemoryCache!.incidents = getInitialIncidentsSeed()
@@ -2163,13 +2004,20 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     }
 
     // Đồng bộ trạng thái nhân sự đã nghỉ việc và loại bỏ chấm công, ca làm việc của họ
-    const resignedCodes = new Set(['BH-9852', 'NV0024', 'NV0035', 'NV0009'])
-    const resignedIds = new Set(['emp-bh9852', 'emp-nv0024', 'emp-nv0035', 'emp-nv0009'])
-    const resignedNames = new Set(['Huỳnh Lê Kiều Linh', 'Tấn Hiếu', 'Nguyễn Mạnh Duy', 'Nguyễn Thị Kiều Trang'])
+    const resignedCodes = new Set(['NV0024', 'NV0035', 'NV0009', 'NV0020'])
+    const resignedIds = new Set(['emp-nv0024', 'emp-nv0035', 'emp-nv0009', 'emp-nv0020'])
+    const resignedNames = new Set(['Tấn Hiếu', 'Nguyễn Mạnh Duy', 'Nguyễn Quỳnh', 'Lê Minh Lộc', 'Nguyễn Thị Kiều Trang'])
 
     if (inMemoryCache?.employees) {
       inMemoryCache.employees.forEach((emp) => {
-        if (resignedIds.has(emp.id) || (emp.employee_code && resignedCodes.has(emp.employee_code))) {
+        if (emp.id === 'emp-bh9852' || emp.employee_code === 'BH-9852' || emp.full_name === 'Huỳnh Lê Kiều Linh') {
+          if (emp.status !== 'active' || emp.account_status !== 'dang_hoat_dong') {
+            emp.status = 'active'
+            emp.account_status = 'dang_hoat_dong'
+            emp.store_id = 'store-001'
+            needMigrate = true
+          }
+        } else if (resignedIds.has(emp.id) || (emp.employee_code && resignedCodes.has(emp.employee_code)) || (emp.full_name && resignedNames.has(emp.full_name))) {
           if (emp.status !== 'resigned' || emp.account_status !== 'bi_khoa') {
             emp.status = 'resigned'
             emp.account_status = 'bi_khoa'

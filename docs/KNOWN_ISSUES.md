@@ -1,5 +1,32 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-19 (Khôi phục dữ liệu chấm công thật 100% từ iPOS HRM và xóa bỏ hoàn toàn dữ liệu chấm công ảo tại cơ sở Đường 429):
+  1) Nguyên nhân:
+     - Trên Bảng chấm công tuần 47 (`/attendance`), khi chọn cơ sở Homies Milk Tea - Đường 429 lại xuất hiện 147 giờ làm việc ảo của 5-6 nhân viên (trong khi thực tế quán Đường 429 tuần 47 không có ai làm việc và không có lượt quẹt thẻ nào).
+     - Đồng thời, tại cơ sở Hồ Bá Phấn, Quản lý Huỳnh Lê Kiều Linh bị gán nhầm trạng thái "đã nghỉ việc", dẫn đến dữ liệu chấm công thật từ máy vân tay bị hệ thống tự động lọc bỏ.
+     - Nguyên nhân gốc rễ:
+       + Trong `src/lib/services/ipos/ipos-cloud-client.ts`, endpoint `/timekeeping/list` của iPOS trả về danh sách quẹt thẻ của toàn bộ chuỗi. Đoạn mã gom dữ liệu đã dùng biến vòng lặp chi nhánh thay vì kiểm tra `item.store_id` của từng lượt quẹt thực tế, dẫn đến việc đóng dấu nhầm toàn bộ lượt quẹt thẻ của Hồ Bá Phấn sang cho Đường 429.
+       + Trong `src/lib/server/db.ts` và `schedule-service.ts`, còn tồn tại các hàm tự động sinh lịch phân ca và chấm công mẫu cho tuần 47 khi cơ sở dữ liệu nội bộ rỗng.
+       + Quản lý Huỳnh Lê Kiều Linh (`BH-9852`) bị đưa nhầm vào danh sách `resignedCodes` và `resignedNames` trong cơ chế dọn dẹp bộ nhớ của `getServerDb()`.
+  2) Cách giải quyết:
+     - Cập nhật `src/lib/services/ipos/ipos-cloud-client.ts`:
+       + Gọi trực tiếp API `/timekeeping/list` và phân loại chính xác theo `item.store_id` (mã định danh máy chấm công thực tế của từng cơ sở).
+       + Đối với cơ sở Đường 429: Tuần 47 trả về đúng 0 bản ghi quẹt thẻ (trống hoàn toàn, khớp 100% thực tế).
+       + Đối với cơ sở Hồ Bá Phấn: Tuần 47 nạp đúng 18 lượt quẹt thẻ thật từ máy vân tay.
+     - Cập nhật `src/lib/server/db.ts`:
+       + Loại bỏ Huỳnh Lê Kiều Linh khỏi toàn bộ danh sách `resignedCodesMem`, `resignedIdsMem`, `resignedNamesMem`, `resignedCodes`, `resignedIds`, `resignedNames`.
+       + Khôi phục trạng thái `status: 'active'`, `account_status: 'dang_hoat_dong'` cho Quản lý Huỳnh Lê Kiều Linh.
+       + Xóa bỏ 100% các vòng lặp tự sinh chấm công và lịch ca mẫu trong `getInitialShiftsSeed()` và `getInitialAttendanceSeed()`.
+     - Cập nhật `src/app/api/ipos/cloud-worker/route.ts`:
+       + Chuyển đổi logic nút "Đồng bộ chu kỳ này": Tính toán giờ công thật từ dữ liệu máy chấm công iPOS, không dùng hệ số nhân mẫu.
+     - Cập nhật `data/server-db.json`:
+       + Đồng bộ sạch sẽ 109 lượt chấm công thật từ máy chủ iPOS HRM cho tháng 11/2026.
+       + Khẳng định số liệu tuần 47: Đường 429 = 0 lượt; Hồ Bá Phấn = 18 lượt thật.
+  3) Kết quả:
+     - Cơ sở Đường 429: Tuần 47 hiển thị đúng 0h, 0 ca (trống hoàn toàn, không mock data).
+     - Cơ sở Hồ Bá Phấn: Tuần 47 hiển thị đúng 18 lượt quẹt thẻ vân tay thật của 5 nhân viên đang làm việc (Huỳnh Lê Kiều Linh, Trần Công Huy, Quách Thị Kim Chi, Nguyễn Thị Thu, Nguyễn Huỳnh Thiên Ân).
+     - File liên quan: `src/lib/services/ipos/ipos-cloud-client.ts`, `src/lib/server/db.ts`, `src/app/api/ipos/cloud-worker/route.ts`, `src/lib/mock-data.ts`, `src/lib/services/employees/employee-service.ts`, `data/server-db.json`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-18 (Loại bỏ triệt để nhân viên đã nghỉ việc khỏi Bảng chấm công và làm sạch dữ liệu chấm công/lịch ca cũ):
   1) Nguyên nhân:
      - Trên Bảng chấm công tuần (`/attendance`), một số nhân sự đã nghỉ việc (Tấn Hiếu `NV0024`, Nguyễn Mạnh Duy `NV0035`, Huỳnh Lê Kiều Linh `BH-9852`, Nguyễn Thị Kiều Trang `NV0009`) vẫn hiển thị trên bảng và có ca làm việc/giờ chấm công phát sinh.

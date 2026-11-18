@@ -606,30 +606,110 @@ export async function POST(req: NextRequest) {
         },
       ]
 
-      // Tính toán giờ làm và lương chi tiết dựa trên hệ số của kỳ
-      const rawDataCalculated = baseEmployees.map((emp) => {
-        const regularHours = Math.round(emp.baseHours * periodMultiplier * 100) / 100
-        const grossSalary = regularHours * emp.hourlyRate + emp.allowanceResponsibility + emp.bonus
-        const netSalary = Math.max(0, grossSalary - emp.deductions)
-        return {
-          employeeCode: emp.employeeCode,
-          employeeName: emp.employeeName,
-          position: emp.position,
-          storeCode: emp.storeCode,
-          storeName: emp.storeName,
-          regularHours,
-          hourlyRate: emp.hourlyRate,
-          netSalary,
-          bonus: emp.bonus,
-          deductions: emp.deductions,
-          allowanceResponsibility: emp.allowanceResponsibility,
-          terminalId: emp.terminalId,
-          missingCheckoutCount: emp.missingCheckoutCount,
-          overtimeHours: Math.round(emp.overtimeHours * periodMultiplier * 10) / 10,
-          bankName: emp.bankName,
-          bankAccountNo: emp.bankAccountNo,
+      // Tính toán giờ làm và lương chi tiết: Ưu tiên tính từ số liệu quẹt thẻ thực tế của máy vân tay
+      let rawDataCalculated: any[] = []
+
+      if (isAuth) {
+        try {
+          const { fetchIposTimesheet } = await import('@/lib/services/ipos/ipos-cloud-client')
+          const timesheetRes = await fetchIposTimesheet({
+            storeId: 'ALL',
+            fromDate: `${currentPeriod}-01`,
+            toDate: `${currentPeriod}-31`,
+            forceRefresh: true,
+          })
+
+          if (timesheetRes.success && Array.isArray(timesheetRes.data) && timesheetRes.data.length > 0) {
+            // Gom nhóm giờ công thật theo nhân viên
+            const empHoursMap: Record<string, {
+              totalHours: number
+              missingCount: number
+              storeId: string
+              storeName: string
+              empName: string
+              empCode?: string
+            }> = {}
+
+            timesheetRes.data.forEach((att) => {
+              const key = att.employee_code || att.employee_id || att.employee_name
+              if (!empHoursMap[key]) {
+                empHoursMap[key] = {
+                  totalHours: 0,
+                  missingCount: 0,
+                  storeId: att.store_id,
+                  storeName: att.store_name || '',
+                  empName: att.employee_name,
+                  empCode: att.employee_code,
+                }
+              }
+              empHoursMap[key].totalHours += att.total_hours || 0
+              if (att.status === 'missing_checkout') {
+                empHoursMap[key].missingCount++
+              }
+            })
+
+            // Ánh xạ thành danh sách nhân sự với giờ công THẬT (nhân sự nào không quẹt thẻ thì giờ công là 0)
+            rawDataCalculated = baseEmployees.map((emp) => {
+              const lookupKey = emp.employeeCode || emp.employeeName
+              const realStats = empHoursMap[lookupKey] || Object.values(empHoursMap).find(
+                s => (s.empName && s.empName.toLowerCase() === emp.employeeName.toLowerCase()) || (s.empCode && s.empCode === emp.employeeCode)
+              )
+              const regularHours = realStats ? Math.round(realStats.totalHours * 10) / 10 : 0
+              const missingCheckoutCount = realStats ? realStats.missingCount : 0
+              const grossSalary = regularHours * emp.hourlyRate + (regularHours > 0 ? emp.allowanceResponsibility + emp.bonus : 0)
+              const netSalary = Math.max(0, grossSalary - emp.deductions)
+
+              return {
+                employeeCode: emp.employeeCode,
+                employeeName: emp.employeeName,
+                position: emp.position,
+                storeCode: emp.storeCode,
+                storeName: emp.storeName,
+                regularHours,
+                hourlyRate: emp.hourlyRate,
+                netSalary,
+                bonus: regularHours > 0 ? emp.bonus : 0,
+                deductions: emp.deductions,
+                allowanceResponsibility: regularHours > 0 ? emp.allowanceResponsibility : 0,
+                terminalId: emp.terminalId,
+                missingCheckoutCount,
+                overtimeHours: 0,
+                bankName: emp.bankName,
+                bankAccountNo: emp.bankAccountNo,
+              }
+            })
+          }
+        } catch (err) {
+          console.warn('[iPOS Cloud Worker] Error fetching real timesheet in trigger_sync:', err)
         }
-      })
+      }
+
+      if (rawDataCalculated.length === 0) {
+        // Chỉ dùng hệ số dự phòng khi chạy chế độ offline hoàn toàn
+        rawDataCalculated = baseEmployees.map((emp) => {
+          const regularHours = Math.round(emp.baseHours * periodMultiplier * 100) / 100
+          const grossSalary = regularHours * emp.hourlyRate + emp.allowanceResponsibility + emp.bonus
+          const netSalary = Math.max(0, grossSalary - emp.deductions)
+          return {
+            employeeCode: emp.employeeCode,
+            employeeName: emp.employeeName,
+            position: emp.position,
+            storeCode: emp.storeCode,
+            storeName: emp.storeName,
+            regularHours,
+            hourlyRate: emp.hourlyRate,
+            netSalary,
+            bonus: emp.bonus,
+            deductions: emp.deductions,
+            allowanceResponsibility: emp.allowanceResponsibility,
+            terminalId: emp.terminalId,
+            missingCheckoutCount: emp.missingCheckoutCount,
+            overtimeHours: Math.round(emp.overtimeHours * periodMultiplier * 10) / 10,
+            bankName: emp.bankName,
+            bankAccountNo: emp.bankAccountNo,
+          }
+        })
+      }
 
       // Dữ liệu lưu trữ thực tế từ iPOS HRM cho TOÀN BỘ CÁC CỬA HÀNG CỦA CHUỖI
       const syncPayrollPayload = {

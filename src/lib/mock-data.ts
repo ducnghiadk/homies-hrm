@@ -261,7 +261,7 @@ export const mockEmployees: Employee[] = [
     id: 'emp-bh9852', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-sm',
     employee_code: 'BH-9852', full_name: 'Huỳnh Lê Kiều Linh', phone: '0779554540',
     email: 'huynhlekieulinh6@gmail.com', date_of_birth: '1998-07-12', gender: 'female',
-    address: '429 Phước Long A, TP. Thủ Đức, TP.HCM', role: 'store_manager', status: 'resigned',
+    address: '429 Phước Long A, TP. Thủ Đức, TP.HCM', role: 'store_manager', status: 'active',
     hire_date: '2024-05-10', total_points: 4200, gamification_level: 'platinum',
     kpi_level: 'L4', contract_type: 'toan_thoi_gian', hourly_rate: 25000,
     allowed_store_ids: ['store-001', 'store-002'],

@@ -40,21 +40,48 @@ export async function getEffectiveIposCloudConfig(): Promise<IposCloudConfig> {
 
   // Nếu biến môi trường chưa có token, thử đọc từ cấu hình người dùng đã lưu trong server-db
   try {
-    const { getServerDb } = await import('@/lib/server/db')
-    const db = await getServerDb()
-    const iposConfig = db.ipos_integration
+    let iposConfig: any
+    let dbInstance: any
+    let saveServerDbFn: any
+
+    try {
+      const dbMod = await import('@/lib/server/db')
+      dbInstance = await dbMod.getServerDb()
+      saveServerDbFn = dbMod.saveServerDb
+      iposConfig = dbInstance?.ipos_integration
+    } catch {
+      try {
+        const fs = await import('fs')
+        const path = await import('path')
+        const dbFile = path.join(process.cwd(), 'data', 'server-db.json')
+        if (fs.existsSync(dbFile)) {
+          const raw = fs.readFileSync(dbFile, 'utf8')
+          dbInstance = JSON.parse(raw)
+          iposConfig = dbInstance?.ipos_integration
+        }
+      } catch {}
+    }
+
     if (iposConfig?.hrm_jwt_token && iposConfig.hrm_jwt_token.length > 5) {
       base.token = iposConfig.hrm_jwt_token.trim()
     } else if (iposConfig?.username && iposConfig?.token_or_password) {
       // Tự động đăng nhập lại bằng thông tin tài khoản đã lưu
-      const { loginHrm } = await import('@/lib/services/ipos/ipos-hrm-client')
+      let loginHrm: any
+      try {
+        const hrmMod = await import('@/lib/services/ipos/ipos-hrm-client')
+        loginHrm = hrmMod.loginHrm
+      } catch {
+        const hrmMod = await import('./ipos-hrm-client.ts')
+        loginHrm = hrmMod.loginHrm
+      }
       const loginRes = await loginHrm(iposConfig.username, iposConfig.token_or_password, iposConfig.api_endpoint)
       if (loginRes.success && loginRes.token) {
         base.token = loginRes.token
         iposConfig.hrm_jwt_token = loginRes.token
         iposConfig.is_authenticated = true
-        const { saveServerDb } = await import('@/lib/server/db')
-        await saveServerDb(db)
+        if (saveServerDbFn && dbInstance) {
+          await saveServerDbFn(dbInstance)
+        }
       }
     }
 
@@ -328,7 +355,8 @@ export async function fetchIposWorkSchedule(params: {
   try {
     const iposStoreId = mapHomiesStoreToIpos(params.storeId)
     const now = new Date()
-    const fromDate = params.fromDate || now.toISOString().slice(0, 10)
+    const todayStr = now.toISOString().slice(0, 10)
+    const fromDate = params.fromDate || todayStr
     const toDate = params.toDate || fromDate
 
     const query = new URLSearchParams({
@@ -359,7 +387,15 @@ export async function fetchIposWorkSchedule(params: {
 
     const homiesStoreId = mapIposStoreToHomies(iposStoreId)
 
-    const mapped: MappedIposSchedule[] = rawList.map((item, idx) => {
+    const mapped: MappedIposSchedule[] = []
+
+    for (let idx = 0; idx < rawList.length; idx++) {
+      const item = rawList[idx]
+      const rawItemStore = String(item.store_id || '')
+      const homiesStoreId = mapIposStoreToHomies(rawItemStore || iposStoreId)
+      if (params.storeId && params.storeId !== 'ALL' && homiesStoreId !== params.storeId) {
+        continue
+      }
       const scheduleId = String(item.id || item.schedule_id || `ipos-sched-${idx}`)
       const rawShift = (item.shift_data && typeof item.shift_data === 'object' ? item.shift_data : {}) as Record<string, unknown>
       const rawEmp = (
@@ -384,7 +420,7 @@ export async function fetchIposWorkSchedule(params: {
       const empCode = String(rawEmp.code || item.employee_code || '').trim()
       const empId = empCode && empCode !== '-' ? `emp-${empCode.toLowerCase()}` : String(rawEmp.id || item.employee_id || `emp-${idx}`)
 
-      return {
+      mapped.push({
         id: scheduleId,
         work_schedule_id: scheduleId,
         employee_id: empId,
@@ -402,8 +438,8 @@ export async function fetchIposWorkSchedule(params: {
         status: (String(item.status || 'APPROVED').toUpperCase() as MappedIposSchedule['status']),
         created_at: String(item.created_at || new Date().toISOString()),
         raw_ipos: item,
-      }
-    })
+      })
+    }
 
     return {
       success: true,
@@ -483,7 +519,8 @@ export async function fetchIposTimesheet(params: {
 
   try {
     const now = new Date()
-    const fromDate = params.fromDate || now.toISOString().slice(0, 10)
+    const todayStr = now.toISOString().slice(0, 10)
+    const fromDate = params.fromDate || todayStr
     const toDate = params.toDate || fromDate
     const cacheKey = `${params.storeId || 'ALL'}_${fromDate}_${toDate}`
 
@@ -495,154 +532,158 @@ export async function fetchIposTimesheet(params: {
       }
     }
 
-    // Xác định danh sách store cần gọi
-    const storeIdsToFetch: string[] = []
-    if (params.storeId && params.storeId !== 'ALL') {
-      storeIdsToFetch.push(mapHomiesStoreToIpos(params.storeId))
-    } else {
-      storeIdsToFetch.push(config.storeIdHbp, config.storeId429)
+    // Tải dữ liệu chấm công từ iPOS API v2:
+    // Chú ý: Endpoint /timekeeping/list của iPOS trả về danh sách chấm công toàn công ty.
+    // Chúng ta lọc và gán đúng store_id theo item.store_id của từng lượt quẹt vân tay thực tế,
+    // tuyệt đối không dùng biến vòng lặp để tránh nhân bản sai lệch sang cơ sở 429.
+    const query = new URLSearchParams()
+    if (fromDate) query.set('from_date', fromDate)
+    if (toDate) query.set('to_date', toDate)
+
+    const url = `${config.baseUrl}/timekeeping/list?${query.toString()}`
+    let res = await fetch(url, {
+      method: 'GET',
+      headers: buildIposHeaders(config.token),
+      signal: AbortSignal.timeout(25000),
+    })
+
+    // Dự phòng endpoint /timesheet/list nếu máy chủ iPOS dùng chuẩn cũ
+    if (!res.ok && (res.status === 404 || res.status === 400)) {
+      const altUrl = `${config.baseUrl}/timesheet/list?${query.toString()}`
+      const altRes = await fetch(altUrl, {
+        method: 'GET',
+        headers: buildIposHeaders(config.token),
+        signal: AbortSignal.timeout(25000),
+      })
+      if (altRes.ok) res = altRes
     }
 
-    const todayStr = now.toISOString().slice(0, 10)
+    if (!res.ok) {
+      console.warn(`[iPOS Timekeeping] API HTTP ${res.status}: ${res.statusText}`)
+      return {
+        success: false,
+        isFallback: true,
+        data: [],
+        message: `Lỗi iPOS Timekeeping API (${res.status}): ${res.statusText}`,
+      }
+    }
 
-    // Tải song song tất cả các chi nhánh cùng lúc (Promise.all)
-    const results = await Promise.all(
-      storeIdsToFetch.map(async (iposStoreId) => {
-        try {
-          const query = new URLSearchParams({
-            store_id: iposStoreId,
-            from_date: fromDate,
-            to_date: toDate,
-          })
+    const json = await res.json()
+    const rawList: Record<string, any>[] = Array.isArray(json)
+      ? json
+      : Array.isArray(json?.data)
+      ? json.data
+      : Array.isArray(json?.items)
+      ? json.items
+      : []
 
-          const url = `${config.baseUrl}/timekeeping/list?${query.toString()}`
-          let res = await fetch(url, {
-            method: 'GET',
-            headers: buildIposHeaders(config.token),
-            signal: AbortSignal.timeout(25000),
-          })
+    const allMapped: MappedIposAttendance[] = []
+    const seenLogKeys = new Set<string>()
 
-          // Dự phòng endpoint /timesheet/list nếu máy chủ iPOS dùng chuẩn cũ
-          if (!res.ok && (res.status === 404 || res.status === 400)) {
-            const altUrl = `${config.baseUrl}/timesheet/list?${query.toString()}`
-            const altRes = await fetch(altUrl, {
-              method: 'GET',
-              headers: buildIposHeaders(config.token),
-              signal: AbortSignal.timeout(25000),
-            })
-            if (altRes.ok) res = altRes
-          }
+    for (let idx = 0; idx < rawList.length; idx++) {
+      const item = rawList[idx]
+      const dateStr = String(item.date || '').slice(0, 10)
+      if (!dateStr) continue
 
-          if (!res.ok) {
-            console.warn(`[iPOS Timekeeping] Store ${iposStoreId} HTTP ${res.status}: ${res.statusText}`)
-            return []
-          }
+      if (fromDate && dateStr < fromDate) continue
+      if (toDate && dateStr > toDate) continue
 
-          const json = await res.json()
-          const rawList: Record<string, any>[] = Array.isArray(json)
-            ? json
-            : Array.isArray(json?.data)
-            ? json.data
-            : Array.isArray(json?.items)
-            ? json.items
-            : []
+      // Lấy chi nhánh thực tế từ bản ghi quẹt thẻ của máy chấm công
+      const rawItemStoreId = String(item.store_id || item.employee_info_log?.store_id || '')
+      const homiesStoreId = mapIposStoreToHomies(rawItemStoreId)
+      const storeName = homiesStoreId === 'store-002' ? 'Homies Milk Tea - Đường 429' : 'Homies Milk Tea - Hồ Bá Phấn'
 
-          const homiesStoreId = mapIposStoreToHomies(iposStoreId)
-          const storeName = homiesStoreId === 'store-002' ? 'Homies Milk Tea - Đường 429' : 'Homies Milk Tea - Hồ Bá Phấn'
-          const storeMapped: MappedIposAttendance[] = []
+      // Lọc theo chi nhánh được yêu cầu từ người dùng
+      if (params.storeId && params.storeId !== 'ALL' && homiesStoreId !== params.storeId) {
+        continue
+      }
 
-          for (let idx = 0; idx < rawList.length; idx++) {
-            const item = rawList[idx]
-            const dateStr = String(item.date || '').slice(0, 10)
-            if (!dateStr) continue
+      const empLog = item.employee_info_log || {}
+      const empName = [empLog.first_name, empLog.last_name].filter(Boolean).join(' ').trim() || String(item.employee_name || 'Nhân viên')
+      let empCode = (empLog.code && empLog.code !== '-') ? String(empLog.code) : undefined
+      let empId = empCode ? `emp-${empCode.toLowerCase()}` : String(empLog.id || item.employee_id || `emp-${idx}`)
 
-            if (fromDate && dateStr < fromDate) continue
-            if (toDate && dateStr > toDate) continue
+      // Nhận diện Quản lý Huỳnh Lê Kiều Linh
+      if (empName.toLowerCase().includes('kiều linh') || String(empLog.phone || '').includes('0779554540')) {
+        empCode = 'BH-9852'
+        empId = 'emp-bh9852'
+      }
 
-            const empLog = item.employee_info_log || {}
-            const empName = [empLog.first_name, empLog.last_name].filter(Boolean).join(' ').trim() || String(item.employee_name || 'Nhân viên')
-            const empCode = (empLog.code && empLog.code !== '-') ? String(empLog.code) : undefined
-            const empId = String(empLog.id || item.employee_id || `emp-${idx}`)
+      const shiftData = item.shift_data || {}
+      const shiftName = String(shiftData.name || item.shift_name || 'Ca làm')
+      const shiftId = String(shiftData.id || item.shift_id || 'shift-001')
 
-            const shiftData = item.shift_data || {}
-            const shiftName = String(shiftData.name || item.shift_name || 'Ca làm')
-            const shiftId = String(shiftData.id || item.shift_id || 'shift-001')
+      // Khóa trùng lặp
+      const logKey = `${empId}_${dateStr}_${shiftId}_${item.id || idx}`
+      if (seenLogKeys.has(logKey)) continue
+      seenLogKeys.add(logKey)
 
-            const timeIn = item.time_check_in ? String(item.time_check_in).slice(0, 5) : ''
-            const timeOut = item.time_check_out ? String(item.time_check_out).slice(0, 5) : undefined
+      const timeIn = item.time_check_in ? String(item.time_check_in).slice(0, 5) : ''
+      const timeOut = item.time_check_out ? String(item.time_check_out).slice(0, 5) : undefined
 
-            const checkInIso = timeIn ? `${dateStr}T${timeIn}:00` : `${dateStr}T08:30:00`
-            const checkOutIso = timeOut ? `${dateStr}T${timeOut}:00` : undefined
+      const checkInIso = timeIn ? `${dateStr}T${timeIn}:00` : `${dateStr}T08:30:00`
+      const checkOutIso = timeOut ? `${dateStr}T${timeOut}:00` : undefined
 
-            let lateMin = 0
-            const statusCheckIn = String(item.status_check_in || '')
-            const isLate = statusCheckIn === 'GO_LATE' || String(item.status || '').includes('GO_LATE')
-            if (isLate && shiftData.time_start && timeIn) {
-              const [sh, sm] = shiftData.time_start.split(':').map(Number)
-              const [ih, im] = timeIn.split(':').map(Number)
-              const diff = (ih * 60 + im) - (sh * 60 + sm)
-              lateMin = diff > 0 ? diff : 5
-            }
+      let lateMin = 0
+      const statusCheckIn = String(item.status_check_in || '')
+      const isLate = statusCheckIn === 'GO_LATE' || String(item.status || '').includes('GO_LATE')
+      if (isLate && shiftData.time_start && timeIn) {
+        const [sh, sm] = shiftData.time_start.split(':').map(Number)
+        const [ih, im] = timeIn.split(':').map(Number)
+        const diff = (ih * 60 + im) - (sh * 60 + sm)
+        lateMin = diff > 0 ? diff : 5
+      }
 
-            let normalizedStatus: MappedIposAttendance['status'] = 'on_time'
-            if (!timeOut && timeIn) {
-              normalizedStatus = dateStr < todayStr ? 'missing_checkout' : 'working'
-            } else if (isLate) {
-              normalizedStatus = 'late'
-            } else if (item.status_check_out === 'LEAVE_EARLY') {
-              normalizedStatus = 'early'
-            }
+      let normalizedStatus: MappedIposAttendance['status'] = 'on_time'
+      if (!timeOut && timeIn) {
+        normalizedStatus = dateStr < todayStr ? 'missing_checkout' : 'working'
+      } else if (isLate) {
+        normalizedStatus = 'late'
+      } else if (item.status_check_out === 'LEAVE_EARLY') {
+        normalizedStatus = 'early'
+      }
 
-            let totalHours = 4.0
-            if (timeIn && timeOut) {
-              const [inH, inM] = timeIn.split(':').map(Number)
-              const [outH, outM] = timeOut.split(':').map(Number)
-              let durationMin = (outH * 60 + outM) - (inH * 60 + inM)
-              if (durationMin < 0) durationMin += 24 * 60
-              totalHours = Math.round((durationMin / 60) * 10) / 10
-            } else if (shiftData.time_start && shiftData.time_end) {
-              const [sh, sm] = shiftData.time_start.split(':').map(Number)
-              const [eh, em] = shiftData.time_end.split(':').map(Number)
-              let dur = (eh * 60 + em) - (sh * 60 + sm)
-              if (dur < 0) dur += 24 * 60
-              totalHours = Math.round((dur / 60) * 10) / 10
-            }
+      let totalHours = 4.0
+      if (timeIn && timeOut) {
+        const [inH, inM] = timeIn.split(':').map(Number)
+        const [outH, outM] = timeOut.split(':').map(Number)
+        let durationMin = (outH * 60 + outM) - (inH * 60 + inM)
+        if (durationMin < 0) durationMin += 24 * 60
+        totalHours = Math.round((durationMin / 60) * 10) / 10
+      } else if (shiftData.time_start && shiftData.time_end) {
+        const [sh, sm] = shiftData.time_start.split(':').map(Number)
+        const [eh, em] = shiftData.time_end.split(':').map(Number)
+        let dur = (eh * 60 + em) - (sh * 60 + sm)
+        if (dur < 0) dur += 24 * 60
+        totalHours = Math.round((dur / 60) * 10) / 10
+      }
 
-            const checkInInfo = item.check_in_info || {}
+      const checkInInfo = item.check_in_info || {}
 
-            storeMapped.push({
-              id: String(item.id || `ipos-att-${idx}`),
-              employee_id: empId,
-              employee_code: empCode,
-              employee_name: empName,
-              store_id: homiesStoreId,
-              store_name: storeName,
-              shift_id: shiftId,
-              shift_name: shiftName,
-              time_in: timeIn,
-              time_out: timeOut,
-              check_in_time: checkInIso,
-              check_out_time: checkOutIso,
-              status: normalizedStatus,
-              is_late: isLate,
-              late_minutes: lateMin,
-              total_hours: totalHours,
-              date: dateStr,
-              check_in_lat: Number(checkInInfo.lat || 10.822435),
-              check_in_lng: Number(checkInInfo.long || checkInInfo.lng || 106.762649),
-              check_in_distance_meters: Number(checkInInfo.distance || 10),
-              raw_ipos: item,
-            })
-          }
-          return storeMapped
-        } catch (e) {
-          console.warn(`[iPOS Timekeeping] Store ${iposStoreId} fetch error:`, e)
-          return []
-        }
+      allMapped.push({
+        id: String(item.id || `ipos-att-${idx}`),
+        employee_id: empId,
+        employee_code: empCode,
+        employee_name: empName,
+        store_id: homiesStoreId,
+        store_name: storeName,
+        shift_id: shiftId,
+        shift_name: shiftName,
+        time_in: timeIn,
+        time_out: timeOut,
+        check_in_time: checkInIso,
+        check_out_time: checkOutIso,
+        status: normalizedStatus,
+        is_late: isLate,
+        late_minutes: lateMin,
+        total_hours: totalHours,
+        date: dateStr,
+        check_in_lat: Number(checkInInfo.lat || 10.822435),
+        check_in_lng: Number(checkInInfo.long || checkInInfo.lng || 106.762649),
+        check_in_distance_meters: Number(checkInInfo.distance || 10),
+        raw_ipos: item,
       })
-    )
-
-    const allMapped = results.flat()
+    }
 
     const finalResponse: IposApiResponse<MappedIposAttendance> = {
       success: true,
