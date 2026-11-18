@@ -2072,11 +2072,15 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
       if (!inMemoryCache.bsc_logs || inMemoryCache.bsc_logs.length === 0) {
         inMemoryCache.bsc_logs = getInitialBscLogsSeed()
       }
-      if (!inMemoryCache.shifts || inMemoryCache.shifts.length < 20) {
-        inMemoryCache.shifts = getInitialShiftsSeed()
+      if (!inMemoryCache.shifts || inMemoryCache.shifts.length < 20 || !inMemoryCache.shifts.some(s => s.date && s.date.startsWith('2026-11'))) {
+        const seed = getInitialShiftsSeed()
+        const nonNov = (inMemoryCache.shifts || []).filter(s => !s.date || !s.date.startsWith('2026-11'))
+        inMemoryCache.shifts = [...nonNov, ...seed]
       }
-      if (!inMemoryCache.attendance || inMemoryCache.attendance.length < 50) {
-        inMemoryCache.attendance = getInitialAttendanceSeed()
+      if (!inMemoryCache.attendance || inMemoryCache.attendance.length < 50 || !inMemoryCache.attendance.some(a => a.date && a.date.startsWith('2026-11'))) {
+        const seed = getInitialAttendanceSeed()
+        const nonNov = (inMemoryCache.attendance || []).filter(a => !a.date || !a.date.startsWith('2026-11'))
+        inMemoryCache.attendance = [...nonNov, ...seed]
       }
       if (!inMemoryCache.bsc_settings) {
         inMemoryCache.bsc_settings = getInitialBscSettingsSeed()
@@ -2110,12 +2114,16 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     if (!inMemoryCache!.bsc_settings) {
       inMemoryCache!.bsc_settings = getInitialBscSettingsSeed()
     }
-    if (!inMemoryCache!.shifts || inMemoryCache!.shifts.length < 20) {
-      inMemoryCache!.shifts = getInitialShiftsSeed()
+    if (!inMemoryCache!.shifts || inMemoryCache!.shifts.length < 20 || !inMemoryCache!.shifts.some(s => s.date && s.date.startsWith('2026-11'))) {
+      const seed = getInitialShiftsSeed()
+      const nonNov = (inMemoryCache!.shifts || []).filter(s => !s.date || !s.date.startsWith('2026-11'))
+      inMemoryCache!.shifts = [...nonNov, ...seed]
       needMigrate = true
     }
-    if (!inMemoryCache!.attendance || inMemoryCache!.attendance.length < 50) {
-      inMemoryCache!.attendance = getInitialAttendanceSeed()
+    if (!inMemoryCache!.attendance || inMemoryCache!.attendance.length < 50 || !inMemoryCache!.attendance.some(a => a.date && a.date.startsWith('2026-11'))) {
+      const seed = getInitialAttendanceSeed()
+      const nonNov = (inMemoryCache!.attendance || []).filter(a => !a.date || !a.date.startsWith('2026-11'))
+      inMemoryCache!.attendance = [...nonNov, ...seed]
       needMigrate = true
     }
     if (!inMemoryCache!.incidents || inMemoryCache!.incidents.length === 0) {

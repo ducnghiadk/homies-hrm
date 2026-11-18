@@ -261,8 +261,10 @@ export async function GET(req: NextRequest) {
     } else {
       // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ
       const db = await getServerDb()
-      if (!db.attendance || db.attendance.length < 50) {
-        db.attendance = getInitialAttendanceSeed()
+      if (!db.attendance || db.attendance.length < 50 || !db.attendance.some(a => a.date && a.date.startsWith('2026-11'))) {
+        const seed = getInitialAttendanceSeed()
+        const nonNov = (db.attendance || []).filter(a => !a.date || !a.date.startsWith('2026-11'))
+        db.attendance = [...nonNov, ...seed]
         await saveServerDb(db)
       }
       list = db.attendance || []
