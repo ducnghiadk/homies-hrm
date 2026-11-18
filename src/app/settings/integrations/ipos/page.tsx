@@ -698,6 +698,11 @@ export default function IposIntegrationPage() {
   const handleTriggerSyncPeriod = async (customPeriod?: string) => {
     setIsSyncing(true)
     const targetPeriod = customPeriod || selectedPeriod
+    const cached = getCachedIposConfig()
+    const isAuthEffective = Boolean(isAuthenticated || cached?.is_authenticated)
+    const effUsername = username || cached?.username || ''
+    const effSecretKey = secretKey || cached?.token_or_password || ''
+
     try {
       const res = await fetch('/api/ipos/cloud-worker', {
         method: 'POST',
@@ -706,8 +711,11 @@ export default function IposIntegrationPage() {
           action: 'trigger_sync',
           period: targetPeriod,
           selected_stores: selectedStoresFilter,
-          mode: isAuthenticated ? 'real_worker' : 'archived_excel',
+          mode: isAuthEffective ? 'real_worker' : 'archived_excel',
           trigger_type: 'manual',
+          is_authenticated: isAuthEffective,
+          username: effUsername,
+          token_or_password: effSecretKey,
         }),
       })
 

@@ -53,13 +53,70 @@ function getDefaultConfig(): ServerIposIntegrationConfig {
   }
 }
 
-export async function GET() {
+// Khôi phục phiên đăng nhập từ Cookie 30 ngày hoặc Client Body vào bộ nhớ máy chủ Serverless
+function hydrateFromCookieOrPayload(req: NextRequest, body?: any, dbIntegration?: ServerIposIntegrationConfig) {
+  if (!dbIntegration) return
+
+  // 1. Đọc Cookie session homies_ipos_session_v2
+  const cookieVal = req.cookies.get('homies_ipos_session_v2')?.value
+  if (cookieVal) {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(cookieVal))
+      if (parsed.is_authenticated) {
+        dbIntegration.is_authenticated = true
+        if (parsed.username) dbIntegration.username = parsed.username
+        if (parsed.token_or_password) dbIntegration.token_or_password = parsed.token_or_password
+        if (parsed.hrm_jwt_token) dbIntegration.hrm_jwt_token = parsed.hrm_jwt_token
+        if (parsed.hrm_details) {
+          dbIntegration.hrm_user = {
+            name: parsed.hrm_details.user_name,
+            email: parsed.hrm_details.user_email,
+            role: parsed.hrm_details.role,
+          }
+          dbIntegration.hrm_company = {
+            name: parsed.hrm_details.company_name,
+          }
+        }
+      }
+      if (parsed.fabi_config?.is_connected) {
+        dbIntegration.fabi_pos_config = {
+          ...dbIntegration.fabi_pos_config,
+          ...parsed.fabi_config,
+          is_connected: true,
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  // 2. Đọc từ body client gửi kèm nếu có
+  if (body) {
+    if (body.is_authenticated || (body.username && body.token_or_password)) {
+      dbIntegration.is_authenticated = true
+      if (body.username) dbIntegration.username = body.username
+      if (body.token_or_password) dbIntegration.token_or_password = body.token_or_password
+    }
+    if (body.fabi_config?.is_connected) {
+      dbIntegration.fabi_pos_config = {
+        ...dbIntegration.fabi_pos_config,
+        ...body.fabi_config,
+        is_connected: true,
+      }
+    }
+  }
+}
+
+export async function GET(req: NextRequest) {
   try {
     const db = await getServerDb()
     if (!db.ipos_integration) {
       db.ipos_integration = getDefaultConfig()
       await saveServerDb(db)
     }
+
+    // Tự động đồng bộ phiên từ Cookie
+    hydrateFromCookieOrPayload(req, null, db.ipos_integration)
 
     const schemaStatus = await getSchemaStatus()
     const isAuth = Boolean(db.ipos_integration.is_authenticated)
@@ -93,6 +150,9 @@ export async function POST(req: NextRequest) {
     if (!db.ipos_integration) {
       db.ipos_integration = getDefaultConfig()
     }
+
+    // Tự động đồng bộ phiên từ Cookie hoặc Body
+    hydrateFromCookieOrPayload(req, body, db.ipos_integration)
 
     // 1. Kiểm tra kết nối mạng thật và xác thực tài khoản iPOS HRM trực tiếp
     if (action === 'test_connection' || action === 'test_hrm_login') {
@@ -263,7 +323,14 @@ export async function POST(req: NextRequest) {
     // 3. Kích hoạt Worker đồng bộ ngầm ngay bây giờ (Trigger Sync)
     if (action === 'trigger_sync') {
       const mode = body.mode || 'real_worker'
-      const isAuth = Boolean(db.ipos_integration.is_authenticated)
+      const clientAuth = Boolean(body.is_authenticated || (body.username && body.token_or_password))
+      const isAuth = Boolean(db.ipos_integration.is_authenticated || clientAuth)
+
+      if (clientAuth) {
+        db.ipos_integration.is_authenticated = true
+        if (body.username) db.ipos_integration.username = body.username
+        if (body.token_or_password) db.ipos_integration.token_or_password = body.token_or_password
+      }
 
       // Chặn tuyệt đối việc tự ý sinh dữ liệu giả khi chưa có phiên đăng nhập thật
       if (!isAuth && mode !== 'archived_excel') {
