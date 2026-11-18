@@ -1344,6 +1344,23 @@ function getInitialSeedData(): ServerDatabaseSchema {
     bsc_settings: getInitialBscSettingsSeed(),
     incidents: getInitialIncidentsSeed(),
     sessions: {},
+    ipos_integration: {
+      is_enabled: true,
+      api_endpoint: 'https://hrm.ipos.vn',
+      username: 'nghianguyen.dk@gmail.com',
+      token_or_password: 'Ducnghia1',
+      store_codes: ['HBP', '429'],
+      sync_schedule: 'every_2_hours',
+      sync_attendance: true,
+      sync_payroll: true,
+      sync_employees: true,
+      sync_shifts: true,
+      sync_pos_revenue: false,
+      sync_inventory: false,
+      is_authenticated: true,
+      last_sync_status: 'success',
+      sync_logs: [],
+    },
   }
 }
 
@@ -1917,6 +1934,25 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
       if (!inMemoryCache.attendance) {
         inMemoryCache.attendance = []
       }
+      if (!inMemoryCache.ipos_integration) {
+        inMemoryCache.ipos_integration = {
+          is_enabled: true,
+          api_endpoint: 'https://hrm.ipos.vn',
+          username: 'nghianguyen.dk@gmail.com',
+          token_or_password: 'Ducnghia1',
+          store_codes: ['HBP', '429'],
+          sync_schedule: 'every_2_hours',
+          sync_attendance: true,
+          sync_payroll: true,
+          sync_employees: true,
+          sync_shifts: true,
+          sync_pos_revenue: false,
+          sync_inventory: false,
+          is_authenticated: true,
+          last_sync_status: 'success',
+          sync_logs: [],
+        }
+      }
       if (!inMemoryCache.bsc_settings) {
         inMemoryCache.bsc_settings = getInitialBscSettingsSeed()
       }
@@ -1979,6 +2015,25 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     }
     if (!inMemoryCache!.attendance) {
       inMemoryCache!.attendance = []
+    }
+    if (!inMemoryCache!.ipos_integration) {
+      inMemoryCache!.ipos_integration = {
+        is_enabled: true,
+        api_endpoint: 'https://hrm.ipos.vn',
+        username: 'nghianguyen.dk@gmail.com',
+        token_or_password: 'Ducnghia1',
+        store_codes: ['HBP', '429'],
+        sync_schedule: 'every_2_hours',
+        sync_attendance: true,
+        sync_payroll: true,
+        sync_employees: true,
+        sync_shifts: true,
+        sync_pos_revenue: false,
+        sync_inventory: false,
+        is_authenticated: true,
+        last_sync_status: 'success',
+        sync_logs: [],
+      }
     }
     if (!inMemoryCache!.incidents || inMemoryCache!.incidents.length === 0) {
       inMemoryCache!.incidents = getInitialIncidentsSeed()
