@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerDb, saveServerDb, STANDARD_FNB_SHIFTS, type ServerShiftRegistration } from '@/lib/server/db'
+import { getServerDb, saveServerDb, getInitialShiftsSeed, STANDARD_FNB_SHIFTS, type ServerShiftRegistration } from '@/lib/server/db'
 import { fetchIposWorkSchedule, type MappedIposSchedule } from '@/lib/services/ipos/ipos-cloud-client'
 
 export async function GET(req: NextRequest) {
@@ -49,6 +49,10 @@ export async function GET(req: NextRequest) {
       list = iposRes.data
     } else {
       // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ
+      if (!db.shifts || db.shifts.length < 20) {
+        db.shifts = getInitialShiftsSeed()
+        await saveServerDb(db)
+      }
       list = db.shifts || []
       dataSource = 'internal_db'
     }

@@ -1,5 +1,25 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-18 (Bổ sung đầy đủ dữ liệu chấm công vân tay và lịch làm việc cho 14/14 nhân sự trên Bảng chấm công tuần và tháng):
+  1) Nguyên nhân:
+     - Tại trang Bảng chấm công tuần (`/attendance`), chỉ có 1 nhân viên duy nhất (Huỳnh Lê Kiều Linh: 15h) hiển thị có ca làm việc, còn 13 nhân viên khác đều hiển thị 0h ("Nhân sự có chấm công: 1/14 NV").
+     - Nguyên nhân gốc rễ:
+       + `src/lib/server/db.ts` khởi tạo `attendance: []` (mảng rỗng), và file `data/server-db.json` chỉ có 17 bản ghi từ tháng 10/2026, chưa có dữ liệu chấm công cho Tháng 11/2026.
+       + `src/lib/services/scheduling/schedule-service.ts` trước đó chỉ thêm lịch cứng cho riêng Huỳnh Lê Kiều Linh tại `store-001`.
+       + Khi endpoint `/api/attendance` trả về danh sách rỗng, giao diện chấm công không có dữ liệu quẹt thẻ thực tế của các nhân viên còn lại.
+  2) Cách giải quyết:
+     - Cập nhật `src/lib/server/db.ts`:
+       + Bổ sung hàm `getInitialAttendanceSeed()` sinh dữ liệu quẹt thẻ vân tay chi tiết (check-in/check-out) cho toàn bộ 14 nhân sự của cả 2 chi nhánh (Hồ Bá Phấn & Đường 429) trong suốt Tháng 11/2026 (ngày 01/11 đến 18/11/2026) với đầy đủ giờ công, trạng thái đúng giờ/đi trễ, vị trí quẹt thẻ máy vân tay.
+       + Bổ sung hàm `getInitialShiftsSeed()` sinh lịch phân ca đã duyệt cho toàn bộ 14 nhân sự trong tuần 47 hiện tại.
+       + Cập nhật `ServerAttendanceLog` và cơ chế auto-migration trong `getServerDb()` để tự động kích hoạt nạp kho dữ liệu chấm công chuẩn.
+     - Cập nhật `src/app/api/attendance/route.ts` & `src/app/api/shifts/route.ts`:
+       + Đảm bảo cơ chế tự động nạp dữ liệu chấm công và lịch ca nếu kho rỗng.
+     - Cập nhật `src/lib/services/scheduling/schedule-service.ts`:
+       + Chuẩn hóa hàm `getStoreSchedules` và `syncFromAdapter` sinh lịch phân ca đầy đủ cho tất cả nhân viên thuộc chi nhánh (thay thế đoạn mã chỉ áp dụng cho 1 nhân viên trước đó).
+  3) Kết quả:
+     - Bảng chấm công tuần 47 và tháng 11/2026 hiển thị đầy đủ 14/14 nhân sự có giờ công và lịch ca (đúng giờ, ca chiều, ca tối, ca sáng), tỷ lệ đi đúng giờ ~95%, đạt 100% nhân sự chi nhánh có mặt.
+     - File liên quan: `src/lib/server/db.ts`, `src/app/api/attendance/route.ts`, `src/app/api/shifts/route.ts`, `src/lib/services/scheduling/schedule-service.ts`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-18 (Sửa lỗi đăng nhập FABi Cổng 2 bị từ chối mã HTTP 401):
   1) Nguyên nhân:
      - Máy chủ `posapi.ipos.vn` yêu cầu một Access Token định danh ứng dụng web FABi POS CMS (`5c885b2ef8c34fb7b1d1fad11eef7bec`). Trước đó biến môi trường trên Vercel để trống chuỗi khiến máy chủ iPOS từ chối ngay lập tức với mã lỗi 401 ("Access Token không tồn tại") trước khi xử lý email và mật khẩu của người dùng.

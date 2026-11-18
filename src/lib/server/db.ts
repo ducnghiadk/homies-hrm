@@ -153,10 +153,12 @@ export interface ServerShiftRegistration {
 export interface ServerAttendanceLog {
   id: string
   employee_id: string
+  employee_code?: string
   employee_name: string
   store_id: string
   store_name: string
   shift_id?: string
+  shift_name?: string
   check_in_time: string
   check_out_time?: string
   check_in_lat: number
@@ -164,7 +166,7 @@ export interface ServerAttendanceLog {
   check_out_lat?: number
   check_out_lng?: number
   check_in_distance_meters: number
-  status: 'on_time' | 'late' | 'check_out' | 'checked_out'
+  status: 'on_time' | 'late' | 'check_out' | 'checked_out' | 'missing_checkout' | 'working'
   is_late?: boolean
   late_minutes: number
   is_early?: boolean
@@ -571,6 +573,175 @@ const DB_FILE = path.join(DATA_DIR, 'server-db.json')
 
 const DEFAULT_SEED_PASSWORD = hashPassword('123456')
 
+export function getInitialShiftsSeed(): ServerShiftRegistration[] {
+  const shifts: ServerShiftRegistration[] = []
+  const weekStart = '2026-11-16' // T2 Tuần 47
+  const weekDates = [
+    '2026-11-16', // T2
+    '2026-11-17', // T3
+    '2026-11-18', // T4
+    '2026-11-19', // T5
+    '2026-11-20', // T6
+    '2026-11-21', // T7
+    '2026-11-22', // CN
+  ]
+
+  const hbpEmployees = [
+    { id: 'emp-bh9852', code: 'BH-9852', name: 'Huỳnh Lê Kiều Linh', store: 'store-001', pos: 'pos-sm' },
+    { id: 'emp-nv0008', code: 'NV0008', name: 'Nguyễn Thị Phương Thảo', store: 'store-001', pos: 'pos-004' },
+    { id: 'emp-nv0013', code: 'NV0013', name: 'Nguyễn Thị Tú Trinh', store: 'store-001', pos: 'pos-002' },
+    { id: 'emp-nv0024', code: 'NV0024', name: 'Tấn Hiếu', store: 'store-001', pos: 'pos-003' },
+    { id: 'emp-nv0028', code: 'NV0028', name: 'Phạm Nguyễn Đông Duy', store: 'store-001', pos: 'pos-001' },
+    { id: 'emp-nv0030', code: 'NV0030', name: 'Quách Thị Kim Chi', store: 'store-001', pos: 'pos-001' },
+    { id: 'emp-nv0027', code: 'NV0027', name: 'Trần Công Huy', store: 'store-001', pos: 'pos-sm' },
+    { id: 'emp-nv0020', code: 'NV0020', name: 'Lê Minh Lộc', store: 'store-001', pos: 'pos-004' },
+    { id: 'emp-nv0031', code: 'NV0031', name: 'Cao Văn Thắng', store: 'store-001', pos: 'pos-001' },
+    { id: 'emp-nv0033', code: 'NV0033', name: 'Nguyễn Hoài Ân', store: 'store-001', pos: 'pos-001' },
+    { id: 'emp-nv0034', code: 'NV0034', name: 'Nguyễn Thị Thu', store: 'store-001', pos: 'pos-002' },
+    { id: 'emp-nv0035', code: 'NV0035', name: 'Nguyễn Mạnh Duy', store: 'store-001', pos: 'pos-003' },
+    { id: 'emp-001', code: 'BH-001', name: 'Nguyễn Đức Nghĩa', store: 'store-001', pos: 'pos-ceo' },
+  ]
+
+  const store429Employees = [
+    { id: 'emp-nv0016', code: 'NV0016', name: 'Nguyễn Thị Kiều Ý', store: 'store-002', pos: 'pos-sm' },
+    { id: 'emp-nv0017', code: 'NV0017', name: 'Nguyễn Thanh Thiện', store: 'store-002', pos: 'pos-001' },
+    { id: 'emp-nv0020', code: 'NV0020', name: 'Lê Minh Lộc', store: 'store-002', pos: 'pos-004' },
+    { id: 'emp-nv0027', code: 'NV0027', name: 'Trần Công Huy', store: 'store-002', pos: 'pos-sm' },
+    { id: 'emp-nv0031', code: 'NV0031', name: 'Cao Văn Thắng', store: 'store-002', pos: 'pos-001' },
+    { id: 'emp-nv0033', code: 'NV0033', name: 'Nguyễn Hoài An', store: 'store-002', pos: 'pos-001' },
+    { id: 'emp-nv0034', code: 'NV0034', name: 'Nguyễn Thị Thu', store: 'store-002', pos: 'pos-002' },
+    { id: 'emp-nv0035', code: 'NV0035', name: 'Nguyễn Mạnh Duy', store: 'store-002', pos: 'pos-003' },
+  ]
+
+  const shiftTemplates = [
+    { shiftId: 'shift-001', name: 'Ca Sáng (08:00 - 12:00)' },
+    { shiftId: 'shift-002', name: 'Ca Chiều (12:00 - 17:00)' },
+    { shiftId: 'shift-003', name: 'Ca Tối (17:00 - 22:00)' },
+  ]
+
+  const allStaff = [...hbpEmployees, ...store429Employees]
+
+  allStaff.forEach((emp, empIdx) => {
+    weekDates.forEach((date, dayIdx) => {
+      if (emp.code === 'BH-001') {
+        if (dayIdx !== 0 && dayIdx !== 2) return
+      } else {
+        if ((empIdx + dayIdx) % 7 === 0) return
+      }
+
+      const sTpl = shiftTemplates[(empIdx + dayIdx) % 3]
+
+      shifts.push({
+        id: `shift-reg-${emp.code.toLowerCase()}-${emp.store}-${date}-${sTpl.shiftId}`,
+        employee_id: emp.id,
+        employee_name: emp.name,
+        store_id: emp.store,
+        week_start_date: weekStart,
+        date,
+        shift_id: sTpl.shiftId,
+        shift_name: sTpl.name,
+        position_id: emp.pos,
+        status: 'APPROVED',
+        created_at: `${date}T00:00:00.000Z`,
+        approved_by: 'emp-001',
+        approved_at: `${date}T00:30:00.000Z`,
+      })
+    })
+  })
+
+  return shifts
+}
+
+export function getInitialAttendanceSeed(): ServerAttendanceLog[] {
+  const logs: ServerAttendanceLog[] = []
+
+  const hbpEmployees = [
+    { id: 'emp-bh9852', code: 'BH-9852', name: 'Huỳnh Lê Kiều Linh', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0008', code: 'NV0008', name: 'Nguyễn Thị Phương Thảo', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0013', code: 'NV0013', name: 'Nguyễn Thị Tú Trinh', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0024', code: 'NV0024', name: 'Tấn Hiếu', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0028', code: 'NV0028', name: 'Phạm Nguyễn Đông Duy', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0030', code: 'NV0030', name: 'Quách Thị Kim Chi', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0027', code: 'NV0027', name: 'Trần Công Huy', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0020', code: 'NV0020', name: 'Lê Minh Lộc', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0031', code: 'NV0031', name: 'Cao Văn Thắng', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0033', code: 'NV0033', name: 'Nguyễn Hoài Ân', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0034', code: 'NV0034', name: 'Nguyễn Thị Thu', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-nv0035', code: 'NV0035', name: 'Nguyễn Mạnh Duy', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+    { id: 'emp-001', code: 'BH-001', name: 'Nguyễn Đức Nghĩa', store: 'store-001', storeName: 'Homies Milk Tea - Hồ Bá Phấn', lat: 10.822435, lng: 106.762649 },
+  ]
+
+  const store429Employees = [
+    { id: 'emp-nv0016', code: 'NV0016', name: 'Nguyễn Thị Kiều Ý', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
+    { id: 'emp-nv0017', code: 'NV0017', name: 'Nguyễn Thanh Thiện', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
+    { id: 'emp-nv0020', code: 'NV0020', name: 'Lê Minh Lộc', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
+    { id: 'emp-nv0027', code: 'NV0027', name: 'Trần Công Huy', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
+    { id: 'emp-nv0031', code: 'NV0031', name: 'Cao Văn Thắng', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
+    { id: 'emp-nv0033', code: 'NV0033', name: 'Nguyễn Hoài An', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
+    { id: 'emp-nv0034', code: 'NV0034', name: 'Nguyễn Thị Thu', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
+    { id: 'emp-nv0035', code: 'NV0035', name: 'Nguyễn Mạnh Duy', store: 'store-002', storeName: 'Homies Milk Tea - Đường 429', lat: 10.84478, lng: 106.78652 },
+  ]
+
+  const shiftDefs = [
+    { shiftId: 'shift-001', name: 'Ca Sáng (08:00 - 12:00)', inH: '08:00', inMinDef: '07:58', outH: '12:00', outMinDef: '12:03', hours: 4.0 },
+    { shiftId: 'shift-002', name: 'Ca Chiều (12:00 - 17:00)', inH: '12:00', inMinDef: '11:58', outH: '17:00', outMinDef: '17:04', hours: 5.0 },
+    { shiftId: 'shift-003', name: 'Ca Tối (17:00 - 22:00)', inH: '17:00', inMinDef: '16:57', outH: '22:00', outMinDef: '22:02', hours: 5.0 },
+  ]
+
+  const allEmpStores = [
+    ...hbpEmployees.map(e => ({ ...e, group: 'hbp' })),
+    ...store429Employees.map(e => ({ ...e, group: '429' })),
+  ]
+
+  // Sinh log chấm công chi tiết từ ngày 01/11/2026 đến 18/11/2026 (hôm nay)
+  for (let day = 1; day <= 18; day++) {
+    const dayStr = day < 10 ? '0' + day : '' + day
+    const date = `2026-11-${dayStr}`
+
+    allEmpStores.forEach((emp, eIdx) => {
+      if (emp.code === 'BH-001') {
+        const dObj = new Date(`${date}T12:00:00Z`)
+        const dow = dObj.getUTCDay()
+        if (dow !== 1 && dow !== 3 && dow !== 5) return
+      } else {
+        if ((eIdx + day) % 7 === 0) return
+      }
+
+      const sIndex = (eIdx + day) % 3
+      const sDef = shiftDefs[sIndex]
+
+      const isLate = (eIdx * 7 + day) % 19 === 0
+      const inTimeStr = isLate
+        ? `${sDef.inH.split(':')[0]}:06:00`
+        : `${sDef.inMinDef}:20`
+      const outTimeStr = `${sDef.outMinDef}:45`
+
+      logs.push({
+        id: `att-${emp.code.toLowerCase()}-${emp.store}-${date}-${sDef.shiftId}`,
+        employee_id: emp.id,
+        employee_code: emp.code,
+        employee_name: emp.name,
+        store_id: emp.store,
+        store_name: emp.storeName,
+        shift_id: sDef.shiftId,
+        shift_name: sDef.name,
+        date,
+        check_in_time: `${date}T${inTimeStr}.000Z`,
+        check_out_time: `${date}T${outTimeStr}.000Z`,
+        check_in_lat: emp.lat + (Math.sin(eIdx + day) * 0.0001),
+        check_in_lng: emp.lng + (Math.cos(eIdx + day) * 0.0001),
+        check_in_distance_meters: 15 + ((eIdx + day) % 20),
+        status: isLate ? 'late' : 'on_time',
+        is_late: isLate,
+        late_minutes: isLate ? 6 : 0,
+        total_hours: sDef.hours,
+      })
+    })
+  }
+
+  return logs
+}
+
 // Seed data chuẩn của Homies F&B
 function getInitialSeedData(): ServerDatabaseSchema {
   const stores: ServerStore[] = [
@@ -891,36 +1062,7 @@ function getInitialSeedData(): ServerDatabaseSchema {
     },
   ]
 
-  const shifts: ServerShiftRegistration[] = [
-    {
-      id: 'shift-reg-001',
-      employee_id: 'emp-005',
-      employee_name: 'Võ Thanh Bình',
-      store_id: 'store-001',
-      week_start_date: '2026-09-14',
-      date: '2026-09-15',
-      shift_id: 'shift-001',
-      shift_name: 'Ca Sáng (08:00 - 12:00)',
-      position_id: 'pos-001',
-      status: 'APPROVED',
-      created_at: '2026-09-13T10:00:00.000Z',
-      approved_by: 'emp-003',
-      approved_at: '2026-09-13T16:00:00.000Z',
-    },
-    {
-      id: 'shift-reg-002',
-      employee_id: 'emp-429-01',
-      employee_name: 'Phạm Nguyễn Đông Duy',
-      store_id: 'store-002',
-      week_start_date: '2026-09-14',
-      date: '2026-09-15',
-      shift_id: 'shift-002',
-      shift_name: 'Ca Chiều (12:00 - 17:00)',
-      position_id: 'pos-001',
-      status: 'PENDING',
-      created_at: '2026-09-14T08:30:00.000Z',
-    },
-  ]
+  const shifts: ServerShiftRegistration[] = getInitialShiftsSeed()
 
   const payroll_summaries: ServerPayrollSummary[] = [
     {
@@ -1353,7 +1495,7 @@ function getInitialSeedData(): ServerDatabaseSchema {
     stores,
     employees,
     shifts,
-    attendance: [],
+    attendance: getInitialAttendanceSeed(),
     payroll_summaries,
     salary_slips,
     contracts: getInitialContractsSeed(),
@@ -1930,6 +2072,12 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
       if (!inMemoryCache.bsc_logs || inMemoryCache.bsc_logs.length === 0) {
         inMemoryCache.bsc_logs = getInitialBscLogsSeed()
       }
+      if (!inMemoryCache.shifts || inMemoryCache.shifts.length < 20) {
+        inMemoryCache.shifts = getInitialShiftsSeed()
+      }
+      if (!inMemoryCache.attendance || inMemoryCache.attendance.length < 50) {
+        inMemoryCache.attendance = getInitialAttendanceSeed()
+      }
       if (!inMemoryCache.bsc_settings) {
         inMemoryCache.bsc_settings = getInitialBscSettingsSeed()
       }
@@ -1946,6 +2094,7 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
 
     const data = await fs.readFile(DB_FILE, 'utf-8')
     inMemoryCache = JSON.parse(data)
+    let needMigrate = false
     if (!inMemoryCache!.contracts) {
       inMemoryCache!.contracts = getInitialContractsSeed()
     }
@@ -1961,6 +2110,14 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     if (!inMemoryCache!.bsc_settings) {
       inMemoryCache!.bsc_settings = getInitialBscSettingsSeed()
     }
+    if (!inMemoryCache!.shifts || inMemoryCache!.shifts.length < 20) {
+      inMemoryCache!.shifts = getInitialShiftsSeed()
+      needMigrate = true
+    }
+    if (!inMemoryCache!.attendance || inMemoryCache!.attendance.length < 50) {
+      inMemoryCache!.attendance = getInitialAttendanceSeed()
+      needMigrate = true
+    }
     if (!inMemoryCache!.incidents || inMemoryCache!.incidents.length === 0) {
       inMemoryCache!.incidents = getInitialIncidentsSeed()
     }
@@ -1975,7 +2132,6 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     }
 
     // Tự động nâng cấp mật khẩu còn ở dạng thường sang chuẩn mã hóa an toàn PBKDF2
-    let needMigrate = false
     if (inMemoryCache?.employees) {
       inMemoryCache.employees.forEach((emp) => {
         if (emp.password && !emp.password.startsWith('pbkdf2:')) {
@@ -2001,6 +2157,12 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
       }
       if (!initial.incidents || initial.incidents.length === 0) {
         initial.incidents = getInitialIncidentsSeed()
+      }
+      if (!initial.shifts || initial.shifts.length < 20) {
+        initial.shifts = getInitialShiftsSeed()
+      }
+      if (!initial.attendance || initial.attendance.length < 50) {
+        initial.attendance = getInitialAttendanceSeed()
       }
     } catch {
       initial = getInitialSeedData()

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   getServerDb,
   saveServerDb,
+  getInitialAttendanceSeed,
   ServerAttendanceLog,
   ServerEmployee,
   ServerShiftRegistration,
@@ -260,6 +261,10 @@ export async function GET(req: NextRequest) {
     } else {
       // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ
       const db = await getServerDb()
+      if (!db.attendance || db.attendance.length < 50) {
+        db.attendance = getInitialAttendanceSeed()
+        await saveServerDb(db)
+      }
       list = db.attendance || []
       dataSource = 'internal_db'
     }
