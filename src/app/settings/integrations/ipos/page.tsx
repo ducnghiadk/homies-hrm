@@ -110,17 +110,63 @@ export default function IposIntegrationPage() {
     )
   }
 
+  // Khóa lưu trữ bền vững trên thiết bị và Cookie 30 ngày (chống mất khi F5 / Serverless cold start)
+  const IPOS_STORAGE_KEY = 'homies_ipos_integration_config_v2'
+  const IPOS_COOKIE_KEY = 'homies_ipos_session_v2'
+
+  const getCachedIposConfig = () => {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = localStorage.getItem(IPOS_STORAGE_KEY)
+      if (raw) return JSON.parse(raw)
+      const match = document.cookie.match(new RegExp(`(?:^|; )${IPOS_COOKIE_KEY}=([^;]*)`))
+      if (match && match[1]) {
+        const decoded = JSON.parse(decodeURIComponent(match[1]))
+        localStorage.setItem(IPOS_STORAGE_KEY, JSON.stringify(decoded))
+        return decoded
+      }
+    } catch {
+      // Ignore parse error
+    }
+    return null
+  }
+
+  const saveCachedIposConfig = (data: Record<string, unknown>) => {
+    if (typeof window === 'undefined') return
+    try {
+      const current = getCachedIposConfig() || {}
+      const updated = { ...current, ...data }
+      localStorage.setItem(IPOS_STORAGE_KEY, JSON.stringify(updated))
+      document.cookie = `${IPOS_COOKIE_KEY}=${encodeURIComponent(JSON.stringify(updated))}; path=/; max-age=2592000; SameSite=Lax`
+    } catch {
+      // Ignore storage error
+    }
+  }
+
+  const clearCachedIposConfig = () => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.removeItem(IPOS_STORAGE_KEY)
+      document.cookie = `${IPOS_COOKIE_KEY}=; path=/; max-age=0`
+    } catch {
+      // Ignore
+    }
+  }
+
+  // Khởi tạo state trực tiếp từ cache để khi F5 không bao giờ bị chớp màn hình trắng
+  const initialCache = typeof window !== 'undefined' ? getCachedIposConfig() : null
+
   // Form states - 6 luồng dữ liệu
   const [isEnabled, setIsEnabled] = useState(true)
   const [apiEndpoint, setApiEndpoint] = useState('https://hrm.ipos.vn')
-  const [username, setUsername] = useState('')
-  const [secretKey, setSecretKey] = useState('')
+  const [username, setUsername] = useState(() => initialCache?.username || '')
+  const [secretKey, setSecretKey] = useState(() => initialCache?.token_or_password || '')
   const [syncSchedule, setSyncSchedule] = useState<'every_1_min' | 'daily_midnight' | 'every_2_hours' | 'manual_only'>('daily_midnight')
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(initialCache?.is_authenticated || (initialCache?.username && initialCache?.token_or_password)))
   
   // Cổng 2: Tài khoản FABi POS (Doanh thu) chuẩn ZaloCRM & Kho IVT (Hao hụt)
-  const [fabiUsername, setFabiUsername] = useState('')
-  const [fabiPassword, setFabiPassword] = useState('')
+  const [fabiUsername, setFabiUsername] = useState(() => initialCache?.fabi_config?.username || '')
+  const [fabiPassword, setFabiPassword] = useState(() => initialCache?.fabi_config?.password || '')
   const [isTestingFabi, setIsTestingFabi] = useState(false)
   const [showFabiPassword, setShowFabiPassword] = useState(false)
   const [fabiDetails, setFabiDetails] = useState<{
@@ -128,11 +174,11 @@ export default function IposIntegrationPage() {
     company_name?: string
     stores?: Array<{ id: string; name: string; address?: string; code?: string; phone?: string }>
     token_expires_at?: string
-  } | null>(null)
+  } | null>(() => initialCache?.fabi_config?.fabi_details || null)
   const [fabiBrandCode, setFabiBrandCode] = useState('HOMIES_TEA')
   const [fabiPosParentId, setFabiPosParentId] = useState('POS-HBP-PARENT-2026')
   const [fabiSecretKey, setFabiSecretKey] = useState('fabi_sec_homies_89218')
-  const [fabiConnected, setFabiConnected] = useState(false)
+  const [fabiConnected, setFabiConnected] = useState(() => Boolean(initialCache?.fabi_config?.is_connected || (initialCache?.fabi_config?.username && initialCache?.fabi_config?.password)))
   const [showFabiSecret, setShowFabiSecret] = useState(false)
   const [showFabiSection, setShowFabiSection] = useState(false)
 
@@ -157,60 +203,28 @@ export default function IposIntegrationPage() {
   const [zaloWebhookUrl, setZaloWebhookUrl] = useState('')
   const [isTestingNotif, setIsTestingNotif] = useState(false)
 
-  // Lưu trữ bền vững tài khoản iPOS trên thiết bị, chống mất cấu hình khi F5
-  const IPOS_STORAGE_KEY = 'homies_ipos_integration_config_v2'
-
-  const getCachedIposConfig = () => {
-    if (typeof window === 'undefined') return null
-    try {
-      const raw = localStorage.getItem(IPOS_STORAGE_KEY)
-      if (raw) return JSON.parse(raw)
-    } catch {
-      // Ignore parse error
-    }
-    return null
-  }
-
-  const saveCachedIposConfig = (data: Record<string, unknown>) => {
-    if (typeof window === 'undefined') return
-    try {
-      const current = getCachedIposConfig() || {}
-      const updated = { ...current, ...data }
-      localStorage.setItem(IPOS_STORAGE_KEY, JSON.stringify(updated))
-    } catch {
-      // Ignore storage error
-    }
-  }
-
-  const clearCachedIposConfig = () => {
-    if (typeof window === 'undefined') return
-    try {
-      localStorage.removeItem(IPOS_STORAGE_KEY)
-    } catch {
-      // Ignore
-    }
-  }
-
   // 1. Tải cấu hình hiện tại
   const loadConfig = async () => {
     setIsLoading(true)
 
     // Khôi phục ngay từ bộ nhớ máy để giao diện không bị giật hay mất thông tin
     const cached = getCachedIposConfig()
+    const hasCachedHrm = Boolean(cached?.is_authenticated || (cached?.username && cached?.token_or_password))
+    const hasCachedFabi = Boolean(cached?.fabi_config?.is_connected || (cached?.fabi_config?.username && cached?.fabi_config?.password))
+
     if (cached) {
       if (cached.username) setUsername(cached.username)
       if (cached.token_or_password) setSecretKey(cached.token_or_password)
-      if (cached.is_authenticated) setIsAuthenticated(true)
+      if (hasCachedHrm) setIsAuthenticated(true)
       if (cached.hrm_details) setHrmDetails(cached.hrm_details)
       if (cached.store_codes && Array.isArray(cached.store_codes) && cached.store_codes.length > 0) {
-        // Lọc bỏ mã LVS cũ nếu còn sót lại trong cache
         const cleanCodes = cached.store_codes.filter((c: string) => c !== 'LVS')
         setSelectedStoresFilter(cleanCodes.length > 0 ? cleanCodes : ['HBP', '429'])
       }
       if (cached.fabi_config) {
         if (cached.fabi_config.username) setFabiUsername(cached.fabi_config.username)
         if (cached.fabi_config.password) setFabiPassword(cached.fabi_config.password)
-        if (cached.fabi_config.is_connected) setFabiConnected(true)
+        if (hasCachedFabi) setFabiConnected(true)
         if (cached.fabi_config.fabi_details) setFabiDetails(cached.fabi_config.fabi_details)
       }
     }
@@ -223,8 +237,6 @@ export default function IposIntegrationPage() {
           setConfig(json.config)
           setIsEnabled(json.config.is_enabled ?? true)
           setApiEndpoint(json.config.api_endpoint || 'https://hrm.ipos.vn')
-          if (json.config.username) setUsername(json.config.username)
-          if (json.config.token_or_password) setSecretKey(json.config.token_or_password)
           setSyncSchedule(json.config.sync_schedule || 'daily_midnight')
           setSyncAttendance(json.config.sync_attendance ?? true)
           setSyncPayroll(json.config.sync_payroll ?? true)
@@ -235,9 +247,12 @@ export default function IposIntegrationPage() {
           setSyncLogs(json.config.sync_logs || [])
           setLatencyMs(json.latency_ms || null)
 
+          // CỔNG 1: iPOS HRM (Ưu tiên client cache nếu serverless cold-start)
           const isServerAuth = Boolean(json.config.is_authenticated)
           if (isServerAuth) {
             setIsAuthenticated(true)
+            if (json.config.username) setUsername(json.config.username)
+            if (json.config.token_or_password) setSecretKey(json.config.token_or_password)
             if (json.config.hrm_user || json.config.hrm_company) {
               const details = {
                 user_name: json.config.hrm_user?.name,
@@ -255,10 +270,13 @@ export default function IposIntegrationPage() {
                 store_codes: json.config.store_codes || selectedStoresFilter,
               })
             }
-          } else if (cached?.is_authenticated && cached?.username && cached?.token_or_password) {
-            // Máy chủ Serverless vừa cold start -> tự động hydrate lại dữ liệu từ localStorage
+          } else if (hasCachedHrm && cached) {
+            // Máy chủ Serverless vừa cold start -> giữ nguyên phiên từ cache và nạp ngầm lên server
             setIsAuthenticated(true)
+            if (cached.username) setUsername(cached.username)
+            if (cached.token_or_password) setSecretKey(cached.token_or_password)
             if (cached.hrm_details) setHrmDetails(cached.hrm_details)
+
             fetch('/api/ipos/cloud-worker', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -285,31 +303,58 @@ export default function IposIntegrationPage() {
             setIsAuthenticated(false)
           }
 
-          if (json.config.hrm_user || json.config.hrm_company) {
-            setHrmDetails({
-              user_name: json.config.hrm_user?.name,
-              user_email: json.config.hrm_user?.email,
-              role: json.config.hrm_user?.role,
-              company_name: json.config.hrm_company?.name,
-            })
-          }
-
-          if (json.config.fabi_pos_config) {
-            setFabiUsername(json.config.fabi_pos_config.username || '')
-            setFabiPassword(json.config.fabi_pos_config.password || '')
-            setFabiBrandCode(json.config.fabi_pos_config.brand_code || 'HOMIES_TEA')
-            setFabiPosParentId(json.config.fabi_pos_config.pos_parent_id || 'POS-HBP-PARENT-2026')
-            setFabiSecretKey(json.config.fabi_pos_config.secret_key || 'fabi_sec_homies_89218')
-            setFabiConnected(Boolean(json.config.fabi_pos_config.is_connected))
+          // CỔNG 2: iPOS FABi POS (Ưu tiên client cache nếu serverless cold-start)
+          const isServerFabi = Boolean(json.config.fabi_pos_config?.is_connected)
+          if (isServerFabi) {
+            setFabiConnected(true)
+            if (json.config.fabi_pos_config.username) setFabiUsername(json.config.fabi_pos_config.username)
+            if (json.config.fabi_pos_config.password) setFabiPassword(json.config.fabi_pos_config.password)
             if (json.config.fabi_pos_config.stores || json.config.fabi_pos_config.brand_name) {
-              setFabiDetails({
+              const fDetails = {
                 brand_name: json.config.fabi_pos_config.brand_name,
                 company_name: json.config.fabi_pos_config.company_name,
                 stores: json.config.fabi_pos_config.stores,
                 token_expires_at: json.config.fabi_pos_config.token_expires_at,
+              }
+              setFabiDetails(fDetails)
+              saveCachedIposConfig({
+                fabi_config: {
+                  username: json.config.fabi_pos_config.username,
+                  password: json.config.fabi_pos_config.password,
+                  is_connected: true,
+                  fabi_details: fDetails,
+                },
               })
             }
+          } else if (hasCachedFabi && cached?.fabi_config) {
+            // Giữ nguyên kết nối FABi từ cache và nạp ngầm lên serverless
+            setFabiConnected(true)
+            if (cached.fabi_config.username) setFabiUsername(cached.fabi_config.username)
+            if (cached.fabi_config.password) setFabiPassword(cached.fabi_config.password)
+            if (cached.fabi_config.fabi_details) setFabiDetails(cached.fabi_config.fabi_details)
+
+            fetch('/api/ipos/cloud-worker', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'save_config',
+                config: {
+                  fabi_pos_config: {
+                    username: cached.fabi_config.username,
+                    password: cached.fabi_config.password,
+                    is_connected: true,
+                    brand_name: cached.fabi_config.fabi_details?.brand_name || 'HOMIES',
+                    company_name: cached.fabi_config.fabi_details?.company_name,
+                    stores: cached.fabi_config.fabi_details?.stores,
+                    token_expires_at: cached.fabi_config.fabi_details?.token_expires_at,
+                  },
+                },
+              }),
+            }).catch(() => {})
+          } else {
+            setFabiConnected(false)
           }
+
           if (json.config.ivt_config) {
             setIvtToken(json.config.ivt_config.token || '')
             setIvtConnected(Boolean(json.config.ivt_config.is_connected))
@@ -329,7 +374,6 @@ export default function IposIntegrationPage() {
       }
     } catch (err) {
       console.warn('Lỗi tải cấu hình iPOS:', err)
-      toast.error('Không thể tải cấu hình tích hợp iPOS')
     } finally {
       setIsLoading(false)
     }
@@ -374,6 +418,23 @@ export default function IposIntegrationPage() {
           hrm_details: details,
           store_codes: selectedStoresFilter,
         })
+        // Tự động lưu bền vững lên máy chủ
+        fetch('/api/ipos/cloud-worker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save_config',
+            config: {
+              is_authenticated: true,
+              username,
+              token_or_password: secretKey,
+              hrm_jwt_token: json.hrm_jwt_token || secretKey,
+              store_codes: selectedStoresFilter,
+              hrm_user: details ? { name: details.user_name, email: details.user_email, role: details.role } : undefined,
+              hrm_company: details ? { name: details.company_name } : undefined,
+            },
+          }),
+        }).catch(() => {})
         toast.success(json.message)
       } else {
         setIsAuthenticated(false)
@@ -393,7 +454,17 @@ export default function IposIntegrationPage() {
     setIsAuthenticated(false)
     setHrmDetails(null)
     setSecretKey('')
-    clearCachedIposConfig()
+    try {
+      const current = getCachedIposConfig() || {}
+      delete current.username
+      delete current.token_or_password
+      delete current.is_authenticated
+      delete current.hrm_jwt_token
+      delete current.hrm_details
+      localStorage.setItem(IPOS_STORAGE_KEY, JSON.stringify(current))
+      document.cookie = `${IPOS_COOKIE_KEY}=${encodeURIComponent(JSON.stringify(current))}; path=/; max-age=2592000; SameSite=Lax`
+    } catch {}
+
     try {
       await fetch('/api/ipos/cloud-worker', {
         method: 'POST',
@@ -452,6 +523,25 @@ export default function IposIntegrationPage() {
             fabi_details: details,
           },
         })
+        // Tự động lưu bền vững lên máy chủ
+        fetch('/api/ipos/cloud-worker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save_config',
+            config: {
+              fabi_pos_config: {
+                username: fabiUsername,
+                password: fabiPassword,
+                is_connected: true,
+                brand_name: details?.brand_name,
+                company_name: details?.company_name,
+                stores: details?.stores,
+                token_expires_at: details?.token_expires_at,
+              },
+            },
+          }),
+        }).catch(() => {})
         toast.success(json.message || 'Kết nối iPOS FABi POS thành công!')
       } else {
         setFabiConnected(false)
@@ -470,14 +560,12 @@ export default function IposIntegrationPage() {
     setFabiConnected(false)
     setFabiDetails(null)
     setFabiPassword('')
-    saveCachedIposConfig({
-      fabi_config: {
-        username: fabiUsername,
-        password: '',
-        is_connected: false,
-        fabi_details: null,
-      },
-    })
+    try {
+      const current = getCachedIposConfig() || {}
+      delete current.fabi_config
+      localStorage.setItem(IPOS_STORAGE_KEY, JSON.stringify(current))
+      document.cookie = `${IPOS_COOKIE_KEY}=${encodeURIComponent(JSON.stringify(current))}; path=/; max-age=2592000; SameSite=Lax`
+    } catch {}
     try {
       await fetch('/api/ipos/cloud-worker', {
         method: 'POST',
