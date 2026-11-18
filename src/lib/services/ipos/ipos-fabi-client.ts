@@ -10,7 +10,7 @@
 export const IPOS_FABI_WEB_APP_TOKEN =
   process.env.NEXT_PUBLIC_IPOS_FABI_WEB_APP_TOKEN ||
   process.env.IPOS_FABI_WEB_APP_TOKEN ||
-  ''
+  '5c885b2ef8c34fb7b1d1fad11eef7bec' // Token chuẩn của FABi POS Web CMS (posapi.ipos.vn)
 export const IPOS_FABI_TYPE = 'pos-cms'
 export const IPOS_POSAPI_BASE = 'https://posapi.ipos.vn'
 
@@ -63,11 +63,8 @@ export async function loginFabi(username: string, password: string): Promise<Fab
 
   try {
     const payload = {
-      username: cleanUsername,
       email: cleanUsername,
       password: cleanPassword,
-      fabi_type: IPOS_FABI_TYPE,
-      access_token: IPOS_FABI_WEB_APP_TOKEN,
     }
 
     const response = await fetch(loginUrl, {
@@ -87,8 +84,12 @@ export async function loginFabi(username: string, password: string): Promise<Fab
 
     const data = await response.json().catch(() => null)
 
-    if (!response.ok || !data) {
-      const errMsg = data?.message || data?.error_description || `Máy chủ iPOS từ chối (Mã HTTP ${response.status})`
+    if (!response.ok || !data || data.error) {
+      const errMsg =
+        data?.error?.message ||
+        data?.message ||
+        data?.error_description ||
+        `Máy chủ iPOS từ chối (Mã HTTP ${response.status})`
       return {
         success: false,
         message: `Đăng nhập FABi thất bại: ${errMsg}`,

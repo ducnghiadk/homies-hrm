@@ -206,6 +206,12 @@ export default function IposIntegrationPage() {
         const cleanCodes = cached.store_codes.filter((c: string) => c !== 'LVS')
         setSelectedStoresFilter(cleanCodes.length > 0 ? cleanCodes : ['HBP', '429'])
       }
+      if (cached.fabi_config) {
+        if (cached.fabi_config.username) setFabiUsername(cached.fabi_config.username)
+        if (cached.fabi_config.password) setFabiPassword(cached.fabi_config.password)
+        if (cached.fabi_config.is_connected) setFabiConnected(true)
+        if (cached.fabi_config.fabi_details) setFabiDetails(cached.fabi_config.fabi_details)
+      }
     }
 
     try {
@@ -428,14 +434,23 @@ export default function IposIntegrationPage() {
       const json = await res.json()
       if (res.ok && json.success) {
         setFabiConnected(true)
-        if (json.config) {
-          setFabiDetails({
-            brand_name: json.config.brand_name,
-            company_name: json.config.company_name,
-            stores: json.config.stores,
-            token_expires_at: json.config.token_expires_at,
-          })
+        const details = json.config ? {
+          brand_name: json.config.brand_name,
+          company_name: json.config.company_name,
+          stores: json.config.stores,
+          token_expires_at: json.config.token_expires_at,
+        } : null
+        if (details) {
+          setFabiDetails(details)
         }
+        saveCachedIposConfig({
+          fabi_config: {
+            username: fabiUsername,
+            password: fabiPassword,
+            is_connected: true,
+            fabi_details: details,
+          },
+        })
         toast.success(json.message || 'Kết nối iPOS FABi POS thành công!')
       } else {
         setFabiConnected(false)
@@ -446,6 +461,41 @@ export default function IposIntegrationPage() {
       toast.error('Lỗi kết nối tới máy chủ posapi.ipos.vn')
     } finally {
       setIsTestingFabi(false)
+    }
+  }
+
+  // 2.1.1 Ngắt kết nối Cổng 2 (iPOS FABi POS)
+  const handleDisconnectFabi = async () => {
+    setFabiConnected(false)
+    setFabiDetails(null)
+    setFabiPassword('')
+    saveCachedIposConfig({
+      fabi_config: {
+        username: fabiUsername,
+        password: '',
+        is_connected: false,
+        fabi_details: null,
+      },
+    })
+    try {
+      await fetch('/api/ipos/cloud-worker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_config',
+          config: {
+            fabi_pos_config: {
+              username: fabiUsername,
+              password: '',
+              jwt_token: undefined,
+              is_connected: false,
+            },
+          },
+        }),
+      })
+      toast.success('Đã ngắt kết nối tài khoản iPOS FABi.')
+    } catch {
+      toast.error('Lỗi khi ngắt kết nối FABi.')
     }
   }
 
@@ -514,6 +564,12 @@ export default function IposIntegrationPage() {
           is_authenticated: isAuthenticated,
           hrm_details: hrmDetails,
           store_codes: selectedStoresFilter,
+          fabi_config: {
+            username: fabiUsername,
+            password: fabiPassword,
+            is_connected: fabiConnected,
+            fabi_details: fabiDetails,
+          },
         })
         toast.success('Đã lưu cấu hình tích hợp iPOS Cloud!')
         if (json.config) setConfig(json.config)
@@ -1142,6 +1198,15 @@ export default function IposIntegrationPage() {
                     <Save size={13} />
                     <span>{isSaving ? 'Đang lưu...' : 'Lưu tài khoản'}</span>
                   </button>
+                  {fabiConnected && (
+                    <button
+                      type="button"
+                      onClick={handleDisconnectFabi}
+                      className="w-full sm:w-auto inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 px-4 py-2 text-xs font-bold shadow-2xs transition cursor-pointer"
+                    >
+                      <span>Ngắt kết nối</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Nút mở rộng Cài đặt kho IVT */}

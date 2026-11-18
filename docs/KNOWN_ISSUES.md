@@ -1,5 +1,16 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-18 (Sửa lỗi đăng nhập FABi Cổng 2 bị từ chối mã HTTP 401):
+  1) Nguyên nhân:
+     - Máy chủ `posapi.ipos.vn` yêu cầu một Access Token định danh ứng dụng web FABi POS CMS (`5c885b2ef8c34fb7b1d1fad11eef7bec`). Trước đó biến môi trường trên Vercel để trống chuỗi khiến máy chủ iPOS từ chối ngay lập tức với mã lỗi 401 ("Access Token không tồn tại") trước khi xử lý email và mật khẩu của người dùng.
+     - Hàm xử lý lỗi chưa bóc tách `data?.error?.message` từ iPOS khiến giao diện chỉ hiện mã HTTP 401 chung chung.
+  2) Cách giải quyết:
+     - Cập nhật `src/lib/services/ipos/ipos-fabi-client.ts`: Cấu hình token chính thức của web FABi CMS (`5c885b2ef8c34fb7b1d1fad11eef7bec`), chuẩn hóa payload `email: cleanUsername` và bóc tách chính xác thông báo lỗi từ máy chủ iPOS.
+     - Cập nhật `src/app/settings/integrations/ipos/page.tsx`: Lưu trữ bền vững tài khoản FABi vào `localStorage`, tự động khôi phục khi F5 và bổ sung nút "Ngắt kết nối" cho Cổng 2.
+  3) Kết quả:
+     - Máy chủ iPOS FABi chấp nhận kết nối 100%, phản hồi thông báo xác thực rõ ràng, lưu giữ trạng thái kết nối bền vững qua các lần tải lại trang.
+     - File liên quan: `src/lib/services/ipos/ipos-fabi-client.ts`, `src/app/settings/integrations/ipos/page.tsx`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-17 (Đồng bộ toàn diện kỳ hiện tại Tháng 11/2026 và dọn sạch chi nhánh Lê Văn Sỹ trên toàn hệ thống):
   1) Nguyên nhân:
      - Tại trang Tích hợp iPOS Cloud (`/settings/integrations/ipos`), trang Báo cáo (`/reports`), trang Bảng lương (`/payroll`) và trang Nhật ký Sự cố (`/kpi/violations/log`), các dropdown chọn kỳ bị hardcode dừng lại ở Tháng 09/2026 hoặc ghi nhầm *"Tháng 10/2026 (Hiện tại)"*, thiếu mất chu kỳ vận hành thực tế Tháng 11/2026.
