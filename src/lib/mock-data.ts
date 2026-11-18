@@ -46,7 +46,8 @@ export type Employee = {
   gender: 'male' | 'female'
   address: string
   role: 'ceo' | 'hr_admin' | 'store_manager' | 'shift_leader' | 'employee'
-  status: 'active' | 'inactive' | 'probation'
+  status: 'active' | 'inactive' | 'probation' | 'resigned'
+  account_status?: 'chua_kich_hoat' | 'dang_hoat_dong' | 'bi_khoa'
   hire_date: string
   total_points: number
   gamification_level: 'bronze' | 'silver' | 'gold' | 'platinum'
@@ -260,7 +261,7 @@ export const mockEmployees: Employee[] = [
     id: 'emp-bh9852', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-sm',
     employee_code: 'BH-9852', full_name: 'Huỳnh Lê Kiều Linh', phone: '0779554540',
     email: 'huynhlekieulinh6@gmail.com', date_of_birth: '1998-07-12', gender: 'female',
-    address: '429 Phước Long A, TP. Thủ Đức, TP.HCM', role: 'store_manager', status: 'active',
+    address: '429 Phước Long A, TP. Thủ Đức, TP.HCM', role: 'store_manager', status: 'resigned',
     hire_date: '2024-05-10', total_points: 4200, gamification_level: 'platinum',
     kpi_level: 'L4', contract_type: 'toan_thoi_gian', hourly_rate: 25000,
     allowed_store_ids: ['store-001', 'store-002'],
@@ -298,7 +299,7 @@ export const mockEmployees: Employee[] = [
     id: 'emp-nv0024', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-001',
     employee_code: 'NV0024', full_name: 'Tấn Hiếu', phone: '0932835952',
     email: 'tan569619@gmail.com', date_of_birth: '2005-08-10', gender: 'male',
-    address: 'TP. Thủ Đức, TP.HCM', role: 'employee', status: 'active',
+    address: 'TP. Thủ Đức, TP.HCM', role: 'employee', status: 'resigned',
     hire_date: '2025-08-01', total_points: 1100, gamification_level: 'bronze',
     kpi_level: 'L1', contract_type: 'ban_thoi_gian', hourly_rate: 16000,
   },
@@ -339,7 +340,7 @@ export const mockEmployees: Employee[] = [
     id: 'emp-nv0009', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-002',
     employee_code: 'NV0009', full_name: 'Nguyễn Thị Kiều Trang', phone: '0908123009',
     email: 'kieutrang.homies@gmail.com', date_of_birth: '2003-09-12', gender: 'female',
-    address: 'TP. Thủ Đức, TP.HCM', role: 'employee', status: 'active',
+    address: 'TP. Thủ Đức, TP.HCM', role: 'employee', status: 'resigned',
     hire_date: '2025-06-01', total_points: 1500, gamification_level: 'silver',
     kpi_level: 'L2', contract_type: 'ban_thoi_gian', hourly_rate: 20000,
   },
@@ -380,7 +381,7 @@ export const mockEmployees: Employee[] = [
     id: 'emp-nv0035', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-001',
     employee_code: 'NV0035', full_name: 'Nguyễn Mạnh Duy', phone: '0377249775',
     email: 'oppoa5301012021@gmail.com', date_of_birth: '2005-01-01', gender: 'male',
-    address: 'TP. Thủ Đức, TP.HCM', role: 'employee', status: 'active',
+    address: 'TP. Thủ Đức, TP.HCM', role: 'employee', status: 'resigned',
     hire_date: '2025-07-15', total_points: 1300, gamification_level: 'bronze',
     kpi_level: 'L1', contract_type: 'ban_thoi_gian', hourly_rate: 20000,
   },

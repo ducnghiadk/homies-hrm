@@ -588,10 +588,10 @@ export default function AttendanceTimesheetPage() {
     return () => { active = false }
   }, [refreshTrigger])
 
-  // Danh sách nhân viên chuẩn từ CSDL theo chi nhánh
+  // Danh sách nhân viên chuẩn từ CSDL theo chi nhánh (ưu tiên apiEmployees từ máy chủ)
   const fullEmployeeList = useMemo(() => {
     const rawList = (EmployeeService.getEmployees() as unknown as Employee[]) || []
-    const combined = [...rawList, ...apiEmployees]
+    const combined = [...apiEmployees, ...rawList]
     const seen = new Set<string>()
     const deduped: Employee[] = []
 
@@ -600,7 +600,7 @@ export default function AttendanceTimesheetPage() {
       const email = emp.email?.trim().toLowerCase()
       const id = emp.id?.trim().toLowerCase()
       const name = emp.full_name?.trim().toLowerCase()
-      const key = name || code || email || id
+      const key = code || email || id || name
 
       if (key && !seen.has(key)) {
         seen.add(key)
@@ -903,7 +903,14 @@ export default function AttendanceTimesheetPage() {
   const tableRows: EmployeeTimesheetRow[] = useMemo(() => {
     return fullEmployeeList
       .filter(emp => {
-        if (emp.status === 'inactive' || (emp.status as string) === 'resigned') return false
+        if (
+          emp.status === 'inactive' ||
+          emp.status === 'resigned' ||
+          emp.account_status === 'bi_khoa' ||
+          (emp as unknown as { is_resigned_employee?: boolean }).is_resigned_employee
+        ) {
+          return false
+        }
         const matchStore = !activeStoreId || 
           isStoreMatch(emp.store_id, activeStoreId) || 
           (Array.isArray(emp.secondary_store_ids) && emp.secondary_store_ids.some(sid => isStoreMatch(sid, activeStoreId))) ||

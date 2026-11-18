@@ -1,5 +1,26 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-18 (Loại bỏ triệt để nhân viên đã nghỉ việc khỏi Bảng chấm công và làm sạch dữ liệu chấm công/lịch ca cũ):
+  1) Nguyên nhân:
+     - Trên Bảng chấm công tuần (`/attendance`), một số nhân sự đã nghỉ việc (Tấn Hiếu `NV0024`, Nguyễn Mạnh Duy `NV0035`, Huỳnh Lê Kiều Linh `BH-9852`, Nguyễn Thị Kiều Trang `NV0009`) vẫn hiển thị trên bảng và có ca làm việc/giờ chấm công phát sinh.
+     - Nguyên nhân gốc rễ:
+       + Bộ sinh dữ liệu mẫu chấm công (`getInitialAttendanceSeed`) và lịch ca (`getInitialShiftsSeed`) trong `src/lib/server/db.ts` chứa cứng danh sách nhân sự cũ (bao gồm cả nhân sự đã nghỉ).
+       + Danh sách nhân viên trên giao diện `/attendance` ưu tiên nạp từ `EmployeeService.getEmployees()` (danh mục mẫu ban đầu) trước `apiEmployees` (danh mục máy chủ), làm đè trạng thái `active` lên trạng thái `resigned`/`inactive`.
+       + Bộ lọc `tableRows` chưa kiểm tra đồng bộ cả `status === 'resigned'` và `account_status === 'bi_khoa'`.
+  2) Cách giải quyết:
+     - Cập nhật `src/lib/server/db.ts`:
+       + Loại bỏ các nhân sự đã nghỉ (`emp-bh9852`, `emp-nv0024`, `emp-nv0035`, `emp-nv0009`) khỏi hàm sinh lịch ca `getInitialShiftsSeed` và sinh chấm công `getInitialAttendanceSeed`.
+       + Cập nhật trạng thái `status: 'resigned'`, `account_status: 'bi_khoa'` trong dữ liệu mẫu máy chủ và bổ sung bộ lọc dọn dẹp tự động (auto-migration) loại bỏ toàn bộ ca làm và chấm công cũ của nhân sự đã nghỉ.
+       + Làm sạch 69 ca làm việc và 64 bản ghi chấm công của nhân sự đã nghỉ trong `data/server-db.json`.
+     - Cập nhật `src/app/attendance/page.tsx`:
+       + Ưu tiên danh sách `apiEmployees` từ máy chủ lên trước danh mục cục bộ để luôn tôn trọng trạng thái nghỉ việc mới nhất.
+       + Nâng cấp bộ lọc `tableRows` ẩn triệt để nhân sự có trạng thái `resigned`, `inactive` hoặc `bi_khoa`.
+     - Cập nhật `src/lib/services/employees/employee-service.ts` & `src/lib/mock-data.ts`:
+       + Đồng bộ trạng thái `status: 'resigned'`, `account_status: 'bi_khoa'` cho 4 nhân sự đã nghỉ trên toàn bộ mock data và service.
+  3) Kết quả:
+     - Bảng chấm công tuần 47 và tháng 11/2026 chỉ hiển thị nhân sự đang thực sự đi làm tại chi nhánh, không còn xuất hiện nhân viên đã nghỉ việc; số liệu tổng giờ, số ca và tỷ lệ đi đúng giờ phản ánh chính xác 100% nhân sự thực tế.
+     - File liên quan: `src/lib/server/db.ts`, `src/app/attendance/page.tsx`, `src/lib/services/employees/employee-service.ts`, `src/lib/mock-data.ts`, `data/server-db.json`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-18 (Bổ sung đầy đủ dữ liệu chấm công vân tay và lịch làm việc cho 14/14 nhân sự trên Bảng chấm công tuần và tháng):
   1) Nguyên nhân:
      - Tại trang Bảng chấm công tuần (`/attendance`), chỉ có 1 nhân viên duy nhất (Huỳnh Lê Kiều Linh: 15h) hiển thị có ca làm việc, còn 13 nhân viên khác đều hiển thị 0h ("Nhân sự có chấm công: 1/14 NV").
