@@ -131,10 +131,10 @@ export function mapIposStoreToHomies(iposStoreId?: string | null): string {
   if (!iposStoreId) return 'store-001'
 
   const clean = iposStoreId.trim().toLowerCase()
-  if (clean === config.storeId429.toLowerCase()) {
+  if (clean === config.storeId429.toLowerCase() || clean === 'store-002' || clean.includes('429')) {
     return 'store-002'
   }
-  if (clean === config.storeIdHbp.toLowerCase()) {
+  if (clean === config.storeIdHbp.toLowerCase() || clean === 'store-001' || clean.includes('hbp') || clean.includes('ba phan')) {
     return 'store-001'
   }
 

@@ -126,6 +126,7 @@ export interface AttendanceSlot {
   penalizeMissIn?: boolean
   penalizeMissOut?: boolean
   isFromSchedule?: boolean
+  storeId?: string
 }
 
 // Kiểu dòng nhân viên trên bảng chấm công
@@ -724,6 +725,7 @@ export default function AttendanceTimesheetPage() {
               earlyMinutes: item.early_minutes || 0,
               totalHours: item.total_hours || (outTimeStr ? 4 : 4),
               sourceType: 'self',
+              storeId: (item as any).store_id || (item as any).storeId,
             }
 
             // Tìm nhân viên trong fullEmployeeList để liên kết chuẩn ID
@@ -780,117 +782,17 @@ export default function AttendanceTimesheetPage() {
     return () => { active = false }
   }, [activeStoreId, refreshTrigger, viewMode, weekDates, monthDates])
 
-  // ─── TỰ ĐỘNG ĐỒNG BỘ 2 CHIỀU VỚI BẢNG PHÂN CA LỊCH LÀM VIỆC (DỮ LIỆU THỰC) ───
+  // ─── DỮ LIỆU CHẤM CÔNG THỰC TẾ (CHỈ DỰA TRÊN QUẸT THẺ THẬT TỪ IPOS / MÁY CHẤM CÔNG) ───
   const mergedTimesheetData = useMemo(() => {
-    const allTemplates = ShiftTemplateService.getAll()
     const merged: Record<string, Record<string, AttendanceSlot[]>> = {}
 
-    // 1. Sao chép dữ liệu chấm công thực tế đã có
+    // Sao chép dữ liệu chấm công thực tế đã có
     Object.keys(timesheetData).forEach(empKey => {
       merged[empKey] = { ...(timesheetData[empKey] || {}) }
     })
 
-    const currentDates = viewMode === 'week' ? weekDates.map(w => w.dateStr) : monthDates.map(m => m.dateStr)
-
-    // Lọc các ca theo đúng chi nhánh đang xem
-    const storeSchedules = user
-      ? ScheduleService.getPublishedSchedulesForStore(user, activeStoreId, currentDates)
-      : []
-
-    // Bổ sung các ca APPROVED từ API máy chủ (/api/shifts)
-    const existingSchIds = new Set(storeSchedules.map(s => s.id))
-    const extraApiShifts = apiShifts.filter(s =>
-      (!activeStoreId || s.store_id === activeStoreId) &&
-      currentDates.includes(s.date) &&
-      (s.status === 'APPROVED' || s.status === 'published') &&
-      !existingSchIds.has(s.id)
-    ).map(s => ({
-      id: s.id,
-      org_id: 'org-001',
-      store_id: s.store_id || activeStoreId,
-      employee_id: s.employee_id,
-      employee_name: s.employee_name,
-      shift_id: s.shift_id,
-      date: s.date,
-      notes: s.notes || s.shift_name,
-      start_time: s.start_time,
-      end_time: s.end_time,
-      shift_name: s.shift_name,
-      status: 'published' as const,
-      updated_at: new Date().toISOString(),
-    }))
-
-    const combinedSchedules = [...storeSchedules, ...extraApiShifts]
-
-    // 2. Đồng bộ các ca từ Lịch làm việc sang Chấm công
-    combinedSchedules.forEach(sch => {
-      // Khớp nhân viên theo ID, mã nhân viên hoặc tên
-      const schEmpName = ((sch as any).employee_name || sch.notes || (sch as any).shift_name || '').toLowerCase().replace(/\s+/g, ' ').trim()
-      const emp = fullEmployeeList.find(e => 
-        e.id === sch.employee_id || 
-        (e.employee_code && e.employee_code.toLowerCase() === sch.employee_id.toLowerCase()) ||
-        (schEmpName && e.full_name.toLowerCase().replace(/\s+/g, ' ').trim() === schEmpName) ||
-        (schEmpName && e.full_name.toLowerCase().includes(schEmpName))
-      )
-      const targetEmpId = emp ? emp.id : sch.employee_id
-      if (!targetEmpId) return
-
-      if (!merged[targetEmpId]) {
-        merged[targetEmpId] = {}
-      }
-
-      const existingSlots = merged[targetEmpId][sch.date] || (emp && merged[emp.id]?.[sch.date]) || []
-
-      // Nếu ngày đó chưa có dữ liệu chấm công thực tế, hiển thị ca theo lịch phân ca
-      if (existingSlots.length === 0) {
-        const tpl = allTemplates.find(t => t.id === sch.shift_id)
-        let sName = (sch as any).shift_name || tpl?.name || 'Ca làm'
-        let sIn = (sch as any).start_time || tpl?.start_time || '08:30'
-        let sOut = (sch as any).end_time || tpl?.end_time || '17:00'
-
-        if (sch.notes) {
-          const timeMatch = sch.notes.match(/\[(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\]/) || sch.notes.match(/\((\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\)/)
-          if (timeMatch) {
-            sIn = timeMatch[1]
-            sOut = timeMatch[2]
-          }
-          const cleanName = sch.notes.replace(/\[.*?\]/, '').replace(/\(.*?\)/, '').trim()
-          if (cleanName) sName = cleanName
-        }
-
-        let schHours = 4.0
-        if (sIn && sOut) {
-          const [inH, inM] = sIn.split(':').map(Number)
-          const [outH, outM] = sOut.split(':').map(Number)
-          let diffMin = (outH * 60 + outM) - (inH * 60 + inM)
-          if (diffMin < 0) diffMin += 24 * 60
-          schHours = Math.round((diffMin / 60) * 10) / 10
-        }
-
-        const slotItem: AttendanceSlot = {
-          id: `sched-sync-${sch.id}`,
-          shiftName: sName,
-          scheduledIn: sIn,
-          scheduledOut: sOut,
-          status: 'scheduled',
-          totalHours: schHours,
-          isFromSchedule: true,
-          sourceType: 'auto_sync',
-        }
-
-        if (!merged[targetEmpId][sch.date]) merged[targetEmpId][sch.date] = []
-        merged[targetEmpId][sch.date].push(slotItem)
-
-        if (emp && emp.id !== targetEmpId) {
-          if (!merged[emp.id]) merged[emp.id] = {}
-          if (!merged[emp.id][sch.date]) merged[emp.id][sch.date] = []
-          merged[emp.id][sch.date].push(slotItem)
-        }
-      }
-    })
-
     return merged
-  }, [timesheetData, activeStoreId, weekDates, monthDates, viewMode, refreshTrigger, fullEmployeeList, user, apiShifts])
+  }, [timesheetData])
 
   const activeDatesList = useMemo(() => {
     if (viewMode === 'week') return weekDates
@@ -911,11 +813,21 @@ export default function AttendanceTimesheetPage() {
         ) {
           return false
         }
-        const matchStore = !activeStoreId || 
-          isStoreMatch(emp.store_id, activeStoreId) || 
-          (Array.isArray(emp.secondary_store_ids) && emp.secondary_store_ids.some(sid => isStoreMatch(sid, activeStoreId))) ||
-          (!emp.store_id && isStoreMatch('store-001', activeStoreId))
-        if (!matchStore) return false
+        const isPrimaryStore = !activeStoreId || activeStoreId === 'ALL' || isStoreMatch(emp.store_id, activeStoreId) || (!emp.store_id && isStoreMatch('store-001', activeStoreId))
+        const hasSecondaryStore = Array.isArray(emp.secondary_store_ids) && emp.secondary_store_ids.some(sid => isStoreMatch(sid, activeStoreId))
+        
+        if (!isPrimaryStore && !hasSecondaryStore) return false
+
+        // Nếu là chi nhánh phụ, chỉ hiển thị nếu nhân viên thực sự có ca làm / chấm công tại chi nhánh này trong kỳ đang xem
+        if (!isPrimaryStore && hasSecondaryStore && activeStoreId && activeStoreId !== 'ALL') {
+          const empDays = mergedTimesheetData[emp.id] || {}
+          const hasAnySlotInCurrentStore = activeDatesList.some(({ dateStr }) => {
+            const rawSlots = empDays[dateStr] || []
+            return rawSlots.some(s => (s.storeId ? isStoreMatch(s.storeId, activeStoreId) : isStoreMatch(emp.store_id, activeStoreId)))
+          })
+          if (!hasAnySlotInCurrentStore) return false
+        }
+
         if (selectedPositionId !== 'ALL' && emp.position_id !== selectedPositionId) return false
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase()
@@ -933,9 +845,22 @@ export default function AttendanceTimesheetPage() {
         let lateCount = 0
         let missingCount = 0
 
+        const filteredDays: Record<string, AttendanceSlot[]> = {}
+
         activeDatesList.forEach(({ dateStr }) => {
-          const slots = empDays[dateStr] || []
-          slots.forEach(slot => {
+          const rawSlots = empDays[dateStr] || []
+          const matchingSlots = rawSlots.filter(slot => {
+            if (!activeStoreId || activeStoreId === 'ALL') return true
+            if (slot.storeId) return isStoreMatch(slot.storeId, activeStoreId)
+            return isStoreMatch(emp.store_id, activeStoreId)
+          })
+
+          filteredDays[dateStr] = matchingSlots
+
+          matchingSlots.forEach(slot => {
+            if (slot.isFromSchedule || slot.status === 'scheduled') {
+              return
+            }
             // Strict Validator: Ca rác hoặc ca vượt mốc 22:00 bị loại bỏ khỏi tổng giờ tự động
             const inTime = slot.actualIn || slot.scheduledIn || ''
             const outTime = slot.actualOut || slot.scheduledOut || ''
@@ -959,7 +884,7 @@ export default function AttendanceTimesheetPage() {
         return {
           employee: emp,
           position: pos,
-          days: empDays,
+          days: filteredDays,
           totalHours: Math.round(totalHours * 10) / 10,
           totalShifts,
           onTimeCount,

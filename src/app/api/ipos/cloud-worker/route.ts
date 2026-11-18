@@ -363,7 +363,7 @@ export async function POST(req: NextRequest) {
 
       // Dữ liệu nhân sự thực tế chuẩn 14 nhân viên của 2 cơ sở (Hồ Bá Phấn & Đường 429)
       const baseEmployees = [
-        // --- CƠ SỞ 1: HỒ BÁ PHẤN (HBP - 6 nhân sự) ---
+        // --- CƠ SỞ 1: HỒ BÁ PHẤN (HBP - 8 nhân sự) ---
         {
           employeeCode: 'BH-9852',
           employeeName: 'Huỳnh Lê Kiều Linh',
@@ -433,6 +433,23 @@ export async function POST(req: NextRequest) {
           bankAccountNo: '0987654321',
         },
         {
+          employeeCode: 'NV0027',
+          employeeName: 'Trần Công Huy',
+          position: 'Quản lý cửa hàng',
+          storeCode: 'HBP',
+          storeName: 'Hồ Bá Phấn',
+          baseHours: 135.0,
+          hourlyRate: 31730,
+          bonus: 0,
+          deductions: 0,
+          allowanceResponsibility: 0,
+          terminalId: 'MAY-VAN-TAY-HBP-01',
+          missingCheckoutCount: 1,
+          overtimeHours: 0,
+          bankName: 'Vietcombank',
+          bankAccountNo: '00710029384',
+        },
+        {
           employeeCode: 'NV0028',
           employeeName: 'Phạm Nguyễn Đông Duy',
           position: 'Pha chế chính',
@@ -466,8 +483,25 @@ export async function POST(req: NextRequest) {
           bankName: 'Techcombank',
           bankAccountNo: '1903672819001',
         },
+        {
+          employeeCode: 'NV0034',
+          employeeName: 'Nguyễn Thị Thu',
+          position: 'Thu ngân',
+          storeCode: 'HBP',
+          storeName: 'Hồ Bá Phấn',
+          baseHours: 140.0,
+          hourlyRate: 20000,
+          bonus: 0,
+          deductions: 0,
+          allowanceResponsibility: 0,
+          terminalId: 'MAY-VAN-TAY-HBP-01',
+          missingCheckoutCount: 0,
+          overtimeHours: 0,
+          bankName: 'MBBank',
+          bankAccountNo: '0978123456',
+        },
 
-        // --- CƠ SỞ 2: ĐƯỜNG 429 (8 nhân sự) ---
+        // --- CƠ SỞ 2: ĐƯỜNG 429 (6 nhân sự) ---
         {
           employeeCode: 'NV0016',
           employeeName: 'Nguyễn Thị Kiều Ý',
@@ -537,23 +571,6 @@ export async function POST(req: NextRequest) {
           bankAccountNo: '0601928374',
         },
         {
-          employeeCode: 'NV0027',
-          employeeName: 'Trần Công Huy',
-          position: 'Phục vụ & Phụ bar',
-          storeCode: '429',
-          storeName: 'Đường 429',
-          baseHours: 135.0,
-          hourlyRate: 16000,
-          bonus: 0,
-          deductions: 0,
-          allowanceResponsibility: 0,
-          terminalId: 'MAY-VAN-TAY-429-01',
-          missingCheckoutCount: 1,
-          overtimeHours: 0,
-          bankName: 'Vietcombank',
-          bankAccountNo: '00710029384',
-        },
-        {
           employeeCode: 'NV0031',
           employeeName: 'Cao Văn Thắng',
           position: 'Pha chế',
@@ -569,23 +586,6 @@ export async function POST(req: NextRequest) {
           overtimeHours: 3.5,
           bankName: 'VPBank',
           bankAccountNo: '182736452',
-        },
-        {
-          employeeCode: 'NV0034',
-          employeeName: 'Nguyễn Thị Thu',
-          position: 'Thu ngân',
-          storeCode: '429',
-          storeName: 'Đường 429',
-          baseHours: 140.0,
-          hourlyRate: 20000,
-          bonus: 0,
-          deductions: 0,
-          allowanceResponsibility: 0,
-          terminalId: 'MAY-VAN-TAY-429-01',
-          missingCheckoutCount: 0,
-          overtimeHours: 0,
-          bankName: 'MBBank',
-          bankAccountNo: '0978123456',
         },
         {
           employeeCode: 'NV0036',

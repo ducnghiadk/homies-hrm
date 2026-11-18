@@ -268,7 +268,7 @@ export const mockEmployees: Employee[] = [
     secondary_store_ids: ['store-001', 'store-002'],
   },
   {
-    id: 'emp-nv0027', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-sm',
+    id: 'emp-nv0027', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-sm',
     employee_code: 'NV0027', full_name: 'Trần Công Huy', phone: '0332151527',
     email: 'jinn.wooo.02@gmail.com', date_of_birth: '1999-02-21', gender: 'male',
     address: '21/2A đường 388, Phường Phước Long, TP. Thủ Đức, TP.HCM', role: 'store_manager', status: 'active',
@@ -369,7 +369,7 @@ export const mockEmployees: Employee[] = [
     kpi_level: 'L1', contract_type: 'ban_thoi_gian', hourly_rate: 20000,
   },
   {
-    id: 'emp-nv0034', org_id: 'org-001', store_id: 'store-002', position_id: 'pos-002',
+    id: 'emp-nv0034', org_id: 'org-001', store_id: 'store-001', position_id: 'pos-002',
     employee_code: 'NV0034', full_name: 'Nguyễn Thị Thu', phone: '0963593319',
     email: 'ntthu.work1@gmail.com', date_of_birth: '2004-07-15', gender: 'female',
     address: 'TP. Thủ Đức, TP.HCM', role: 'employee', status: 'active',
