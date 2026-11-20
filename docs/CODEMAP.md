@@ -135,8 +135,19 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - Dung khi: sua dinh muc ca, nhu cau tuan, cong cu tinh nhan su
 
 ### Dang ky ca va Phan ca tuan
-- Mo ta: dang ky ca ranh tuan Mobile-First, quan ly phan ca theo tuan, 1-cham duyet dang ky ca hop le, ban do thoi gian trong (Availability Heatmap 7 ngay x 3 ca) va ty le nop lich ranh.
-- File chinh: `src/app/shifts/register/page.tsx`, `src/app/my-schedule/page.tsx`, `src/app/schedule/page.tsx`, `src/app/schedule/registrations/page.tsx`, `src/components/scheduling/ManagerSchedulingBoard.tsx`, `src/lib/services/scheduling/shift-registration-service.ts`, `src/lib/services/scheduling/schedule-service.ts`, `src/lib/services/scheduling/schedule-import-batch.ts`, `src/lib/services/scheduling/schedule-export-service.ts`
+- Mo ta: dang ky ca ranh tuan Mobile-First, quan ly phan ca theo tuan, 1-cham duyet dang ky ca hop le, ban do thoi gian trong (Availability Heatmap 7 ngay x 3 ca) va ty le nop lich ranh. Giao dien tai cau truc 3 tang Executive SaaS F&B, 2 goc nhin linh hoat Theo Khung Ca va Theo Tuyen Nhan Vien, drawer phe duyet tung nguoi/tung o ca va modal soan nhac Zalo chuan van phong.
+- File chinh:
+  + `src/app/shifts/register/page.tsx`: dang ky ca ranh cho nhan vien tren di dong
+  + `src/app/my-schedule/page.tsx`: xem lich lam viec ca nhan
+  + `src/app/schedule/page.tsx`: bang dieu hanh xep ca tong the
+  + `src/app/schedule/registrations/page.tsx`: trang chu Duyet Dang Ky Ca & Ban Do Thoi Gian Trong (Bố cục 3 tầng SaaS F&B)
+  + `src/components/scheduling/registrations/RegistrationHeaderAndKpis.tsx`: Tang 1 Command Header va Tang 2 Macro 4 KPI Cards
+  + `src/components/scheduling/registrations/RegistrationMatrixAndStaffView.tsx`: Tang 3 Ma tran 7x3, Bang tong hop nhan vien va theo doi da/chua nop
+  + `src/components/scheduling/registrations/RegistrationCellDrawer.tsx`: Drawer chi tiet o ca & duyet tung nguoi + Modal nhac Zalo
+  + `src/components/scheduling/ManagerSchedulingBoard.tsx`: bang phan ca truc quan cho quan ly
+  + `src/lib/services/scheduling/shift-registration-service.ts`: service xu ly du lieu dang ky ca, tinh ty le coverage va loc loai bo CEO khoi chi nhanh
+  + `src/app/api/shifts/approve/route.ts`: API may chu phe duyet hoac tu choi ca dang ky
+  + `src/lib/services/scheduling/schedule-service.ts`: quan ly lich phan ca chinh thuc
 - Dung khi: sua flow dang ky ca di dong, phe duyet ca tuan, xep lich lam viec, radar phat hien lung ca.
 
 ### CÃ i Ä‘áº·t vÃ  Danh má»¥c chuáº©n SaaS

@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}))
     const { registration_ids, week_start_date, store_id } = body
+    const targetStatus: 'APPROVED' | 'REJECTED' = body.action === 'reject' ? 'REJECTED' : 'APPROVED'
     const approver = auth.employee?.full_name || auth.userId || 'Quản lý'
 
     const db = await getServerDb()
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
       if (shouldApprove) {
         const approvedItem: ServerShiftRegistration = {
           ...shift,
-          status: 'APPROVED',
+          status: targetStatus,
           approved_by: approver,
           approved_at: now,
         }
@@ -66,7 +67,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Đã duyệt thành công ${updatedList.length} ca làm việc tuần`,
+      message: targetStatus === 'REJECTED'
+        ? `Đã từ chối ${updatedList.length} ca đăng ký`
+        : `Đã duyệt thành công ${updatedList.length} ca làm việc tuần`,
       approved_count: updatedList.length,
       data: updatedList,
     })

@@ -35,8 +35,18 @@ export interface CoverageRateResult {
   totalEmployees: number
   submittedCount: number
   ratePercent: number
-  submittedEmployees: Array<{ id: string; name: string; code: string; phone?: string }>
-  missingEmployees: Array<{ id: string; name: string; code: string; phone?: string }>
+  submittedEmployees: Array<{ id: string; name: string; code: string; phone?: string; shiftCount?: number }>
+  missingEmployees: Array<{ id: string; name: string; code: string; phone?: string; role?: string; positionName?: string }>
+}
+
+export interface HeatmapEmployeeItem {
+  id: string
+  registrationId: string
+  name: string
+  code: string
+  positionName: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  notes?: string
 }
 
 export interface HeatmapCell {
@@ -47,161 +57,71 @@ export interface HeatmapCell {
   shiftName: string
   timeRange: string
   registrations: PendingShiftRegistration[]
-  registeredEmployees: Array<{ id: string; name: string; code: string; positionName: string }>
+  registeredEmployees: HeatmapEmployeeItem[]
   count: number
+  approvedCount: number
+  pendingCount: number
   status: 'FULL' | 'RISK' | 'EMPTY' // FULL (>= 2), RISK (1), EMPTY (0)
+}
+
+export interface StaffDayShift {
+  id: string
+  shiftId: string
+  shiftName: string
+  timeRange?: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  notes?: string
+}
+
+export interface StaffRegistrationSummary {
+  id: string
+  name: string
+  code: string
+  role: string
+  positionName: string
+  phone: string
+  hasSubmitted: boolean
+  registeredCount: number
+  approvedCount: number
+  pendingCount: number
+  totalHours: number
+  days: Record<string, StaffDayShift[]>
 }
 
 let memoryRegistrations: PendingShiftRegistration[] = []
 let isInitialized = false
 
 function seedDefaultRegistrations(): PendingShiftRegistration[] {
-  const today = new Date()
-  const thisMon = getMondayOfDate(today)
-  const nextMon = new Date(thisMon)
-  nextMon.setDate(thisMon.getDate() + 7)
-
-  const weeks = Array.from(new Set(['2026-10-05', formatDateString(thisMon), formatDateString(nextMon)]))
-  const seeded: PendingShiftRegistration[] = []
-
-  // Store 429 (store-002) employees
-  const p429Employees = [
-    { id: 'f747f06f-9e95-406e-a5b5-0f6571dbfaa4', storeId: 'store-002', posId: 'pos-001' }, // Đông Duy
-    { id: '2f3acef5-118f-490b-8530-d86aa164b90a', storeId: 'store-002', posId: 'pos-001' }, // Minh Lộc
-    { id: 'd8b8ecd5-1e74-415b-a739-2fa6bbd81284', storeId: 'store-002', posId: 'pos-002' }, // Thanh Thiện
-  ]
-
-  // Store HBP (store-001) employees
-  const pHbpEmployees = [
-    { id: 'emp-bh9852', storeId: 'store-001', posId: 'pos-002' }, // Huỳnh Lê Kiều Linh (Thu ngân / Quản lý)
-    { id: 'emp-nv0031', storeId: 'store-001', posId: 'pos-001' }, // Cao Văn Thắng (Pha chế)
-    { id: 'emp-nv0033', storeId: 'store-001', posId: 'pos-001' }, // Nguyễn Hoài Ân (Pha chế)
-    { id: 'emp-nv0027', storeId: 'store-001', posId: 'pos-002' }, // Trần Công Huy (Quản lý / Thu ngân)
-    { id: 'e0000000-0000-0000-0000-000000000014', storeId: 'store-001', posId: 'pos-002' }, // Thu Phương
-  ]
-
-  const allStaff = [...p429Employees, ...pHbpEmployees]
-
-  weeks.forEach(weekStr => {
-    const mondayDate = new Date(`${weekStr}T00:00:00`)
-    // 7 days from Monday to Sunday
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-      const curDate = new Date(mondayDate)
-      curDate.setDate(mondayDate.getDate() + dayOffset)
-      const dateStr = formatDateString(curDate)
-
-      allStaff.forEach(staff => {
-        // Riêng Quản lý Huỳnh Lê Kiều Linh: đăng ký ca lẻ 12:00 - 15:00 vào các ngày trong tuần
-        if (staff.id === 'emp-bh9852') {
-          // Thứ 3 (1), Thứ 5 (3), Thứ 6 (4), Thứ 7 (5): Ca Trưa Lẻ 12:00 - 15:00
-          if ([1, 3, 4, 5].includes(dayOffset)) {
-            seeded.push({
-              id: `reg-seed-${weekStr}-${staff.id}-${dateStr}-shift-002`,
-              employee_id: staff.id,
-              store_id: staff.storeId,
-              week_start_date: weekStr,
-              date: dateStr,
-              shift_id: 'shift-002',
-              position_id: staff.posId,
-              status: 'PENDING',
-              created_at: new Date().toISOString(),
-              notes: 'Ca Trưa Lẻ [12:00 - 15:00] (Ca lẻ)',
-            })
-          }
-          // Thứ 2 (0), Thứ 4 (2): Ca Sáng
-          if ([0, 2].includes(dayOffset)) {
-            seeded.push({
-              id: `reg-seed-${weekStr}-${staff.id}-${dateStr}-shift-001`,
-              employee_id: staff.id,
-              store_id: staff.storeId,
-              week_start_date: weekStr,
-              date: dateStr,
-              shift_id: 'shift-001',
-              position_id: staff.posId,
-              status: 'PENDING',
-              created_at: new Date().toISOString(),
-              notes: 'Ca Sáng [08:30 - 12:00]',
-            })
-          }
-          // Chủ Nhật (6): Ca Tối
-          if (dayOffset === 6) {
-            seeded.push({
-              id: `reg-seed-${weekStr}-${staff.id}-${dateStr}-shift-003`,
-              employee_id: staff.id,
-              store_id: staff.storeId,
-              week_start_date: weekStr,
-              date: dateStr,
-              shift_id: 'shift-003',
-              position_id: staff.posId,
-              status: 'PENDING',
-              created_at: new Date().toISOString(),
-              notes: 'Ca Tối [17:00 - 22:00]',
-            })
-          }
-          return
-        }
-
-        // Mô phỏng nhân sự khác: Một số ca nhân viên đăng ký rảnh
-        const shifts = ['shift-001', 'shift-002', 'shift-003']
-        shifts.forEach((shiftId, sIdx) => {
-          const isTuesdayNight = dayOffset === 1 && shiftId === 'shift-003'
-          const isWednesdayMorning = dayOffset === 2 && shiftId === 'shift-001'
-
-          if (isTuesdayNight) return // Lủng ca (0 người)
-          if (isWednesdayMorning && staff.id !== p429Employees[0].id) return // Nguy cơ (1 người)
-
-          // Ngẫu nhiên đăng ký
-          const shouldRegister = (dayOffset + sIdx) % 2 === 0 || dayOffset >= 5
-          if (shouldRegister) {
-            seeded.push({
-              id: `reg-seed-${weekStr}-${staff.id}-${dateStr}-${shiftId}`,
-              employee_id: staff.id,
-              store_id: staff.storeId,
-              week_start_date: weekStr,
-              date: dateStr,
-              shift_id: shiftId,
-              position_id: staff.posId,
-              status: 'PENDING',
-              created_at: new Date().toISOString(),
-              notes: 'Rảnh ca này theo nguyện vọng',
-            })
-          }
-        })
-      })
-    }
-  })
-
-  return seeded
+  return []
 }
 
 function initStorage() {
   if (isInitialized) return
   isInitialized = true
-
-  // Khởi tạo hạt giống mặc định ban đầu
-  memoryRegistrations = seedDefaultRegistrations()
+  memoryRegistrations = []
 
   // Đồng bộ từ Database máy chủ
   if (typeof window !== 'undefined') {
     fetch('/api/shifts/register?status=all')
       .then(res => res.ok ? res.json() : null)
       .then(json => {
-        if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
+        if (json?.success && Array.isArray(json.data)) {
           const serverRegs: PendingShiftRegistration[] = json.data.map((r: Record<string, unknown>) => ({
             id: String(r.id || `reg-${Date.now()}`),
             employee_id: String(r.employee_id || ''),
+            employee_code: r.employee_code ? String(r.employee_code) : undefined,
+            employee_name: r.employee_name ? String(r.employee_name) : undefined,
             store_id: String(r.store_id || 'store-001'),
             week_start_date: String(r.week_start_date || ''),
             date: String(r.date || ''),
             shift_id: String(r.shift_id || 'shift-001'),
+            shift_name: r.shift_name ? String(r.shift_name) : undefined,
             position_id: String(r.position_id || 'pos-001'),
             status: (String(r.status || 'PENDING').toUpperCase() as 'PENDING' | 'APPROVED' | 'REJECTED'),
             created_at: String(r.created_at || new Date().toISOString()),
             notes: r.notes ? String(r.notes) : undefined,
           }))
-          if (serverRegs.length > 0) {
-            memoryRegistrations = serverRegs
-          }
+          memoryRegistrations = serverRegs
         }
       })
       .catch(err => {
@@ -394,11 +314,20 @@ export class ShiftRegistrationService {
             created_at: String(d.created_at || new Date().toISOString()),
             notes: String(d.notes || ''),
           }))
-          const serverIds = new Set(serverItems.map(s => s.id))
-          memoryRegistrations = [
-            ...memoryRegistrations.filter(r => !serverIds.has(r.id)),
-            ...serverItems,
-          ]
+          if (storeId && weekStartDate) {
+            memoryRegistrations = [
+              ...memoryRegistrations.filter(
+                r => !(isStoreMatch(r.store_id, storeId) && r.week_start_date === weekStartDate)
+              ),
+              ...serverItems,
+            ]
+          } else {
+            const serverIds = new Set(serverItems.map(s => s.id))
+            memoryRegistrations = [
+              ...memoryRegistrations.filter(r => !serverIds.has(r.id)),
+              ...serverItems,
+            ]
+          }
           persistStorage()
           return serverItems
         }
@@ -467,24 +396,183 @@ export class ShiftRegistrationService {
     })
 
     persistStorage()
+
+    if (typeof window !== 'undefined' && approvedCount > 0) {
+      fetch('/api/shifts/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store_id: storeId,
+          week_start_date: weekStartDate,
+          action: 'approve',
+          approver_name: 'Quản lý cửa hàng',
+        }),
+      }).catch(err => console.warn('[ShiftRegistrationService] approveAllPendingForWeek error:', err))
+    }
+
     return { approvedCount, skippedCount }
   }
 
   /**
-   * Hủy/Từ chối một ca đăng ký
+   * Quản lý duyệt 1 ca cụ thể
+   */
+  static approveRegistration(id: string, approverName = 'Quản lý'): boolean {
+    initStorage()
+    const target = memoryRegistrations.find(r => r.id === id)
+    if (!target) return false
+
+    target.status = 'APPROVED'
+
+    // Bổ sung vào mockSchedules nếu chưa có
+    const emp = mockEmployees.find(e => e.id === target.employee_id)
+    const already = mockSchedules.find(
+      s => s.employee_id === target.employee_id && s.date === target.date && s.shift_id === target.shift_id
+    )
+    if (!already) {
+      addSchedule(
+        target.store_id,
+        target.employee_id,
+        target.shift_id,
+        target.date,
+        target.notes || 'Đăng ký ca (Đã duyệt)',
+        'draft',
+        target.position_id || emp?.position_id
+      )
+    }
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/shifts/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registration_ids: [id],
+          action: 'approve',
+          approver_name: approverName,
+        }),
+      }).catch(err => {
+        console.warn('[ShiftRegistrationService] approve error:', err)
+      })
+    }
+    return true
+  }
+
+  /**
+   * Quản lý từ chối 1 ca cụ thể
    */
   static rejectRegistration(id: string): boolean {
     initStorage()
     const target = memoryRegistrations.find(r => r.id === id)
     if (!target) return false
+
     target.status = 'REJECTED'
-    persistStorage()
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/shifts/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registration_ids: [id],
+          action: 'reject',
+        }),
+      }).catch(err => {
+        console.warn('[ShiftRegistrationService] reject error:', err)
+      })
+    }
     return true
   }
 
   /**
+   * Quản lý duyệt nhanh toàn bộ ca PENDING trong 1 ô (Ngày + Khung ca)
+   */
+  static approveCell(storeId: string, date: string, shiftId: string, approverName = 'Quản lý'): { approvedCount: number } {
+    initStorage()
+    const cellRegs = memoryRegistrations.filter(
+      r =>
+        isStoreMatch(r.store_id, storeId) &&
+        r.date === date &&
+        (r.shift_id === shiftId || standardizeShiftId(r.shift_id, r.shift_name) === shiftId) &&
+        r.status === 'PENDING'
+    )
+
+    let approvedCount = 0
+    const idsToApprove: string[] = []
+
+    cellRegs.forEach(reg => {
+      reg.status = 'APPROVED'
+      idsToApprove.push(reg.id)
+      approvedCount++
+
+      const emp = mockEmployees.find(e => e.id === reg.employee_id)
+      const already = mockSchedules.find(
+        s => s.employee_id === reg.employee_id && s.date === reg.date && s.shift_id === reg.shift_id
+      )
+      if (!already) {
+        addSchedule(
+          storeId,
+          reg.employee_id,
+          reg.shift_id,
+          reg.date,
+          reg.notes || 'Duyệt theo ô ca',
+          'draft',
+          reg.position_id || emp?.position_id
+        )
+      }
+    })
+
+    if (idsToApprove.length > 0 && typeof window !== 'undefined') {
+      fetch('/api/shifts/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registration_ids: idsToApprove,
+          action: 'approve',
+          approver_name: approverName,
+        }),
+      }).catch(err => console.warn('[ShiftRegistrationService] approveCell error:', err))
+    }
+
+    return { approvedCount }
+  }
+
+  /**
+   * Quản lý từ chối toàn bộ ca PENDING trong 1 ô (Ngày + Khung ca)
+   */
+  static rejectCell(storeId: string, date: string, shiftId: string): { rejectedCount: number } {
+    initStorage()
+    const cellRegs = memoryRegistrations.filter(
+      r =>
+        isStoreMatch(r.store_id, storeId) &&
+        r.date === date &&
+        (r.shift_id === shiftId || standardizeShiftId(r.shift_id, r.shift_name) === shiftId) &&
+        r.status === 'PENDING'
+    )
+
+    let rejectedCount = 0
+    const idsToReject: string[] = []
+
+    cellRegs.forEach(reg => {
+      reg.status = 'REJECTED'
+      idsToReject.push(reg.id)
+      rejectedCount++
+    })
+
+    if (idsToReject.length > 0 && typeof window !== 'undefined') {
+      fetch('/api/shifts/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registration_ids: idsToReject,
+          action: 'reject',
+        }),
+      }).catch(err => console.warn('[ShiftRegistrationService] rejectCell error:', err))
+    }
+
+    return { rejectedCount }
+  }
+
+  /**
    * Thống kê độ phủ ca (Staffing Coverage Rate)
-   * Tỷ lệ nhân viên đã nộp lịch rảnh cho tuần tới
+   * Tỷ lệ nhân viên đã nộp lịch rảnh cho tuần tới (Loại CEO)
    */
   static getCoverageRate(storeId: string, weekStartDate: string): CoverageRateResult {
     initStorage()
@@ -506,9 +594,10 @@ export class ShiftRegistrationService {
       if (empName) submittedNames.add(empName.toLowerCase().trim())
     })
 
-    // Lọc nhân sự chi nhánh đang active (chỉ tính nhân sự chính thức của cửa hàng này, hoặc nhân sự hỗ trợ đã đăng ký)
+    // Lọc nhân sự chi nhánh đang active (chỉ tính nhân sự chính thức của cửa hàng này, LOẠI CEO)
     const storeStaff = mockEmployees.filter(emp => {
       if (emp.status !== 'active') return false
+      if (emp.role === 'ceo') return false
       // Nhân sự trực thuộc cửa hàng này
       if (isStoreMatch(emp.store_id, storeId)) return true
       // Hoặc nhân sự từ chi nhánh khác đã nộp đăng ký hỗ trợ tại chi nhánh này
@@ -522,25 +611,36 @@ export class ShiftRegistrationService {
       return false
     })
 
-    const submittedEmployees: Array<{ id: string; name: string; code: string; phone?: string }> = []
-    const missingEmployees: Array<{ id: string; name: string; code: string; phone?: string }> = []
+    const submittedEmployees: Array<{ id: string; name: string; code: string; phone?: string; shiftCount?: number }> = []
+    const missingEmployees: Array<{ id: string; name: string; code: string; phone?: string; role?: string; positionName?: string }> = []
 
     storeStaff.forEach(emp => {
-      const isSubmitted =
-        submittedIds.has(emp.id) ||
-        (emp.employee_code && submittedCodes.has(emp.employee_code)) ||
-        submittedNames.has(emp.full_name.toLowerCase().trim())
+      const empRegs = weekRegistrations.filter(
+        r =>
+          r.employee_id === emp.id ||
+          (emp.employee_code && r.employee_code === emp.employee_code) ||
+          (r.employee_name && r.employee_name.toLowerCase() === emp.full_name.toLowerCase())
+      )
+      const isSubmitted = empRegs.length > 0 || submittedIds.has(emp.id)
+      const pos = mockPositions.find(p => p.id === emp.position_id)
 
-      const info = {
-        id: emp.id,
-        name: emp.full_name,
-        code: emp.employee_code,
-        phone: emp.phone,
-      }
       if (isSubmitted) {
-        submittedEmployees.push(info)
+        submittedEmployees.push({
+          id: emp.id,
+          name: emp.full_name,
+          code: emp.employee_code,
+          phone: emp.phone,
+          shiftCount: empRegs.length,
+        })
       } else {
-        missingEmployees.push(info)
+        missingEmployees.push({
+          id: emp.id,
+          name: emp.full_name,
+          code: emp.employee_code,
+          phone: emp.phone,
+          role: emp.role === 'store_manager' ? 'Quản lý' : emp.role === 'shift_leader' ? 'Trưởng ca' : 'Nhân viên',
+          positionName: pos?.name || 'Nhân viên F&B',
+        })
       }
     })
 
@@ -552,14 +652,20 @@ export class ShiftRegistrationService {
         e => e.id === r.employee_id || (rCode && e.code === rCode) || (rName && e.name.toLowerCase() === rName.toLowerCase())
       )
       if (!alreadyIncluded && rName) {
+        const empRegs = weekRegistrations.filter(
+          reg => reg.employee_id === r.employee_id || (rName && reg.employee_name === rName)
+        )
         submittedEmployees.push({
           id: r.employee_id,
           name: rName,
           code: rCode || '',
           phone: '',
+          shiftCount: empRegs.length,
         })
       }
     })
+
+    submittedEmployees.sort((a, b) => (b.shiftCount || 0) - (a.shiftCount || 0))
 
     const totalEmployees = submittedEmployees.length + missingEmployees.length
     const submittedCount = submittedEmployees.length
@@ -605,7 +711,7 @@ export class ShiftRegistrationService {
             r.status !== 'REJECTED'
         )
 
-        const registeredEmployees = regs.map(reg => {
+        const registeredEmployees: HeatmapEmployeeItem[] = regs.map(reg => {
           const regCode = reg.employee_code || (reg.employee_id?.startsWith('emp-') ? reg.employee_id.replace('emp-', '').toUpperCase() : '')
           const regName = reg.employee_name || ''
           const emp = mockEmployees.find(
@@ -617,13 +723,18 @@ export class ShiftRegistrationService {
           const pos = mockPositions.find(p => p.id === (reg.position_id || emp?.position_id))
           return {
             id: reg.employee_id,
+            registrationId: reg.id,
             name: regName || emp?.full_name || 'Nhân viên',
             code: regCode || emp?.employee_code || '',
             positionName: pos?.name || 'Nhân viên F&B',
+            status: reg.status,
+            notes: reg.notes,
           }
         })
 
         const count = regs.length
+        const approvedCount = regs.filter(r => r.status === 'APPROVED').length
+        const pendingCount = regs.filter(r => r.status === 'PENDING').length
         const status: 'FULL' | 'RISK' | 'EMPTY' = count >= 2 ? 'FULL' : count === 1 ? 'RISK' : 'EMPTY'
 
         cells.push({
@@ -636,11 +747,123 @@ export class ShiftRegistrationService {
           registrations: regs,
           registeredEmployees,
           count,
+          approvedCount,
+          pendingCount,
           status,
         })
       })
     }
 
     return cells
+  }
+
+  /**
+   * Bóc tách tổng hợp theo nhân viên (Tab 2: Theo Nhân Viên)
+   */
+  static getStaffOverview(storeId: string, weekStartDate: string): StaffRegistrationSummary[] {
+    initStorage()
+
+    const weekRegistrations = memoryRegistrations.filter(
+      r => isStoreMatch(r.store_id, storeId) && r.week_start_date === weekStartDate && r.status !== 'REJECTED'
+    )
+
+    // Nhân sự cửa hàng (không bao gồm CEO)
+    const storeStaff = mockEmployees.filter(emp => {
+      if (emp.status !== 'active') return false
+      if (emp.role === 'ceo') return false
+      return isStoreMatch(emp.store_id, storeId)
+    })
+
+    const localIds = new Set(storeStaff.map(e => e.id))
+    const extraStaffFromRegs: typeof storeStaff = []
+
+    weekRegistrations.forEach(r => {
+      if (!localIds.has(r.employee_id)) {
+        const foundEmp = mockEmployees.find(
+          e => e.id === r.employee_id || (r.employee_code && e.employee_code === r.employee_code)
+        )
+        if (foundEmp && foundEmp.status === 'active' && foundEmp.role !== 'ceo') {
+          localIds.add(foundEmp.id)
+          extraStaffFromRegs.push(foundEmp)
+        } else if (!foundEmp && r.employee_name) {
+          localIds.add(r.employee_id)
+          extraStaffFromRegs.push({
+            id: r.employee_id,
+            org_id: 'org-001',
+            store_id: storeId,
+            position_id: r.position_id || 'pos-001',
+            employee_code: r.employee_code || '',
+            full_name: r.employee_name,
+            phone: '',
+            email: '',
+            date_of_birth: '',
+            gender: 'female',
+            address: '',
+            role: 'employee',
+            status: 'active',
+            hire_date: '2026-10-01',
+            total_points: 0,
+            gamification_level: 'bronze',
+          })
+        }
+      }
+    })
+
+    const allStaff = [...storeStaff, ...extraStaffFromRegs]
+
+    return allStaff
+      .map(emp => {
+        const empRegs = weekRegistrations.filter(
+          r =>
+            r.employee_id === emp.id ||
+            (emp.employee_code && r.employee_code === emp.employee_code) ||
+            (r.employee_name && r.employee_name.toLowerCase() === emp.full_name.toLowerCase())
+        )
+
+        const hasSubmitted = empRegs.length > 0
+        const registeredCount = empRegs.length
+        const approvedCount = empRegs.filter(r => r.status === 'APPROVED').length
+        const pendingCount = empRegs.filter(r => r.status === 'PENDING').length
+
+        // Ước tính giờ công chuẩn Homies F&B: Ca Sáng 3.5h (08:30-12:00), Ca Trưa 5h, Ca Tối 5h
+        const totalHours = empRegs.reduce((acc, r) => {
+          if (r.shift_id === 'shift-001') return acc + 3.5
+          if (r.shift_id === 'shift-002') return acc + 5.0
+          if (r.shift_id === 'shift-003') return acc + 5.0
+          return acc + 4.0
+        }, 0)
+
+        const days: Record<string, StaffDayShift[]> = {}
+        empRegs.forEach(r => {
+          if (!days[r.date]) days[r.date] = []
+          days[r.date].push({
+            id: r.id,
+            shiftId: r.shift_id,
+            shiftName:
+              r.shift_name ||
+              (r.shift_id === 'shift-001' ? 'Ca Sáng' : r.shift_id === 'shift-002' ? 'Ca Trưa' : 'Ca Tối'),
+            status: r.status,
+            notes: r.notes,
+          })
+        })
+
+        const pos = mockPositions.find(p => p.id === emp.position_id)
+
+        return {
+          id: emp.id,
+          name: emp.full_name,
+          code: emp.employee_code,
+          role: emp.role === 'store_manager' ? 'Quản lý' : emp.role === 'shift_leader' ? 'Trưởng ca' : 'Nhân viên',
+          positionName: pos?.name || 'Nhân viên F&B',
+          phone: emp.phone,
+          hasSubmitted,
+          registeredCount,
+          approvedCount,
+          pendingCount,
+          totalHours,
+          days,
+        }
+      })
+      .sort((a, b) => b.registeredCount - a.registeredCount)
   }
 }

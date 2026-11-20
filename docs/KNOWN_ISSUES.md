@@ -1,5 +1,32 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-20 (Thiết kế lại toàn diện giao diện Duyệt Đăng Ký Ca /schedule/registrations chuẩn Bố cục 3 tầng Homies Executive SaaS F&B và loại bỏ dồn ca ảo):
+  1) Nguyên nhân:
+     - Giao diện cũ chật chội (bị bó trong `max-w-7xl`), thiếu phân tầng thị giác rõ ràng, dùng nhiều icon/emoji lặp lại không đúng quy chuẩn nhận diện thương hiệu Homies (`DESIGN_RULE_HOMIES_FINAL.md`).
+     - Ca Tối bị dồn ca ảo (hiện 9 đến 13 bạn trong một ca) do hàm `seedDefaultRegistrations()` chèn nhân sự giả lập vào bộ nhớ `memoryRegistrations` và cộng dồn với ca thật từ iPOS.
+     - Danh sách "Nhân sự chưa nộp lịch" hiển thị nhầm cả CEO Nguyễn Đức Nghĩa (`role: ceo`), gây hiểu lầm là CEO cần đăng ký ca phục vụ tại quán.
+     - Chưa hỗ trợ cơ chế duyệt/từ chối chọn lọc từng người hoặc từng ô ca mà chỉ có nút duyệt hàng loạt.
+  2) Cách giải quyết:
+     - Tái cấu trúc trang `/schedule/registrations` thành 3 tầng chuẩn Homies Executive SaaS F&B:
+       + Tầng 1: Executive Command Header (Breadcrumb, tiêu đề, Live Data badge, chuyển đổi tuần, chọn chi nhánh và nút Phê duyệt nhanh).
+       + Tầng 2: 4 Thẻ KPI Vĩ mô (Độ phủ ca, Tình trạng ca tuần, Tiến độ phê duyệt, Chỉ báo rủi ro lủng ca).
+       + Tầng 3: Ma trận phân bổ 7 Ngày x 3 Ca kết hợp 2 Tab xem linh hoạt ("Theo Khung Ca" & "Theo Từng Nhân Viên") cùng cột theo dõi nhân sự đã nộp/chưa nộp lịch.
+     - Tạo mới 3 component chuyên biệt:
+       + `src/components/scheduling/registrations/RegistrationHeaderAndKpis.tsx`: Header điều hành và 4 KPI cards.
+       + `src/components/scheduling/registrations/RegistrationMatrixAndStaffView.tsx`: Ma trận 7x3, bảng tổng hợp nhân sự, bộ lọc trạng thái và cột theo dõi.
+       + `src/components/scheduling/registrations/RegistrationCellDrawer.tsx`: Drawer trượt bóc tách chi tiết từng ca và duyệt/từ chối từng nhân sự, kèm Popup Zalo chuẩn văn phong thông báo hành chính.
+     - Làm sạch dữ liệu trong `shift-registration-service.ts`:
+       + Gỡ bỏ hoàn toàn hạt giống giả lập `seedDefaultRegistrations()`, đảm bảo dữ liệu hiển thị trung thực 100% từ iPOS Cloud.
+       + Loại trừ CEO (`role === 'ceo'`) khỏi danh sách phân ca cửa hàng.
+       + Bổ sung hàm `approveRegistration`, `rejectRegistration`, `approveCell`, `rejectCell`, `getStaffOverview`.
+  3) Kết quả:
+     - Giao diện full-width 100%, phong cách Apple SaaS F&B tối giản, chuyên nghiệp, không emoji, màu sắc chuẩn nhận diện Homies (`#FFF8E8`, `#001D3D`, `#2F6FA8`, Emerald/Mint).
+     - Dữ liệu hiển thị đúng 45 ca rảnh từ 4 nhân sự thật tại cơ sở Hồ Bá Phấn, không còn tình trạng dồn ca ảo 9-13 bạn.
+     - Hỗ trợ thao tác duyệt/từ chối linh hoạt: Duyệt cả tuần, Duyệt cả ca (ô), Duyệt từng người, hoặc Nhắc Zalo 1-chạm.
+     - Kiểm tra kỹ thuật: `npm run ai:guard` PASSED, `npx tsc --noEmit` 0 errors, `npm run build` 190/190 routes thành công.
+     - File liên quan: `src/app/schedule/registrations/page.tsx`, `src/components/scheduling/registrations/RegistrationHeaderAndKpis.tsx`, `src/components/scheduling/registrations/RegistrationMatrixAndStaffView.tsx`, `src/components/scheduling/registrations/RegistrationCellDrawer.tsx`, `src/lib/services/scheduling/shift-registration-service.ts`, `src/app/api/shifts/approve/route.ts`.
+
+
 - Đã hoàn thiện 2026-11-20 (Khắc phục đồng bộ trực tiếp ca đăng ký rảnh từ iPOS Cloud, sửa lủng ca ảo và tính đúng tỷ lệ độ phủ ca tại /schedule/registrations):
   1) Nguyên nhân:
      - Trên trang "Duyệt Đăng Ký Ca & Bản Đồ Thời Gian Trống" (`/schedule/registrations`), tuần tới (23/11 - 29/11) tại cơ sở Hồ Bá Phấn báo "Độ phủ đăng ký: 0%", "Nhân sự chưa nộp lịch: 7 bạn", và toàn bộ 21 ô ma trận nhiệt đều báo "0 bạn / Cần gọi bù!".
