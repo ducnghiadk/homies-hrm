@@ -1,5 +1,21 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-21 (Pass B - Dọn sạch chi nhánh mẫu tạm ngưng, đồng nhất lọc nhân sự đã nghỉ và nối dữ liệu máy chủ thật cho Đăng ký ca / Chấm công / Nhân viên):
+  1) Nguyên nhân:
+     - API `/api/stores` và seed `db.ts` vẫn trả về chi nhánh mẫu tạm ngưng `store-003` ("Homies Milk Tea - Lê Văn Sỹ"), còn xuất hiện trong dropdown import chấm công (`/attendance`) và trang nhân viên (`/employees`).
+     - Khi chạy ở chế độ iPOS Live, API iPOS vẫn trả về nhân sự đã nghỉ việc (`NV0034` Nguyễn Thị Thu) với trạng thái `active`, làm lệch tổng nhân sự chi nhánh giữa 2 chế độ Đồng bộ iPOS và Homies Tự Vận Hành.
+     - Trang `/schedule/registrations` vẫn dùng danh sách nhân sự mẫu tĩnh (`mockEmployees`) và cửa hàng tĩnh (`mockStores`) khi tính độ phủ ca và danh sách nhân sự.
+     - Các trang `/attendance` và `/employees` chưa tự tải lại dữ liệu khi gạt Công tắc Vận hành trên thanh đầu trang.
+  2) Cách giải quyết:
+     - Cập nhật `/api/stores` và `src/lib/server/db.ts`: mặc định lọc bỏ chi nhánh `is_active === false`, xóa `store-003` khỏi dữ liệu seed khởi tạo mới.
+     - Cập nhật `/api/employees`: đối soát chéo trạng thái `resigned` từ CSDL nội bộ ngay cả khi đọc từ `ipos_cloud` và chuẩn hóa thông tin `BH-9852` (Huỳnh Lê Kiều Linh) để cả 2 chế độ trả về cùng đúng danh sách nhân sự thật (9 nhân sự hoạt động tại Hồ Bá Phấn + 5 tại Đường 429).
+     - Cập nhật `ShiftRegistrationService` (`syncEmployeesFromServer`, `getEffectiveEmployees`, `isEmployeeMatch`), `page.tsx` và `RegistrationHeaderAndKpis.tsx`: đồng bộ nhân sự và cửa hàng thật từ máy chủ (`/api/employees?status=active`, `/api/stores`).
+     - Cập nhật `/attendance` và `/employees`: dùng `getStoresList()`, loại bỏ gợi ý `store-003` Lê Văn Sỹ khi import, hiển thị đúng nhãn chế độ `Homies Tự Vận Hành` và lắng nghe sự kiện `homies-data-mode-changed` để tự tải lại tức thì.
+  3) Kết quả:
+     - Không còn xuất hiện chi nhánh mẫu Lê Văn Sỹ trên các luồng vận hành chính.
+     - Danh sách nhân sự hoạt động đồng nhất 100% giữa 2 chế độ Đồng bộ iPOS và Homies Tự Vận Hành.
+     - Kiểm tra kỹ thuật: `npm run ai:guard`, `npx tsc --noEmit`, `npm run build` và kiểm thử sống trên cổng 3535 đạt 100%.
+
 - Đã hoàn thiện 2026-11-20 (Thiết kế lại toàn diện giao diện Duyệt Đăng Ký Ca /schedule/registrations chuẩn Bố cục 3 tầng Homies Executive SaaS F&B và loại bỏ dồn ca ảo):
   1) Nguyên nhân:
      - Giao diện cũ chật chội (bị bó trong `max-w-7xl`), thiếu phân tầng thị giác rõ ràng, dùng nhiều icon/emoji lặp lại không đúng quy chuẩn nhận diện thương hiệu Homies (`DESIGN_RULE_HOMIES_FINAL.md`).

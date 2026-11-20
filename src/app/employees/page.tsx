@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import { Avatar } from '@/components/ui/Avatar'
-import { getPositionById, getStoreById, mockStores, isStoreMatch } from '@/lib/mock-data'
+import { getPositionById, getStoreById, getStoresList, isStoreMatch } from '@/lib/mock-data'
 import { storeAdapter, employeeAdapter } from '@/lib/adapters'
 import { EmployeeService, getDepartmentName, getDefaultSecondaryPositions } from '@/lib/services/employee-service'
 import { useAuthStore, type AuthUser } from '@/store/auth-store'
@@ -273,7 +273,7 @@ export default function EmployeesPage() {
   const [selectedAccountStatus, setSelectedAccountStatus] = useState('')
   const [rawSelectedEmployeeIds, setRawSelectedEmployeeIds] = useState<string[]>([])
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null)
-  const [stores, setStores] = useState(mockStores)
+  const [stores, setStores] = useState(() => getStoresList())
   const actionMenuRef = useRef<HTMLDivElement | null>(null)
   const [resetPasswordTarget, setResetPasswordTarget] = useState<AuthUser | null>(null)
   const [customNewPassword, setCustomNewPassword] = useState('')
@@ -351,7 +351,7 @@ export default function EmployeesPage() {
   }, [activeColumns, viewMode])
 
   useEffect(() => {
-    storeAdapter.getStores().then(res => setStores(res))
+    storeAdapter.getStores().then(res => setStores(res.filter(s => s.is_active !== false)))
   }, [])
 
   const handleResetPasswordSubmit = () => {
@@ -418,6 +418,15 @@ export default function EmployeesPage() {
       isMounted = false
     }
   }, [viewer, refreshKey])
+
+  // Tự động tải lại danh sách nhân sự khi gạt Công tắc Vận hành trên Header
+  useEffect(() => {
+    const handleModeChanged = () => {
+      setRefreshKey((current) => current + 1)
+    }
+    window.addEventListener('homies-data-mode-changed', handleModeChanged)
+    return () => window.removeEventListener('homies-data-mode-changed', handleModeChanged)
+  }, [])
 
   const filteredEmployees = useMemo(() => {
     return employeesList.filter((employee) => {

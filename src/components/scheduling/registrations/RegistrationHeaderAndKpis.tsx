@@ -42,6 +42,7 @@ export interface RegistrationHeaderAndKpisProps {
   filterStatus: 'ALL' | 'RISK' | 'PENDING' | 'APPROVED'
   onSelectFilterStatus: (status: 'ALL' | 'RISK' | 'PENDING' | 'APPROVED') => void
   dataSource?: 'ipos_cloud' | 'homies_native' | 'internal_db'
+  stores?: Array<{ id: string; name: string; is_active?: boolean }>
 }
 
 export default function RegistrationHeaderAndKpis({
@@ -65,10 +66,13 @@ export default function RegistrationHeaderAndKpis({
   filterStatus,
   onSelectFilterStatus,
   dataSource = 'ipos_cloud',
+  stores,
 }: RegistrationHeaderAndKpisProps) {
   const isHomiesNative = dataSource === 'homies_native'
   const isInternalDb = dataSource === 'internal_db'
-  const currentStore = mockStores.find(s => s.id === selectedStoreId) || mockStores[0]
+  const activeStores = (stores && stores.length > 0 ? stores : mockStores).filter(
+    s => s.is_active !== false
+  )
 
   return (
     <div className="w-full space-y-4">
@@ -130,9 +134,7 @@ export default function RegistrationHeaderAndKpis({
             <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-200/80">
               <Store size={13} className="text-[#2F6FA8] ml-2 mr-1" />
               <div className="flex items-center gap-1">
-                {mockStores
-                  .filter(store => store.is_active !== false)
-                  .map(store => {
+                {activeStores.map(store => {
                     const isActive = selectedStoreId === store.id
                     const shortName = store.name.replace('Homies Milk Tea - ', '')
                     return (

@@ -8,7 +8,7 @@ import {
   type CoverageRateResult,
   type StaffRegistrationSummary,
 } from '@/lib/services/scheduling/shift-registration-service'
-import { mockStores } from '@/lib/mock-data'
+import { getStoresList, mockStores } from '@/lib/mock-data'
 import { getMondayOfDate, formatDateString } from '@/lib/mock-data-registration-weeks'
 import RegistrationHeaderAndKpis from '@/components/scheduling/registrations/RegistrationHeaderAndKpis'
 import RegistrationMatrixAndStaffView from '@/components/scheduling/registrations/RegistrationMatrixAndStaffView'
@@ -48,6 +48,7 @@ export default function ShiftRegistrationsHeatmapPage() {
   const [isZaloModalOpen, setIsZaloModalOpen] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [dataVersion, setDataVersion] = useState(0)
+  const [stores, setStores] = useState<Array<{ id: string; name: string; is_active?: boolean }>>(() => getStoresList())
   const [dataSource, setDataSource] = useState<'ipos_cloud' | 'homies_native' | 'internal_db'>('ipos_cloud')
   const [toastNotice, setToastNotice] = useState<{ message: string; type: 'success' | 'info' } | null>(null)
 
@@ -59,12 +60,25 @@ export default function ShiftRegistrationsHeatmapPage() {
     }, 3000)
   }, [])
 
-  // Đồng bộ ca đăng ký từ Database máy chủ & kiểm tra chế độ iPOS / Homies Tự Vận Hành
+  // Nạp danh sách chi nhánh đang hoạt động từ máy chủ (/api/stores)
+  useEffect(() => {
+    fetch('/api/stores', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(json => {
+        if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
+          setStores(json.data.filter((s: { is_active?: boolean }) => s.is_active !== false))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Đồng bộ ca đăng ký, nhân sự thực tế từ Database máy chủ & kiểm tra chế độ iPOS / Homies Tự Vận Hành
   const syncData = useCallback(async (storeId: string, week: string) => {
     setIsSyncing(true)
     try {
       const [modeRes] = await Promise.all([
         fetch('/api/ipos/cloud-worker', { cache: 'no-store' }).catch(() => null),
+        ShiftRegistrationService.syncEmployeesFromServer(),
         ShiftRegistrationService.syncRegistrationsFromServer(storeId, week),
       ])
       if (modeRes && modeRes.ok) {
@@ -235,7 +249,7 @@ export default function ShiftRegistrationsHeatmapPage() {
     }
   }
 
-  const currentStore = mockStores.find(s => s.id === selectedStoreId) || mockStores[0]
+  const currentStore = stores.find(s => s.id === selectedStoreId) || stores[0] || mockStores[0]
 
   return (
     <AppShell>
@@ -262,6 +276,7 @@ export default function ShiftRegistrationsHeatmapPage() {
           filterStatus={filterStatus}
           onSelectFilterStatus={setFilterStatus}
           dataSource={dataSource}
+          stores={stores}
         />
 
         {/* TẦNG 3: BẢNG MA TRẬN 7X3 & THEO DÕI NHÂN VIÊN */}

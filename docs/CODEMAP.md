@@ -145,8 +145,9 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `src/components/scheduling/registrations/RegistrationMatrixAndStaffView.tsx`: Tang 3 Ma tran 7x3, Bang tong hop nhan vien va theo doi da/chua nop
   + `src/components/scheduling/registrations/RegistrationCellDrawer.tsx`: Drawer chi tiet o ca & duyet tung nguoi + Modal nhac Zalo
   + `src/components/scheduling/ManagerSchedulingBoard.tsx`: bang phan ca truc quan cho quan ly
-  + `src/lib/services/scheduling/shift-registration-service.ts`: service xu ly du lieu dang ky ca, tinh ty le coverage va loc loai bo CEO khoi chi nhanh
+  + `src/lib/services/scheduling/shift-registration-service.ts`: service xu ly du lieu dang ky ca, dong bo nhan su that tu `/api/employees?status=active` (`syncEmployeesFromServer`), tinh ty le coverage va loc loai bo CEO khoi chi nhanh
   + `src/app/api/shifts/approve/route.ts`: API may chu phe duyet hoac tu choi ca dang ky
+  + `src/app/api/stores/route.ts`: API danh sach chi nhanh (mac dinh chi tra cac co so dang hoat dong `is_active !== false`)
   + `src/lib/services/scheduling/schedule-service.ts`: quan ly lich phan ca chinh thuc
 - Dung khi: sua flow dang ky ca di dong, phe duyet ca tuan, xep lich lam viec, radar phat hien lung ca.
 

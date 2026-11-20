@@ -604,16 +604,6 @@ function getInitialSeedData(): ServerDatabaseSchema {
       phone: '0901 234 568',
       is_active: true,
     },
-    {
-      id: 'store-003',
-      name: 'Homies Milk Tea - Lê Văn Sỹ (Tạm ngưng)',
-      address: '350 Lê Văn Sỹ, Phường 14, Quận 3, TP.HCM',
-      latitude: 10.7892,
-      longitude: 106.6781,
-      checkin_radius_meters: 100,
-      phone: '0901 234 569',
-      is_active: false,
-    },
   ]
 
   const employees: ServerEmployee[] = [

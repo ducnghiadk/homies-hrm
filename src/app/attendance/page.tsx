@@ -639,7 +639,11 @@ export default function AttendanceTimesheetPage() {
       .then(json => {
         if (active && json?.success && Array.isArray(json.data)) {
           const nowTimeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-          setLastIposSyncText(`Đã gom lúc ${nowTimeStr} (Tự động 10p/lần)`)
+          setLastIposSyncText(
+            json.source === 'homies_native'
+              ? `Homies Tự Vận Hành (Cập nhật lúc ${nowTimeStr})`
+              : `Đã gom lúc ${nowTimeStr} (Tự động 10p/lần)`
+          )
 
           if (wasForced) {
             const count = (typeof json.synced_from_ipos_count === 'number' && json.synced_from_ipos_count > 0)
@@ -759,6 +763,15 @@ export default function AttendanceTimesheetPage() {
       })
     return () => { active = false }
   }, [activeStoreId, refreshTrigger, viewMode, weekDates, monthDates, fullEmployeeList])
+
+  // Tự động tải lại chấm công & ca làm việc khi gạt Công tắc Vận hành trên Header
+  useEffect(() => {
+    const handleModeChanged = () => {
+      setRefreshTrigger(prev => prev + 1)
+    }
+    window.addEventListener('homies-data-mode-changed', handleModeChanged)
+    return () => window.removeEventListener('homies-data-mode-changed', handleModeChanged)
+  }, [])
 
   // Nạp dữ liệu ca phân công từ API máy chủ (Truyền đúng khoảng ngày tuần/tháng thực tế)
   useEffect(() => {
@@ -1223,11 +1236,8 @@ export default function AttendanceTimesheetPage() {
     } else if (fLower.includes('429')) {
       setImportSelectedStoreId('store-002')
       setAutoDetectedStoreName('Homies Milk Tea - 429')
-    } else if (fLower.includes('sy') || fTone.includes('sy') || fLower.includes('le van sy')) {
-      setImportSelectedStoreId('store-003')
-      setAutoDetectedStoreName('Homies Milk Tea - Lê Văn Sỹ')
     } else {
-      const matchedStore = mockStores.find(s => {
+      const matchedStore = getStoresList().find(s => {
         const sLower = s.name.toLowerCase()
         const sTone = removeVietnameseTones(sLower)
         return fLower.includes(sLower) || fTone.includes(sTone)
@@ -1382,7 +1392,7 @@ export default function AttendanceTimesheetPage() {
           const extractedBranch = branchMatch[1].trim().toLowerCase()
           const extractedBranchTone = removeVietnameseTones(extractedBranch)
 
-          const matched = mockStores.find(s => {
+          const matched = getStoresList().find(s => {
             const sLower = s.name.toLowerCase()
             const sTone = removeVietnameseTones(sLower)
             return (
@@ -1391,8 +1401,7 @@ export default function AttendanceTimesheetPage() {
               sTone.includes(extractedBranchTone) ||
               extractedBranchTone.includes(sTone) ||
               (extractedBranch.includes('429') && s.id === 'store-002') ||
-              ((extractedBranch.includes('hồ bá phấn') || extractedBranch.includes('ho ba phan') || extractedBranch.includes('ba phan')) && s.id === 'store-001') ||
-              ((extractedBranch.includes('lê văn sỹ') || extractedBranch.includes('le van sy')) && s.id === 'store-003')
+              ((extractedBranch.includes('hồ bá phấn') || extractedBranch.includes('ho ba phan') || extractedBranch.includes('ba phan')) && s.id === 'store-001')
             )
           })
 
@@ -1402,16 +1411,13 @@ export default function AttendanceTimesheetPage() {
           }
         } else if (rowLower.includes('429')) {
           setImportSelectedStoreId('store-002')
-          setAutoDetectedStoreName(mockStores.find(s => s.id === 'store-002')?.name || 'Homies Milk Tea - 429')
+          setAutoDetectedStoreName(getStoresList().find(s => s.id === 'store-002')?.name || 'Homies Milk Tea - 429')
         } else if (rowLower.includes('hồ bá phấn') || rowLower.includes('ho ba phan') || rowLower.includes('429')) {
           setImportSelectedStoreId('store-001')
           setAutoDetectedStoreName('Homies Milk Tea - 429')
         } else if (rowLower.includes('quang trung')) {
           setImportSelectedStoreId('store-002')
           setAutoDetectedStoreName('Homies Milk Tea - Quang Trung')
-        } else if (rowLower.includes('lê văn sỹ') || rowLower.includes('le van sy')) {
-          setImportSelectedStoreId('store-003')
-          setAutoDetectedStoreName('Homies Milk Tea - Lê văn Sỹ')
         }
       }
 
@@ -3044,7 +3050,7 @@ export default function AttendanceTimesheetPage() {
                           onChange={e => setImportSelectedStoreId(e.target.value)}
                           className="bg-transparent text-[#001D3D] text-[11px] font-extrabold focus:outline-hidden cursor-pointer"
                         >
-                          {mockStores.map(s => (
+                          {getStoresList().map(s => (
                             <option key={s.id} value={s.id}>
                               {s.name} {s.id === activeStoreId ? '(Đang xem)' : ''}
                             </option>

@@ -18,7 +18,49 @@ export async function GET(req: NextRequest) {
       // 1. Tải dữ liệu trực tiếp từ iPOS Cloud API khi công tắc Nhân sự đang BẬT
       const iposRes = await fetchIposEmployees()
       if (iposRes.success && !iposRes.isFallback && iposRes.data.length > 0) {
-        list = iposRes.data
+        const resignedList = (db.employees || []).filter((e) => e.status === 'resigned')
+        const resignedIds = new Set(resignedList.map((e) => e.id))
+        const resignedCodes = new Set(
+          resignedList
+            .map((e) => (e.employee_code || '').trim().toUpperCase())
+            .filter((c) => c && c !== '-')
+        )
+        const resignedNames = new Set(
+          resignedList
+            .map((e) => (e.full_name || '').trim().toLowerCase())
+            .filter(Boolean)
+        )
+
+        list = iposRes.data.map((emp) => {
+          const codeUpper = (emp.employee_code || '').trim().toUpperCase()
+          const nameLower = (emp.full_name || '').trim().toLowerCase()
+          const isResigned =
+            resignedIds.has(emp.id) ||
+            (codeUpper && codeUpper !== '-' && resignedCodes.has(codeUpper)) ||
+            (nameLower && resignedNames.has(nameLower))
+
+          if (isResigned) {
+            return {
+              ...emp,
+              status: 'resigned' as const,
+              account_status: 'bi_khoa' as const,
+            }
+          }
+
+          if (
+            emp.id === 'emp-bh9852' ||
+            codeUpper === 'BH-9852' ||
+            nameLower === 'huỳnh lê kiều linh'
+          ) {
+            return {
+              ...emp,
+              employee_code: !emp.employee_code || emp.employee_code === '-' ? 'BH-9852' : emp.employee_code,
+              store_id: 'store-001',
+            }
+          }
+
+          return emp
+        })
         dataSource = 'ipos_cloud'
       } else {
         // 2. Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ

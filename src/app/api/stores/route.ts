@@ -8,6 +8,9 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const storeId = searchParams.get('id')
+    const includeInactive =
+      searchParams.get('include_inactive') === '1' ||
+      searchParams.get('include_inactive') === 'true'
 
     const db = await getServerDb()
     let stores = db.stores || []
@@ -27,6 +30,10 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: false, error: 'Không tìm thấy chi nhánh' }, { status: 404 })
       }
       return NextResponse.json({ success: true, data: sanitizeStore(single) })
+    }
+
+    if (!includeInactive) {
+      stores = stores.filter((s) => s.is_active !== false)
     }
 
     return NextResponse.json({
