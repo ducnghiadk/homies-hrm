@@ -1,5 +1,19 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-21 (Pass C - Lớp lưu trữ đám mây Supabase bền vững sẵn sàng Deploy Vercel + Chỉ báo kho dữ liệu):
+  1) Nguyên nhân:
+     - Mọi thay đổi vận hành (công tắc iPOS, duyệt ca, chấm công, nhân sự) trước đây lưu trong file cục bộ `data/server-db.json` (trên Vercel Serverless chỉ là `/tmp` tạm thời, sẽ mất sạch khi máy chủ khởi động lại).
+     - Tên miền dự án Supabase cũ cài trong `.env.local` (`ncxwnldazjtlgipdsuws.supabase.co`) hiện không còn phân giải DNS được (có thể đã tạm ngưng/xóa), nhưng giao diện Header chưa báo trung thực cho chủ quán biết lý do.
+  2) Cách giải quyết:
+     - Tạo bảng SQL chuyên dụng `supabase/schema_v5_runtime_persistence.sql` (`public.homies_runtime_store` bật RLS bảo mật).
+     - Xây dựng driver `src/lib/server/supabase-store.ts` sử dụng REST API PostgREST với timeout 3 giây, bộ ngắt mạch (circuit breaker) 60 giây khi mất kết nối, upsert tối ưu theo từng phần thay đổi và tự động nạp dữ liệu nền lần đầu khi bảng trống.
+     - Nối trực tiếp `supabase-store.ts` vào `src/lib/server/db.ts` (`getServerDb` / `saveServerDb` / `clearServerDbCache`).
+     - Trả về `storage_status` (không bao giờ lộ khóa bí mật) trong `/api/ipos/cloud-worker` và hiển thị thẻ trạng thái "Kho Lưu Trữ Dữ Liệu (Vercel Deploy)" trên `DataSourceStatusBadge.tsx`.
+     - Viết hướng dẫn 4 bước dành cho người dùng không chuyên kỹ thuật tại `docs/DEPLOY_VERCEL_SUPABASE.md`.
+  3) Kết quả:
+     - Hệ thống sẵn sàng triển khai ngay lên Vercel + Supabase mới mà không mất dữ liệu; khi chạy local với URL cũ đã chết vẫn phản hồi nhanh và dự phòng an toàn bằng file nội bộ.
+     - Kiểm tra kỹ thuật & kiểm thử đơn vị (mocked `fetch` 5 tình huống Supabase + build 190 routes + kiểm thử sống cổng 3535) đạt 100%.
+
 - Đã hoàn thiện 2026-11-21 (Pass B - Dọn sạch chi nhánh mẫu tạm ngưng, đồng nhất lọc nhân sự đã nghỉ và nối dữ liệu máy chủ thật cho Đăng ký ca / Chấm công / Nhân viên):
   1) Nguyên nhân:
      - API `/api/stores` và seed `db.ts` vẫn trả về chi nhánh mẫu tạm ngưng `store-003` ("Homies Milk Tea - Lê Văn Sỹ"), còn xuất hiện trong dropdown import chấm công (`/attendance`) và trang nhân viên (`/employees`).

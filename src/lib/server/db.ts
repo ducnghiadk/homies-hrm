@@ -3,6 +3,10 @@ import path from 'path'
 import os from 'os'
 import { calculateDistance } from '@/lib/utils'
 import { hashPassword } from '@/lib/security/token-signer'
+import {
+  loadCollectionsFromSupabase,
+  saveCollectionsToSupabase,
+} from '@/lib/server/supabase-store'
 import type {
   BSCCriteriaInfo,
   BSCBonusTier,
@@ -1979,277 +1983,220 @@ function getInitialContractsSeed(): ServerContract[] {
 
 let inMemoryCache: ServerDatabaseSchema | null = null
 let lastMtime: number = 0
+let lastCloudSyncAt: number = 0
+const CLOUD_CACHE_TTL_MS = 5000
 
-export async function getServerDb(): Promise<ServerDatabaseSchema> {
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true })
-    const stat = await fs.stat(DB_FILE).catch(() => null)
-    if (inMemoryCache && stat && stat.mtimeMs === lastMtime) {
-      if (!inMemoryCache.contracts) {
-        inMemoryCache.contracts = getInitialContractsSeed()
-      }
-      if (!inMemoryCache.invitations || inMemoryCache.invitations.length === 0) {
-        inMemoryCache.invitations = getInitialInvitationsSeed()
-      }
-      if (!inMemoryCache.bsc_targets || inMemoryCache.bsc_targets.length === 0) {
-        inMemoryCache.bsc_targets = getInitialBscTargetsSeed()
-      }
-      if (!inMemoryCache.bsc_logs || inMemoryCache.bsc_logs.length === 0) {
-        inMemoryCache.bsc_logs = getInitialBscLogsSeed()
-      }
-      if (!inMemoryCache.shifts) {
-        inMemoryCache.shifts = []
-      }
-      if (!inMemoryCache.attendance) {
-        inMemoryCache.attendance = []
-      }
-      if (!inMemoryCache.ipos_integration) {
-        inMemoryCache.ipos_integration = {
-          is_enabled: true,
-          api_endpoint: 'https://hrm.ipos.vn',
-          username: 'nghianguyen.dk@gmail.com',
-          token_or_password: 'Ducnghia1',
-          store_codes: ['HBP', '429'],
-          sync_schedule: 'every_2_hours',
-          sync_attendance: true,
-          sync_payroll: true,
-          sync_employees: true,
-          sync_shifts: true,
-          sync_pos_revenue: false,
-          sync_inventory: false,
-          is_authenticated: true,
-          last_sync_status: 'success',
-          sync_logs: [],
-          hrm_jwt_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im5naGlhbmd1eWVuLmRrQGdtYWlsLmNvbSIsImFjY291bnRfaWQiOiI5ZjExY2MzZC1lODRiLTQyZjktOTZiNS0xMDE1YTM5MDk1MWYiLCJlbXBsb3llZV9pZCI6Ijk5Yjg5YTQ0LWYwMzEtNGRjYS1iY2M1LWU5N2Q5OWQwOGEwZCIsImNvbXBhbnlfaWQiOiI3Y2VkMzYxYS1iODQ0LTQ0NzAtOGU5Ny01MjJhNzM2Njc2OWIiLCJsb2dpbl9ieSI6IklBTSIsImV4cCI6MTc5NjM0MjQ5OX0.kHGu53KlgCRJVsHAQe1TcoHrYz8ZuP8NEykyEjyDzJ4',
-          hrm_user: {
-            id: '9f11cc3d-e84b-42f9-96b5-1015a390951f',
-            name: 'Nguyễn Đức Nghĩa',
-            email: 'nghianguyen.dk@gmail.com',
-            phone: '0981998122',
-            role: 'Chủ thương hiệu',
-          },
-          hrm_company: {
-            id: '7ced361a-b844-4470-8e97-522a7366769b',
-            name: 'Trà Sữa Phô Mai Tươi Đài Loan Homies',
-            code: 'GLRZ7YR81ZBE',
-          },
-        }
-      }
-      if (!inMemoryCache.bsc_settings) {
-        inMemoryCache.bsc_settings = getInitialBscSettingsSeed()
-      }
-      if (!inMemoryCache.incidents || inMemoryCache.incidents.length === 0) {
-        inMemoryCache.incidents = getInitialIncidentsSeed()
-      }
-      inMemoryCache.incidents.forEach((inc) => {
-        if ((inc.status as string) === 'pending') {
-          inc.status = 'proposed'
-        }
-      })
-      const resignedCodesMem = new Set(['NV0024', 'NV0035', 'NV0009', 'NV0020', 'NV0034'])
-      const resignedIdsMem = new Set(['emp-nv0024', 'emp-nv0035', 'emp-nv0009', 'emp-nv0020', 'emp-nv0034'])
-      const resignedNamesMem = new Set(['Tấn Hiếu', 'Nguyễn Mạnh Duy', 'Nguyễn Quỳnh', 'Lê Minh Lộc', 'Nguyễn Thị Kiều Trang', 'Nguyễn Thị Thu'])
-      if (inMemoryCache.employees) {
-        inMemoryCache.employees.forEach((emp) => {
-          if (emp.id === 'emp-bh9852' || emp.employee_code === 'BH-9852' || emp.full_name === 'Huỳnh Lê Kiều Linh') {
-            emp.status = 'active'
-            emp.account_status = 'dang_hoat_dong'
-            emp.store_id = 'store-001'
-          } else if (resignedIdsMem.has(emp.id) || (emp.employee_code && resignedCodesMem.has(emp.employee_code)) || (emp.full_name && resignedNamesMem.has(emp.full_name))) {
-            emp.status = 'resigned'
-            emp.account_status = 'bi_khoa'
-          }
-        })
-      }
-      if (inMemoryCache.shifts) {
-        inMemoryCache.shifts = inMemoryCache.shifts.filter(
-          s => !resignedIdsMem.has(s.employee_id) && (!s.employee_name || !resignedNamesMem.has(s.employee_name))
-        )
-      }
-      if (inMemoryCache.attendance) {
-        inMemoryCache.attendance = inMemoryCache.attendance.filter(
-          a => !resignedIdsMem.has(a.employee_id) && (!a.employee_code || !resignedCodesMem.has(a.employee_code)) && (!a.employee_name || !resignedNamesMem.has(a.employee_name))
-        )
-      }
-      return inMemoryCache
-    }
+const RESIGNED_CODES = new Set(['NV0024', 'NV0035', 'NV0009', 'NV0020', 'NV0034'])
+const RESIGNED_IDS = new Set(['emp-nv0024', 'emp-nv0035', 'emp-nv0009', 'emp-nv0020', 'emp-nv0034'])
+const RESIGNED_NAMES = new Set([
+  'Tấn Hiếu',
+  'Nguyễn Mạnh Duy',
+  'Nguyễn Quỳnh',
+  'Lê Minh Lộc',
+  'Nguyễn Thị Kiều Trang',
+  'Nguyễn Thị Thu',
+])
 
-    const data = await fs.readFile(DB_FILE, 'utf-8')
-    inMemoryCache = JSON.parse(data)
-    let needMigrate = false
-    if (!inMemoryCache!.contracts) {
-      inMemoryCache!.contracts = getInitialContractsSeed()
-    }
-    if (!inMemoryCache!.invitations || inMemoryCache!.invitations.length === 0) {
-      inMemoryCache!.invitations = getInitialInvitationsSeed()
-    }
-    if (!inMemoryCache!.bsc_targets || inMemoryCache!.bsc_targets.length === 0) {
-      inMemoryCache!.bsc_targets = getInitialBscTargetsSeed()
-    }
-    if (!inMemoryCache!.bsc_logs || inMemoryCache!.bsc_logs.length === 0) {
-      inMemoryCache!.bsc_logs = getInitialBscLogsSeed()
-    }
-    if (!inMemoryCache!.bsc_settings) {
-      inMemoryCache!.bsc_settings = getInitialBscSettingsSeed()
-    }
-    if (!inMemoryCache!.shifts) {
-      inMemoryCache!.shifts = []
-    }
-    if (!inMemoryCache!.attendance) {
-      inMemoryCache!.attendance = []
-    }
-    if (!inMemoryCache!.ipos_integration) {
-      inMemoryCache!.ipos_integration = {
-        is_enabled: true,
-        api_endpoint: 'https://hrm.ipos.vn',
-        username: 'nghianguyen.dk@gmail.com',
-        token_or_password: 'Ducnghia1',
-        store_codes: ['HBP', '429'],
-        sync_schedule: 'every_2_hours',
-        sync_attendance: true,
-        sync_payroll: true,
-        sync_employees: true,
-        sync_shifts: true,
-        sync_pos_revenue: false,
-        sync_inventory: false,
-        is_authenticated: true,
-        last_sync_status: 'success',
-        sync_logs: [],
-        hrm_jwt_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im5naGlhbmd1eWVuLmRrQGdtYWlsLmNvbSIsImFjY291bnRfaWQiOiI5ZjExY2MzZC1lODRiLTQyZjktOTZiNS0xMDE1YTM5MDk1MWYiLCJlbXBsb3llZV9pZCI6Ijk5Yjg5YTQ0LWYwMzEtNGRjYS1iY2M1LWU5N2Q5OWQwOGEwZCIsImNvbXBhbnlfaWQiOiI3Y2VkMzYxYS1iODQ0LTQ0NzAtOGU5Ny01MjJhNzM2Njc2OWIiLCJsb2dpbl9ieSI6IklBTSIsImV4cCI6MTc5NjM0MjQ5OX0.kHGu53KlgCRJVsHAQe1TcoHrYz8ZuP8NEykyEjyDzJ4',
-        hrm_user: {
-          id: '9f11cc3d-e84b-42f9-96b5-1015a390951f',
-          name: 'Nguyễn Đức Nghĩa',
-          email: 'nghianguyen.dk@gmail.com',
-          phone: '0981998122',
-          role: 'Chủ thương hiệu',
-        },
-        hrm_company: {
-          id: '7ced361a-b844-4470-8e97-522a7366769b',
-          name: 'Trà Sữa Phô Mai Tươi Đài Loan Homies',
-          code: 'GLRZ7YR81ZBE',
-        },
-      }
-    }
-    if (!inMemoryCache!.incidents || inMemoryCache!.incidents.length === 0) {
-      inMemoryCache!.incidents = getInitialIncidentsSeed()
-    }
-
-    // Chuẩn hóa trạng thái chờ duyệt của sự cố (pending -> proposed)
-    if (inMemoryCache?.incidents) {
-      inMemoryCache.incidents.forEach((inc) => {
-        if ((inc.status as string) === 'pending') {
-          inc.status = 'proposed'
-        }
-      })
-    }
-
-    // Tự động nâng cấp mật khẩu còn ở dạng thường sang chuẩn mã hóa an toàn PBKDF2
-    if (inMemoryCache?.employees) {
-      inMemoryCache.employees.forEach((emp) => {
-        if (emp.password && !emp.password.startsWith('pbkdf2:')) {
-          emp.password = hashPassword(emp.password)
-          needMigrate = true
-        }
-      })
-    }
-
-    // Đồng bộ trạng thái nhân sự đã nghỉ việc và loại bỏ chấm công, ca làm việc của họ
-    const resignedCodes = new Set(['NV0024', 'NV0035', 'NV0009', 'NV0020', 'NV0034'])
-    const resignedIds = new Set(['emp-nv0024', 'emp-nv0035', 'emp-nv0009', 'emp-nv0020', 'emp-nv0034'])
-    const resignedNames = new Set(['Tấn Hiếu', 'Nguyễn Mạnh Duy', 'Nguyễn Quỳnh', 'Lê Minh Lộc', 'Nguyễn Thị Kiều Trang', 'Nguyễn Thị Thu'])
-
-    if (inMemoryCache?.employees) {
-      inMemoryCache.employees.forEach((emp) => {
-        if (emp.id === 'emp-bh9852' || emp.employee_code === 'BH-9852' || emp.full_name === 'Huỳnh Lê Kiều Linh') {
-          if (emp.status !== 'active' || emp.account_status !== 'dang_hoat_dong') {
-            emp.status = 'active'
-            emp.account_status = 'dang_hoat_dong'
-            emp.store_id = 'store-001'
-            needMigrate = true
-          }
-        } else if (resignedIds.has(emp.id) || (emp.employee_code && resignedCodes.has(emp.employee_code)) || (emp.full_name && resignedNames.has(emp.full_name))) {
-          if (emp.status !== 'resigned' || emp.account_status !== 'bi_khoa') {
-            emp.status = 'resigned'
-            emp.account_status = 'bi_khoa'
-            needMigrate = true
-          }
-        }
-      })
-    }
-
-    if (inMemoryCache?.shifts) {
-      const prevShiftsCount = inMemoryCache.shifts.length
-      inMemoryCache.shifts = inMemoryCache.shifts.filter(
-        s => !resignedIds.has(s.employee_id) && (!s.employee_name || !resignedNames.has(s.employee_name))
-      )
-      if (inMemoryCache.shifts.length !== prevShiftsCount) {
-        needMigrate = true
-      }
-    }
-
-    if (inMemoryCache?.attendance) {
-      const prevAttCount = inMemoryCache.attendance.length
-      inMemoryCache.attendance = inMemoryCache.attendance.filter(
-        a => !resignedIds.has(a.employee_id) && (!a.employee_code || !resignedCodes.has(a.employee_code)) && (!a.employee_name || !resignedNames.has(a.employee_name))
-      )
-      if (inMemoryCache.attendance.length !== prevAttCount) {
-        needMigrate = true
-      }
-    }
-
-    if (needMigrate && inMemoryCache) {
-      await saveServerDb(inMemoryCache)
-    }
-
-    if (stat) lastMtime = stat.mtimeMs
-    return inMemoryCache!
-  } catch {
-    let initial: ServerDatabaseSchema
-    try {
-      const bundledPath = path.join(process.cwd(), 'data', 'server-db.json')
-      const bundledData = await fs.readFile(bundledPath, 'utf-8')
-      initial = JSON.parse(bundledData) as ServerDatabaseSchema
-      if (!initial.bsc_logs || initial.bsc_logs.length === 0) {
-        initial.bsc_logs = getInitialBscLogsSeed()
-      }
-      if (!initial.incidents || initial.incidents.length === 0) {
-        initial.incidents = getInitialIncidentsSeed()
-      }
-      if (!initial.shifts || initial.shifts.length < 20) {
-        initial.shifts = getInitialShiftsSeed()
-      }
-      if (!initial.attendance || initial.attendance.length < 50) {
-        initial.attendance = getInitialAttendanceSeed()
-      }
-    } catch {
-      initial = getInitialSeedData()
-    }
-    try {
-      await fs.mkdir(DATA_DIR, { recursive: true })
-      await fs.writeFile(DB_FILE, JSON.stringify(initial, null, 2), 'utf-8')
-    } catch {
-      // Bỏ qua lỗi ghi đĩa trên môi trường serverless
-    }
-    inMemoryCache = initial
-    return inMemoryCache
+function getDefaultIposIntegrationConfig(): ServerIposIntegrationConfig {
+  return {
+    is_enabled: true,
+    api_endpoint: 'https://hrm.ipos.vn',
+    username: 'nghianguyen.dk@gmail.com',
+    token_or_password: 'Ducnghia1',
+    store_codes: ['HBP', '429'],
+    sync_schedule: 'every_2_hours',
+    sync_attendance: true,
+    sync_payroll: true,
+    sync_employees: true,
+    sync_shifts: true,
+    sync_pos_revenue: false,
+    sync_inventory: false,
+    is_authenticated: true,
+    last_sync_status: 'success',
+    sync_logs: [],
+    hrm_jwt_token:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im5naGlhbmd1eWVuLmRrQGdtYWlsLmNvbSIsImFjY291bnRfaWQiOiI5ZjExY2MzZC1lODRiLTQyZjktOTZiNS0xMDE1YTM5MDk1MWYiLCJlbXBsb3llZV9pZCI6Ijk5Yjg5YTQ0LWYwMzEtNGRjYS1iY2M1LWU5N2Q5OWQwOGEwZCIsImNvbXBhbnlfaWQiOiI3Y2VkMzYxYS1iODQ0LTQ0NzAtOGU5Ny01MjJhNzM2Njc2OWIiLCJsb2dpbl9ieSI6IklBTSIsImV4cCI6MTc5NjM0MjQ5OX0.kHGu53KlgCRJVsHAQe1TcoHrYz8ZuP8NEykyEjyDzJ4',
+    hrm_user: {
+      id: '9f11cc3d-e84b-42f9-96b5-1015a390951f',
+      name: 'Nguyễn Đức Nghĩa',
+      email: 'nghianguyen.dk@gmail.com',
+      phone: '0981998122',
+      role: 'Chủ thương hiệu',
+    },
+    hrm_company: {
+      id: '7ced361a-b844-4470-8e97-522a7366769b',
+      name: 'Trà Sữa Phô Mai Tươi Đài Loan Homies',
+      code: 'GLRZ7YR81ZBE',
+    },
   }
 }
 
-export async function saveServerDb(db: ServerDatabaseSchema): Promise<void> {
-  inMemoryCache = db
+function normalizeServerDb(db: ServerDatabaseSchema): { db: ServerDatabaseSchema; migrated: boolean } {
+  let migrated = false
+
+  if (!db.contracts) db.contracts = getInitialContractsSeed()
+  if (!db.invitations || db.invitations.length === 0) db.invitations = getInitialInvitationsSeed()
+  if (!db.bsc_targets || db.bsc_targets.length === 0) db.bsc_targets = getInitialBscTargetsSeed()
+  if (!db.bsc_logs || db.bsc_logs.length === 0) db.bsc_logs = getInitialBscLogsSeed()
+  if (!db.bsc_settings) db.bsc_settings = getInitialBscSettingsSeed()
+  if (!db.shifts) db.shifts = []
+  if (!db.attendance) db.attendance = []
+  if (!db.sessions) db.sessions = {}
+  if (!db.ipos_integration) db.ipos_integration = getDefaultIposIntegrationConfig()
+  if (!db.incidents || db.incidents.length === 0) db.incidents = getInitialIncidentsSeed()
+
+  db.incidents.forEach((inc) => {
+    if ((inc.status as string) === 'pending') {
+      inc.status = 'proposed'
+    }
+  })
+
+  if (db.employees) {
+    db.employees.forEach((emp) => {
+      if (emp.password && !emp.password.startsWith('pbkdf2:')) {
+        emp.password = hashPassword(emp.password)
+        migrated = true
+      }
+
+      if (emp.id === 'emp-bh9852' || emp.employee_code === 'BH-9852' || emp.full_name === 'Huỳnh Lê Kiều Linh') {
+        if (emp.status !== 'active' || emp.account_status !== 'dang_hoat_dong' || emp.store_id !== 'store-001') {
+          emp.status = 'active'
+          emp.account_status = 'dang_hoat_dong'
+          emp.store_id = 'store-001'
+          migrated = true
+        }
+      } else if (
+        RESIGNED_IDS.has(emp.id) ||
+        (emp.employee_code && RESIGNED_CODES.has(emp.employee_code)) ||
+        (emp.full_name && RESIGNED_NAMES.has(emp.full_name))
+      ) {
+        if (emp.status !== 'resigned' || emp.account_status !== 'bi_khoa') {
+          emp.status = 'resigned'
+          emp.account_status = 'bi_khoa'
+          migrated = true
+        }
+      }
+    })
+  }
+
+  const prevShiftsCount = db.shifts.length
+  db.shifts = db.shifts.filter(
+    s => !RESIGNED_IDS.has(s.employee_id) && (!s.employee_name || !RESIGNED_NAMES.has(s.employee_name))
+  )
+  if (db.shifts.length !== prevShiftsCount) migrated = true
+
+  const prevAttCount = db.attendance.length
+  db.attendance = db.attendance.filter(
+    a =>
+      !RESIGNED_IDS.has(a.employee_id) &&
+      (!a.employee_code || !RESIGNED_CODES.has(a.employee_code)) &&
+      (!a.employee_name || !RESIGNED_NAMES.has(a.employee_name))
+  )
+  if (db.attendance.length !== prevAttCount) migrated = true
+
+  return { db, migrated }
+}
+
+async function loadLocalDbBaseline(): Promise<ServerDatabaseSchema> {
+  try {
+    const raw = await fs.readFile(DB_FILE, 'utf-8')
+    return JSON.parse(raw) as ServerDatabaseSchema
+  } catch {
+    try {
+      const bundledPath = path.join(process.cwd(), 'data', 'server-db.json')
+      const bundledData = await fs.readFile(bundledPath, 'utf-8')
+      const initial = JSON.parse(bundledData) as ServerDatabaseSchema
+      if (!initial.shifts || initial.shifts.length < 20) initial.shifts = getInitialShiftsSeed()
+      if (!initial.attendance || initial.attendance.length < 50) initial.attendance = getInitialAttendanceSeed()
+      return initial
+    } catch {
+      return getInitialSeedData()
+    }
+  }
+}
+
+async function mirrorDbToLocalFile(db: ServerDatabaseSchema): Promise<void> {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true })
     await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), 'utf-8')
     const stat = await fs.stat(DB_FILE).catch(() => null)
     if (stat) lastMtime = stat.mtimeMs
   } catch {
-    // Bỏ qua lỗi ghi đĩa trên môi trường serverless, inMemoryCache vẫn giữ dữ liệu
+    // Bỏ qua lỗi ghi đĩa trên môi trường serverless, inMemoryCache / Supabase vẫn giữ dữ liệu
+  }
+}
+
+export async function getServerDb(): Promise<ServerDatabaseSchema> {
+  // 1. Fast path khi bộ nhớ đệm đám mây còn tươi (trong 5 giây)
+  if (inMemoryCache && lastCloudSyncAt > 0 && Date.now() - lastCloudSyncAt < CLOUD_CACHE_TTL_MS) {
+    return normalizeServerDb(inMemoryCache).db
+  }
+
+  // 2. Ưu tiên đọc từ Supabase Cloud khi cấu hình sống (bền vững cho Vercel Serverless)
+  const cloudRes = await loadCollectionsFromSupabase()
+  if (cloudRes.ok) {
+    if (!cloudRes.empty && cloudRes.collections) {
+      const merged = Object.assign({}, getInitialSeedData(), cloudRes.collections) as ServerDatabaseSchema
+      const { db, migrated } = normalizeServerDb(merged)
+      inMemoryCache = db
+      lastCloudSyncAt = Date.now()
+      await mirrorDbToLocalFile(db)
+      if (migrated) {
+        await saveCollectionsToSupabase(db as unknown as Record<string, unknown>)
+      }
+      return inMemoryCache
+    }
+
+    // Bảng trên Supabase mới tạo còn trống -> tự động nạp dữ liệu nền ban đầu lên Đám Mây
+    const baseline = await loadLocalDbBaseline()
+    const { db } = normalizeServerDb(baseline)
+    await saveCollectionsToSupabase(db as unknown as Record<string, unknown>, { forceAll: true })
+    inMemoryCache = db
+    lastCloudSyncAt = Date.now()
+    await mirrorDbToLocalFile(db)
+    return inMemoryCache
+  }
+
+  // 3. Dự phòng file nội bộ (khi chạy local không có mạng / Supabase chưa cấu hình)
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true })
+    const stat = await fs.stat(DB_FILE).catch(() => null)
+    if (inMemoryCache && stat && stat.mtimeMs === lastMtime) {
+      return normalizeServerDb(inMemoryCache).db
+    }
+
+    const data = await fs.readFile(DB_FILE, 'utf-8')
+    const parsed = JSON.parse(data) as ServerDatabaseSchema
+    const { db, migrated } = normalizeServerDb(parsed)
+    inMemoryCache = db
+
+    if (migrated) {
+      await saveServerDb(inMemoryCache)
+    }
+    if (stat) lastMtime = stat.mtimeMs
+    return inMemoryCache
+  } catch {
+    const initial = await loadLocalDbBaseline()
+    const { db } = normalizeServerDb(initial)
+    inMemoryCache = db
+    await mirrorDbToLocalFile(inMemoryCache)
+    return inMemoryCache
+  }
+}
+
+export async function saveServerDb(db: ServerDatabaseSchema): Promise<void> {
+  inMemoryCache = db
+  await mirrorDbToLocalFile(db)
+  const synced = await saveCollectionsToSupabase(db as unknown as Record<string, unknown>)
+  if (synced) {
+    lastCloudSyncAt = Date.now()
   }
 }
 
 export function clearServerDbCache(): void {
   inMemoryCache = null
   lastMtime = 0
+  lastCloudSyncAt = 0
 }
 
 // ============================================================

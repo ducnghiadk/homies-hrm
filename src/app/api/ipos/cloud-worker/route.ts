@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb, type ServerIposIntegrationConfig, type ServerIposSyncLog } from '@/lib/server/db'
 import { getAuthenticatedUser, hasRequiredRole } from '@/lib/server/auth-helper'
 import { getEffectiveDataMode } from '@/lib/server/data-mode'
+import { getStorageStatus } from '@/lib/server/supabase-store'
 import { normalizeIposData } from '@/lib/services/ipos/ipos-normalizer'
 import {
   getSchemaStatus,
@@ -120,7 +121,11 @@ export async function GET(req: NextRequest) {
     // Tự động đồng bộ phiên từ Cookie
     hydrateFromCookieOrPayload(req, null, db.ipos_integration)
 
-    const schemaStatus = await getSchemaStatus()
+    const forceCheckStorage = req.nextUrl.searchParams.get('check_storage') === '1'
+    const [schemaStatus, storageStatus] = await Promise.all([
+      getSchemaStatus(),
+      getStorageStatus({ forceCheck: forceCheckStorage }),
+    ])
     const isAuth = Boolean(db.ipos_integration.is_authenticated)
     const dataMode = getEffectiveDataMode(db)
     const serverStatus = !db.ipos_integration.is_enabled
@@ -134,6 +139,7 @@ export async function GET(req: NextRequest) {
         success: true,
         config: db.ipos_integration,
         data_mode: dataMode,
+        storage_status: storageStatus,
         schema_status: schemaStatus,
         server_status: serverStatus,
         latency_ms: isAuth && db.ipos_integration.is_enabled ? 68 : null,

@@ -15,8 +15,21 @@ import {
   Lock,
   Settings,
   Info,
+  HardDrive,
+  AlertTriangle,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth-store'
+
+export interface StorageStatusClient {
+  provider: 'supabase_cloud' | 'local_file'
+  status: 'connected' | 'unconfigured' | 'table_missing' | 'auth_error' | 'unreachable'
+  ready_for_vercel: boolean
+  using_service_role: boolean
+  supabase_host: string | null
+  reason: string
+  last_checked_at: string | null
+  last_synced_at: string | null
+}
 
 export interface EffectiveDataModeClient {
   mode: 'ipos' | 'homies_native'
@@ -51,6 +64,7 @@ export default function DataSourceStatusBadge() {
   const [modeError, setModeError] = useState<string | null>(null)
   const [latencyMs, setLatencyMs] = useState<number | null>(null)
   const [dataMode, setDataMode] = useState<EffectiveDataModeClient | null>(null)
+  const [storageStatus, setStorageStatus] = useState<StorageStatusClient | null>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
 
   const [modules, setModules] = useState<ModuleHealth[]>([
@@ -61,7 +75,7 @@ export default function DataSourceStatusBadge() {
     { name: 'Cầu nối iPOS Cloud', table: 'ipos_bridge', count: null, badgeText: 'Kiểm tra...', badgeTone: 'loading' },
   ])
 
-  const checkLiveStatus = useCallback(async () => {
+  const checkLiveStatus = useCallback(async (forceStorageProbe = false) => {
     setIsChecking(true)
     const startTime = performance.now()
 
@@ -73,9 +87,13 @@ export default function DataSourceStatusBadge() {
     }
 
     try {
-      const iposRes = await fetch('/api/ipos/cloud-worker', { cache: 'no-store' })
+      const workerUrl = forceStorageProbe ? '/api/ipos/cloud-worker?check_storage=1' : '/api/ipos/cloud-worker'
+      const iposRes = await fetch(workerUrl, { cache: 'no-store' })
       if (iposRes.ok) {
         const json = await iposRes.json()
+        if (json.storage_status) {
+          setStorageStatus(json.storage_status)
+        }
         if (json.config && typeof window !== 'undefined') {
           try {
             localStorage.setItem(IPOS_STORAGE_KEY, JSON.stringify(json.config))
@@ -308,10 +326,10 @@ export default function DataSourceStatusBadge() {
 
             <button
               type="button"
-              onClick={checkLiveStatus}
+              onClick={() => checkLiveStatus(true)}
               disabled={isChecking}
               className="p-1.5 text-gray-400 hover:text-[#2F6FA8] hover:bg-gray-50 rounded-lg transition-all cursor-pointer"
-              title="Kiểm tra lại trạng thái"
+              title="Kiểm tra lại kết nối iPOS & Supabase"
             >
               <RefreshCw size={14} className={isChecking ? 'animate-spin text-[#2F6FA8]' : ''} />
             </button>
@@ -413,6 +431,38 @@ export default function DataSourceStatusBadge() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* Kho Lưu Trữ Dữ Liệu (Vercel Deploy Readiness) */}
+          {storageStatus && (
+            <div
+              className={`mb-3 p-2.5 rounded-xl border space-y-1 ${
+                storageStatus.ready_for_vercel
+                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                  : 'bg-amber-50/70 border-amber-200 text-amber-900'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {storageStatus.ready_for_vercel ? (
+                    <HardDrive size={14} className="text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                  )}
+                  <span className="text-xs font-bold truncate">
+                    {storageStatus.ready_for_vercel
+                      ? 'Supabase Đám Mây — Sẵn sàng Deploy'
+                      : 'File Nội Bộ — Cần nối Supabase mới'}
+                  </span>
+                </div>
+                {storageStatus.supabase_host && (
+                  <span className="text-[10px] font-mono text-gray-500 shrink-0 truncate max-w-[120px]">
+                    {storageStatus.supabase_host}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] leading-snug opacity-90">{storageStatus.reason}</p>
             </div>
           )}
 

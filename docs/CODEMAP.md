@@ -184,6 +184,11 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - File chinh: `src/lib/server/data-mode.ts`, `src/app/api/ipos/cloud-worker/route.ts`, `src/components/ui/DataSourceStatusBadge.tsx`, `src/app/api/employees/route.ts`, `src/app/api/shifts/route.ts`, `src/app/api/shifts/register/route.ts`, `src/app/api/attendance/route.ts`
 - Dung khi: sua logic bat/tat dong bo iPOS vs che do tu van hanh doc lap.
 
+### Luu tru Dam may Supabase & Trien khai Vercel (Pass C)
+- Mo ta: Lop luu tru ben vung qua bang `public.homies_runtime_store` tren Supabase cho moi route `/api/*` khi deploy Vercel Serverless (diffed upsert theo collection, timeout 3s, circuit breaker 60s khi offline/URL cu chet va tu nap du lieu nen lan dau). Hien thi trang thai san sang tren Header Badge (`storage_status`).
+- File chinh: `src/lib/server/supabase-store.ts`, `src/lib/server/db.ts`, `supabase/schema_v5_runtime_persistence.sql`, `docs/DEPLOY_VERCEL_SUPABASE.md`, `src/app/api/ipos/cloud-worker/route.ts`, `src/components/ui/DataSourceStatusBadge.tsx`
+- Dung khi: sua luu tru dam may Supabase, bao mat `SUPABASE_SERVICE_ROLE_KEY`, hoac huong dan deploy Vercel.
+
 ### Xac thuc demo va role
 - Mo ta: dang nhap mock, user hien tai, role label, nho phien dang nhap.
 - File chinh: `src/store/auth-store.ts`, `src/components/auth/ProtectedRoute.tsx`, `src/components/auth/RoleGuard.tsx`, `src/proxy.ts`, `src/lib/rbac.ts`, `src/proxy-access.test.ts`
