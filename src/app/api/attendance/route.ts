@@ -7,6 +7,7 @@ import {
   ServerEmployee,
   ServerShiftRegistration,
 } from '@/lib/server/db'
+import { isIposMasterEnabled, isIposModuleEnabled } from '@/lib/server/data-mode'
 import {
   fetchIposTimesheet,
   fetchIposEmployees,
@@ -167,44 +168,62 @@ async function persistIposSchedulesToDb(items: MappedIposSchedule[]): Promise<nu
 
 // Khởi chạy bộ đồng bộ ngầm toàn diện tự động mỗi 10 phút trên máy chủ
 ensureIposBackgroundSyncDaemon(async () => {
+  const db = await getServerDb()
+  if (!isIposMasterEnabled(db)) {
+    return
+  }
+
   const now = new Date()
   const yearMonth = now.toISOString().slice(0, 7)
   const fromDate = `${yearMonth}-01`
   const toDate = `${yearMonth}-31`
 
-  // 1. Tự động đồng bộ Chấm công (Timesheet)
-  const res = await fetchIposTimesheet({
-    storeId: 'ALL',
-    fromDate,
-    toDate,
-    forceRefresh: true,
-  })
-  if (res.success && !res.isFallback && res.data.length > 0) {
-    await persistIposAttendanceToDb(res.data)
+  let attendanceSyncedCount = 0
+  let employeesSyncedCount: number | undefined
+  let shiftsSyncedCount: number | undefined
+
+  // 1. Tự động đồng bộ Chấm công (Timesheet) nếu công tắc Chấm công đang BẬT
+  if (isIposModuleEnabled(db, 'attendance')) {
+    const res = await fetchIposTimesheet({
+      storeId: 'ALL',
+      fromDate,
+      toDate,
+      forceRefresh: true,
+    })
+    if (res.success && !res.isFallback && res.data.length > 0) {
+      await persistIposAttendanceToDb(res.data)
+      attendanceSyncedCount = res.data.length
+    }
   }
 
-  // 2. Tự động đồng bộ Nhân sự (Employees)
-  const empRes = await fetchIposEmployees()
-  if (empRes.success && !empRes.isFallback && empRes.data.length > 0) {
-    await persistIposEmployeesToDb(empRes.data)
+  // 2. Tự động đồng bộ Nhân sự (Employees) nếu công tắc Nhân sự đang BẬT
+  if (isIposModuleEnabled(db, 'employees')) {
+    const empRes = await fetchIposEmployees()
+    if (empRes.success && !empRes.isFallback && empRes.data.length > 0) {
+      await persistIposEmployeesToDb(empRes.data)
+      employeesSyncedCount = empRes.data.length
+    }
   }
 
-  // 3. Tự động đồng bộ Lịch phân ca (Work Schedules)
-  const schedRes = await fetchIposWorkSchedule({
-    storeId: 'ALL',
-    fromDate,
-    toDate,
-  })
-  if (schedRes.success && !schedRes.isFallback && schedRes.data.length > 0) {
-    await persistIposSchedulesToDb(schedRes.data)
+  // 3. Tự động đồng bộ Lịch phân ca (Work Schedules) nếu công tắc Lịch ca đang BẬT
+  if (isIposModuleEnabled(db, 'shifts')) {
+    const schedRes = await fetchIposWorkSchedule({
+      storeId: 'ALL',
+      fromDate,
+      toDate,
+    })
+    if (schedRes.success && !schedRes.isFallback && schedRes.data.length > 0) {
+      await persistIposSchedulesToDb(schedRes.data)
+      shiftsSyncedCount = schedRes.data.length
+    }
   }
 
-  // Phát thông báo đa kênh (Quả chuông In-App + Telegram/Zalo)
-  if (res.success && !res.isFallback && res.data.length > 0) {
+  // Phát thông báo đa kênh (Quả chuông In-App + Telegram/Zalo) khi có đồng bộ thực tế
+  if (attendanceSyncedCount > 0) {
     await sendIposSyncAlert({
-      attendanceCount: res.data.length,
-      employeesCount: empRes.success ? empRes.data.length : undefined,
-      shiftsCount: schedRes.success ? schedRes.data.length : undefined,
+      attendanceCount: attendanceSyncedCount,
+      employeesCount: employeesSyncedCount,
+      shiftsCount: shiftsSyncedCount,
       storeName: 'Tất cả chi nhánh',
       triggerType: 'auto',
     })
@@ -231,38 +250,47 @@ export async function GET(req: NextRequest) {
       toDate = `${month}-31`
     }
 
-    // 1. Thử tải dữ liệu chấm công trực tiếp từ iPOS Cloud
-    const iposRes = await fetchIposTimesheet({
-      storeId,
-      fromDate,
-      toDate,
-      forceRefresh,
-    })
+    const db = await getServerDb()
+    const useIposAttendance = isIposModuleEnabled(db, 'attendance')
 
     let list: Array<ServerAttendanceLog | MappedIposAttendance> = []
-    let dataSource = 'ipos_cloud'
+    let dataSource = 'homies_native'
     let syncedFromIposCount = 0
 
-    if (iposRes.success && !iposRes.isFallback && iposRes.data.length > 0) {
-      list = iposRes.data
-      syncedFromIposCount = iposRes.data.length
+    if (useIposAttendance) {
+      // 1. Thử tải dữ liệu chấm công trực tiếp từ iPOS Cloud khi công tắc Chấm công đang BẬT
+      const iposRes = await fetchIposTimesheet({
+        storeId,
+        fromDate,
+        toDate,
+        forceRefresh,
+      })
 
-      if (forceRefresh) {
-        await persistIposAttendanceToDb(iposRes.data)
-        sendIposSyncAlert({
-          attendanceCount: iposRes.data.length,
-          period: `${fromDate} đến ${toDate}`,
-          storeName: storeId || 'ALL',
-          triggerType: 'manual',
-        }).catch(() => {})
+      if (iposRes.success && !iposRes.isFallback && iposRes.data.length > 0) {
+        list = iposRes.data
+        dataSource = 'ipos_cloud'
+        syncedFromIposCount = iposRes.data.length
+
+        if (forceRefresh) {
+          await persistIposAttendanceToDb(iposRes.data)
+          sendIposSyncAlert({
+            attendanceCount: iposRes.data.length,
+            period: `${fromDate} đến ${toDate}`,
+            storeName: storeId || 'ALL',
+            triggerType: 'manual',
+          }).catch(() => {})
+        } else {
+          persistIposAttendanceToDb(iposRes.data).catch(() => {})
+        }
       } else {
-        persistIposAttendanceToDb(iposRes.data).catch(() => {})
+        // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ đã đồng bộ từ iPOS
+        list = db.attendance || []
+        dataSource = 'internal_db'
       }
     } else {
-      // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ đã đồng bộ từ iPOS
-      const db = await getServerDb()
+      // Chế độ Homies Tự Vận Hành: Không gọi iPOS
       list = db.attendance || []
-      dataSource = 'internal_db'
+      dataSource = 'homies_native'
     }
 
     if (storeId && storeId !== 'ALL') {
@@ -289,7 +317,9 @@ export async function GET(req: NextRequest) {
       list = list.filter((a) => a.employee_id === employeeId)
     }
 
-    const effectiveSyncedCount = syncedFromIposCount > 0 ? syncedFromIposCount : list.length
+    const effectiveSyncedCount = useIposAttendance
+      ? (syncedFromIposCount > 0 ? syncedFromIposCount : list.length)
+      : 0
 
     return NextResponse.json({
       success: true,

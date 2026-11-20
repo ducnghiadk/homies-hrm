@@ -41,6 +41,7 @@ export interface RegistrationHeaderAndKpisProps {
   fullCount: number
   filterStatus: 'ALL' | 'RISK' | 'PENDING' | 'APPROVED'
   onSelectFilterStatus: (status: 'ALL' | 'RISK' | 'PENDING' | 'APPROVED') => void
+  dataSource?: 'ipos_cloud' | 'homies_native' | 'internal_db'
 }
 
 export default function RegistrationHeaderAndKpis({
@@ -63,7 +64,10 @@ export default function RegistrationHeaderAndKpis({
   fullCount,
   filterStatus,
   onSelectFilterStatus,
+  dataSource = 'ipos_cloud',
 }: RegistrationHeaderAndKpisProps) {
+  const isHomiesNative = dataSource === 'homies_native'
+  const isInternalDb = dataSource === 'internal_db'
   const currentStore = mockStores.find(s => s.id === selectedStoreId) || mockStores[0]
 
   return (
@@ -90,10 +94,22 @@ export default function RegistrationHeaderAndKpis({
               </h1>
 
               <div className="flex items-center gap-1.5">
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  iPOS Live Data
-                </span>
+                {isHomiesNative ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-blue-50 text-[#2F6FA8] border border-[#2F6FA8]/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#2F6FA8]" />
+                    Homies Tự Vận Hành
+                  </span>
+                ) : isInternalDb ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                    Dữ Liệu Nội Bộ
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    iPOS Live Data
+                  </span>
+                )}
 
                 {pendingTotal > 0 ? (
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200">
@@ -255,8 +271,16 @@ export default function RegistrationHeaderAndKpis({
                 <Layers size={14} className="text-[#2F6FA8]" />
                 Tổng Ca Đăng Ký
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">
-                iPOS Live
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border ${
+                  isHomiesNative
+                    ? 'bg-blue-50 text-[#2F6FA8] border-[#2F6FA8]/30'
+                    : isInternalDb
+                    ? 'bg-slate-100 text-slate-700 border-slate-200'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}
+              >
+                {isHomiesNative ? 'Homies App' : isInternalDb ? 'Nội bộ' : 'iPOS Live'}
               </span>
             </div>
 

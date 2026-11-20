@@ -48,6 +48,7 @@ export default function ShiftRegistrationsHeatmapPage() {
   const [isZaloModalOpen, setIsZaloModalOpen] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [dataVersion, setDataVersion] = useState(0)
+  const [dataSource, setDataSource] = useState<'ipos_cloud' | 'homies_native' | 'internal_db'>('ipos_cloud')
   const [toastNotice, setToastNotice] = useState<{ message: string; type: 'success' | 'info' } | null>(null)
 
   // Hiển thị thông báo Toast nhanh
@@ -58,11 +59,21 @@ export default function ShiftRegistrationsHeatmapPage() {
     }, 3000)
   }, [])
 
-  // Đồng bộ ca đăng ký từ Database máy chủ
+  // Đồng bộ ca đăng ký từ Database máy chủ & kiểm tra chế độ iPOS / Homies Tự Vận Hành
   const syncData = useCallback(async (storeId: string, week: string) => {
     setIsSyncing(true)
     try {
-      await ShiftRegistrationService.syncRegistrationsFromServer(storeId, week)
+      const [modeRes] = await Promise.all([
+        fetch('/api/ipos/cloud-worker', { cache: 'no-store' }).catch(() => null),
+        ShiftRegistrationService.syncRegistrationsFromServer(storeId, week),
+      ])
+      if (modeRes && modeRes.ok) {
+        const modeJson = await modeRes.json().catch(() => null)
+        const shiftsEnabled = modeJson?.data_mode
+          ? Boolean(modeJson.data_mode.ipos_master_enabled && modeJson.data_mode.modules?.shifts)
+          : modeJson?.config?.is_enabled !== false && modeJson?.config?.sync_shifts !== false
+        setDataSource(shiftsEnabled ? 'ipos_cloud' : 'homies_native')
+      }
       setDataVersion(v => v + 1)
     } catch (err) {
       console.error('Lỗi khi đồng bộ ca đăng ký:', err)
@@ -75,6 +86,26 @@ export default function ShiftRegistrationsHeatmapPage() {
     if (selectedStoreId && selectedWeek) {
       syncData(selectedStoreId, selectedWeek)
     }
+  }, [selectedStoreId, selectedWeek, syncData])
+
+  // Tự động cập nhật ngay khi gạt Công tắc Vận hành trên thanh Header
+  useEffect(() => {
+    const handleModeChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        ipos_master_enabled?: boolean
+        modules?: { shifts?: boolean }
+      }>
+      const detail = customEvent.detail
+      if (detail) {
+        const shiftsEnabled = Boolean(detail.ipos_master_enabled && detail.modules?.shifts)
+        setDataSource(shiftsEnabled ? 'ipos_cloud' : 'homies_native')
+      }
+      if (selectedStoreId && selectedWeek) {
+        syncData(selectedStoreId, selectedWeek)
+      }
+    }
+    window.addEventListener('homies-data-mode-changed', handleModeChanged)
+    return () => window.removeEventListener('homies-data-mode-changed', handleModeChanged)
   }, [selectedStoreId, selectedWeek, syncData])
 
   // 2. Lấy dữ liệu Coverage & Heatmap & Staff Overview
@@ -230,6 +261,7 @@ export default function ShiftRegistrationsHeatmapPage() {
           fullCount={stats.fullCount}
           filterStatus={filterStatus}
           onSelectFilterStatus={setFilterStatus}
+          dataSource={dataSource}
         />
 
         {/* TẦNG 3: BẢNG MA TRẬN 7X3 & THEO DÕI NHÂN VIÊN */}

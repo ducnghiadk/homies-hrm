@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb, getInitialShiftsSeed, STANDARD_FNB_SHIFTS, type ServerShiftRegistration } from '@/lib/server/db'
+import { isIposModuleEnabled } from '@/lib/server/data-mode'
 import { fetchIposWorkSchedule, type MappedIposSchedule } from '@/lib/services/ipos/ipos-cloud-client'
 
 export async function GET(req: NextRequest) {
@@ -35,22 +36,29 @@ export async function GET(req: NextRequest) {
 
     const db = await getServerDb()
 
-    // 1. Thử tải dữ liệu ca làm việc trực tiếp từ iPOS Cloud
-    const iposRes = await fetchIposWorkSchedule({
-      storeId,
-      fromDate,
-      toDate,
-    })
-
     let list: Array<ServerShiftRegistration | MappedIposSchedule> = []
-    let dataSource = 'ipos_cloud'
+    let dataSource = 'homies_native'
 
-    if (iposRes.success && !iposRes.isFallback && iposRes.data.length > 0) {
-      list = iposRes.data
+    if (isIposModuleEnabled(db, 'shifts')) {
+      // 1. Tải dữ liệu ca làm việc trực tiếp từ iPOS Cloud khi công tắc Lịch ca đang BẬT
+      const iposRes = await fetchIposWorkSchedule({
+        storeId,
+        fromDate,
+        toDate,
+      })
+
+      if (iposRes.success && !iposRes.isFallback && iposRes.data.length > 0) {
+        list = iposRes.data
+        dataSource = 'ipos_cloud'
+      } else {
+        // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ
+        list = db.shifts || []
+        dataSource = 'internal_db'
+      }
     } else {
-      // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ đã đồng bộ từ iPOS
+      // Chế độ Homies Tự Vận Hành: Không gọi iPOS
       list = db.shifts || []
-      dataSource = 'internal_db'
+      dataSource = 'homies_native'
     }
 
     if (storeId && storeId !== 'ALL') {

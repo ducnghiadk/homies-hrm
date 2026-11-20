@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb, ServerShiftRegistration } from '@/lib/server/db'
+import { isIposModuleEnabled } from '@/lib/server/data-mode'
 import { fetchIposShiftRegistrations } from '@/lib/services/ipos/ipos-cloud-client'
 
 // 1. GET: Quản lý lấy danh sách ca đăng ký chờ duyệt từ Database máy chủ & iPOS Cloud
@@ -12,47 +13,57 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status') || 'PENDING'
 
     const db = await getServerDb()
+    let dataSource = 'homies_native'
 
-    // Đồng bộ trực tiếp ca đăng ký rảnh từ iPOS Cloud
-    try {
-      const iposRes = await fetchIposShiftRegistrations({
-        storeId: storeId || undefined,
-        week: week || undefined,
-      })
+    // Đồng bộ trực tiếp ca đăng ký rảnh từ iPOS Cloud nếu công tắc Đăng ký & Lịch ca đang BẬT
+    if (isIposModuleEnabled(db, 'shifts')) {
+      try {
+        const iposRes = await fetchIposShiftRegistrations({
+          storeId: storeId || undefined,
+          week: week || undefined,
+        })
 
-      if (iposRes.success && Array.isArray(iposRes.data) && iposRes.data.length > 0) {
-        if (!db.shifts) db.shifts = []
-        const existingIds = new Set(db.shifts.map((s) => s.id))
-        let hasNew = false
+        if (iposRes.success && !iposRes.isFallback) {
+          dataSource = 'ipos_cloud'
+        } else {
+          dataSource = 'internal_db'
+        }
 
-        for (const item of iposRes.data) {
-          if (!existingIds.has(item.id)) {
-            const newReg: ServerShiftRegistration = {
-              id: item.id,
-              employee_id: item.employee_id,
-              employee_name: item.employee_name,
-              store_id: item.store_id,
-              week_start_date: item.week_start_date,
-              date: item.date,
-              shift_id: item.shift_id,
-              shift_name: item.shift_name,
-              position_id: item.position_id || 'pos-001',
-              status: item.status,
-              created_at: item.created_at,
-              notes: item.notes,
+        if (iposRes.success && Array.isArray(iposRes.data) && iposRes.data.length > 0) {
+          if (!db.shifts) db.shifts = []
+          const existingIds = new Set(db.shifts.map((s) => s.id))
+          let hasNew = false
+
+          for (const item of iposRes.data) {
+            if (!existingIds.has(item.id)) {
+              const newReg: ServerShiftRegistration = {
+                id: item.id,
+                employee_id: item.employee_id,
+                employee_name: item.employee_name,
+                store_id: item.store_id,
+                week_start_date: item.week_start_date,
+                date: item.date,
+                shift_id: item.shift_id,
+                shift_name: item.shift_name,
+                position_id: item.position_id || 'pos-001',
+                status: item.status,
+                created_at: item.created_at,
+                notes: item.notes,
+              }
+              db.shifts.push(newReg)
+              existingIds.add(item.id)
+              hasNew = true
             }
-            db.shifts.push(newReg)
-            existingIds.add(item.id)
-            hasNew = true
+          }
+
+          if (hasNew) {
+            await saveServerDb(db)
           }
         }
-
-        if (hasNew) {
-          await saveServerDb(db)
-        }
+      } catch (iposErr) {
+        dataSource = 'internal_db'
+        console.warn('[API /api/shifts/register] Lỗi đồng bộ từ iPOS Cloud:', iposErr)
       }
-    } catch (iposErr) {
-      console.warn('[API /api/shifts/register] Lỗi đồng bộ từ iPOS Cloud:', iposErr)
     }
 
     let list = db.shifts || []
@@ -75,6 +86,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      source: dataSource,
       count: list.length,
       data: list,
     })

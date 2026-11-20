@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb, ServerEmployee } from '@/lib/server/db'
+import { isIposModuleEnabled } from '@/lib/server/data-mode'
 import { fetchIposEmployees, type MappedIposEmployee } from '@/lib/services/ipos/ipos-cloud-client'
 
 export async function GET(req: NextRequest) {
@@ -9,18 +10,25 @@ export async function GET(req: NextRequest) {
     const role = searchParams.get('role')
     const status = searchParams.get('status')
 
-    // 1. Thử tải dữ liệu trực tiếp từ iPOS Cloud API
-    const iposRes = await fetchIposEmployees()
+    const db = await getServerDb()
     let list: Array<ServerEmployee | MappedIposEmployee> = []
-    let dataSource = 'ipos_cloud'
+    let dataSource = 'homies_native'
 
-    if (iposRes.success && !iposRes.isFallback && iposRes.data.length > 0) {
-      list = iposRes.data
+    if (isIposModuleEnabled(db, 'employees')) {
+      // 1. Tải dữ liệu trực tiếp từ iPOS Cloud API khi công tắc Nhân sự đang BẬT
+      const iposRes = await fetchIposEmployees()
+      if (iposRes.success && !iposRes.isFallback && iposRes.data.length > 0) {
+        list = iposRes.data
+        dataSource = 'ipos_cloud'
+      } else {
+        // 2. Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ
+        list = db.employees || []
+        dataSource = 'internal_db'
+      }
     } else {
-      // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ
-      const db = await getServerDb()
+      // Chế độ Homies Tự Vận Hành: Không gọi iPOS
       list = db.employees || []
-      dataSource = 'internal_db'
+      dataSource = 'homies_native'
     }
 
     if (storeId) {

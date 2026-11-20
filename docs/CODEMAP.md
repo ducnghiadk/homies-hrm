@@ -175,8 +175,13 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 ## App Shell va dieu huong
 ### Khung ung dung & Site Map Tinh Gon (18 Hubs)
 - Mo ta: layout goc, toaster, error boundary, shell, BottomNav va Sidebar duoc tinh gon theo mo hinh 18 Hubs nghiep vu chuan SaaS F&B. Cac route cu/trung lap duoc tu dong chuyen huong qua `next.config.ts`.
-- File chinh: `src/app/layout.tsx`, `src/components/layout/AppShell.tsx`, `src/components/layout/BottomNav.tsx`, `src/components/layout/Header.tsx`, `src/lib/navigation/sidebar-config.ts`, `next.config.ts`
+- File chinh: `src/app/layout.tsx`, `src/components/layout/AppShell.tsx`, `src/components/layout/BottomNav.tsx`, `src/components/layout/Header.tsx`, `src/components/ui/DataSourceStatusBadge.tsx`, `src/lib/navigation/sidebar-config.ts`, `next.config.ts`
 - Dung khi: sua khung chung, dieu huong, bao ve trai nghiem toan app, them redirect hoac sua menu theo role.
+
+### Che do Van hanh & Cong tac Dong bo iPOS (Kieu 1)
+- Mo ta: Cong tac tong (`is_enabled`) chuyen doi toan app giua Dong bo iPOS HRM va Homies Tu Van Hanh, kem cong tac bat/tat le tung phan he (`sync_employees`, `sync_shifts`, `sync_attendance`, `sync_payroll`). Chi CEO va HR Admin duoc doi; khoa tat ca API `/api/employees`, `/api/shifts`, `/api/shifts/register`, `/api/attendance` va daemon dong bo ngam 10 phut khi tat.
+- File chinh: `src/lib/server/data-mode.ts`, `src/app/api/ipos/cloud-worker/route.ts`, `src/components/ui/DataSourceStatusBadge.tsx`, `src/app/api/employees/route.ts`, `src/app/api/shifts/route.ts`, `src/app/api/shifts/register/route.ts`, `src/app/api/attendance/route.ts`
+- Dung khi: sua logic bat/tat dong bo iPOS vs che do tu van hanh doc lap.
 
 ### Xac thuc demo va role
 - Mo ta: dang nhap mock, user hien tai, role label, nho phien dang nhap.

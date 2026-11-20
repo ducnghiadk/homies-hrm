@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb, type ServerIposIntegrationConfig, type ServerIposSyncLog } from '@/lib/server/db'
+import { getAuthenticatedUser, hasRequiredRole } from '@/lib/server/auth-helper'
+import { getEffectiveDataMode } from '@/lib/server/data-mode'
 import { normalizeIposData } from '@/lib/services/ipos/ipos-normalizer'
 import {
   getSchemaStatus,
@@ -120,16 +122,27 @@ export async function GET(req: NextRequest) {
 
     const schemaStatus = await getSchemaStatus()
     const isAuth = Boolean(db.ipos_integration.is_authenticated)
+    const dataMode = getEffectiveDataMode(db)
+    const serverStatus = !db.ipos_integration.is_enabled
+      ? 'disabled'
+      : isAuth
+      ? 'connected'
+      : 'unauthenticated'
 
     return NextResponse.json(
       {
         success: true,
         config: db.ipos_integration,
+        data_mode: dataMode,
         schema_status: schemaStatus,
-        server_status: isAuth ? 'connected' : 'unauthenticated',
-        latency_ms: isAuth ? 68 : null,
+        server_status: serverStatus,
+        latency_ms: isAuth && db.ipos_integration.is_enabled ? 68 : null,
         active_worker: isAuth && db.ipos_integration.is_enabled,
-        next_run: isAuth ? 'Hôm nay lúc 23:59:00' : 'Chưa kích hoạt (Chờ xác thực tài khoản thật)',
+        next_run: !db.ipos_integration.is_enabled
+          ? 'Đã tắt đồng bộ (Homies Tự Vận Hành)'
+          : isAuth
+          ? 'Hôm nay lúc 23:59:00'
+          : 'Chưa kích hoạt (Chờ xác thực tài khoản thật)',
       },
       { status: 200, headers: corsHeaders }
     )
@@ -278,6 +291,49 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 2a. Bật/tắt chế độ Đồng bộ iPOS <-> Homies Tự Vận Hành (Công tắc tổng & từng phân hệ Kiểu 1)
+    if (action === 'set_data_mode') {
+      const auth = await getAuthenticatedUser(req)
+      if (!auth || !hasRequiredRole(auth.role, ['ceo', 'hr_admin'])) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Chỉ Chủ thương hiệu (CEO) hoặc Quản trị nhân sự mới có quyền chuyển đổi chế độ đồng bộ iPOS.',
+          },
+          { status: 403, headers: corsHeaders }
+        )
+      }
+
+      const patch: Partial<ServerIposIntegrationConfig> = {}
+      if (typeof body.is_enabled === 'boolean') patch.is_enabled = body.is_enabled
+      if (typeof body.sync_employees === 'boolean') patch.sync_employees = body.sync_employees
+      if (typeof body.sync_shifts === 'boolean') patch.sync_shifts = body.sync_shifts
+      if (typeof body.sync_attendance === 'boolean') patch.sync_attendance = body.sync_attendance
+      if (typeof body.sync_payroll === 'boolean') patch.sync_payroll = body.sync_payroll
+
+      db.ipos_integration = {
+        ...db.ipos_integration,
+        ...patch,
+        sync_logs: db.ipos_integration.sync_logs || [],
+      }
+      await saveServerDb(db)
+
+      const dataMode = getEffectiveDataMode(db)
+      const statusMsg = dataMode.ipos_master_enabled
+        ? 'Đã bật chế độ Đồng bộ iPOS Cloud.'
+        : 'Đã chuyển sang chế độ Homies Tự Vận Hành độc lập.'
+
+      return NextResponse.json(
+        {
+          success: true,
+          config: db.ipos_integration,
+          data_mode: dataMode,
+          message: statusMsg,
+        },
+        { status: 200, headers: corsHeaders }
+      )
+    }
+
     // 2. Lưu cài đặt tích hợp
     if (action === 'save_config') {
       const newConfig: Partial<ServerIposIntegrationConfig> = body.config || {}
@@ -292,6 +348,7 @@ export async function POST(req: NextRequest) {
         {
           success: true,
           config: db.ipos_integration,
+          data_mode: getEffectiveDataMode(db),
           message: 'Đã lưu cấu hình tích hợp iPOS Cloud thành công!',
         },
         { status: 200, headers: corsHeaders }
