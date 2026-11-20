@@ -742,6 +742,12 @@
   4) Đăng ký ca làm việc: shift-registration-service.ts nối trực tiếp POST /api/shifts/register lên máy chủ CSDL data/server-db.json, gỡ bỏ hoàn toàn localStorage;
   5) Kiểm thử kiểu dữ liệu tsc: npx tsc --noEmit kết thúc mã 0 thành công 100% | file liên quan: src/app/bsc-bonus/page.tsx, src/app/kpi/page.tsx, src/app/login/page.tsx, src/app/payroll/page.tsx, src/app/payroll/salary-slip/page.tsx, src/lib/services/scheduling/shift-registration-service.ts, docs/KNOWN_ISSUES.md
 
+- Đã hoàn thiện 2026-11-20: Khắc phục triệt để thông báo bảo mật "Phát hiện lượt đăng nhập lạ / Thiết bị mới" từ máy chủ iPOS HRM:
+  1) Cố định mã thiết bị (`device_id`) kết nối iPOS: Thay thế hoàn toàn mã UUID ngẫu nhiên bằng mã nhận diện cố định duy nhất `HOMIES-HRM-SERVER-SYNC-OFFICIAL` trong `ipos-hrm-client.ts`, giúp máy chủ iPOS định danh chính xác đây là thiết bị tin cậy quen thuộc của quán;
+  2) Tái sử dụng Token dài hạn trong cấu hình máy chủ: Nạp sẵn `hrm_jwt_token` có hiệu lực đến 12/2026 vào dữ liệu khởi tạo `getInitialSeedData()` trong `src/lib/server/db.ts`, giúp hệ thống trên đám mây (Vercel) lấy dữ liệu chấm công trực tiếp mà không cần gửi Email/Mật khẩu đăng nhập lại;
+  3) Kiểm tra thời hạn Token (`isJwtExpired`): Bổ sung kiểm tra hạn Token trong `ipos-cloud-client.ts`, chặn hoàn toàn việc gọi lại hàm `loginHrm` khi Token hiện tại còn hiệu lực;
+  4) Kiểm tra kiểm thử: `npm run ai:guard` pass, `npx tsc --noEmit` pass 100% không lỗi, `npm run build` tạo thành công 190/190 static routes | file liên quan: src/lib/services/ipos/ipos-hrm-client.ts, src/lib/server/db.ts, src/lib/services/ipos/ipos-cloud-client.ts, docs/KNOWN_ISSUES.md
+
 - Đã hoàn thiện 2026-11-19: Khắc phục triệt để lỗi hiển thị chấm công ma (isFromSchedule) và rò rỉ chấm công chéo cơ sở giữa Hồ Bá Phấn và Đường 429:
   1) Loại bỏ việc tự động bơm ca theo lịch phân ca (`isFromSchedule`) vào Bảng chấm công tuần (`/attendance`): Nhân viên nào không quẹt vân tay thực tế thì ô chấm công hiển thị rỗng (`-`) và tổng giờ là `0h`, loại bỏ hoàn toàn các ca xám hiển thị ảo (như trường hợp Kiều Linh có 15h ca ma dù không quẹt thẻ);
   2) Lọc nghiêm ngặt bản ghi chấm công theo đúng cơ sở đang chọn (`activeStoreId`): Chỉ hiển thị các lượt quẹt thẻ có `storeId` trùng khớp với chi nhánh được lọc; khi chọn Đường 429 (`store-002`), các lượt chấm công của Hồ Bá Phấn (`store-001`) không còn hiển thị hay bị tính cộng dồn;

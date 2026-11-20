@@ -30,11 +30,32 @@ export function getIposCloudConfig(): IposCloudConfig {
 }
 
 /**
+ * Kiểm tra xem JWT Token có bị hết hạn hay không
+ */
+function isJwtExpired(token: string): boolean {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return false
+    const base64Url = parts[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const payloadStr = typeof Buffer !== 'undefined'
+      ? Buffer.from(base64, 'base64').toString('utf8')
+      : atob(base64)
+    const payload = JSON.parse(payloadStr)
+    if (!payload.exp) return false
+    // Token coi là hết hạn nếu exp nhỏ hơn hoặc bằng hiện tại + 60 giây trừ hao
+    return (payload.exp * 1000) <= (Date.now() + 60 * 1000)
+  } catch {
+    return false
+  }
+}
+
+/**
  * Lấy cấu hình iPOS Cloud động: Ưu tiên process.env, sau đó tự động nạp Token từ CSDL server-db (tài khoản đã kết nối)
  */
 export async function getEffectiveIposCloudConfig(): Promise<IposCloudConfig> {
   const base = getIposCloudConfig()
-  if (base.token && base.token.length > 5) {
+  if (base.token && base.token.length > 5 && !isJwtExpired(base.token)) {
     return base
   }
 
@@ -62,10 +83,13 @@ export async function getEffectiveIposCloudConfig(): Promise<IposCloudConfig> {
       } catch {}
     }
 
-    if (iposConfig?.hrm_jwt_token && iposConfig.hrm_jwt_token.length > 5) {
-      base.token = iposConfig.hrm_jwt_token.trim()
+    const existingToken = (iposConfig?.hrm_jwt_token || '').trim()
+    const isExpired = existingToken ? isJwtExpired(existingToken) : true
+
+    if (existingToken && existingToken.length > 5 && !isExpired) {
+      base.token = existingToken
     } else if (iposConfig?.username && iposConfig?.token_or_password) {
-      // Tự động đăng nhập lại bằng thông tin tài khoản đã lưu
+      // Chỉ tự động đăng nhập lại khi token thực sự bị thiếu hoặc đã hết hạn
       let loginHrm: any
       try {
         const hrmMod = await import('@/lib/services/ipos/ipos-hrm-client')

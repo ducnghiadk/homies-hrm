@@ -94,9 +94,9 @@ export async function loginHrm(emailInput: string, passwordInput: string, baseUr
   }
 
   try {
-    const deviceId = typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID().toUpperCase()
-      : 'HOMIES-HRM-NODE-CLIENT-2026'
+    // Mã thiết bị cố định đại diện cho máy chủ Homies Cloud Sync
+    // Tuyệt đối không sinh ngẫu nhiên UUID để tránh iPOS kích hoạt cảnh báo "Phát hiện thiết bị lạ"
+    const deviceId = 'HOMIES-HRM-SERVER-SYNC-OFFICIAL'
 
     const bodyParams = new URLSearchParams()
     bodyParams.append('username', email)
@@ -105,8 +105,8 @@ export async function loginHrm(emailInput: string, passwordInput: string, baseUr
     bodyParams.append('web_app_version', '1.0.0')
     bodyParams.append('os_name', 'Windows')
     bodyParams.append('os_version', '10')
-    bodyParams.append('device_name', 'Chrome')
-    bodyParams.append('device_model', '128.0.0.0')
+    bodyParams.append('device_name', 'Homies Cloud Server')
+    bodyParams.append('device_model', 'Server-Gateway')
     bodyParams.append('device_id', deviceId)
     bodyParams.append('device_push_id', '')
 
