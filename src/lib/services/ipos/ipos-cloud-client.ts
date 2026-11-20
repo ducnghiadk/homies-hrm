@@ -360,6 +360,32 @@ export interface MappedIposSchedule {
   raw_ipos?: Record<string, unknown>
 }
 
+export function getMondayOfWeek(dateStr: string): string {
+  try {
+    const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number)
+    const date = new Date(Date.UTC(y, m - 1, d))
+    const day = date.getUTCDay()
+    const diff = date.getUTCDate() - day + (day === 0 ? -6 : 1)
+    const monday = new Date(Date.UTC(y, m - 1, diff))
+    return monday.toISOString().slice(0, 10)
+  } catch {
+    return dateStr.slice(0, 10)
+  }
+}
+
+export function standardizeShiftId(startTime: string, shiftName?: string): string {
+  const cleanTime = (startTime || '').trim()
+  const cleanName = (shiftName || '').toLowerCase()
+
+  if (cleanName.includes('sáng') || cleanName.includes('morning')) return 'shift-001'
+  if (cleanName.includes('trưa') || cleanName.includes('chiều') || cleanName.includes('afternoon')) return 'shift-002'
+  if (cleanName.includes('tối') || cleanName.includes('đêm') || cleanName.includes('evening') || cleanName.includes('bếp')) return 'shift-003'
+
+  if (cleanTime < '12:00') return 'shift-001'
+  if (cleanTime >= '12:00' && cleanTime < '17:00') return 'shift-002'
+  return 'shift-003'
+}
+
 export async function fetchIposWorkSchedule(params: {
   storeId?: string | null
   fromDate?: string | null
@@ -443,6 +469,10 @@ export async function fetchIposWorkSchedule(params: {
       const schedDate = String(item.date || item.work_date || fromDate)
       const empCode = String(rawEmp.code || item.employee_code || '').trim()
       const empId = empCode && empCode !== '-' ? `emp-${empCode.toLowerCase()}` : String(rawEmp.id || item.employee_id || `emp-${idx}`)
+      const weekStart = getMondayOfWeek(schedDate)
+      const standardShift = standardizeShiftId(startTime, shiftName)
+      const rawStatus = String(item.status || 'APPROVED').toUpperCase()
+      const status: MappedIposSchedule['status'] = rawStatus === 'PUBLISH' || rawStatus === 'APPROVED' ? 'APPROVED' : 'PENDING'
 
       mapped.push({
         id: scheduleId,
@@ -456,10 +486,10 @@ export async function fetchIposWorkSchedule(params: {
         end_time: endTime,
         store_id: homiesStoreId,
         date: schedDate,
-        week_start_date: schedDate,
-        shift_id: String(item.shift_id || rawShift.id || 'shift-001'),
+        week_start_date: weekStart,
+        shift_id: standardShift,
         shift_name: shiftName,
-        status: (String(item.status || 'APPROVED').toUpperCase() as MappedIposSchedule['status']),
+        status,
         created_at: String(item.created_at || new Date().toISOString()),
         raw_ipos: item,
       })
@@ -474,6 +504,165 @@ export async function fetchIposWorkSchedule(params: {
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error)
     console.warn('[iPOS Cloud API] Lỗi khi gọi /work-schedule/list, tự động fallback:', errorMsg)
+    return {
+      success: false,
+      isFallback: true,
+      data: [],
+      error: errorMsg,
+      message: 'Lỗi kết nối iPOS Cloud, tự động sử dụng CSDL nội bộ.',
+    }
+  }
+}
+
+export interface MappedIposShiftRegistration {
+  id: string
+  employee_id: string
+  employee_code?: string
+  employee_name: string
+  store_id: string
+  date: string
+  week_start_date: string
+  shift_id: string
+  shift_name: string
+  start_time: string
+  end_time: string
+  position_id?: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  created_at: string
+  notes?: string
+}
+
+export async function fetchIposShiftRegistrations(params: {
+  storeId?: string | null
+  fromDate?: string | null
+  toDate?: string | null
+  week?: string | null
+}): Promise<IposApiResponse<MappedIposShiftRegistration>> {
+  const config = await getEffectiveIposCloudConfig()
+
+  if (!config.token || config.token.length < 5) {
+    return {
+      success: false,
+      isFallback: true,
+      data: [],
+      message: 'Chưa cấu hình IPOS_HRM_TOKEN. Kích hoạt dự phòng dữ liệu CSDL nội bộ.',
+    }
+  }
+
+  try {
+    const iposStoreId = mapHomiesStoreToIpos(params.storeId)
+    const now = new Date()
+    const todayStr = now.toISOString().slice(0, 10)
+    let fromDate = params.fromDate
+    let toDate = params.toDate
+
+    if (params.week) {
+      fromDate = params.week
+      const wDate = new Date(params.week)
+      wDate.setDate(wDate.getDate() + 6)
+      toDate = wDate.toISOString().slice(0, 10)
+    } else if (!fromDate) {
+      const monThisWeek = getMondayOfWeek(todayStr)
+      fromDate = monThisWeek
+      const d = new Date(monThisWeek)
+      d.setDate(d.getDate() + 13)
+      toDate = d.toISOString().slice(0, 10)
+    } else if (!toDate) {
+      toDate = fromDate
+    }
+
+    const query = new URLSearchParams()
+    if (params.storeId && params.storeId !== 'ALL') {
+      query.set('store_id', iposStoreId)
+    }
+    if (fromDate) query.set('from_date', fromDate)
+    if (toDate) query.set('to_date', toDate)
+
+    const url = `${config.baseUrl}/work-schedule-register/list?${query.toString()}`
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: buildIposHeaders(config.token),
+      signal: AbortSignal.timeout(10000),
+    })
+
+    if (!res.ok) {
+      throw new Error(`iPOS Cloud HTTP ${res.status}: ${res.statusText}`)
+    }
+
+    const json = await res.json()
+    const rawList: Record<string, any>[] = Array.isArray(json)
+      ? json
+      : Array.isArray(json?.data)
+      ? json.data
+      : Array.isArray(json?.items)
+      ? json.items
+      : []
+
+    const mapped: MappedIposShiftRegistration[] = []
+
+    for (let idx = 0; idx < rawList.length; idx++) {
+      const item = rawList[idx]
+      const rawItemStore = String(item.store_id || '')
+      const homiesStoreId = mapIposStoreToHomies(rawItemStore || iposStoreId)
+      if (params.storeId && params.storeId !== 'ALL' && homiesStoreId !== params.storeId) {
+        continue
+      }
+
+      const rawShift = (item.shift_data && typeof item.shift_data === 'object' ? item.shift_data : {}) as Record<string, any>
+      const rawEmp = (
+        (item.employee_data && typeof item.employee_data === 'object' ? item.employee_data : null) ||
+        (Array.isArray(item.arr_employee_data) && typeof item.arr_employee_data[0] === 'object' ? item.arr_employee_data[0] : null) ||
+        (item.employee && typeof item.employee === 'object' ? item.employee : {})
+      ) as Record<string, any>
+
+      const empName = String(
+        rawEmp.full_name ||
+        (rawEmp.first_name && rawEmp.last_name ? `${rawEmp.first_name} ${rawEmp.last_name}` : '') ||
+        rawEmp.name ||
+        item.employee_name ||
+        'Nhân viên'
+      ).trim()
+
+      const empCode = String(rawEmp.code || item.employee_code || '').trim()
+      const empId = empCode && empCode !== '-' ? `emp-${empCode.toLowerCase()}` : String(rawEmp.id || item.employee_id || `emp-reg-${idx}`)
+
+      const startTime = String(rawShift.time_start || item.start_time || '08:30')
+      const endTime = String(rawShift.time_end || item.end_time || '12:00')
+      const shiftName = String(rawShift.name || item.shift_name || `Ca ${startTime}-${endTime}`)
+      const regDate = String(item.date || fromDate)
+      const weekStart = getMondayOfWeek(regDate)
+      const standardShift = standardizeShiftId(startTime, shiftName)
+
+      const rawStatus = String(item.status || 'PENDING').toUpperCase()
+      const status: MappedIposShiftRegistration['status'] = rawStatus === 'APPROVED' || rawStatus === 'PUBLISH' ? 'APPROVED' : rawStatus === 'REJECTED' ? 'REJECTED' : 'PENDING'
+
+      mapped.push({
+        id: String(item.id || `reg-${idx}`),
+        employee_id: empId,
+        employee_code: empCode && empCode !== '-' ? empCode : undefined,
+        employee_name: empName,
+        store_id: homiesStoreId,
+        date: regDate,
+        week_start_date: weekStart,
+        shift_id: standardShift,
+        shift_name: shiftName,
+        start_time: startTime,
+        end_time: endTime,
+        status,
+        created_at: String(item.created_at || new Date().toISOString()),
+        notes: `[${startTime} - ${endTime}] ${shiftName}`,
+      })
+    }
+
+    return {
+      success: true,
+      isFallback: false,
+      data: mapped,
+      message: `Đã tải thành công ${mapped.length} ca đăng ký từ iPOS Cloud.`,
+    }
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    console.warn('[iPOS Cloud API] Lỗi khi gọi /work-schedule-register/list, tự động fallback:', errorMsg)
     return {
       success: false,
       isFallback: true,

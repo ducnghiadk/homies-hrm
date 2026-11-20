@@ -788,13 +788,12 @@ function getInitialSeedData(): ServerDatabaseSchema {
       position_id: 'pos-leader',
       phone: '0945576422',
       employee_code: 'NV0020',
-      status: 'active',
-      account_status: 'dang_hoat_dong',
+      status: 'resigned',
+      account_status: 'bi_khoa',
       department_name: 'Vận hành cửa hàng',
       base_salary: 0,
       hourly_rate: 20000,
       hire_date: '2024-08-20',
-      secondary_store_ids: ['store-001', 'store-002'],
     },
     {
       id: 'emp-nv0009',
@@ -871,12 +870,11 @@ function getInitialSeedData(): ServerDatabaseSchema {
       password: DEFAULT_SEED_PASSWORD,
       role: 'employee',
       store_id: 'store-001',
-      secondary_store_ids: ['store-001', 'store-002'],
       position_id: 'pos-cashier',
       phone: '0963593319',
       employee_code: 'NV0034',
-      status: 'active',
-      account_status: 'dang_hoat_dong',
+      status: 'resigned',
+      account_status: 'bi_khoa',
       department_name: 'Thu ngân & Phục vụ',
       base_salary: 0,
       hourly_rate: 20000,
@@ -898,6 +896,74 @@ function getInitialSeedData(): ServerDatabaseSchema {
       base_salary: 0,
       hourly_rate: 20000,
       hire_date: '2025-07-15',
+    },
+    {
+      id: 'emp-nv0040',
+      full_name: 'Mai Thảo Uyên',
+      email: 'maithaouyen@gmail.com',
+      password: DEFAULT_SEED_PASSWORD,
+      role: 'employee',
+      store_id: 'store-001',
+      position_id: 'pos-barista',
+      phone: '0974410259',
+      employee_code: 'NV0040',
+      status: 'active',
+      account_status: 'dang_hoat_dong',
+      department_name: 'Pha chế & Barista',
+      base_salary: 0,
+      hourly_rate: 20000,
+      hire_date: '2026-10-01',
+    },
+    {
+      id: 'emp-nv0041',
+      full_name: 'Nguyễn Huỳnh Thiên Ân',
+      email: 'nhta.16508@gmail.com',
+      password: DEFAULT_SEED_PASSWORD,
+      role: 'employee',
+      store_id: 'store-001',
+      position_id: 'pos-barista',
+      phone: '0931880253',
+      employee_code: 'NV0041',
+      status: 'active',
+      account_status: 'dang_hoat_dong',
+      department_name: 'Pha chế & Barista',
+      base_salary: 0,
+      hourly_rate: 20000,
+      hire_date: '2026-10-01',
+    },
+    {
+      id: 'emp-nv0036',
+      full_name: 'Lê Văn Quý Phi',
+      email: 'quyphi@gmail.com',
+      password: DEFAULT_SEED_PASSWORD,
+      role: 'employee',
+      store_id: 'store-002',
+      position_id: 'pos-barista',
+      phone: '0777302197',
+      employee_code: 'NV0036',
+      status: 'active',
+      account_status: 'dang_hoat_dong',
+      department_name: 'Pha chế & Barista',
+      base_salary: 0,
+      hourly_rate: 20000,
+      hire_date: '2026-10-01',
+    },
+    {
+      id: 'emp-nv0039',
+      full_name: 'Lê Trần Thảo Vy',
+      email: 'thaovy@gmail.com',
+      password: DEFAULT_SEED_PASSWORD,
+      role: 'employee',
+      store_id: 'store-002',
+      position_id: 'pos-barista',
+      phone: '0706637699',
+      employee_code: 'NV0039',
+      status: 'active',
+      account_status: 'dang_hoat_dong',
+      department_name: 'Pha chế & Barista',
+      base_salary: 0,
+      hourly_rate: 20000,
+      hire_date: '2026-10-01',
     },
   ]
 
@@ -1990,9 +2056,9 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
           inc.status = 'proposed'
         }
       })
-      const resignedCodesMem = new Set(['NV0024', 'NV0035', 'NV0009', 'NV0020'])
-      const resignedIdsMem = new Set(['emp-nv0024', 'emp-nv0035', 'emp-nv0009', 'emp-nv0020'])
-      const resignedNamesMem = new Set(['Tấn Hiếu', 'Nguyễn Mạnh Duy', 'Nguyễn Quỳnh', 'Lê Minh Lộc', 'Nguyễn Thị Kiều Trang'])
+      const resignedCodesMem = new Set(['NV0024', 'NV0035', 'NV0009', 'NV0020', 'NV0034'])
+      const resignedIdsMem = new Set(['emp-nv0024', 'emp-nv0035', 'emp-nv0009', 'emp-nv0020', 'emp-nv0034'])
+      const resignedNamesMem = new Set(['Tấn Hiếu', 'Nguyễn Mạnh Duy', 'Nguyễn Quỳnh', 'Lê Minh Lộc', 'Nguyễn Thị Kiều Trang', 'Nguyễn Thị Thu'])
       if (inMemoryCache.employees) {
         inMemoryCache.employees.forEach((emp) => {
           if (emp.id === 'emp-bh9852' || emp.employee_code === 'BH-9852' || emp.full_name === 'Huỳnh Lê Kiều Linh') {
@@ -2098,9 +2164,9 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
     }
 
     // Đồng bộ trạng thái nhân sự đã nghỉ việc và loại bỏ chấm công, ca làm việc của họ
-    const resignedCodes = new Set(['NV0024', 'NV0035', 'NV0009', 'NV0020'])
-    const resignedIds = new Set(['emp-nv0024', 'emp-nv0035', 'emp-nv0009', 'emp-nv0020'])
-    const resignedNames = new Set(['Tấn Hiếu', 'Nguyễn Mạnh Duy', 'Nguyễn Quỳnh', 'Lê Minh Lộc', 'Nguyễn Thị Kiều Trang'])
+    const resignedCodes = new Set(['NV0024', 'NV0035', 'NV0009', 'NV0020', 'NV0034'])
+    const resignedIds = new Set(['emp-nv0024', 'emp-nv0035', 'emp-nv0009', 'emp-nv0020', 'emp-nv0034'])
+    const resignedNames = new Set(['Tấn Hiếu', 'Nguyễn Mạnh Duy', 'Nguyễn Quỳnh', 'Lê Minh Lộc', 'Nguyễn Thị Kiều Trang', 'Nguyễn Thị Thu'])
 
     if (inMemoryCache?.employees) {
       inMemoryCache.employees.forEach((emp) => {

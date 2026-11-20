@@ -2,13 +2,29 @@ import { getMondayOfDate, formatDateString } from '@/lib/mock-data-registration-
 import { addSchedule, mockEmployees, mockPositions, isStoreMatch, mockSchedules } from '@/lib/mock-data'
 import { savePreferences } from '@/lib/mock-data-preferences'
 
+export function standardizeShiftId(startTime: string, shiftName?: string): string {
+  const cleanTime = (startTime || '').trim()
+  const cleanName = (shiftName || '').toLowerCase()
+
+  if (cleanName.includes('sáng') || cleanName.includes('morning')) return 'shift-001'
+  if (cleanName.includes('trưa') || cleanName.includes('chiều') || cleanName.includes('afternoon')) return 'shift-002'
+  if (cleanName.includes('tối') || cleanName.includes('đêm') || cleanName.includes('evening') || cleanName.includes('bếp')) return 'shift-003'
+
+  if (cleanTime < '12:00') return 'shift-001'
+  if (cleanTime >= '12:00' && cleanTime < '17:00') return 'shift-002'
+  return 'shift-003'
+}
+
 export interface PendingShiftRegistration {
   id: string
   employee_id: string
+  employee_code?: string
+  employee_name?: string
   store_id: string
   week_start_date: string // YYYY-MM-DD (Thứ 2)
   date: string            // YYYY-MM-DD
   shift_id: string        // shift-001, shift-002, shift-003
+  shift_name?: string
   position_id: string     // pos-001 (Pha chế), pos-002 (Thu ngân), ...
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
   created_at: string
@@ -358,6 +374,7 @@ export class ShiftRegistrationService {
       const params = new URLSearchParams()
       if (storeId) params.append('store_id', storeId)
       if (weekStartDate) params.append('week', weekStartDate)
+      params.append('status', 'all')
       const res = await fetch(`/api/shifts/register?${params.toString()}`)
       if (res.ok) {
         const json = await res.json()
@@ -472,40 +489,79 @@ export class ShiftRegistrationService {
   static getCoverageRate(storeId: string, weekStartDate: string): CoverageRateResult {
     initStorage()
 
-    // Lọc nhân sự chi nhánh (bao gồm nhân sự hỗ trợ / floating staff)
-    const storeStaff = mockEmployees.filter(emp => {
-      if (emp.status !== 'active') return false
-      return (
-        isStoreMatch(emp.store_id, storeId) ||
-        emp.allowed_store_ids?.some(id => isStoreMatch(id, storeId)) ||
-        emp.secondary_store_ids?.some(id => isStoreMatch(id, storeId))
-      )
-    })
-
     const weekRegistrations = memoryRegistrations.filter(
       r => isStoreMatch(r.store_id, storeId) && r.week_start_date === weekStartDate && r.status !== 'REJECTED'
     )
 
-    const submittedIds = new Set(weekRegistrations.map(r => r.employee_id))
+    // Tập hợp ID, mã NV và họ tên của các nhân sự đã nộp lịch rảnh
+    const submittedIds = new Set<string>()
+    const submittedCodes = new Set<string>()
+    const submittedNames = new Set<string>()
+
+    weekRegistrations.forEach(r => {
+      if (r.employee_id) submittedIds.add(r.employee_id)
+      const empCode = r.employee_code || (r.employee_id?.startsWith('emp-') ? r.employee_id.replace('emp-', '').toUpperCase() : '')
+      if (empCode) submittedCodes.add(empCode)
+      const empName = r.employee_name
+      if (empName) submittedNames.add(empName.toLowerCase().trim())
+    })
+
+    // Lọc nhân sự chi nhánh đang active (chỉ tính nhân sự chính thức của cửa hàng này, hoặc nhân sự hỗ trợ đã đăng ký)
+    const storeStaff = mockEmployees.filter(emp => {
+      if (emp.status !== 'active') return false
+      // Nhân sự trực thuộc cửa hàng này
+      if (isStoreMatch(emp.store_id, storeId)) return true
+      // Hoặc nhân sự từ chi nhánh khác đã nộp đăng ký hỗ trợ tại chi nhánh này
+      if (
+        submittedIds.has(emp.id) ||
+        (emp.employee_code && submittedCodes.has(emp.employee_code)) ||
+        submittedNames.has(emp.full_name.toLowerCase().trim())
+      ) {
+        return true
+      }
+      return false
+    })
 
     const submittedEmployees: Array<{ id: string; name: string; code: string; phone?: string }> = []
     const missingEmployees: Array<{ id: string; name: string; code: string; phone?: string }> = []
 
     storeStaff.forEach(emp => {
+      const isSubmitted =
+        submittedIds.has(emp.id) ||
+        (emp.employee_code && submittedCodes.has(emp.employee_code)) ||
+        submittedNames.has(emp.full_name.toLowerCase().trim())
+
       const info = {
         id: emp.id,
         name: emp.full_name,
         code: emp.employee_code,
         phone: emp.phone,
       }
-      if (submittedIds.has(emp.id)) {
+      if (isSubmitted) {
         submittedEmployees.push(info)
       } else {
         missingEmployees.push(info)
       }
     })
 
-    const totalEmployees = storeStaff.length
+    // Bổ sung nhân sự từ iPOS Cloud đã đăng ký nhưng chưa nằm trong danh sách tĩnh cục bộ
+    weekRegistrations.forEach(r => {
+      const rName = r.employee_name
+      const rCode = r.employee_code || (r.employee_id?.startsWith('emp-') ? r.employee_id.replace('emp-', '').toUpperCase() : '')
+      const alreadyIncluded = submittedEmployees.some(
+        e => e.id === r.employee_id || (rCode && e.code === rCode) || (rName && e.name.toLowerCase() === rName.toLowerCase())
+      )
+      if (!alreadyIncluded && rName) {
+        submittedEmployees.push({
+          id: r.employee_id,
+          name: rName,
+          code: rCode || '',
+          phone: '',
+        })
+      }
+    })
+
+    const totalEmployees = submittedEmployees.length + missingEmployees.length
     const submittedCount = submittedEmployees.length
     const ratePercent = totalEmployees > 0 ? Math.round((submittedCount / totalEmployees) * 100) : 0
 
@@ -545,17 +601,24 @@ export class ShiftRegistrationService {
           r =>
             isStoreMatch(r.store_id, storeId) &&
             r.date === dateStr &&
-            r.shift_id === shift.id &&
+            (r.shift_id === shift.id || standardizeShiftId(r.shift_id, r.shift_name) === shift.id) &&
             r.status !== 'REJECTED'
         )
 
         const registeredEmployees = regs.map(reg => {
-          const emp = mockEmployees.find(e => e.id === reg.employee_id)
+          const regCode = reg.employee_code || (reg.employee_id?.startsWith('emp-') ? reg.employee_id.replace('emp-', '').toUpperCase() : '')
+          const regName = reg.employee_name || ''
+          const emp = mockEmployees.find(
+            e =>
+              e.id === reg.employee_id ||
+              (regCode && e.employee_code === regCode) ||
+              (regName && e.full_name.toLowerCase() === regName.toLowerCase())
+          )
           const pos = mockPositions.find(p => p.id === (reg.position_id || emp?.position_id))
           return {
             id: reg.employee_id,
-            name: emp?.full_name || 'Nhân viên',
-            code: emp?.employee_code || '',
+            name: regName || emp?.full_name || 'Nhân viên',
+            code: regCode || emp?.employee_code || '',
             positionName: pos?.name || 'Nhân viên F&B',
           }
         })

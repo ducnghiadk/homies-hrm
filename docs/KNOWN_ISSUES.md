@@ -1,5 +1,39 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-20 (Khắc phục đồng bộ trực tiếp ca đăng ký rảnh từ iPOS Cloud, sửa lủng ca ảo và tính đúng tỷ lệ độ phủ ca tại /schedule/registrations):
+  1) Nguyên nhân:
+     - Trên trang "Duyệt Đăng Ký Ca & Bản Đồ Thời Gian Trống" (`/schedule/registrations`), tuần tới (23/11 - 29/11) tại cơ sở Hồ Bá Phấn báo "Độ phủ đăng ký: 0%", "Nhân sự chưa nộp lịch: 7 bạn", và toàn bộ 21 ô ma trận nhiệt đều báo "0 bạn / Cần gọi bù!".
+     - Trong khi thực tế trên iPOS Cloud, 4 nhân viên (Quách Thị Kim Chi, Nguyễn Huỳnh Thiên Ân, Cao Văn Thắng, Trần Công Huy) đã nộp tổng cộng 45 ca rảnh hợp lệ cho tuần tới.
+     - Nguyên nhân gốc rễ:
+       + API `/api/shifts/register` chỉ đọc dữ liệu cục bộ trong `data/server-db.json` mà chưa gọi tích hợp endpoint `/work-schedule-register/list` của iPOS Cloud.
+       + Hàm `getCoverageRate` và `getHeatmapData` trong `shift-registration-service.ts` khớp cứng shift ID và ID nhân viên; đồng thời danh sách nhân viên chi nhánh bị gom cả nhân viên thuộc cơ sở Đường 429 và nhân viên đã nghỉ việc (Lê Minh Lộc NV0020, Nguyễn Thị Thu NV0034) khiến báo sai 7 nhân viên chưa nộp lịch.
+       + Danh sách nhân viên cục bộ thiếu các nhân sự mới đang hoạt động thật trên iPOS: NV0041 (Nguyễn Huỳnh Thiên Ân), NV0040 (Mai Thảo Uyên), NV0036 (Lê Văn Quý Phi), NV0039 (Lê Trần Thảo Vy).
+       + Trong `src/app/schedule/registrations/page.tsx`, chi nhánh mặc định là `store-002` thay vì cơ sở chính `store-001` (Hồ Bá Phấn).
+  2) Cách giải quyết:
+     - Cập nhật `src/lib/services/ipos/ipos-cloud-client.ts`:
+       + Bổ sung endpoint gọi `/work-schedule-register/list` với cửa sổ dữ liệu 14 ngày tự động chuẩn hóa ngày đầu tuần Monday (`getMondayOfWeek`).
+       + Tự động quy đổi tên/giờ ca của iPOS thành chuẩn `shift-001` (Sáng), `shift-002` (Trưa), `shift-003` (Tối).
+       + Hỗ trợ trạng thái `PUBLISH` và `APPROVED` đồng nhất cho lịch chính thức.
+     - Cập nhật `src/app/api/shifts/register/route.ts`:
+       + Tích hợp trực tiếp `fetchIposShiftRegistrations` vào method `GET`, tự động đồng bộ và lưu trữ vào CSDL máy chủ `db.shifts`.
+     - Cập nhật `src/app/api/shifts/route.ts`:
+       + Đồng bộ chuẩn hóa `week_start_date` theo Thứ 2 và hỗ trợ lọc linh hoạt chi nhánh `storeId !== 'ALL'`.
+     - Cập nhật `src/lib/services/scheduling/shift-registration-service.ts`:
+       + Tách helper `standardizeShiftId` thuần túy phía client để tránh rò rỉ phụ thuộc Node.js `fs` vào client bundle.
+       + Khớp nhân viên linh hoạt theo cả ID, mã NV (`employee_code`) và họ tên thật (`employee_name`).
+       + Chỉ tính nhân sự trực thuộc chi nhánh vào danh sách "chưa nộp lịch", loại bỏ việc phạt nhân viên cơ sở khác.
+     - Cập nhật `src/lib/mock-data.ts` và `src/lib/server/db.ts`:
+       + Bổ sung đầy đủ nhân sự thật từ iPOS: NV0041 (Thiên Ân), NV0040 (Thảo Uyên), NV0036 (Quý Phi), NV0039 (Thảo Vy).
+       + Cập nhật trạng thái `resigned` cho NV0020 (Minh Lộc) và NV0034 (Thu).
+     - Cập nhật `src/app/schedule/registrations/page.tsx`:
+       + Đặt mặc định chi nhánh là `store-001` (Hồ Bá Phấn) để quản lý thấy ngay dữ liệu thật khi truy cập.
+  3) Kết quả:
+     - Toàn bộ 45 ca rảnh đã đăng ký của 4 nhân sự (Kim Chi 7 ca, Thiên Ân 10 ca, Cao Văn Thắng 10 ca, Trần Công Huy 18 ca) được tải đầy đủ và phủ kín ma trận nhiệt tuần 23/11 - 29/11.
+     - Tỷ lệ độ phủ ca phản ánh chính xác, danh sách chưa nộp lịch chỉ gồm nhân sự thực tế đang hoạt động tại cơ sở.
+     - Kiểm tra `npm run ai:guard`, `npx tsc --noEmit` và `npm run build` (190 routes) đạt 100% không lỗi.
+     - File liên quan: `src/lib/services/ipos/ipos-cloud-client.ts`, `src/app/api/shifts/register/route.ts`, `src/app/api/shifts/route.ts`, `src/lib/services/scheduling/shift-registration-service.ts`, `src/app/schedule/registrations/page.tsx`, `src/lib/mock-data.ts`, `src/lib/server/db.ts`, `docs/KNOWN_ISSUES.md`.
+
+
 - Đã hoàn thiện 2026-11-19 (Khôi phục dữ liệu chấm công thật 100% từ iPOS HRM và xóa bỏ hoàn toàn dữ liệu chấm công ảo tại cơ sở Đường 429):
   1) Nguyên nhân:
      - Trên Bảng chấm công tuần 47 (`/attendance`), khi chọn cơ sở Homies Milk Tea - Đường 429 lại xuất hiện 147 giờ làm việc ảo của 5-6 nhân viên (trong khi thực tế quán Đường 429 tuần 47 không có ai làm việc và không có lượt quẹt thẻ nào).

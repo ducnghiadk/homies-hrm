@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       dataSource = 'internal_db'
     }
 
-    if (storeId) {
+    if (storeId && storeId !== 'ALL') {
       list = list.filter((s) => s.store_id === storeId)
     }
 

@@ -45,8 +45,8 @@ export default function ShiftRegistrationsHeatmapPage() {
 
   // Mặc định chọn Tuần tới (đúng thực tế xếp lịch của Store Manager)
   const [selectedWeek, setSelectedWeek] = useState<string>(nextMonStr)
-  // Mặc định chọn Store 429 hoặc HBP
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('store-002')
+  // Mặc định chọn Store Hồ Bá Phấn (store-001)
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('store-001')
 
   // State tương tác UI
   const [selectedCell, setSelectedCell] = useState<HeatmapCell | null>(null)
