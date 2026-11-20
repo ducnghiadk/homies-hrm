@@ -114,23 +114,25 @@ export default function RegistrationHeaderAndKpis({
             <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-200/80">
               <Store size={13} className="text-[#2F6FA8] ml-2 mr-1" />
               <div className="flex items-center gap-1">
-                {mockStores.map(store => {
-                  const isActive = selectedStoreId === store.id
-                  const shortName = store.name.replace('Homies Milk Tea - ', '')
-                  return (
-                    <button
-                      key={store.id}
-                      onClick={() => onSelectStoreId(store.id)}
-                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-white text-[#001D3D] shadow-xs font-bold border border-gray-100'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      {shortName}
-                    </button>
-                  )
-                })}
+                {mockStores
+                  .filter(store => store.is_active !== false)
+                  .map(store => {
+                    const isActive = selectedStoreId === store.id
+                    const shortName = store.name.replace('Homies Milk Tea - ', '')
+                    return (
+                      <button
+                        key={store.id}
+                        onClick={() => onSelectStoreId(store.id)}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-white text-[#001D3D] shadow-xs font-bold border border-gray-100'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        {shortName}
+                      </button>
+                    )
+                  })}
               </div>
             </div>
 
@@ -364,3 +366,4 @@ export default function RegistrationHeaderAndKpis({
     </div>
   )
 }
+
