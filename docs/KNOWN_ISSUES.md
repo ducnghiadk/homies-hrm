@@ -6,7 +6,7 @@
      - Tên miền dự án Supabase cũ cài trong `.env.local` (`ncxwnldazjtlgipdsuws.supabase.co`) hiện không còn phân giải DNS được (có thể đã tạm ngưng/xóa), nhưng giao diện Header chưa báo trung thực cho chủ quán biết lý do.
   2) Cách giải quyết:
      - Tạo bảng SQL chuyên dụng `supabase/schema_v5_runtime_persistence.sql` (`public.homies_runtime_store` bật RLS bảo mật).
-     - Xây dựng driver `src/lib/server/supabase-store.ts` sử dụng REST API PostgREST với timeout 3 giây, bộ ngắt mạch (circuit breaker) 60 giây khi mất kết nối, upsert tối ưu theo từng phần thay đổi và tự động nạp dữ liệu nền lần đầu khi bảng trống.
+     - Xây dựng driver `src/lib/server/supabase-store.ts` sử dụng REST API PostgREST với đồng bộ vi phân (delta-sync kiểm tra `updated_at` <1KB trước khi tải, timeout kiểm tra 5 giây, timeout tải/ghi dữ liệu 20 giây, chia gói gửi tối đa ~150 KB/lượt), bộ ngắt mạch (circuit breaker) 60 giây khi mất kết nối, upsert tối ưu theo từng phần thay đổi và tự động nạp dữ liệu nền lần đầu khi bảng trống.
      - Nối trực tiếp `supabase-store.ts` vào `src/lib/server/db.ts` (`getServerDb` / `saveServerDb` / `clearServerDbCache`).
      - Trả về `storage_status` (không bao giờ lộ khóa bí mật) trong `/api/ipos/cloud-worker` và hiển thị thẻ trạng thái "Kho Lưu Trữ Dữ Liệu (Vercel Deploy)" trên `DataSourceStatusBadge.tsx`.
      - Viết hướng dẫn 4 bước dành cho người dùng không chuyên kỹ thuật tại `docs/DEPLOY_VERCEL_SUPABASE.md`.

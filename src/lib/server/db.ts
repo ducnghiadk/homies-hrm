@@ -1984,7 +1984,7 @@ function getInitialContractsSeed(): ServerContract[] {
 let inMemoryCache: ServerDatabaseSchema | null = null
 let lastMtime: number = 0
 let lastCloudSyncAt: number = 0
-const CLOUD_CACHE_TTL_MS = 5000
+const CLOUD_CACHE_TTL_MS = 15_000
 
 const RESIGNED_CODES = new Set(['NV0024', 'NV0035', 'NV0009', 'NV0020', 'NV0034'])
 const RESIGNED_IDS = new Set(['emp-nv0024', 'emp-nv0035', 'emp-nv0009', 'emp-nv0020', 'emp-nv0034'])
@@ -2127,14 +2127,33 @@ async function mirrorDbToLocalFile(db: ServerDatabaseSchema): Promise<void> {
 }
 
 export async function getServerDb(): Promise<ServerDatabaseSchema> {
-  // 1. Fast path khi bộ nhớ đệm đám mây còn tươi (trong 5 giây)
+  // 1. Fast path khi bộ nhớ đệm đám mây còn tươi (trong 15 giây)
   if (inMemoryCache && lastCloudSyncAt > 0 && Date.now() - lastCloudSyncAt < CLOUD_CACHE_TTL_MS) {
     return normalizeServerDb(inMemoryCache).db
   }
 
   // 2. Ưu tiên đọc từ Supabase Cloud khi cấu hình sống (bền vững cho Vercel Serverless)
-  const cloudRes = await loadCollectionsFromSupabase()
+  const cloudRes = await loadCollectionsFromSupabase({
+    hasLocalCache: Boolean(inMemoryCache),
+  })
   if (cloudRes.ok) {
+    if (cloudRes.unchanged && inMemoryCache) {
+      lastCloudSyncAt = Date.now()
+      return normalizeServerDb(inMemoryCache).db
+    }
+
+    if (cloudRes.partial && inMemoryCache && cloudRes.collections) {
+      const mergedPartial = Object.assign({}, inMemoryCache, cloudRes.collections) as ServerDatabaseSchema
+      const { db, migrated } = normalizeServerDb(mergedPartial)
+      inMemoryCache = db
+      lastCloudSyncAt = Date.now()
+      await mirrorDbToLocalFile(db)
+      if (migrated) {
+        await saveCollectionsToSupabase(db as unknown as Record<string, unknown>)
+      }
+      return inMemoryCache
+    }
+
     if (!cloudRes.empty && cloudRes.collections) {
       const merged = Object.assign({}, getInitialSeedData(), cloudRes.collections) as ServerDatabaseSchema
       const { db, migrated } = normalizeServerDb(merged)
