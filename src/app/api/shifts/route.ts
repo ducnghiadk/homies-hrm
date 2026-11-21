@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerDb, saveServerDb, getInitialShiftsSeed, STANDARD_FNB_SHIFTS, type ServerShiftRegistration } from '@/lib/server/db'
+import {
+  getServerDb,
+  saveServerDb,
+  getInitialShiftsSeed,
+  STANDARD_FNB_SHIFTS,
+  isFakeSeedShift,
+  getShiftSlotDedupeKey,
+  mergeShiftRecords,
+  dedupeServerShifts,
+  type ServerShiftRegistration,
+} from '@/lib/server/db'
 import { isIposModuleEnabled } from '@/lib/server/data-mode'
 import { fetchIposWorkSchedule, type MappedIposSchedule } from '@/lib/services/ipos/ipos-cloud-client'
 
@@ -52,12 +62,12 @@ export async function GET(req: NextRequest) {
         dataSource = 'ipos_cloud'
       } else {
         // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ
-        list = db.shifts || []
+        list = dedupeServerShifts(db.shifts || []).shifts
         dataSource = 'internal_db'
       }
     } else {
       // Chế độ Homies Tự Vận Hành: Không gọi iPOS
-      list = db.shifts || []
+      list = dedupeServerShifts(db.shifts || []).shifts
       dataSource = 'homies_native'
     }
 
@@ -173,44 +183,58 @@ export async function POST(req: NextRequest) {
         if (!empId || !sDate || !sShiftId) continue
 
         const sId = item.id
-        const existingIdx = db.shifts.findIndex(
-          (s) => (sId && s.id === sId) || (s.employee_id === empId && s.date === sDate && s.shift_id === sShiftId)
-        )
+        if (isFakeSeedShift({ id: String(sId || ''), notes: String(item.notes || '') })) {
+          continue
+        }
 
         const emp = db.employees.find((e) => e.id === empId)
-        const defaultShiftName = sShiftId === 'shift-001' ? 'Ca Sáng' : sShiftId === 'shift-002' ? 'Ca Trưa' : sShiftId === 'shift-003' ? 'Ca Tối' : sShiftId
+        const defaultShiftName =
+          sShiftId === 'shift-001'
+            ? 'Ca Sáng'
+            : sShiftId === 'shift-002'
+            ? 'Ca Trưa'
+            : sShiftId === 'shift-003'
+            ? 'Ca Tối'
+            : sShiftId
+
+        const candidate: ServerShiftRegistration = {
+          id: sId || `shift-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          employee_id: empId,
+          employee_name: item.employee_name || emp?.full_name || 'Nhân viên',
+          store_id: item.store_id || emp?.store_id || 'store-001',
+          week_start_date: item.week_start_date || sDate,
+          date: sDate,
+          shift_id: sShiftId,
+          shift_name: item.shift_name || defaultShiftName,
+          position_id: item.position_id || item.assigned_position_id || emp?.position_id || 'pos-001',
+          status: item.status === 'published' ? 'APPROVED' : item.status?.toUpperCase() || 'APPROVED',
+          created_at: new Date().toISOString(),
+          notes: item.notes || '',
+        }
+
+        const candidateSlotKey = getShiftSlotDedupeKey(candidate)
+        const existingIdx = db.shifts.findIndex(
+          (s) =>
+            (sId && s.id === sId) ||
+            ((s.status || '').toUpperCase() !== 'REJECTED' &&
+              getShiftSlotDedupeKey(s) === candidateSlotKey)
+        )
 
         if (existingIdx >= 0) {
-          db.shifts[existingIdx] = {
-            ...db.shifts[existingIdx],
-            ...item,
-            employee_id: empId,
-            date: sDate,
-            shift_id: sShiftId,
-            position_id: item.position_id || item.assigned_position_id || db.shifts[existingIdx].position_id,
-            status: item.status ? (item.status === 'published' ? 'APPROVED' : item.status.toUpperCase()) : db.shifts[existingIdx].status,
-          }
+          db.shifts[existingIdx] = mergeShiftRecords(db.shifts[existingIdx], {
+            ...candidate,
+            id: db.shifts[existingIdx].id,
+          })
           count++
         } else {
-          db.shifts.push({
-            id: sId || `shift-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            employee_id: empId,
-            employee_name: item.employee_name || emp?.full_name || 'Nhân viên',
-            store_id: item.store_id || emp?.store_id || 'store-001',
-            week_start_date: item.week_start_date || sDate,
-            date: sDate,
-            shift_id: sShiftId,
-            shift_name: item.shift_name || defaultShiftName,
-            position_id: item.position_id || item.assigned_position_id || emp?.position_id || 'pos-001',
-            status: item.status === 'published' ? 'APPROVED' : (item.status?.toUpperCase() || 'APPROVED'),
-            created_at: new Date().toISOString(),
-            notes: item.notes || '',
-          })
+          db.shifts.push(candidate)
           count++
         }
       }
 
-      await saveServerDb(db)
+      if (count > 0) {
+        await saveServerDb(db)
+      }
       return NextResponse.json({
         success: true,
         message: `Đã đồng bộ ${count} ca phân lịch lên máy chủ`,
@@ -233,6 +257,13 @@ export async function POST(req: NextRequest) {
       notes,
     } = body
 
+    if (isFakeSeedShift({ id: String(id || ''), notes: String(notes || '') })) {
+      return NextResponse.json(
+        { success: false, error: 'Không cho phép lưu ca giả lập (sch-seed)' },
+        { status: 400 }
+      )
+    }
+
     if (!employee_id || !date || !shift_id) {
       return NextResponse.json(
         { success: false, error: 'Thiếu thông tin bắt buộc (employee_id, date, shift_id)' },
@@ -240,8 +271,20 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const candidateKey = getShiftSlotDedupeKey({
+      store_id: store_id || 'store-001',
+      date,
+      shift_id,
+      shift_name,
+      notes,
+      employee_id,
+      employee_name,
+    })
+
     const existingIndex = db.shifts.findIndex(
-      (s) => (id && s.id === id) || (s.employee_id === employee_id && s.date === date && s.shift_id === shift_id)
+      (s) =>
+        (id && s.id === id) ||
+        ((s.status || '').toUpperCase() !== 'REJECTED' && getShiftSlotDedupeKey(s) === candidateKey)
     )
 
     let shiftRecord: typeof db.shifts[0]

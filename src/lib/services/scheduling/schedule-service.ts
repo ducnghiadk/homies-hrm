@@ -1366,80 +1366,30 @@ export class ScheduleService {
       !(isStoreMatch(s.store_id, storeId) && weekDates.includes(s.date))
     )
 
-    // 2. Chuyển đổi dbShifts sang Schedule
-    const newSchedules: Schedule[] = dbShifts.map((db, idx) => ({
-      id: db.id || `sch-db-${db.date}-${db.shift_id}-${db.employee_id}-${idx}`,
-      org_id: 'org-001',
-      store_id: db.store_id || storeId,
-      employee_id: db.employee_id,
-      employee_name: db.employee_name || '',
-      shift_id: db.shift_id,
-      date: db.date,
-      notes: db.notes || '',
-      status: (db.status === 'da_xac_nhan' || (db.status as string) === 'APPROVED') ? 'published' : 'draft',
-      updated_at: new Date().toISOString(),
-    }))
-
-    // Đảm bảo tất cả nhân viên của chi nhánh có lịch phân ca tuần chính thức
-    if (weekDates.length >= 7) {
-      const isStore1 = isStoreMatch(storeId, 'store-001')
-      const targetEmployees = isStore1
-        ? [
-            { id: 'emp-bh9852', name: 'Huỳnh Lê Kiều Linh', shift: 'Ca Sáng [08:00 - 12:00]', shiftId: 'shift-001' },
-            { id: 'emp-nv0008', name: 'Nguyễn Thị Phương Thảo', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002' },
-            { id: 'emp-nv0013', name: 'Nguyễn Thị Tú Trinh', shift: 'Ca Sáng [08:30 - 12:00]', shiftId: 'shift-001' },
-            { id: 'emp-nv0024', name: 'Tấn Hiếu', shift: 'Ca Tối [17:00 - 22:00]', shiftId: 'shift-003' },
-            { id: 'emp-nv0028', name: 'Phạm Nguyễn Đông Duy', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002' },
-            { id: 'emp-nv0030', name: 'Quách Thị Kim Chi', shift: 'Ca Tối [17:00 - 22:00]', shiftId: 'shift-003' },
-            { id: 'emp-nv0027', name: 'Trần Công Huy', shift: 'Ca Sáng [08:00 - 12:00]', shiftId: 'shift-001' },
-            { id: 'emp-nv0020', name: 'Lê Minh Lộc', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002' },
-            { id: 'emp-nv0031', name: 'Cao Văn Thắng', shift: 'Ca Sáng [08:00 - 12:00]', shiftId: 'shift-001' },
-            { id: 'emp-nv0033', name: 'Nguyễn Hoài Ân', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002' },
-            { id: 'emp-nv0034', name: 'Nguyễn Thị Thu', shift: 'Ca Sáng [08:30 - 12:00]', shiftId: 'shift-001' },
-            { id: 'emp-nv0035', name: 'Nguyễn Mạnh Duy', shift: 'Ca Tối [17:00 - 22:00]', shiftId: 'shift-003' },
-            { id: 'emp-001', name: 'Nguyễn Đức Nghĩa', shift: 'Ca Sáng [08:30 - 12:00]', shiftId: 'shift-001' },
-          ]
-        : [
-            { id: 'emp-nv0016', name: 'Nguyễn Thị Kiều Ý', shift: 'Ca Sáng [08:00 - 12:00]', shiftId: 'shift-001' },
-            { id: 'emp-nv0017', name: 'Nguyễn Thanh Thiện', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002' },
-            { id: 'emp-nv0020', name: 'Lê Minh Lộc', shift: 'Ca Tối [17:00 - 22:00]', shiftId: 'shift-003' },
-            { id: 'emp-nv0027', name: 'Trần Công Huy', shift: 'Ca Sáng [08:00 - 12:00]', shiftId: 'shift-001' },
-            { id: 'emp-nv0031', name: 'Cao Văn Thắng', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002' },
-            { id: 'emp-nv0033', name: 'Nguyễn Hoài An', shift: 'Ca Sáng [08:30 - 12:00]', shiftId: 'shift-001' },
-            { id: 'emp-nv0034', name: 'Nguyễn Thị Thu', shift: 'Ca Tối [17:00 - 22:00]', shiftId: 'shift-003' },
-            { id: 'emp-nv0035', name: 'Nguyễn Mạnh Duy', shift: 'Ca Chiều [12:00 - 17:00]', shiftId: 'shift-002' },
-          ]
-
-      targetEmployees.forEach((emp, empIdx) => {
-        const hasEmpShifts = newSchedules.some(s => s.employee_id === emp.id)
-        if (!hasEmpShifts) {
-          weekDates.forEach((date, dayIdx) => {
-            if (emp.id === 'emp-001') {
-              if (dayIdx !== 0 && dayIdx !== 2) return
-            } else {
-              if ((empIdx + dayIdx) % 7 === 0) return
-            }
-            if (date) {
-              newSchedules.push({
-                id: `sch-seed-${emp.id}-${date}-${emp.shiftId}`,
-                org_id: 'org-001',
-                store_id: storeId,
-                employee_id: emp.id,
-                employee_name: emp.name,
-                shift_id: emp.shiftId,
-                date,
-                notes: `${emp.shift} (Đã xếp)`,
-                status: 'published',
-                updated_at: new Date().toISOString(),
-              })
-            }
-          })
-        }
+    // 2. Chuyển đổi dbShifts thật sang Schedule (loại bỏ hoàn toàn ca giả lập sch-seed-* và khử trùng)
+    const seenKeys = new Set<string>()
+    const newSchedules: Schedule[] = []
+    dbShifts.forEach((db, idx) => {
+      if ((db.id || '').trim().toLowerCase().startsWith('sch-seed-')) return
+      const empIdentity = (db.employee_name || db.employee_id || '').trim().toLowerCase()
+      const slotKey = `${db.store_id || storeId}|${db.date}|${db.shift_id}|${empIdentity}`
+      if (seenKeys.has(slotKey)) return
+      seenKeys.add(slotKey)
+      newSchedules.push({
+        id: db.id || `sch-db-${db.date}-${db.shift_id}-${db.employee_id}-${idx}`,
+        org_id: 'org-001',
+        store_id: db.store_id || storeId,
+        employee_id: db.employee_id,
+        employee_name: db.employee_name || '',
+        shift_id: db.shift_id,
+        date: db.date,
+        notes: db.notes || '',
+        status: (db.status === 'da_xac_nhan' || (db.status as string) === 'APPROVED') ? 'published' : 'draft',
+        updated_at: new Date().toISOString(),
       })
-    }
+    })
 
     mockSchedules.splice(0, mockSchedules.length, ...keepSchedules, ...newSchedules)
-    saveSchedulesToStorage()
   }
 
   /**

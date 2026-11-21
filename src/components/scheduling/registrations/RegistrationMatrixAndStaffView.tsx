@@ -5,21 +5,13 @@ import {
   Layers,
   Users,
   CheckCircle2,
-  Clock,
-  AlertTriangle,
-  AlertCircle,
-  Copy,
   Check,
-  Eye,
   Filter,
   Phone,
   MessageSquare,
-  Sparkles,
-  UserCheck,
-  UserX,
-  Calendar,
+  AlertTriangle,
+  AlertCircle,
   X,
-  ExternalLink,
 } from 'lucide-react'
 import type {
   HeatmapCell,
@@ -41,9 +33,15 @@ interface RegistrationMatrixAndStaffViewProps {
   onApproveStaffAll: (staffId: string) => void
 }
 
+function formatShortStaffName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 2) return fullName.trim()
+  return parts.slice(-2).join(' ')
+}
+
 export default function RegistrationMatrixAndStaffView({
-  selectedStoreId,
-  selectedWeek,
+  selectedStoreId: _selectedStoreId,
+  selectedWeek: _selectedWeek,
   heatmapCells,
   staffOverview,
   coverageData,
@@ -54,18 +52,15 @@ export default function RegistrationMatrixAndStaffView({
   onOpenZaloModal,
   onApproveStaffAll,
 }: RegistrationMatrixAndStaffViewProps) {
-  // Tab chính: 'MATRIX' (Theo Ca 7x3) hoặc 'STAFF' (Theo Nhân Viên)
   const [activeTab, setActiveTab] = useState<'MATRIX' | 'STAFF'>('MATRIX')
   const [highlightEmployeeId, setHighlightEmployeeId] = useState<string | null>(null)
 
-  // Danh sách 3 ca chuẩn Homies F&B
   const shiftsConfig = [
     { id: 'shift-001', name: 'Ca Sáng', time: '08:30 - 12:00', duration: '3.5h' },
     { id: 'shift-002', name: 'Ca Trưa', time: '12:00 - 17:00', duration: '5.0h' },
     { id: 'shift-003', name: 'Ca Tối', time: '17:00 - 22:00', duration: '5.0h' },
   ]
 
-  // Danh sách 7 ngày trong tuần từ heatmapCells
   const uniqueDates = React.useMemo(() => {
     const datesMap = new Map<string, string>()
     heatmapCells.forEach(c => {
@@ -80,38 +75,93 @@ export default function RegistrationMatrixAndStaffView({
     }))
   }, [heatmapCells])
 
-  // Lọc heatmapCells theo filterStatus
-  const filteredCells = React.useMemo(() => {
-    if (filterStatus === 'ALL') return heatmapCells
-    if (filterStatus === 'RISK') return heatmapCells.filter(c => c.status === 'RISK' || c.status === 'EMPTY')
-    if (filterStatus === 'PENDING') return heatmapCells.filter(c => c.pendingCount > 0)
-    if (filterStatus === 'APPROVED') return heatmapCells.filter(c => c.approvedCount > 0)
-    return heatmapCells
-  }, [heatmapCells, filterStatus])
+  const thinShiftCount = React.useMemo(
+    () => heatmapCells.filter(c => c.status === 'RISK' || c.status === 'EMPTY').length,
+    [heatmapCells]
+  )
 
-  // Số lượng ca cần bù / ca mỏng
-  const thinShiftCount = React.useMemo(() => {
-    return heatmapCells.filter(c => c.status === 'RISK' || c.status === 'EMPTY').length
-  }, [heatmapCells])
+  const pendingCellCount = React.useMemo(
+    () => heatmapCells.filter(c => c.pendingCount > 0).length,
+    [heatmapCells]
+  )
+
+  const approvedCellCount = React.useMemo(
+    () => heatmapCells.filter(c => c.count > 0 && c.approvedCount === c.count).length,
+    [heatmapCells]
+  )
+
+  const missingEmployees = coverageData.missingEmployees
+  const submittedEmployees = coverageData.submittedEmployees
+  const activeHighlightedStaff = submittedEmployees.find(e => e.id === highlightEmployeeId)
 
   return (
-    <div className="w-full grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+    <div className="w-full space-y-3.5">
       {/* ─────────────────────────────────────────────────────────────
-          CỘT TRÁI (8 / 12 CỘT): MA TRẬN 7X3 HOẶC BẢNG THEO NHÂN VIÊN
+          DẢI A: NHẮC NHANH CHƯA NỘP LỊCH (Kiểu 1 — Tự ẩn khi đủ 100%)
          ───────────────────────────────────────────────────────────── */}
-      <div className="xl:col-span-8 space-y-4">
-        {/* Navigation Tabs Bar + Quick Filter Chips */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-3 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Main Tab Switcher */}
-          <div className="flex items-center bg-gray-100/80 p-1 rounded-xl">
+      {missingEmployees.length > 0 && (
+        <div className="bg-rose-50/75 border border-rose-200/80 rounded-2xl px-4 py-2.5 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 shadow-2xs">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-800 shrink-0">
+              <AlertCircle size={15} className="text-rose-600" />
+              <span>
+                Chưa nộp lịch (
+                <span className="font-mono tabular-nums">{missingEmployees.length}</span>):
+              </span>
+            </span>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {missingEmployees.slice(0, 6).map(emp => (
+                <span
+                  key={emp.id}
+                  className="bg-white border border-rose-200/70 text-gray-800 px-2 py-0.5 rounded-lg text-xs font-medium"
+                  title={emp.positionName || 'Nhân viên F&B'}
+                >
+                  {emp.name}
+                </span>
+              ))}
+              {missingEmployees.length > 6 && (
+                <span className="text-xs font-semibold text-rose-700 font-mono tabular-nums px-1">
+                  +{missingEmployees.length - 6} bạn khác
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab('STAFF')}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white hover:bg-rose-100/60 text-gray-700 border border-rose-200/80 transition cursor-pointer"
+            >
+              Xem danh sách
+            </button>
+            <button
+              type="button"
+              onClick={onOpenZaloModal}
+              className="px-3 py-1 rounded-lg text-xs font-bold bg-[#2F6FA8] hover:bg-[#1D3E61] text-white transition inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <MessageSquare size={12} />
+              <span>Nhắc Zalo cả đội</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          DẢI B: THANH ĐIỀU KHIỂN THỐNG NHẤT FULL-WIDTH + THẺ SOI LỊCH
+         ───────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+        <div className="px-4 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Chuyển Tab Chính */}
+          <div className="flex items-center bg-gray-100/80 p-1 rounded-xl w-fit">
             <button
               type="button"
               onClick={() => setActiveTab('MATRIX')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'MATRIX'
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === 'MATRIX'
                   ? 'bg-white text-[#2F6FA8] shadow-xs'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               <Layers size={14} className={activeTab === 'MATRIX' ? 'text-[#2F6FA8]' : 'text-gray-500'} />
               <span>Theo Khung Ca (7 Ngày x 3 Ca)</span>
@@ -120,34 +170,32 @@ export default function RegistrationMatrixAndStaffView({
             <button
               type="button"
               onClick={() => setActiveTab('STAFF')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'STAFF'
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === 'STAFF'
                   ? 'bg-white text-[#2F6FA8] shadow-xs'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               <Users size={14} className={activeTab === 'STAFF' ? 'text-[#2F6FA8]' : 'text-gray-500'} />
               <span>Theo Từng Nhân Viên</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-[#2F6FA8] font-bold">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-[#2F6FA8] font-bold font-mono tabular-nums">
                 {staffOverview.length}
               </span>
             </button>
           </div>
 
-          {/* Quick Filter Status Buttons */}
+          {/* Bộ Lọc Nhanh Theo Trạng Thái */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-            <span className="text-[11px] font-medium text-gray-400 mr-1 flex items-center gap-1">
+            <span className="text-[11px] font-medium text-gray-400 mr-1 flex items-center gap-1 shrink-0">
               <Filter size={11} /> Lọc:
             </span>
 
             <button
               type="button"
               onClick={() => onSelectFilterStatus('ALL')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
-                filterStatus === 'ALL'
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${filterStatus === 'ALL'
                   ? 'bg-[#001D3D] text-white shadow-xs'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+                }`}
             >
               Tất cả
             </button>
@@ -155,559 +203,504 @@ export default function RegistrationMatrixAndStaffView({
             <button
               type="button"
               onClick={() => onSelectFilterStatus('RISK')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition ${
-                filterStatus === 'RISK'
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer shrink-0 font-mono tabular-nums ${filterStatus === 'RISK'
                   ? 'bg-amber-600 text-white shadow-xs'
-                  : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/60'
-              }`}
+                  : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/70'
+                }`}
             >
               <AlertTriangle size={12} />
-              <span>Ca mỏng / Cần bù ({thinShiftCount})</span>
+              <span className="font-sans">Cần bù ({thinShiftCount})</span>
             </button>
 
             <button
               type="button"
               onClick={() => onSelectFilterStatus('PENDING')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
-                filterStatus === 'PENDING'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60'
-              }`}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${filterStatus === 'PENDING'
+                  ? 'bg-[#2F6FA8] text-white shadow-xs'
+                  : 'bg-blue-50 text-[#2F6FA8] hover:bg-blue-100 border border-blue-200/70'
+                }`}
             >
-              Chờ duyệt
+              Chờ duyệt ({pendingCellCount})
             </button>
 
             <button
               type="button"
               onClick={() => onSelectFilterStatus('APPROVED')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
-                filterStatus === 'APPROVED'
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${filterStatus === 'APPROVED'
                   ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60'
-              }`}
+                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/70'
+                }`}
             >
-              Đã duyệt
+              Đã duyệt ({approvedCellCount})
             </button>
           </div>
         </div>
 
-        {/* ─────────────────────────────────────────────────────────
-            TAB 1: MA TRẬN NHIỆT ĐỘ PHỦ CA 7 NGÀY X 3 CA
-           ───────────────────────────────────────────────────────── */}
-        {activeTab === 'MATRIX' && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-            {/* Header thông tin ma trận */}
-            <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2 bg-gradient-to-r from-gray-50/60 to-white">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#2F6FA8]" />
-                <h3 className="text-sm font-bold text-[#001D3D]">
-                  Ma Trận Phủ Ca Tuần ({uniqueDates.length} ngày x 3 ca)
-                </h3>
-                <span className="text-xs text-gray-500 font-medium hidden sm:inline">
-                  — Bấm vào ô bất kỳ để xem chi tiết hoặc duyệt từng bạn
-                </span>
-              </div>
+        {/* Hàng Soi Nhanh Nhân Sự Đã Nộp (Kiểu 1) */}
+        {activeTab === 'MATRIX' && submittedEmployees.length > 0 && (
+          <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-2 flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-semibold text-gray-500 shrink-0">
+              Soi lịch đã nộp (
+              <span className="font-mono tabular-nums">{submittedEmployees.length}</span>):
+            </span>
 
-              {/* Legend trạng thái ca */}
-              <div className="flex items-center gap-3 text-xs font-medium">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                  <span className="text-gray-700">Đủ ca (≥2 bạn)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  <span className="text-gray-700">Ca mỏng (1 bạn)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                  <span className="text-gray-700">Trống (0 bạn)</span>
-                </div>
-              </div>
-            </div>
+            {submittedEmployees.map(emp => {
+              const isSelected = highlightEmployeeId === emp.id
+              return (
+                <button
+                  key={emp.id}
+                  type="button"
+                  onClick={() => setHighlightEmployeeId(isSelected ? null : emp.id)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition cursor-pointer ${isSelected
+                      ? 'bg-[#2F6FA8] text-white border-[#2F6FA8] shadow-xs font-semibold'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-[#2F6FA8]/50 hover:text-[#001D3D]'
+                    }`}
+                  title={`Bấm để tô sáng các ca của ${emp.name}`}
+                >
+                  <span>{emp.name}</span>
+                  <span
+                    className={`font-mono tabular-nums text-[11px] font-bold ${isSelected ? 'text-blue-100' : 'text-[#2F6FA8]'
+                      }`}
+                  >
+                    {emp.shiftCount || 0} ca
+                  </span>
+                </button>
+              )
+            })}
 
-            {/* Bảng ma trận 7x3 cuộn ngang khi màn hình nhỏ */}
-            <div className="overflow-x-auto p-4">
-              <table className="w-full border-collapse min-w-[760px]">
-                <thead>
-                  <tr>
-                    <th className="w-28 p-2.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider bg-gray-50/80 rounded-l-xl">
-                      Khung Ca
-                    </th>
-                    {uniqueDates.map(d => (
-                      <th
-                        key={d.date}
-                        className="p-2.5 text-center text-xs font-bold text-[#001D3D] bg-gray-50/80 first:rounded-l-none last:rounded-r-xl"
-                      >
-                        <div className="font-bold">{d.dayOfWeek}</div>
-                        <div className="text-[11px] font-mono text-gray-500 font-normal">{d.formattedDate}</div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {shiftsConfig.map(shift => {
-                    return (
-                      <tr key={shift.id} className="hover:bg-gray-50/30 transition">
-                        {/* Cột tiêu đề Khung Ca */}
-                        <td className="p-2.5 align-top">
-                          <div className="space-y-0.5">
-                            <span className="text-xs font-bold text-[#001D3D] block">{shift.name}</span>
-                            <span className="text-[10px] font-mono text-gray-500 block">{shift.time}</span>
-                            <span className="inline-block text-[9px] font-bold px-1.5 py-0.2 rounded bg-gray-100 text-gray-600">
-                              {shift.duration}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* 7 ô tương ứng 7 ngày */}
-                        {uniqueDates.map(d => {
-                          const cell = heatmapCells.find(c => c.date === d.date && c.shiftId === shift.id)
-                          if (!cell) {
-                            return (
-                              <td key={d.date} className="p-1.5 text-center text-gray-300 text-xs">
-                                —
-                              </td>
-                            )
-                          }
-
-                          // Kiểm tra xem ô có khớp với bộ lọc không
-                          const isDimmed =
-                            (filterStatus === 'RISK' && cell.status === 'FULL') ||
-                            (filterStatus === 'PENDING' && cell.pendingCount === 0) ||
-                            (filterStatus === 'APPROVED' && cell.approvedCount === 0)
-
-                          // Highlight nếu nhân viên đang được chọn có đăng ký ô này
-                          const isHighlighted =
-                            highlightEmployeeId &&
-                            cell.registeredEmployees.some(e => e.id === highlightEmployeeId)
-
-                          return (
-                            <td key={d.date} className="p-1.5 align-top">
-                              <div
-                                onClick={() => onSelectCell(cell)}
-                                className={`group relative p-2 rounded-xl transition-all border text-left cursor-pointer min-h-[96px] flex flex-col justify-between ${
-                                  isDimmed ? 'opacity-30' : ''
-                                } ${
-                                  isHighlighted ? 'ring-2 ring-[#2F6FA8] ring-offset-1' : ''
-                                } ${
-                                  cell.status === 'FULL'
-                                    ? 'bg-emerald-50/50 hover:bg-emerald-50 border-emerald-200/80 hover:border-emerald-400 hover:shadow-xs'
-                                    : cell.status === 'RISK'
-                                    ? 'bg-amber-50/60 hover:bg-amber-50 border-amber-200/90 hover:border-amber-400 hover:shadow-xs'
-                                    : 'bg-rose-50/50 hover:bg-rose-50 border-rose-200/80 hover:border-rose-400 hover:shadow-xs'
-                                }`}
-                              >
-                                {/* Header ô: Số lượng + Tình trạng */}
-                                <div className="flex items-center justify-between gap-1 mb-1.5">
-                                  <div className="flex items-center gap-1">
-                                    <span
-                                      className={`w-1.5 h-1.5 rounded-full ${
-                                        cell.status === 'FULL'
-                                          ? 'bg-emerald-500'
-                                          : cell.status === 'RISK'
-                                          ? 'bg-amber-500'
-                                          : 'bg-rose-500'
-                                      }`}
-                                    />
-                                    <span
-                                      className={`text-xs font-bold font-mono tabular-nums ${
-                                        cell.status === 'FULL'
-                                          ? 'text-emerald-800'
-                                          : cell.status === 'RISK'
-                                          ? 'text-amber-800'
-                                          : 'text-rose-700'
-                                      }`}
-                                    >
-                                      {cell.count} bạn
-                                    </span>
-                                  </div>
-
-                                  {/* Tiến độ duyệt: approved/total */}
-                                  {cell.count > 0 && (
-                                    <span
-                                      className={`text-[10px] font-mono px-1 py-0.2 rounded font-medium ${
-                                        cell.approvedCount === cell.count
-                                          ? 'bg-emerald-100 text-emerald-800 font-bold'
-                                          : 'bg-white/80 text-gray-600'
-                                      }`}
-                                    >
-                                      {cell.approvedCount}/{cell.count}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Danh sách nhân viên trong ô */}
-                                <div className="space-y-1 my-auto">
-                                  {cell.count === 0 ? (
-                                    <div className="text-[11px] text-rose-600 font-semibold flex items-center gap-1">
-                                      <AlertCircle size={11} /> Cần gọi bù
-                                    </div>
-                                  ) : (
-                                    cell.registeredEmployees.slice(0, 3).map(emp => {
-                                      const isEmpHighlighted = emp.id === highlightEmployeeId
-                                      return (
-                                        <div
-                                          key={emp.registrationId}
-                                          className={`text-[11px] px-1.5 py-0.5 rounded flex items-center justify-between gap-1 transition ${
-                                            isEmpHighlighted
-                                              ? 'bg-[#2F6FA8] text-white font-bold'
-                                              : emp.status === 'APPROVED'
-                                              ? 'bg-white/90 text-gray-800 border border-emerald-200'
-                                              : 'bg-white/80 text-gray-700'
-                                          }`}
-                                        >
-                                          <span className="truncate max-w-[70px] font-medium" title={emp.name}>
-                                            {emp.name.split(' ').slice(-2).join(' ')}
-                                          </span>
-                                          {emp.status === 'APPROVED' ? (
-                                            <Check size={10} className="text-emerald-600 shrink-0" />
-                                          ) : (
-                                            <Clock size={10} className="text-amber-500 shrink-0" />
-                                          )}
-                                        </div>
-                                      )
-                                    })
-                                  )}
-
-                                  {cell.count > 3 && (
-                                    <span className="text-[10px] text-gray-500 font-medium pl-1">
-                                      +{cell.count - 3} bạn nữa...
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Nút thao tác nhanh khi hover */}
-                                <div className="pt-1.5 mt-1 border-t border-black/5 flex items-center justify-between">
-                                  <span className="text-[10px] text-gray-500 group-hover:text-[#2F6FA8] font-medium flex items-center gap-0.5">
-                                    <Eye size={10} /> Chi tiết
-                                  </span>
-
-                                  {cell.pendingCount > 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={e => {
-                                        e.stopPropagation()
-                                        onApproveCell(cell.date, cell.shiftId)
-                                      }}
-                                      className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs flex items-center gap-0.5"
-                                      title="Duyệt tất cả bạn trong ca này"
-                                    >
-                                      <Check size={9} /> Duyệt ô
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ─────────────────────────────────────────────────────────
-            TAB 2: BẢNG TỔNG HỢP THEO TỪNG NHÂN VIÊN
-           ───────────────────────────────────────────────────────── */}
-        {activeTab === 'STAFF' && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2 bg-gradient-to-r from-gray-50/60 to-white">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#2F6FA8]" />
-                <h3 className="text-sm font-bold text-[#001D3D]">
-                  Danh Sách Nhân Viên Đăng Ký ({staffOverview.length} nhân sự)
-                </h3>
-              </div>
-              <span className="text-xs text-gray-500 font-medium">
-                Đã nộp: <strong className="text-emerald-700">{coverageData.submittedCount}</strong> / Chưa nộp:{' '}
-                <strong className="text-rose-700">{coverageData.totalEmployees - coverageData.submittedCount}</strong>
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-50/80 border-b border-gray-100">
-                    <th className="p-3 text-left text-xs font-bold text-gray-600">Nhân Viên</th>
-                    <th className="p-3 text-left text-xs font-bold text-gray-600">Chức Vụ</th>
-                    <th className="p-3 text-center text-xs font-bold text-gray-600">Trạng Thái</th>
-                    <th className="p-3 text-center text-xs font-bold text-gray-600">Tổng Ca</th>
-                    <th className="p-3 text-center text-xs font-bold text-gray-600">Giờ Dự Kiến</th>
-                    <th className="p-3 text-center text-xs font-bold text-gray-600">Tiến Độ Duyệt</th>
-                    <th className="p-3 text-right text-xs font-bold text-gray-600">Thao Tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-xs">
-                  {staffOverview.map(staff => {
-                    const isSelected = highlightEmployeeId === staff.id
-
-                    return (
-                      <tr
-                        key={staff.id}
-                        className={`hover:bg-gray-50/60 transition ${
-                          isSelected ? 'bg-blue-50/40' : ''
-                        }`}
-                      >
-                        {/* Tên nhân viên + Mã */}
-                        <td className="p-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-[#2F6FA8]/10 text-[#2F6FA8] font-bold flex items-center justify-center text-xs font-mono">
-                              {staff.name.slice(0, 1)}
-                            </div>
-                            <div>
-                              <div className="font-bold text-[#001D3D]">{staff.name}</div>
-                              <div className="text-[11px] font-mono text-gray-400">
-                                {staff.code || 'Chưa có mã'}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Chức vụ */}
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-medium text-[11px]">
-                            {staff.positionName}
-                          </span>
-                        </td>
-
-                        {/* Trạng thái nộp */}
-                        <td className="p-3 text-center">
-                          {staff.hasSubmitted ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 size={11} /> Đã nộp lịch
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              <AlertCircle size={11} /> Chưa nộp
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Tổng ca */}
-                        <td className="p-3 text-center font-mono font-bold text-[#001D3D]">
-                          {staff.registeredCount > 0 ? `${staff.registeredCount} ca` : '—'}
-                        </td>
-
-                        {/* Tổng giờ dự kiến */}
-                        <td className="p-3 text-center font-mono text-gray-700">
-                          {staff.totalHours > 0 ? `${staff.totalHours}h` : '—'}
-                        </td>
-
-                        {/* Tiến độ duyệt */}
-                        <td className="p-3 text-center">
-                          {staff.registeredCount > 0 ? (
-                            <div className="inline-flex items-center gap-1 font-mono text-xs">
-                              <span className="font-bold text-emerald-700">{staff.approvedCount}</span>
-                              <span className="text-gray-400">/</span>
-                              <span className="text-gray-600">{staff.registeredCount}</span>
-                              {staff.pendingCount > 0 && (
-                                <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-semibold">
-                                  {staff.pendingCount} chờ
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-
-                        {/* Thao tác */}
-                        <td className="p-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {staff.hasSubmitted && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setHighlightEmployeeId(staff.id)
-                                  setActiveTab('MATRIX')
-                                }}
-                                className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 transition"
-                              >
-                                Xem trên ma trận
-                              </button>
-                            )}
-
-                            {staff.pendingCount > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => onApproveStaffAll(staff.id)}
-                                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs"
-                              >
-                                Duyệt hết ({staff.pendingCount})
-                              </button>
-                            )}
-
-                            {!staff.hasSubmitted && (
-                              <button
-                                type="button"
-                                onClick={onOpenZaloModal}
-                                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition"
-                              >
-                                Nhắc Zalo
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {activeHighlightedStaff && (
+              <button
+                type="button"
+                onClick={() => setHighlightEmployeeId(null)}
+                className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-200/60 transition cursor-pointer"
+              >
+                <X size={12} />
+                <span>Bỏ chọn</span>
+              </button>
+            )}
           </div>
         )}
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          CỘT PHẢI (4 / 12 CỘT): THEO DÕI ĐÃ NỘP & CHƯA NỘP LỊCH
+          TAB 1: MA TRẬN PHỦ CA 7 NGÀY X 3 CA FULL-WIDTH (4 TRẠNG THÁI RÕ)
          ───────────────────────────────────────────────────────────── */}
-      <div className="xl:col-span-4 space-y-4">
-        {/* Card 1: Danh sách nhân sự CHƯA nộp lịch (Cần hành động ngay) */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-xs space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-              <h3 className="text-sm font-bold text-[#001D3D]">
-                Chưa Nộp Lịch Tuần Tới ({coverageData.missingEmployees.length})
+      {activeTab === 'MATRIX' && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2 bg-gradient-to-r from-gray-50/60 to-white">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="w-2 h-2 rounded-full bg-[#2F6FA8]" />
+              <h3 id="registration-matrix-title" className="text-sm font-bold text-[#001D3D]">
+                Ma Trận Phủ Ca Tuần ({uniqueDates.length} ngày x 3 ca)
               </h3>
+              <span className="text-xs text-gray-500 font-medium hidden sm:inline">
+                — Bấm vào ô bất kỳ để xem chi tiết &amp; duyệt từng bạn
+              </span>
             </div>
 
-            <button
-              type="button"
-              onClick={onOpenZaloModal}
-              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-[#2F6FA8] hover:bg-blue-100 transition border border-blue-200/80 flex items-center gap-1 shadow-2xs"
-            >
-              <MessageSquare size={12} />
-              <span>Nhắc Zalo cả đội</span>
-            </button>
-          </div>
-
-          {coverageData.missingEmployees.length === 0 ? (
-            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center space-y-1">
-              <div className="text-xs font-bold text-emerald-800 flex items-center justify-center gap-1">
-                <CheckCircle2 size={14} /> Hoàn hảo! 100% nhân sự đã nộp lịch
+            {/* Chú thích 4 sắc thái rõ ràng */}
+            <div className="flex items-center gap-3.5 text-xs font-medium flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                <span className="text-gray-700">Trống (0 bạn)</span>
               </div>
-              <p className="text-[11px] text-emerald-600">
-                Tất cả các bạn đã đăng ký khung giờ rảnh đầy đủ cho tuần này.
-              </p>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                <span className="text-gray-700">Ca mỏng (1 bạn)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-white border border-gray-300" />
+                <span className="text-gray-700">Đủ người · Chờ duyệt</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <span className="text-gray-700">Đã duyệt xong</span>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-              {coverageData.missingEmployees.map(emp => (
-                <div
-                  key={emp.id}
-                  className="p-2.5 rounded-xl border border-rose-100 bg-rose-50/30 hover:bg-rose-50/60 transition flex items-center justify-between gap-2"
-                >
-                  <div className="space-y-0.5 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-bold text-gray-900 truncate">{emp.name}</span>
-                      {emp.code && (
-                        <span className="text-[10px] font-mono text-gray-400">({emp.code})</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px] text-gray-500">
-                      <span>{emp.positionName || 'Nhân viên F&B'}</span>
-                      {emp.phone && (
-                        <span className="text-gray-400 font-mono flex items-center gap-0.5">
-                          <Phone size={10} /> {emp.phone}
+          </div>
+
+          <div
+            tabIndex={0}
+            role="region"
+            aria-labelledby="registration-matrix-title"
+            className="overflow-x-auto p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FA8]/40"
+          >
+            <table className="w-full border-separate border-spacing-0 min-w-[920px] table-fixed">
+              <thead>
+                <tr>
+                  <th className="w-[116px] sticky left-0 z-20 bg-gray-50 p-2.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider rounded-l-xl border-b border-gray-100">
+                    Khung Ca
+                  </th>
+                  {uniqueDates.map(d => (
+                    <th
+                      key={d.date}
+                      className="p-2.5 text-center text-xs font-bold text-[#001D3D] bg-gray-50 last:rounded-r-xl border-b border-gray-100"
+                    >
+                      <div className="font-bold">{d.dayOfWeek}</div>
+                      <div className="text-[11px] font-mono tabular-nums text-gray-500 font-normal">
+                        {d.formattedDate}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {shiftsConfig.map(shift => (
+                  <tr key={shift.id} className="hover:bg-gray-50/25 transition">
+                    <th
+                      scope="row"
+                      className="sticky left-0 z-10 bg-white align-top p-2.5 border-b border-gray-100 text-left font-normal"
+                    >
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-[#001D3D] block">{shift.name}</span>
+                        <span className="text-[10px] font-mono tabular-nums text-gray-500 block">
+                          {shift.time}
                         </span>
-                      )}
-                    </div>
-                  </div>
+                        <span className="inline-block text-[10px] font-bold font-mono px-1.5 py-0.2 rounded bg-gray-100 text-gray-600">
+                          {shift.duration}
+                        </span>
+                      </div>
+                    </th>
 
-                  <button
-                    type="button"
-                    onClick={onOpenZaloModal}
-                    className="px-2 py-1 rounded-lg text-[11px] font-bold bg-white text-rose-700 hover:bg-rose-100 border border-rose-200 transition shrink-0"
-                  >
-                    Nhắc
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+                    {uniqueDates.map(d => {
+                      const cell = heatmapCells.find(
+                        c => c.date === d.date && c.shiftId === shift.id
+                      )
+                      if (!cell) {
+                        return (
+                          <td
+                            key={d.date}
+                            className="p-1.5 text-center text-gray-300 text-xs border-b border-gray-100"
+                          >
+                            —
+                          </td>
+                        )
+                      }
+
+                      const isEmpty = cell.count === 0
+                      const isThin = cell.count === 1
+                      const isFullyApproved = cell.count > 0 && cell.approvedCount === cell.count
+
+                      const isFilterDimmed =
+                        (filterStatus === 'RISK' && cell.status === 'FULL') ||
+                        (filterStatus === 'PENDING' && cell.pendingCount === 0) ||
+                        (filterStatus === 'APPROVED' && !(cell.count > 0 && cell.approvedCount > 0))
+
+                      const hasHighlightedEmployee =
+                        Boolean(highlightEmployeeId) &&
+                        cell.registeredEmployees.some(e => e.id === highlightEmployeeId)
+                      const isStaffDimmed = Boolean(highlightEmployeeId) && !hasHighlightedEmployee
+
+                      const cellSurfaceClass = isEmpty
+                        ? 'bg-rose-50/85 hover:bg-rose-50 border-rose-200 hover:border-rose-400'
+                        : isThin
+                          ? 'bg-amber-50/65 hover:bg-amber-50 border-amber-200 hover:border-amber-400'
+                          : isFullyApproved
+                            ? 'bg-emerald-50/60 hover:bg-emerald-50 border-emerald-200 hover:border-emerald-400'
+                            : 'bg-white hover:bg-blue-50/30 border-gray-200/90 hover:border-[#2F6FA8]/60 shadow-2xs'
+
+                      return (
+                        <td key={d.date} className="p-1.5 align-top border-b border-gray-100">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => onSelectCell(cell)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                onSelectCell(cell)
+                              }
+                            }}
+                            aria-label={`${shift.name} ${d.dayOfWeek} ${d.formattedDate}: ${cell.count} bạn đăng ký`}
+                            className={`group relative rounded-xl p-2.5 border transition-all text-left cursor-pointer min-h-[116px] flex flex-col focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FA8] ${isFilterDimmed || isStaffDimmed ? 'opacity-30' : ''
+                              } ${hasHighlightedEmployee ? 'ring-2 ring-[#2F6FA8] ring-offset-1' : ''
+                              } ${cellSurfaceClass}`}
+                          >
+                            {/* Header ô: Số lượng + Nhãn trạng thái rõ */}
+                            <div className="flex items-center justify-between gap-1 mb-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {isFullyApproved ? (
+                                  <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                                ) : (
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEmpty
+                                        ? 'bg-rose-500'
+                                        : isThin
+                                          ? 'bg-amber-500'
+                                          : 'bg-[#2F6FA8]'
+                                      }`}
+                                  />
+                                )}
+                                <span
+                                  className={`text-xs font-bold font-mono tabular-nums ${isEmpty
+                                      ? 'text-rose-700'
+                                      : isThin
+                                        ? 'text-amber-800'
+                                        : isFullyApproved
+                                          ? 'text-emerald-800'
+                                          : 'text-[#001D3D]'
+                                    }`}
+                                >
+                                  {cell.count} bạn
+                                </span>
+                              </div>
+
+                              {isEmpty ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-700">
+                                  Trống
+                                </span>
+                              ) : isFullyApproved ? (
+                                <span className="text-[10px] font-mono tabular-nums font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                                  {cell.approvedCount}/{cell.count}
+                                </span>
+                              ) : isThin ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+                                  Mỏng
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono tabular-nums font-semibold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200/70">
+                                  {cell.approvedCount}/{cell.count} chờ
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Thân ô: Dòng nhân sự phẳng, thoáng mắt */}
+                            <div className="space-y-1 flex-1">
+                              {isEmpty ? (
+                                <div className="h-full min-h-[44px] flex items-center justify-center gap-1 text-xs font-semibold text-rose-700">
+                                  <AlertCircle size={12} />
+                                  <span>Cần gọi bù</span>
+                                </div>
+                              ) : (
+                                cell.registeredEmployees.slice(0, 4).map(emp => {
+                                  const isEmpHighlighted = emp.id === highlightEmployeeId
+                                  const isApproved = emp.status === 'APPROVED'
+                                  return (
+                                    <div
+                                      key={emp.registrationId}
+                                      title={emp.name}
+                                      className={`flex items-center justify-between gap-1.5 px-1.5 py-0.5 rounded-md text-xs transition ${isEmpHighlighted
+                                          ? 'bg-[#2F6FA8] text-white font-semibold'
+                                          : 'text-gray-800'
+                                        }`}
+                                    >
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span
+                                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEmpHighlighted
+                                              ? 'bg-white'
+                                              : isApproved
+                                                ? 'bg-emerald-500'
+                                                : 'bg-amber-400'
+                                            }`}
+                                        />
+                                        <span className="truncate font-medium">
+                                          {formatShortStaffName(emp.name)}
+                                        </span>
+                                      </div>
+
+                                      {isApproved && (
+                                        <Check
+                                          size={11}
+                                          className={`shrink-0 ${isEmpHighlighted ? 'text-white' : 'text-emerald-600'
+                                            }`}
+                                        />
+                                      )}
+                                    </div>
+                                  )
+                                })
+                              )}
+
+                              {cell.count > 4 && (
+                                <div className="text-[11px] text-gray-500 font-medium pl-1.5 pt-0.5 font-mono tabular-nums">
+                                  +{cell.count - 4} bạn khác
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Duyệt nhanh: chỉ hiện khi rê chuột vào ô có ca chờ duyệt */}
+                            {cell.pendingCount > 0 && (
+                              <div className="mt-auto pt-1.5 flex justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    onApproveCell(cell.date, cell.shiftId)
+                                  }}
+                                  className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+                                  title="Duyệt tất cả bạn trong ca này"
+                                >
+                                  <Check size={10} />
+                                  <span>Duyệt ca</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+      )}
 
-        {/* Card 2: Danh sách nhân sự ĐÃ nộp lịch rảnh (Xếp theo số ca nộp) */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-xs space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+      {/* ─────────────────────────────────────────────────────────────
+          TAB 2: BẢNG TỔNG HỢP THEO TỪNG NHÂN VIÊN FULL-WIDTH
+         ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'STAFF' && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2 bg-gradient-to-r from-gray-50/60 to-white">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-[#2F6FA8]" />
               <h3 className="text-sm font-bold text-[#001D3D]">
-                Đã Nộp Lịch Rảnh ({coverageData.submittedEmployees.length})
+                Danh Sách Nhân Viên Đăng Ký ({staffOverview.length} nhân sự)
               </h3>
             </div>
-            <span className="text-xs text-gray-500 font-medium">Bấm để lọc ca</span>
+            <span className="text-xs text-gray-500 font-medium font-mono tabular-nums">
+              Đã nộp: <strong className="text-emerald-700">{coverageData.submittedCount}</strong> / Chưa nộp:{' '}
+              <strong className="text-rose-700">
+                {coverageData.totalEmployees - coverageData.submittedCount}
+              </strong>
+            </span>
           </div>
 
-          <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
-            {coverageData.submittedEmployees.map(emp => {
-              const isSelected = highlightEmployeeId === emp.id
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Danh sách nhân viên đăng ký ca"
+            className="overflow-x-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FA8]/40"
+          >
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-50/80 border-b border-gray-100">
+                  <th className="p-3 text-left text-xs font-bold text-gray-600">Nhân Viên</th>
+                  <th className="p-3 text-left text-xs font-bold text-gray-600">Chức Vụ</th>
+                  <th className="p-3 text-center text-xs font-bold text-gray-600">Trạng Thái</th>
+                  <th className="p-3 text-center text-xs font-bold text-gray-600">Tổng Ca</th>
+                  <th className="p-3 text-center text-xs font-bold text-gray-600">Giờ Dự Kiến</th>
+                  <th className="p-3 text-center text-xs font-bold text-gray-600">Tiến Độ Duyệt</th>
+                  <th className="p-3 text-right text-xs font-bold text-gray-600">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-xs">
+                {staffOverview.map(staff => {
+                  const isSelected = highlightEmployeeId === staff.id
 
-              return (
-                <div
-                  key={emp.id}
-                  onClick={() => {
-                    if (isSelected) {
-                      setHighlightEmployeeId(null)
-                    } else {
-                      setHighlightEmployeeId(emp.id)
-                      setActiveTab('MATRIX')
-                    }
-                  }}
-                  className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between gap-2 ${
-                    isSelected
-                      ? 'border-[#2F6FA8] bg-blue-50/80 shadow-xs'
-                      : 'border-gray-100 hover:border-gray-300 hover:bg-gray-50/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-mono shrink-0 ${
-                        isSelected ? 'bg-[#2F6FA8] text-white' : 'bg-gray-100 text-gray-700'
-                      }`}
+                  return (
+                    <tr
+                      key={staff.id}
+                      className={`hover:bg-gray-50/60 transition ${isSelected ? 'bg-blue-50/40' : ''
+                        }`}
                     >
-                      {emp.name.slice(0, 1)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-gray-900 truncate">{emp.name}</div>
-                      <div className="text-[10px] font-mono text-gray-400">
-                        {emp.code || 'Mã NV'}
-                      </div>
-                    </div>
-                  </div>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-[#2F6FA8]/10 text-[#2F6FA8] font-bold flex items-center justify-center text-xs font-mono shrink-0">
+                            {staff.name.slice(0, 1)}
+                          </div>
+                          <div>
+                            <div className="font-bold text-[#001D3D]">{staff.name}</div>
+                            <div className="flex items-center gap-2 text-[11px] font-mono text-gray-400">
+                              <span>{staff.code || 'Chưa có mã'}</span>
+                              {staff.phone && (
+                                <span className="inline-flex items-center gap-0.5 text-gray-500">
+                                  <Phone size={10} />
+                                  {staff.phone}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-xs font-bold font-mono text-[#001D3D] px-2 py-0.5 rounded-full bg-gray-100">
-                      {emp.shiftCount || 0} ca
-                    </span>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-medium text-[11px]">
+                          {staff.positionName}
+                        </span>
+                      </td>
 
-                    {isSelected && (
-                      <span className="text-[10px] font-bold text-[#2F6FA8] bg-blue-100 px-1.5 py-0.5 rounded">
-                        Đang chọn
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+                      <td className="p-3 text-center">
+                        {staff.hasSubmitted ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 size={11} /> Đã nộp lịch
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            <AlertCircle size={11} /> Chưa nộp
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="p-3 text-center font-mono tabular-nums font-bold text-[#001D3D]">
+                        {staff.registeredCount > 0 ? `${staff.registeredCount} ca` : '—'}
+                      </td>
+
+                      <td className="p-3 text-center font-mono tabular-nums text-gray-700">
+                        {staff.totalHours > 0 ? `${staff.totalHours}h` : '—'}
+                      </td>
+
+                      <td className="p-3 text-center">
+                        {staff.registeredCount > 0 ? (
+                          <div className="inline-flex items-center gap-1 font-mono tabular-nums text-xs">
+                            <span className="font-bold text-emerald-700">{staff.approvedCount}</span>
+                            <span className="text-gray-400">/</span>
+                            <span className="text-gray-600">{staff.registeredCount}</span>
+                            {staff.pendingCount > 0 && (
+                              <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-semibold">
+                                {staff.pendingCount} chờ
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {staff.hasSubmitted && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHighlightEmployeeId(staff.id)
+                                setActiveTab('MATRIX')
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 transition cursor-pointer"
+                            >
+                              Xem trên ma trận
+                            </button>
+                          )}
+
+                          {staff.pendingCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => onApproveStaffAll(staff.id)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs cursor-pointer"
+                            >
+                              Duyệt hết ({staff.pendingCount})
+                            </button>
+                          )}
+
+                          {!staff.hasSubmitted && (
+                            <button
+                              type="button"
+                              onClick={onOpenZaloModal}
+                              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer"
+                            >
+                              Nhắc Zalo
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
-
-          {highlightEmployeeId && (
-            <button
-              type="button"
-              onClick={() => setHighlightEmployeeId(null)}
-              className="w-full py-1.5 text-center text-xs font-bold text-gray-500 hover:text-gray-800 transition"
-            >
-              Hủy chọn / Hiện tất cả nhân viên
-            </button>
-          )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
-

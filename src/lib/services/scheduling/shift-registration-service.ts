@@ -92,6 +92,14 @@ let memoryRegistrations: PendingShiftRegistration[] = []
 let serverActiveEmployees: Employee[] | null = null
 let isInitialized = false
 
+const GENERIC_EMP_NAMES = new Set(['', 'nhân viên', 'nhân viên ipos', 'unknown'])
+
+function parseLocalYmd(ymd: string): Date {
+  const parts = (ymd || '').slice(0, 10).split('-').map(Number)
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return new Date()
+  return new Date(parts[0], parts[1] - 1, parts[2])
+}
+
 function getEffectiveEmployees(): Employee[] {
   return serverActiveEmployees && serverActiveEmployees.length > 0
     ? serverActiveEmployees
@@ -106,6 +114,76 @@ function extractRegCode(reg: PendingShiftRegistration): string {
     return reg.employee_id.replace('emp-', '').toUpperCase()
   }
   return ''
+}
+
+function getRegistrationSlotKey(reg: PendingShiftRegistration): string {
+  const rawStore = (reg.store_id || '').trim().toLowerCase()
+  const normStore =
+    rawStore === 'store-002' || rawStore.includes('429')
+      ? 'store-002'
+      : rawStore === 'store-001' || rawStore.includes('hbp') || rawStore.includes('ba phan')
+      ? 'store-001'
+      : rawStore || 'store-001'
+  const normDate = (reg.date || '').slice(0, 10)
+  const normShift = /^shift-00[1-5]$/.test(reg.shift_id)
+    ? reg.shift_id
+    : standardizeShiftId(reg.shift_id, reg.shift_name || reg.notes)
+  const cleanName = (reg.employee_name || '').trim().toLowerCase()
+  const code = extractRegCode(reg)
+  const empKey = !GENERIC_EMP_NAMES.has(cleanName)
+    ? `name:${cleanName}`
+    : code
+    ? `code:${code}`
+    : `id:${(reg.employee_id || '').trim().toLowerCase()}`
+  return `${normStore}|${normDate}|${normShift}|${empKey}`
+}
+
+function dedupeRegistrationsBySlot(regs: PendingShiftRegistration[]): PendingShiftRegistration[] {
+  const seenRejectedIds = new Set<string>()
+  const slotIndexMap = new Map<string, number>()
+  const result: PendingShiftRegistration[] = []
+
+  const getRank = (status?: string) => (status === 'APPROVED' ? 2 : status === 'PENDING' ? 1 : 0)
+
+  for (const reg of regs) {
+    if (reg.status === 'REJECTED') {
+      if (seenRejectedIds.has(reg.id)) continue
+      seenRejectedIds.add(reg.id)
+      result.push(reg)
+      continue
+    }
+
+    const key = getRegistrationSlotKey(reg)
+    const idx = slotIndexMap.get(key)
+    if (idx === undefined) {
+      slotIndexMap.set(key, result.length)
+      result.push(reg)
+      continue
+    }
+
+    const existing = result[idx]
+    const regWins =
+      getRank(reg.status) > getRank(existing.status) ||
+      (getRank(reg.status) === getRank(existing.status) &&
+        Boolean(reg.notes?.trim()) &&
+        !existing.notes?.trim())
+    const primary = regWins ? reg : existing
+    const secondary = regWins ? existing : reg
+
+    result[idx] = {
+      ...secondary,
+      ...primary,
+      employee_name:
+        primary.employee_name && !GENERIC_EMP_NAMES.has(primary.employee_name.trim().toLowerCase())
+          ? primary.employee_name
+          : secondary.employee_name,
+      employee_code: primary.employee_code || secondary.employee_code,
+      notes: primary.notes?.trim() ? primary.notes : secondary.notes,
+      position_id: primary.position_id || secondary.position_id,
+    }
+  }
+
+  return result
 }
 
 function isEmployeeMatch(emp: Employee, reg: PendingShiftRegistration): boolean {
@@ -412,22 +490,22 @@ export class ShiftRegistrationService {
             created_at: String(d.created_at || new Date().toISOString()),
             notes: String(d.notes || ''),
           }))
+          const cleanServerItems = dedupeRegistrationsBySlot(serverItems)
           if (storeId && weekStartDate) {
-            memoryRegistrations = [
+            memoryRegistrations = dedupeRegistrationsBySlot([
               ...memoryRegistrations.filter(
                 r => !(isStoreMatch(r.store_id, storeId) && r.week_start_date === weekStartDate)
               ),
-              ...serverItems,
-            ]
+              ...cleanServerItems,
+            ])
           } else {
-            const serverIds = new Set(serverItems.map(s => s.id))
-            memoryRegistrations = [
+            const serverIds = new Set(cleanServerItems.map(s => s.id))
+            memoryRegistrations = dedupeRegistrationsBySlot([
               ...memoryRegistrations.filter(r => !serverIds.has(r.id)),
-              ...serverItems,
-            ]
+              ...cleanServerItems,
+            ])
           }
-          persistStorage()
-          return serverItems
+          return cleanServerItems
         }
       }
     } catch (err) {
@@ -678,8 +756,10 @@ export class ShiftRegistrationService {
   static getCoverageRate(storeId: string, weekStartDate: string): CoverageRateResult {
     initStorage()
 
-    const weekRegistrations = memoryRegistrations.filter(
-      r => isStoreMatch(r.store_id, storeId) && r.week_start_date === weekStartDate && r.status !== 'REJECTED'
+    const weekRegistrations = dedupeRegistrationsBySlot(
+      memoryRegistrations.filter(
+        r => isStoreMatch(r.store_id, storeId) && r.week_start_date === weekStartDate && r.status !== 'REJECTED'
+      )
     )
 
     // Tập hợp ID, mã NV và họ tên của các nhân sự đã nộp lịch rảnh
@@ -791,7 +871,7 @@ export class ShiftRegistrationService {
     ]
 
     const dayLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật']
-    const mondayDate = new Date(`${weekStartDate}T00:00:00`)
+    const mondayDate = parseLocalYmd(weekStartDate)
     const cells: HeatmapCell[] = []
 
     for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
@@ -801,13 +881,14 @@ export class ShiftRegistrationService {
       const dateFormatted = `${curDate.getDate()}/${curDate.getMonth() + 1}`
 
       standardShifts.forEach(shift => {
-        const regs = memoryRegistrations.filter(
+        const rawRegs = memoryRegistrations.filter(
           r =>
             isStoreMatch(r.store_id, storeId) &&
             r.date === dateStr &&
             (r.shift_id === shift.id || standardizeShiftId(r.shift_id, r.shift_name) === shift.id) &&
             r.status !== 'REJECTED'
         )
+        const regs = dedupeRegistrationsBySlot(rawRegs)
 
         const effectiveEmployees = getEffectiveEmployees()
         const registeredEmployees: HeatmapEmployeeItem[] = regs.map(reg => {
@@ -857,8 +938,10 @@ export class ShiftRegistrationService {
   static getStaffOverview(storeId: string, weekStartDate: string): StaffRegistrationSummary[] {
     initStorage()
 
-    const weekRegistrations = memoryRegistrations.filter(
-      r => isStoreMatch(r.store_id, storeId) && r.week_start_date === weekStartDate && r.status !== 'REJECTED'
+    const weekRegistrations = dedupeRegistrationsBySlot(
+      memoryRegistrations.filter(
+        r => isStoreMatch(r.store_id, storeId) && r.week_start_date === weekStartDate && r.status !== 'REJECTED'
+      )
     )
 
     const effectiveEmployees = getEffectiveEmployees()

@@ -2031,6 +2031,154 @@ function getDefaultIposIntegrationConfig(): ServerIposIntegrationConfig {
   }
 }
 
+const GENERIC_SHIFT_EMP_NAMES = new Set(['', 'nhân viên', 'nhân viên ipos', 'unknown'])
+const STANDARD_SHIFT_IDS = new Set(['shift-001', 'shift-002', 'shift-003', 'shift-004', 'shift-005'])
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function normalizeShiftBucket(shiftId?: string, shiftName?: string, notes?: string): string {
+  const cleanId = (shiftId || '').trim().toLowerCase()
+  if (STANDARD_SHIFT_IDS.has(cleanId)) return cleanId
+  const text = `${shiftName || ''} ${notes || ''}`.toLowerCase()
+  if (text.includes('sáng') || text.includes('morning')) return 'shift-001'
+  if (text.includes('trưa') || text.includes('chiều') || text.includes('afternoon')) return 'shift-002'
+  if (text.includes('tối') || text.includes('đêm') || text.includes('evening') || text.includes('bếp')) return 'shift-003'
+  return cleanId
+}
+
+function getShiftEmployeeIdentityKey(
+  shift: Pick<ServerShiftRegistration, 'employee_id' | 'employee_name'>
+): string {
+  const cleanName = (shift.employee_name || '').trim().toLowerCase()
+  if (!GENERIC_SHIFT_EMP_NAMES.has(cleanName)) {
+    return `name:${cleanName}`
+  }
+  return `id:${(shift.employee_id || '').trim().toLowerCase()}`
+}
+
+export function getShiftSlotDedupeKey(
+  shift: Pick<
+    ServerShiftRegistration,
+    'store_id' | 'date' | 'shift_id' | 'shift_name' | 'notes' | 'employee_id' | 'employee_name'
+  >
+): string {
+  const rawStore = (shift.store_id || '').trim().toLowerCase()
+  const normStore =
+    rawStore === 'store-002' || rawStore.includes('429')
+      ? 'store-002'
+      : rawStore === 'store-001' || rawStore.includes('hbp') || rawStore.includes('ba phan')
+      ? 'store-001'
+      : rawStore || 'store-001'
+  const normDate = (shift.date || '').slice(0, 10)
+  const normShift = normalizeShiftBucket(shift.shift_id, shift.shift_name, shift.notes)
+  const empKey = getShiftEmployeeIdentityKey(shift)
+  return `${normStore}|${normDate}|${normShift}|${empKey}`
+}
+
+function getShiftStatusRank(status?: string): number {
+  const upper = (status || '').trim().toUpperCase()
+  if (upper === 'APPROVED') return 3
+  if (upper === 'PENDING') return 2
+  if (upper === 'DRAFT') return 1
+  if (upper === 'REJECTED') return 0
+  return 1
+}
+
+function pickRealEmployeeName(primary?: string, secondary?: string): string | undefined {
+  const pClean = (primary || '').trim().toLowerCase()
+  if (primary && !GENERIC_SHIFT_EMP_NAMES.has(pClean)) return primary
+  const sClean = (secondary || '').trim().toLowerCase()
+  if (secondary && !GENERIC_SHIFT_EMP_NAMES.has(sClean)) return secondary
+  return primary || secondary
+}
+
+function pickBetterShiftName(primary?: string, secondary?: string): string | undefined {
+  const p = (primary || '').trim()
+  const s = (secondary || '').trim()
+  const pValid = Boolean(p) && !UUID_PATTERN.test(p)
+  const sValid = Boolean(s) && !UUID_PATTERN.test(s)
+  if (pValid && !sValid) return p
+  if (sValid && !pValid) return s
+  if (pValid && sValid) return s.length > p.length ? s : p
+  return p || s || undefined
+}
+
+export function mergeShiftRecords(
+  existing: ServerShiftRegistration,
+  incoming: ServerShiftRegistration
+): ServerShiftRegistration {
+  const existingRank = getShiftStatusRank(existing.status)
+  const incomingRank = getShiftStatusRank(incoming.status)
+
+  let primary = existing
+  let secondary = incoming
+
+  if (incomingRank > existingRank) {
+    primary = incoming
+    secondary = existing
+  } else if (incomingRank === existingRank) {
+    const existingScore = (existing.notes?.trim() ? 2 : 0) + (existing.approved_at ? 1 : 0)
+    const incomingScore = (incoming.notes?.trim() ? 2 : 0) + (incoming.approved_at ? 1 : 0)
+    if (incomingScore > existingScore) {
+      primary = incoming
+      secondary = existing
+    }
+  }
+
+  return {
+    ...secondary,
+    ...primary,
+    employee_name: pickRealEmployeeName(primary.employee_name, secondary.employee_name),
+    shift_name: pickBetterShiftName(primary.shift_name, secondary.shift_name),
+    position_id: primary.position_id || secondary.position_id,
+    approved_by: primary.approved_by || secondary.approved_by,
+    approved_at: primary.approved_at || secondary.approved_at,
+    notes: primary.notes?.trim() ? primary.notes : secondary.notes,
+  }
+}
+
+export function isFakeSeedShift(shift: Pick<ServerShiftRegistration, 'id' | 'notes'>): boolean {
+  const id = (shift.id || '').trim().toLowerCase()
+  return id.startsWith('sch-seed-')
+}
+
+export function dedupeServerShifts(shifts: ServerShiftRegistration[]): {
+  shifts: ServerShiftRegistration[]
+  changed: boolean
+} {
+  const seenRejectedIds = new Set<string>()
+  const slotIndexMap = new Map<string, number>()
+  const result: ServerShiftRegistration[] = []
+  let changed = false
+
+  for (const shift of shifts) {
+    if (isFakeSeedShift(shift)) {
+      changed = true
+      continue
+    }
+    if ((shift.status || '').trim().toUpperCase() === 'REJECTED') {
+      if (seenRejectedIds.has(shift.id)) {
+        changed = true
+        continue
+      }
+      seenRejectedIds.add(shift.id)
+      result.push(shift)
+      continue
+    }
+
+    const slotKey = getShiftSlotDedupeKey(shift)
+    const existingIdx = slotIndexMap.get(slotKey)
+    if (existingIdx !== undefined) {
+      result[existingIdx] = mergeShiftRecords(result[existingIdx], shift)
+      changed = true
+    } else {
+      slotIndexMap.set(slotKey, result.length)
+      result.push(shift)
+    }
+  }
+
+  return { shifts: result, changed }
+}
+
 function normalizeServerDb(db: ServerDatabaseSchema): { db: ServerDatabaseSchema; migrated: boolean } {
   let migrated = false
 
@@ -2084,6 +2232,12 @@ function normalizeServerDb(db: ServerDatabaseSchema): { db: ServerDatabaseSchema
     s => !RESIGNED_IDS.has(s.employee_id) && (!s.employee_name || !RESIGNED_NAMES.has(s.employee_name))
   )
   if (db.shifts.length !== prevShiftsCount) migrated = true
+
+  const dedupedShifts = dedupeServerShifts(db.shifts)
+  if (dedupedShifts.changed) {
+    db.shifts = dedupedShifts.shifts
+    migrated = true
+  }
 
   const prevAttCount = db.attendance.length
   db.attendance = db.attendance.filter(

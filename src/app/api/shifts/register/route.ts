@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerDb, saveServerDb, ServerShiftRegistration } from '@/lib/server/db'
+import {
+  getServerDb,
+  saveServerDb,
+  getShiftSlotDedupeKey,
+  mergeShiftRecords,
+  dedupeServerShifts,
+  ServerShiftRegistration,
+} from '@/lib/server/db'
 import { isIposModuleEnabled } from '@/lib/server/data-mode'
 import { fetchIposShiftRegistrations } from '@/lib/services/ipos/ipos-cloud-client'
 
@@ -32,26 +39,56 @@ export async function GET(req: NextRequest) {
         if (iposRes.success && Array.isArray(iposRes.data) && iposRes.data.length > 0) {
           if (!db.shifts) db.shifts = []
           const existingIds = new Set(db.shifts.map((s) => s.id))
+          const slotIndexMap = new Map<string, number>()
+          db.shifts.forEach((s, idx) => {
+            if ((s.status || '').toUpperCase() !== 'REJECTED') {
+              slotIndexMap.set(getShiftSlotDedupeKey(s), idx)
+            }
+          })
           let hasNew = false
 
           for (const item of iposRes.data) {
-            if (!existingIds.has(item.id)) {
-              const newReg: ServerShiftRegistration = {
-                id: item.id,
-                employee_id: item.employee_id,
-                employee_name: item.employee_name,
-                store_id: item.store_id,
-                week_start_date: item.week_start_date,
-                date: item.date,
-                shift_id: item.shift_id,
-                shift_name: item.shift_name,
-                position_id: item.position_id || 'pos-001',
-                status: item.status,
-                created_at: item.created_at,
-                notes: item.notes,
+            if (existingIds.has(item.id)) continue
+
+            const newReg: ServerShiftRegistration = {
+              id: item.id,
+              employee_id: item.employee_id,
+              employee_name: item.employee_name,
+              store_id: item.store_id,
+              week_start_date: item.week_start_date,
+              date: item.date,
+              shift_id: item.shift_id,
+              shift_name: item.shift_name,
+              position_id: item.position_id || 'pos-001',
+              status: item.status,
+              created_at: item.created_at,
+              notes: item.notes,
+            }
+
+            const slotKey = getShiftSlotDedupeKey(newReg)
+            const existingSlotIdx = slotIndexMap.get(slotKey)
+
+            if ((newReg.status || '').toUpperCase() !== 'REJECTED' && existingSlotIdx !== undefined) {
+              const before = db.shifts[existingSlotIdx]
+              const merged = mergeShiftRecords(before, newReg)
+              const changed =
+                (merged.notes || '') !== (before.notes || '') ||
+                merged.status !== before.status ||
+                (merged.position_id || '') !== (before.position_id || '') ||
+                (merged.shift_name || '') !== (before.shift_name || '') ||
+                (merged.approved_at || '') !== (before.approved_at || '') ||
+                (merged.employee_name || '') !== (before.employee_name || '')
+              if (changed) {
+                db.shifts[existingSlotIdx] = merged
+                hasNew = true
+              }
+              existingIds.add(newReg.id)
+            } else {
+              if ((newReg.status || '').toUpperCase() !== 'REJECTED') {
+                slotIndexMap.set(slotKey, db.shifts.length)
               }
               db.shifts.push(newReg)
-              existingIds.add(item.id)
+              existingIds.add(newReg.id)
               hasNew = true
             }
           }
@@ -66,7 +103,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    let list = db.shifts || []
+    let list = dedupeServerShifts(db.shifts || []).shifts
 
     if (status && status !== 'all') {
       list = list.filter((s) => s.status.toUpperCase() === status.toUpperCase())

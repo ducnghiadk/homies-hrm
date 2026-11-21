@@ -31,14 +31,17 @@ export interface ShiftQuota {
 
 // ─── Helpers to generate real dynamic dates ───
 export function getMondayOfDate(d: Date): Date {
-  const date = new Date(d)
-  const day = date.getDay()
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1) // adjust when day is sunday
-  return new Date(date.setDate(diff))
+  const local = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const day = local.getDay()
+  const diff = local.getDate() - day + (day === 0 ? -6 : 1) // adjust when day is sunday
+  return new Date(local.getFullYear(), local.getMonth(), diff)
 }
 
 export function formatDateString(d: Date): string {
-  return d.toISOString().split('T')[0]
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 // ─── In-memory Storage with LocalStorage persistence helper ───
