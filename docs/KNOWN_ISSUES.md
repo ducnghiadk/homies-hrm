@@ -1,5 +1,18 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-22 (Tách biệt kho Lịch Rảnh vs Lịch Chính Thức theo Hướng A — Vá dứt điểm 6 lỗ hổng xếp lịch qua Pass A + B + C):
+  1) Nguyên nhân (6 lỗ hổng):
+     - Lịch rảnh từ iPOS/nhân viên nộp chung kho với lịch phân ca chính thức, dễ bị lẫn hoặc iPOS ghi đè sau khi quản lý chốt lịch.
+     - Hàm `isWeekPublished()` từng trả về `true` cứng, và trang `/my-schedule` lấy cả dữ liệu chưa chốt hoặc mock khi không có ca, cũng chỉ giữ 1 ca/ngày (`Map<string, Schedule>`) làm mất ca khi nhân viên làm gãy 2 ca/ngày.
+     - Trang `/schedule/registrations` từng mang giao diện "Duyệt Đăng Ký Ca" gây hiểu lầm phải duyệt từng ô trước khi xếp ca.
+     - Xóa/đổi ca trước đây chỉ khớp `(employeeId, date)` thay vì `(id / shiftId)`, dễ xóa nhầm toàn bộ ca trong ngày.
+     - Trang `/shifts/register` từng dùng `toISOString().split('T')[0]` gây lệch `-1 ngày` theo múi giờ UTC, và không khóa khi tuần đã chốt lịch chính thức.
+  2) Cách xử lý triệt để:
+     - **Pass A (Backend SSOT & Cloud)**: Thêm `official_schedules`, `schedule_weeks`, `schedule_change_logs` vào `supabase-store.ts` (19 keys) và `db.ts`; tạo API `/api/schedules` với chế độ Hướng A (`published_only=1`); cập nhật `/api/shifts` ưu tiên lịch `published` khi tuần đã chốt; khóa `POST /api/shifts/register` bằng HTTP `409 WEEK_ALREADY_PUBLISHED` sau khi chốt.
+     - **Pass B (Giao diện Quản lý)**: Đồng bộ `schedule-service.ts`, `mock-data.ts`, `ManagerSchedulingBoard.tsx` dùng `/api/schedules`, thêm nút `Điền nhanh vào Bản Nháp` và `Chốt Lịch Chính Thức`, sửa xóa/di chuyển đúng `shiftId + scheduleId`; chuyển `/schedule/registrations` thành bản đồ **Lịch Rảnh Tuần** chỉ xem + nút `Mở Bảng Xếp Lịch tuần này` giữ nguyên ngữ cảnh `?storeId=...&weekStart=...`.
+     - **Pass C (Giao diện Nhân viên)**: `/my-schedule` đọc `/api/schedules?published_only=1` (Hướng A — ẩn nháp/lịch rảnh, bỏ fallback mock), nhóm nhiều ca/ngày theo `schedulesByDate`, đồng bộ nhân sự qua `/api/employees?status=active`; `/shifts/register` sửa ngày local không lệch UTC, hiển thị banner khóa và tự vô hiệu hóa chỉnh sửa khi tuần đã chốt.
+     - Spec kiến trúc: `docs/superpowers/specs/2026-11-21-scheduling-flow-hardening-design.md`.
+
 - Đã hoàn thiện 2026-11-21 (Pass C - Lớp lưu trữ đám mây Supabase bền vững sẵn sàng Deploy Vercel + Chỉ báo kho dữ liệu):
   1) Nguyên nhân:
      - Mọi thay đổi vận hành (công tắc iPOS, duyệt ca, chấm công, nhân sự) trước đây lưu trong file cục bộ `data/server-db.json` (trên Vercel Serverless chỉ là `/tmp` tạm thời, sẽ mất sạch khi máy chủ khởi động lại).

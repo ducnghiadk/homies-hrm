@@ -5,7 +5,6 @@ import {
   Layers,
   Users,
   CheckCircle2,
-  Check,
   Filter,
   Phone,
   MessageSquare,
@@ -28,9 +27,9 @@ interface RegistrationMatrixAndStaffViewProps {
   filterStatus: 'ALL' | 'RISK' | 'PENDING' | 'APPROVED'
   onSelectFilterStatus: (status: 'ALL' | 'RISK' | 'PENDING' | 'APPROVED') => void
   onSelectCell: (cell: HeatmapCell) => void
-  onApproveCell: (date: string, shiftId: string) => void
+  onApproveCell?: (date: string, shiftId: string) => void
   onOpenZaloModal: () => void
-  onApproveStaffAll: (staffId: string) => void
+  onApproveStaffAll?: (staffId: string) => void
 }
 
 function formatShortStaffName(fullName: string): string {
@@ -40,17 +39,13 @@ function formatShortStaffName(fullName: string): string {
 }
 
 export default function RegistrationMatrixAndStaffView({
-  selectedStoreId: _selectedStoreId,
-  selectedWeek: _selectedWeek,
   heatmapCells,
   staffOverview,
   coverageData,
   filterStatus,
   onSelectFilterStatus,
   onSelectCell,
-  onApproveCell,
   onOpenZaloModal,
-  onApproveStaffAll,
 }: RegistrationMatrixAndStaffViewProps) {
   const [activeTab, setActiveTab] = useState<'MATRIX' | 'STAFF'>('MATRIX')
   const [highlightEmployeeId, setHighlightEmployeeId] = useState<string | null>(null)
@@ -76,17 +71,12 @@ export default function RegistrationMatrixAndStaffView({
   }, [heatmapCells])
 
   const thinShiftCount = React.useMemo(
-    () => heatmapCells.filter(c => c.status === 'RISK' || c.status === 'EMPTY').length,
+    () => heatmapCells.filter(c => c.count < 2).length,
     [heatmapCells]
   )
 
-  const pendingCellCount = React.useMemo(
-    () => heatmapCells.filter(c => c.pendingCount > 0).length,
-    [heatmapCells]
-  )
-
-  const approvedCellCount = React.useMemo(
-    () => heatmapCells.filter(c => c.count > 0 && c.approvedCount === c.count).length,
+  const fullCellCount = React.useMemo(
+    () => heatmapCells.filter(c => c.count >= 2).length,
     [heatmapCells]
   )
 
@@ -214,24 +204,13 @@ export default function RegistrationMatrixAndStaffView({
 
             <button
               type="button"
-              onClick={() => onSelectFilterStatus('PENDING')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${filterStatus === 'PENDING'
-                  ? 'bg-[#2F6FA8] text-white shadow-xs'
-                  : 'bg-blue-50 text-[#2F6FA8] hover:bg-blue-100 border border-blue-200/70'
-                }`}
-            >
-              Chờ duyệt ({pendingCellCount})
-            </button>
-
-            <button
-              type="button"
               onClick={() => onSelectFilterStatus('APPROVED')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${filterStatus === 'APPROVED'
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 font-mono tabular-nums ${filterStatus === 'APPROVED'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/70'
                 }`}
             >
-              Đã duyệt ({approvedCellCount})
+              Đủ người ({fullCellCount})
             </button>
           </div>
         </div>
@@ -294,11 +273,11 @@ export default function RegistrationMatrixAndStaffView({
                 Ma Trận Phủ Ca Tuần ({uniqueDates.length} ngày x 3 ca)
               </h3>
               <span className="text-xs text-gray-500 font-medium hidden sm:inline">
-                — Bấm vào ô bất kỳ để xem chi tiết &amp; duyệt từng bạn
+                — Bấm vào ô bất kỳ để xem chi tiết nhân sự rảnh khung giờ này
               </span>
             </div>
 
-            {/* Chú thích 4 sắc thái rõ ràng */}
+            {/* Chú thích 3 sắc thái rõ ràng */}
             <div className="flex items-center gap-3.5 text-xs font-medium flex-wrap">
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
@@ -309,12 +288,8 @@ export default function RegistrationMatrixAndStaffView({
                 <span className="text-gray-700">Ca mỏng (1 bạn)</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-white border border-gray-300" />
-                <span className="text-gray-700">Đủ người · Chờ duyệt</span>
-              </div>
-              <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                <span className="text-gray-700">Đã duyệt xong</span>
+                <span className="text-gray-700">Đủ người rảnh (&ge;2 bạn)</span>
               </div>
             </div>
           </div>
@@ -379,12 +354,11 @@ export default function RegistrationMatrixAndStaffView({
 
                       const isEmpty = cell.count === 0
                       const isThin = cell.count === 1
-                      const isFullyApproved = cell.count > 0 && cell.approvedCount === cell.count
+                      const isEnough = cell.count >= 2
 
                       const isFilterDimmed =
-                        (filterStatus === 'RISK' && cell.status === 'FULL') ||
-                        (filterStatus === 'PENDING' && cell.pendingCount === 0) ||
-                        (filterStatus === 'APPROVED' && !(cell.count > 0 && cell.approvedCount > 0))
+                        (filterStatus === 'RISK' && cell.count >= 2) ||
+                        (filterStatus === 'APPROVED' && cell.count < 2)
 
                       const hasHighlightedEmployee =
                         Boolean(highlightEmployeeId) &&
@@ -395,9 +369,7 @@ export default function RegistrationMatrixAndStaffView({
                         ? 'bg-rose-50/85 hover:bg-rose-50 border-rose-200 hover:border-rose-400'
                         : isThin
                           ? 'bg-amber-50/65 hover:bg-amber-50 border-amber-200 hover:border-amber-400'
-                          : isFullyApproved
-                            ? 'bg-emerald-50/60 hover:bg-emerald-50 border-emerald-200 hover:border-emerald-400'
-                            : 'bg-white hover:bg-blue-50/30 border-gray-200/90 hover:border-[#2F6FA8]/60 shadow-2xs'
+                          : 'bg-emerald-50/60 hover:bg-emerald-50 border-emerald-200 hover:border-emerald-400'
 
                       return (
                         <td key={d.date} className="p-1.5 align-top border-b border-gray-100">
@@ -411,24 +383,19 @@ export default function RegistrationMatrixAndStaffView({
                                 onSelectCell(cell)
                               }
                             }}
-                            aria-label={`${shift.name} ${d.dayOfWeek} ${d.formattedDate}: ${cell.count} bạn đăng ký`}
+                            aria-label={`${shift.name} ${d.dayOfWeek} ${d.formattedDate}: ${cell.count} bạn rảnh`}
                             className={`group relative rounded-xl p-2.5 border transition-all text-left cursor-pointer min-h-[116px] flex flex-col focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FA8] ${isFilterDimmed || isStaffDimmed ? 'opacity-30' : ''
                               } ${hasHighlightedEmployee ? 'ring-2 ring-[#2F6FA8] ring-offset-1' : ''
                               } ${cellSurfaceClass}`}
                           >
-                            {/* Header ô: Số lượng + Nhãn trạng thái rõ */}
+                            {/* Header ô: Số lượng người rảnh + Nhãn mức phủ */}
                             <div className="flex items-center justify-between gap-1 mb-2">
                               <div className="flex items-center gap-1.5 min-w-0">
-                                {isFullyApproved ? (
+                                {isEnough ? (
                                   <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
                                 ) : (
                                   <span
-                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEmpty
-                                        ? 'bg-rose-500'
-                                        : isThin
-                                          ? 'bg-amber-500'
-                                          : 'bg-[#2F6FA8]'
-                                      }`}
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEmpty ? 'bg-rose-500' : 'bg-amber-500'}`}
                                   />
                                 )}
                                 <span
@@ -436,9 +403,7 @@ export default function RegistrationMatrixAndStaffView({
                                       ? 'text-rose-700'
                                       : isThin
                                         ? 'text-amber-800'
-                                        : isFullyApproved
-                                          ? 'text-emerald-800'
-                                          : 'text-[#001D3D]'
+                                        : 'text-emerald-800'
                                     }`}
                                 >
                                   {cell.count} bạn
@@ -449,22 +414,18 @@ export default function RegistrationMatrixAndStaffView({
                                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-700">
                                   Trống
                                 </span>
-                              ) : isFullyApproved ? (
-                                <span className="text-[10px] font-mono tabular-nums font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
-                                  {cell.approvedCount}/{cell.count}
-                                </span>
                               ) : isThin ? (
                                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
                                   Mỏng
                                 </span>
                               ) : (
-                                <span className="text-[10px] font-mono tabular-nums font-semibold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200/70">
-                                  {cell.approvedCount}/{cell.count} chờ
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                                  Đủ rảnh
                                 </span>
                               )}
                             </div>
 
-                            {/* Thân ô: Dòng nhân sự phẳng, thoáng mắt */}
+                            {/* Thân ô: Dòng nhân sự rảnh, phẳng thoáng mắt */}
                             <div className="space-y-1 flex-1">
                               {isEmpty ? (
                                 <div className="h-full min-h-[44px] flex items-center justify-center gap-1 text-xs font-semibold text-rose-700">
@@ -474,7 +435,6 @@ export default function RegistrationMatrixAndStaffView({
                               ) : (
                                 cell.registeredEmployees.slice(0, 4).map(emp => {
                                   const isEmpHighlighted = emp.id === highlightEmployeeId
-                                  const isApproved = emp.status === 'APPROVED'
                                   return (
                                     <div
                                       key={emp.registrationId}
@@ -488,23 +448,15 @@ export default function RegistrationMatrixAndStaffView({
                                         <span
                                           className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEmpHighlighted
                                               ? 'bg-white'
-                                              : isApproved
-                                                ? 'bg-emerald-500'
-                                                : 'bg-amber-400'
+                                              : isThin
+                                                ? 'bg-amber-400'
+                                                : 'bg-emerald-500'
                                             }`}
                                         />
                                         <span className="truncate font-medium">
                                           {formatShortStaffName(emp.name)}
                                         </span>
                                       </div>
-
-                                      {isApproved && (
-                                        <Check
-                                          size={11}
-                                          className={`shrink-0 ${isEmpHighlighted ? 'text-white' : 'text-emerald-600'
-                                            }`}
-                                        />
-                                      )}
                                     </div>
                                   )
                                 })
@@ -516,24 +468,6 @@ export default function RegistrationMatrixAndStaffView({
                                 </div>
                               )}
                             </div>
-
-                            {/* Duyệt nhanh: chỉ hiện khi rê chuột vào ô có ca chờ duyệt */}
-                            {cell.pendingCount > 0 && (
-                              <div className="mt-auto pt-1.5 flex justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                                <button
-                                  type="button"
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    onApproveCell(cell.date, cell.shiftId)
-                                  }}
-                                  className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs inline-flex items-center gap-1 cursor-pointer"
-                                  title="Duyệt tất cả bạn trong ca này"
-                                >
-                                  <Check size={10} />
-                                  <span>Duyệt ca</span>
-                                </button>
-                              </div>
-                            )}
                           </div>
                         </td>
                       )
@@ -578,9 +512,8 @@ export default function RegistrationMatrixAndStaffView({
                   <th className="p-3 text-left text-xs font-bold text-gray-600">Nhân Viên</th>
                   <th className="p-3 text-left text-xs font-bold text-gray-600">Chức Vụ</th>
                   <th className="p-3 text-center text-xs font-bold text-gray-600">Trạng Thái</th>
-                  <th className="p-3 text-center text-xs font-bold text-gray-600">Tổng Ca</th>
-                  <th className="p-3 text-center text-xs font-bold text-gray-600">Giờ Dự Kiến</th>
-                  <th className="p-3 text-center text-xs font-bold text-gray-600">Tiến Độ Duyệt</th>
+                  <th className="p-3 text-center text-xs font-bold text-gray-600">Số Ca Rảnh</th>
+                  <th className="p-3 text-center text-xs font-bold text-gray-600">Tổng Giờ Rảnh</th>
                   <th className="p-3 text-right text-xs font-bold text-gray-600">Thao Tác</th>
                 </tr>
               </thead>
@@ -640,23 +573,6 @@ export default function RegistrationMatrixAndStaffView({
                         {staff.totalHours > 0 ? `${staff.totalHours}h` : '—'}
                       </td>
 
-                      <td className="p-3 text-center">
-                        {staff.registeredCount > 0 ? (
-                          <div className="inline-flex items-center gap-1 font-mono tabular-nums text-xs">
-                            <span className="font-bold text-emerald-700">{staff.approvedCount}</span>
-                            <span className="text-gray-400">/</span>
-                            <span className="text-gray-600">{staff.registeredCount}</span>
-                            {staff.pendingCount > 0 && (
-                              <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-semibold">
-                                {staff.pendingCount} chờ
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {staff.hasSubmitted && (
@@ -669,16 +585,6 @@ export default function RegistrationMatrixAndStaffView({
                               className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 transition cursor-pointer"
                             >
                               Xem trên ma trận
-                            </button>
-                          )}
-
-                          {staff.pendingCount > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => onApproveStaffAll(staff.id)}
-                              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs cursor-pointer"
-                            >
-                              Duyệt hết ({staff.pendingCount})
                             </button>
                           )}
 

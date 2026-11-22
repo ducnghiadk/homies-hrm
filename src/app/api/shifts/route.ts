@@ -2,16 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   getServerDb,
   saveServerDb,
-  getInitialShiftsSeed,
   STANDARD_FNB_SHIFTS,
   isFakeSeedShift,
   getShiftSlotDedupeKey,
   mergeShiftRecords,
-  dedupeServerShifts,
+  normalizeStoreId,
+  getCalendarWeekStart,
+  getCalendarWeekEnd,
+  isWeekPublishedInDb,
   type ServerShiftRegistration,
 } from '@/lib/server/db'
 import { isIposModuleEnabled } from '@/lib/server/data-mode'
 import { fetchIposWorkSchedule, type MappedIposSchedule } from '@/lib/services/ipos/ipos-cloud-client'
+
+type CompatibilityShiftItem = (ServerShiftRegistration | MappedIposSchedule) & {
+  assigned_position_id?: string
+  modified_after_publish?: boolean
+  change_reason?: string
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,8 +32,10 @@ export async function GET(req: NextRequest) {
     const month = searchParams.get('month') || searchParams.get('period')
     const fromDateParam = searchParams.get('from_date')
     const toDateParam = searchParams.get('to_date')
+    const publishedOnly =
+      searchParams.get('published_only') === '1' || searchParams.get('published_only') === 'true'
 
-    // Xác định khoảng thời gian truy vấn cho iPOS Cloud
+    // Xác định khoảng thời gian truy vấn theo lịch dương thuần Việt Nam (UTC+7)
     let fromDate = fromDateParam || date
     let toDate = toDateParam || date
 
@@ -33,24 +43,51 @@ export async function GET(req: NextRequest) {
       fromDate = `${month}-01`
       toDate = `${month}-31`
     } else if (!fromDate && weekStart) {
-      fromDate = weekStart
-      const startDate = new Date(weekStart)
-      startDate.setDate(startDate.getDate() + 6)
-      toDate = startDate.toISOString().slice(0, 10)
+      const monday = getCalendarWeekStart(weekStart)
+      fromDate = monday
+      toDate = getCalendarWeekEnd(monday)
     } else if (!fromDate && !toDate) {
-      // Mặc định lấy trọn vẹn tháng hiện tại theo thời gian thực
-      const currMonth = new Date().toISOString().slice(0, 7)
+      const vnNow = new Date(Date.now() + 7 * 3600_000)
+      const currMonth = vnNow.toISOString().slice(0, 7)
       fromDate = `${currMonth}-01`
       toDate = `${currMonth}-31`
     }
 
     const db = await getServerDb()
 
-    let list: Array<ServerShiftRegistration | MappedIposSchedule> = []
-    let dataSource = 'homies_native'
+    // 1. Luôn ưu tiên Lịch Đã Chốt Chính Thức trên Homies (Kho 2: official_schedules + schedule_weeks)
+    const publishedOfficial: CompatibilityShiftItem[] = (db.official_schedules || [])
+      .filter((s) => s.status === 'published' && isWeekPublishedInDb(db, s.store_id, s.week_start_date))
+      .map((s) => ({
+        id: s.id,
+        employee_id: s.employee_id,
+        employee_name: s.employee_name,
+        store_id: normalizeStoreId(s.store_id),
+        week_start_date: getCalendarWeekStart(s.week_start_date || s.date),
+        date: s.date,
+        shift_id: s.shift_id,
+        shift_name: s.shift_name,
+        position_id: s.assigned_position_id || 'pos-001',
+        assigned_position_id: s.assigned_position_id || 'pos-001',
+        status: 'APPROVED' as const,
+        created_at: s.created_at,
+        notes: s.notes,
+        modified_after_publish: s.modified_after_publish,
+        change_reason: s.change_reason,
+      }))
 
-    if (isIposModuleEnabled(db, 'shifts')) {
-      // 1. Tải dữ liệu ca làm việc trực tiếp từ iPOS Cloud khi công tắc Lịch ca đang BẬT
+    const publishedWeekKeys = new Set(
+      (db.schedule_weeks || [])
+        .filter((w) => w.status === 'published')
+        .map((w) => `${normalizeStoreId(w.store_id)}|${getCalendarWeekStart(w.week_start)}`)
+    )
+
+    let list: CompatibilityShiftItem[] = publishedOfficial
+    let dataSource = 'homies_official'
+
+    // 2. Nếu không yêu cầu published_only và công tắc iPOS đang BẬT:
+    // chỉ bổ sung dữ liệu iPOS cho các tuần CHƯA chốt chính thức trên Homies (tuyệt đối không ghi đè tuần đã chốt)
+    if (!publishedOnly && isIposModuleEnabled(db, 'shifts')) {
       const iposRes = await fetchIposWorkSchedule({
         storeId,
         fromDate,
@@ -58,21 +95,23 @@ export async function GET(req: NextRequest) {
       })
 
       if (iposRes.success && !iposRes.isFallback && iposRes.data.length > 0) {
-        list = iposRes.data
-        dataSource = 'ipos_cloud'
-      } else {
-        // 2. Cơ chế Dự phòng An toàn (Fallback): Đọc từ CSDL nội bộ
-        list = dedupeServerShifts(db.shifts || []).shifts
-        dataSource = 'internal_db'
+        const iposFallback = iposRes.data.filter((item) => {
+          const itemWeekKey = `${normalizeStoreId(item.store_id)}|${getCalendarWeekStart(item.date)}`
+          return !publishedWeekKeys.has(itemWeekKey)
+        })
+        list = [...publishedOfficial, ...iposFallback]
+        dataSource =
+          publishedOfficial.length > 0
+            ? iposFallback.length > 0
+              ? 'homies_official+ipos_cloud'
+              : 'homies_official'
+            : 'ipos_cloud'
       }
-    } else {
-      // Chế độ Homies Tự Vận Hành: Không gọi iPOS
-      list = dedupeServerShifts(db.shifts || []).shifts
-      dataSource = 'homies_native'
     }
 
     if (storeId && storeId !== 'ALL') {
-      list = list.filter((s) => s.store_id === storeId)
+      const targetStore = normalizeStoreId(storeId)
+      list = list.filter((s) => normalizeStoreId(s.store_id) === targetStore)
     }
 
     if (month) {
@@ -80,7 +119,8 @@ export async function GET(req: NextRequest) {
     }
 
     if (weekStart) {
-      list = list.filter((s) => s.week_start_date === weekStart)
+      const targetWeek = getCalendarWeekStart(weekStart)
+      list = list.filter((s) => getCalendarWeekStart(s.week_start_date || s.date) === targetWeek)
     }
 
     if (fromDateParam) {

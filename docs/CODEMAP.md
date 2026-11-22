@@ -24,10 +24,11 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `src/app/api/auth/login/route.ts`: POST dang nhap, cap session token cho Bot dong vai (Nhan vien, Quan ly, CEO).
   + `src/app/api/stores/route.ts`: GET & POST quan ly danh sach co so, toa do GPS, ban kinh check-in va ma PIN bao mat cua tung quan.
   + `src/app/api/employees/route.ts`: GET & POST/PUT danh sach 14 nhan vien that va cap nhat ho so/muc luong gio.
-  + `src/app/api/shifts/route.ts`: GET lich ca theo co so, theo thang (T8/T9), tra ve 5 khung ca that F&B (Sang, Trua, Toi, Cao diem trua, Don quay dem) va POST quan ly khung ca mau.
+  + `src/app/api/schedules/route.ts`: SSOT Lich Chinh Thuc Homies (GET doc draft/published, ho tro `published_only=1` Huong A; POST `publish_week`, `unpublish_week`, `seed_from_availability`, `replace_week_draft`, `save_draft_meta`, `upsert` kem `change_reason`; DELETE `scope=draft_week` hoac dung 1 ca theo `id` / 4 khoa).
+  + `src/app/api/shifts/route.ts`: GET uu tien lich `published` tu Homies `official_schedules` khi tuan da chot, chi bo sung fallback iPOS cho tuan chua chot (dung pure calendar helpers); POST quan ly khung ca mau.
   + `src/app/api/schedule-rules/route.ts`: GET & POST quan ly bang quy tac xep ca F&B (dinh muc ngay 8.5h, OT tuan, thoi gian nghi giua 2 ca, clopening) va ngoai le theo vi tri tren CSDL may chu.
   + `src/app/api/master-data/route.ts`: GET & POST quan ly danh muc dung chung (phong ban, chuc vu, loai nghi phep) dong bo CSDL may chu.
-  + `src/app/api/shifts/register/route.ts`: GET & POST dang ky ca ranh cua nhan vien (Mobile bundle gui len, ManagerSchedulingBoard va Trang phe duyet ca tai ve tu server).
+  + `src/app/api/shifts/register/route.ts`: GET tra kem `week_status` & `week_meta`; POST chuan hoa `store_id`/`week_start_date` va khoa bang HTTP `409` (`WEEK_ALREADY_PUBLISHED`) neu tuan da chot lich chinh thuc.
   + `src/app/forgot-password/page.tsx`: trang Quen mat khau voi Hotline 1 phut 0919.246.273 va form gui yeu cau cap lai.
   + `src/app/api/shifts/approve/route.ts`: POST duyet ca lam viec (kiem tra quyen Store Manager / CEO).
   + `src/app/api/attendance/route.ts`: GET & POST lich su cham cong, loc theo chi nhanh, ngay, thang va nhan vien.
@@ -134,22 +135,23 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - File chinh: `src/app/settings/schedule-rules/**/*`, `src/app/settings/staffing/page.tsx`, `src/lib/adapters/staffing-adapter.ts`, `src/components/staffing/*`, `src/lib/staffing/*`, `src/lib/mock-data-settings.ts`
 - Dung khi: sua dinh muc ca, nhu cau tuan, cong cu tinh nhan su
 
-### Dang ky ca va Phan ca tuan
-- Mo ta: dang ky ca ranh tuan Mobile-First, quan ly phan ca theo tuan, 1-cham duyet dang ky ca hop le, ban do thoi gian trong (Availability Heatmap 7 ngay x 3 ca) va ty le nop lich ranh. Giao dien tai cau truc 3 tang Executive SaaS F&B, 2 goc nhin linh hoat Theo Khung Ca va Theo Tuyen Nhan Vien, drawer phe duyet tung nguoi/tung o ca va modal soan nhac Zalo chuan van phong.
+### Dang ky ca ranh va Xep lich chinh thuc (Tach kho Input vs Official - Huong A)
+- Mo ta: Tach biet hoan toan kho Lich Ranh dau vao (`/schedule/registrations` va `/shifts/register`) voi kho Lich Chinh Thuc Homies (`Draft -> Published` tai `/schedule` qua `/api/schedules`). Nhan vien xem `/my-schedule` theo che do Huong A (`published_only=1`, ho tro nhieu ca/ngay). Sau khi quan ly `Chot Lich Chinh Thuc`, nhan vien bi khoa chinh sua lich ranh tuan do (`409 WEEK_ALREADY_PUBLISHED`) va iPOS khong bao gio ghi de lich da chot.
 - File chinh:
-  + `src/app/shifts/register/page.tsx`: dang ky ca ranh cho nhan vien tren di dong
-  + `src/app/my-schedule/page.tsx`: xem lich lam viec ca nhan
+  + `src/app/api/schedules/route.ts`: API SSOT quan ly Draft/Published va audit log thay doi lich (`official_schedules`, `schedule_weeks`, `schedule_change_logs`)
+  + `src/app/shifts/register/page.tsx`: dang ky ca ranh cho nhan vien (chuan hoa ngay local khong lech UTC, tu dong khoa va hien banner khi tuan da chot)
+  + `src/app/my-schedule/page.tsx`: xem lich lam viec ca nhan theo Huong A (`published_only=1`, gom nhom da ca moi ngay `schedulesByDate`, dong bo nhan su qua `/api/employees?status=active`)
   + `src/app/schedule/page.tsx`: bang dieu hanh xep ca tong the
-  + `src/app/schedule/registrations/page.tsx`: trang chu Duyet Dang Ky Ca & Ban Do Thoi Gian Trong (Bố cục 3 tầng SaaS F&B)
-  + `src/components/scheduling/registrations/RegistrationHeaderAndKpis.tsx`: Tang 1 Command Header va Tang 2 Macro 4 KPI Cards
-  + `src/components/scheduling/registrations/RegistrationMatrixAndStaffView.tsx`: Tang 3 Ma tran 7x3, Bang tong hop nhan vien va theo doi da/chua nop
-  + `src/components/scheduling/registrations/RegistrationCellDrawer.tsx`: Drawer chi tiet o ca & duyet tung nguoi + Modal nhac Zalo
-  + `src/components/scheduling/ManagerSchedulingBoard.tsx`: bang phan ca truc quan cho quan ly
-  + `src/lib/services/scheduling/shift-registration-service.ts`: service xu ly du lieu dang ky ca, dong bo nhan su that tu `/api/employees?status=active` (`syncEmployeesFromServer`), tinh ty le coverage va loc loai bo CEO khoi chi nhanh
-  + `src/app/api/shifts/approve/route.ts`: API may chu phe duyet hoac tu choi ca dang ky
+  + `src/app/schedule/registrations/page.tsx`: trang **Lich Ranh Tuan** (ban do tham khao ca ranh iPOS & tu nop, link `?storeId=...&weekStart=...` sang `/schedule`, hien trang thai tuan da chot/chua chot)
+  + `src/components/scheduling/registrations/RegistrationHeaderAndKpis.tsx`: Tang 1 Header **Lich Ranh Tuan**, badge trang thai chot lich, nut `Mo Bang Xep Lich tuan nay`, va KPI `Tong Khung Gio Ranh`
+  + `src/components/scheduling/registrations/RegistrationMatrixAndStaffView.tsx`: Tang 3 Ma tran 7x3 va bang theo doi chi xem/loc (`Tat ca`, `Can bu`, `Du nguoi`), khong con luong duyet o ca
+  + `src/components/scheduling/registrations/RegistrationCellDrawer.tsx`: Drawer chi tiet o ca & Modal nhac Zalo
+  + `src/components/scheduling/ManagerSchedulingBoard.tsx`: bang phan ca truc quan cho quan ly (hydrate `/api/schedules`, nut `Dien nhanh vao Ban Nhap` tu lich ranh, nut `Chot Lich Chinh Thuc`, xoa/doi dung `shiftId + scheduleId`)
+  + `src/lib/services/scheduling/shift-registration-service.ts`: service xu ly du lieu dang ky ca ranh, dong bo nhan su that tu `/api/employees?status=active` (`syncEmployeesFromServer`), tinh ty le coverage va loc loai bo CEO khoi chi nhanh
+  + `src/app/api/shifts/approve/route.ts`: API di san phe duyet ca (khong dung trong luong Lich Ranh Tuan moi)
   + `src/app/api/stores/route.ts`: API danh sach chi nhanh (mac dinh chi tra cac co so dang hoat dong `is_active !== false`)
-  + `src/lib/services/scheduling/schedule-service.ts`: quan ly lich phan ca chinh thuc
-- Dung khi: sua flow dang ky ca di dong, phe duyet ca tuan, xep lich lam viec, radar phat hien lung ca.
+  + `src/lib/services/scheduling/schedule-service.ts`: quan ly ban nhap & lich phan ca chinh thuc (`hydrateWeekFromServer`, `seedDraftFromAvailability`, `publishWeekAsync`, `deleteScheduleAsync`, xoa/chuyen dung `shiftId + scheduleId`)
+- Dung khi: sua flow dang ky ca ranh, bang xep ca quan ly, chot lich chinh thuc, xem lich ca nhan Huong A.
 
 ### CÃ i Ä‘áº·t vÃ  Danh má»¥c chuáº©n SaaS
 - Mo ta: he thong cai dat duoc gom thanh 5 nhom SaaS chuyen nghiep (Doanh nghiep, Danh muc nhan su, Luong & Phu cap, Phan ca & Cham cong, He thong & Phan quyen).
@@ -184,8 +186,8 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - File chinh: `src/lib/server/data-mode.ts`, `src/app/api/ipos/cloud-worker/route.ts`, `src/components/ui/DataSourceStatusBadge.tsx`, `src/app/api/employees/route.ts`, `src/app/api/shifts/route.ts`, `src/app/api/shifts/register/route.ts`, `src/app/api/attendance/route.ts`
 - Dung khi: sua logic bat/tat dong bo iPOS vs che do tu van hanh doc lap.
 
-### Luu tru Dam may Supabase & Trien khai Vercel (Pass C)
-- Mo ta: Lop luu tru ben vung qua bang `public.homies_runtime_store` tren Supabase cho moi route `/api/*` khi deploy Vercel Serverless (diffed upsert theo collection, timeout 3s, circuit breaker 60s khi offline/URL cu chet va tu nap du lieu nen lan dau). Hien thi trang thai san sang tren Header Badge (`storage_status`).
+### Luu tru Dam may Supabase & Trien khai Vercel (Pass C + SSOT Official Schedule)
+- Mo ta: Lop luu tru ben vung qua bang `public.homies_runtime_store` tren Supabase cho moi route `/api/*` khi deploy Vercel Serverless (19 `PERSISTED_KEYS`, bo sung `official_schedules`, `schedule_weeks`, `schedule_change_logs`; diffed upsert theo collection, timeout, circuit breaker 60s khi offline). Hien thi trang thai san sang tren Header Badge (`storage_status`).
 - File chinh: `src/lib/server/supabase-store.ts`, `src/lib/server/db.ts`, `supabase/schema_v5_runtime_persistence.sql`, `docs/DEPLOY_VERCEL_SUPABASE.md`, `src/app/api/ipos/cloud-worker/route.ts`, `src/components/ui/DataSourceStatusBadge.tsx`
 - Dung khi: sua luu tru dam may Supabase, bao mat `SUPABASE_SERVICE_ROLE_KEY`, hoac huong dan deploy Vercel.
 

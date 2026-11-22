@@ -154,6 +154,57 @@ export interface ServerShiftRegistration {
   notes?: string
 }
 
+export interface ServerOfficialSchedule {
+  id: string
+  store_id: string
+  week_start_date: string // YYYY-MM-DD (Thứ 2 theo lịch dương thuần)
+  date: string            // YYYY-MM-DD
+  employee_id: string
+  employee_name?: string
+  shift_id: string
+  shift_name?: string
+  assigned_position_id?: string
+  status: 'draft' | 'published'
+  notes?: string
+  modified_after_publish?: boolean
+  change_reason?: string
+  updated_by?: string
+  updated_at: string
+  created_at: string
+}
+
+export interface ServerScheduleWeekMeta {
+  store_id: string
+  week_start: string // YYYY-MM-DD (Thứ 2)
+  week_end: string   // YYYY-MM-DD (Chủ Nhật)
+  status: 'draft' | 'published'
+  published_at?: string
+  published_by?: string
+  published_by_name?: string
+  updated_at: string
+  updated_by?: string
+  last_modified_after_publish_at?: string
+  source?: 'manual' | 'seeded_from_availability' | 'imported_excel' | 'copied_week'
+}
+
+export interface ServerScheduleChangeLog {
+  id: string
+  store_id: string
+  week_start: string
+  assignment_id: string
+  employee_id: string
+  employee_name?: string
+  date: string
+  shift_id?: string
+  action: 'create' | 'update' | 'delete' | 'publish' | 'unpublish' | 'cancel' | 'seed_draft'
+  reason?: string
+  changed_by: string
+  changed_by_name?: string
+  changed_at: string
+  before_state?: Partial<ServerOfficialSchedule> | null
+  after_state?: Partial<ServerOfficialSchedule> | null
+}
+
 export interface ServerAttendanceLog {
   id: string
   employee_id: string
@@ -461,7 +512,7 @@ export interface ServerIposSyncLog {
 export interface IposSchemaFieldInfo {
   key: string
   label_vi: string
-  sample_value: any
+  sample_value: unknown
   data_type: 'string' | 'number' | 'boolean' | 'date' | 'object'
   is_mapped: boolean
   mapped_homies_field?: string
@@ -555,6 +606,9 @@ export interface ServerDatabaseSchema {
   schedule_rules?: ServerScheduleRule[]
   rule_overrides?: ServerScheduleRuleOverride[]
   shifts: ServerShiftRegistration[]
+  official_schedules?: ServerOfficialSchedule[]
+  schedule_weeks?: ServerScheduleWeekMeta[]
+  schedule_change_logs?: ServerScheduleChangeLog[]
   attendance: ServerAttendanceLog[]
   requests?: ServerRequest[]
   invitations?: ServerInvitation[]
@@ -1394,6 +1448,9 @@ function getInitialSeedData(): ServerDatabaseSchema {
     stores,
     employees,
     shifts,
+    official_schedules: [],
+    schedule_weeks: [],
+    schedule_change_logs: [],
     attendance: getInitialAttendanceSeed(),
     payroll_summaries,
     salary_slips,
@@ -2055,23 +2112,105 @@ function getShiftEmployeeIdentityKey(
   return `id:${(shift.employee_id || '').trim().toLowerCase()}`
 }
 
+export function normalizeStoreId(raw?: string): string {
+  const clean = (raw || '').trim()
+  const lower = clean.toLowerCase()
+  if (lower === 'store-002' || lower.includes('429')) return 'store-002'
+  if (lower === 'store-001' || lower.includes('hbp') || lower.includes('ba phan') || lower.includes('hồ bá phấn')) return 'store-001'
+  return clean || 'store-001'
+}
+
+export function getCalendarWeekStart(ymd: string): string {
+  const clean = (ymd || '').trim().slice(0, 10)
+  const parts = clean.split('-').map(Number)
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) {
+    return clean
+  }
+  const [year, month, day] = parts
+  const dt = new Date(Date.UTC(year, month - 1, day))
+  if (Number.isNaN(dt.getTime())) return clean
+  const dow = dt.getUTCDay()
+  dt.setUTCDate(dt.getUTCDate() - dow + (dow === 0 ? -6 : 1))
+  return dt.toISOString().slice(0, 10)
+}
+
+export function getCalendarWeekEnd(weekStartYmd: string): string {
+  const monday = getCalendarWeekStart(weekStartYmd)
+  const parts = monday.split('-').map(Number)
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) {
+    return monday
+  }
+  const [year, month, day] = parts
+  const dt = new Date(Date.UTC(year, month - 1, day + 6))
+  if (Number.isNaN(dt.getTime())) return monday
+  return dt.toISOString().slice(0, 10)
+}
+
+export function isResignedEmployeeRecord(employeeId?: string, employeeName?: string): boolean {
+  const cleanId = (employeeId || '').trim()
+  const cleanName = (employeeName || '').trim()
+  return Boolean(
+    (cleanId && RESIGNED_IDS.has(cleanId)) ||
+    (cleanName && RESIGNED_NAMES.has(cleanName))
+  )
+}
+
 export function getShiftSlotDedupeKey(
   shift: Pick<
     ServerShiftRegistration,
     'store_id' | 'date' | 'shift_id' | 'shift_name' | 'notes' | 'employee_id' | 'employee_name'
   >
 ): string {
-  const rawStore = (shift.store_id || '').trim().toLowerCase()
-  const normStore =
-    rawStore === 'store-002' || rawStore.includes('429')
-      ? 'store-002'
-      : rawStore === 'store-001' || rawStore.includes('hbp') || rawStore.includes('ba phan')
-      ? 'store-001'
-      : rawStore || 'store-001'
+  const normStore = normalizeStoreId(shift.store_id)
   const normDate = (shift.date || '').slice(0, 10)
   const normShift = normalizeShiftBucket(shift.shift_id, shift.shift_name, shift.notes)
   const empKey = getShiftEmployeeIdentityKey(shift)
   return `${normStore}|${normDate}|${normShift}|${empKey}`
+}
+
+export function getOfficialScheduleSlotKey(
+  item: Pick<ServerOfficialSchedule, 'store_id' | 'date' | 'employee_id' | 'shift_id' | 'shift_name' | 'notes'>
+): string {
+  const normStore = normalizeStoreId(item.store_id)
+  const normDate = (item.date || '').slice(0, 10)
+  const normEmp = (item.employee_id || '').trim().toLowerCase()
+  const cleanShiftId = (item.shift_id || '').trim().toLowerCase()
+  const notesText = (item.notes || '').trim()
+  const timeMatch =
+    notesText.match(/\[(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})\]/) ||
+    notesText.match(/\((\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})\)/)
+  const isFlex =
+    cleanShiftId === 'shift-004' ||
+    cleanShiftId.startsWith('shift-flex') ||
+    notesText.toLowerCase().includes('linh hoạt') ||
+    notesText.toLowerCase().includes('phát sinh') ||
+    Boolean(timeMatch)
+
+  const shiftKey = isFlex
+    ? `${cleanShiftId}:${timeMatch ? timeMatch[1].replace(/\s+/g, '') : notesText.toLowerCase()}`
+    : normalizeShiftBucket(item.shift_id, item.shift_name, item.notes)
+
+  return `${normStore}|${normDate}|${normEmp}|${shiftKey}`
+}
+
+export function getWeekMetaInDb(
+  db: ServerDatabaseSchema,
+  storeId: string,
+  weekStart: string
+): ServerScheduleWeekMeta | undefined {
+  const normStore = normalizeStoreId(storeId)
+  const normWeekStart = getCalendarWeekStart(weekStart)
+  return (db.schedule_weeks || []).find(
+    (w) => normalizeStoreId(w.store_id) === normStore && getCalendarWeekStart(w.week_start) === normWeekStart
+  )
+}
+
+export function isWeekPublishedInDb(
+  db: ServerDatabaseSchema,
+  storeId: string,
+  weekStart: string
+): boolean {
+  return getWeekMetaInDb(db, storeId, weekStart)?.status === 'published'
 }
 
 function getShiftStatusRank(status?: string): number {
@@ -2179,6 +2318,126 @@ export function dedupeServerShifts(shifts: ServerShiftRegistration[]): {
   return { shifts: result, changed }
 }
 
+export function dedupeOfficialSchedules(items: ServerOfficialSchedule[]): {
+  schedules: ServerOfficialSchedule[]
+  changed: boolean
+} {
+  const slotIndexMap = new Map<string, number>()
+  const result: ServerOfficialSchedule[] = []
+  let changed = false
+
+  for (const raw of items) {
+    if (!raw || !raw.employee_id || !raw.date || !raw.shift_id) {
+      changed = true
+      continue
+    }
+    if (isFakeSeedShift(raw) || isResignedEmployeeRecord(raw.employee_id, raw.employee_name)) {
+      changed = true
+      continue
+    }
+
+    const normStore = normalizeStoreId(raw.store_id)
+    const normDate = raw.date.slice(0, 10)
+    const normWeekStart = getCalendarWeekStart(normDate)
+    const normStatus: 'draft' | 'published' = raw.status === 'published' ? 'published' : 'draft'
+
+    const normalized: ServerOfficialSchedule = {
+      ...raw,
+      store_id: normStore,
+      date: normDate,
+      week_start_date: normWeekStart,
+      status: normStatus,
+    }
+    if (
+      normalized.store_id !== raw.store_id ||
+      normalized.date !== raw.date ||
+      normalized.week_start_date !== raw.week_start_date ||
+      normalized.status !== raw.status
+    ) {
+      changed = true
+    }
+
+    const slotKey = getOfficialScheduleSlotKey(normalized)
+    const existingIdx = slotIndexMap.get(slotKey)
+    if (existingIdx !== undefined) {
+      const existing = result[existingIdx]
+      const incomingWins =
+        (normalized.status === 'published' && existing.status !== 'published') ||
+        (normalized.status === existing.status &&
+          String(normalized.updated_at || '') >= String(existing.updated_at || ''))
+      if (incomingWins) {
+        result[existingIdx] = {
+          ...existing,
+          ...normalized,
+          id: existing.id || normalized.id,
+        }
+      }
+      changed = true
+    } else {
+      slotIndexMap.set(slotKey, result.length)
+      result.push(normalized)
+    }
+  }
+
+  return { schedules: result, changed }
+}
+
+export function dedupeScheduleWeeks(items: ServerScheduleWeekMeta[]): {
+  weeks: ServerScheduleWeekMeta[]
+  changed: boolean
+} {
+  const weekIndexMap = new Map<string, number>()
+  const result: ServerScheduleWeekMeta[] = []
+  let changed = false
+
+  for (const raw of items) {
+    if (!raw || !raw.week_start) {
+      changed = true
+      continue
+    }
+    const normStore = normalizeStoreId(raw.store_id)
+    const normWeekStart = getCalendarWeekStart(raw.week_start)
+    const normWeekEnd = getCalendarWeekEnd(normWeekStart)
+    const normStatus: 'draft' | 'published' = raw.status === 'published' ? 'published' : 'draft'
+    const normalized: ServerScheduleWeekMeta = {
+      ...raw,
+      store_id: normStore,
+      week_start: normWeekStart,
+      week_end: normWeekEnd,
+      status: normStatus,
+    }
+    if (
+      normalized.store_id !== raw.store_id ||
+      normalized.week_start !== raw.week_start ||
+      normalized.week_end !== raw.week_end ||
+      normalized.status !== raw.status
+    ) {
+      changed = true
+    }
+
+    const key = `${normStore}|${normWeekStart}`
+    const existingIdx = weekIndexMap.get(key)
+    if (existingIdx !== undefined) {
+      const existing = result[existingIdx]
+      const incomingWins =
+        (normalized.status === 'published' &&
+          existing.status === 'published' &&
+          String(normalized.published_at || normalized.updated_at || '') >=
+            String(existing.published_at || existing.updated_at || '')) ||
+        String(normalized.updated_at || '') >= String(existing.updated_at || '')
+      if (incomingWins) {
+        result[existingIdx] = normalized
+      }
+      changed = true
+    } else {
+      weekIndexMap.set(key, result.length)
+      result.push(normalized)
+    }
+  }
+
+  return { weeks: result, changed }
+}
+
 function normalizeServerDb(db: ServerDatabaseSchema): { db: ServerDatabaseSchema; migrated: boolean } {
   let migrated = false
 
@@ -2188,6 +2447,9 @@ function normalizeServerDb(db: ServerDatabaseSchema): { db: ServerDatabaseSchema
   if (!db.bsc_logs || db.bsc_logs.length === 0) db.bsc_logs = getInitialBscLogsSeed()
   if (!db.bsc_settings) db.bsc_settings = getInitialBscSettingsSeed()
   if (!db.shifts) db.shifts = []
+  if (!Array.isArray(db.official_schedules)) db.official_schedules = []
+  if (!Array.isArray(db.schedule_weeks)) db.schedule_weeks = []
+  if (!Array.isArray(db.schedule_change_logs)) db.schedule_change_logs = []
   if (!db.attendance) db.attendance = []
   if (!db.sessions) db.sessions = {}
   if (!db.ipos_integration) db.ipos_integration = getDefaultIposIntegrationConfig()
@@ -2229,13 +2491,25 @@ function normalizeServerDb(db: ServerDatabaseSchema): { db: ServerDatabaseSchema
 
   const prevShiftsCount = db.shifts.length
   db.shifts = db.shifts.filter(
-    s => !RESIGNED_IDS.has(s.employee_id) && (!s.employee_name || !RESIGNED_NAMES.has(s.employee_name))
+    s => !isResignedEmployeeRecord(s.employee_id, s.employee_name)
   )
   if (db.shifts.length !== prevShiftsCount) migrated = true
 
   const dedupedShifts = dedupeServerShifts(db.shifts)
   if (dedupedShifts.changed) {
     db.shifts = dedupedShifts.shifts
+    migrated = true
+  }
+
+  const dedupedOfficial = dedupeOfficialSchedules(db.official_schedules)
+  if (dedupedOfficial.changed) {
+    db.official_schedules = dedupedOfficial.schedules
+    migrated = true
+  }
+
+  const dedupedWeeks = dedupeScheduleWeeks(db.schedule_weeks)
+  if (dedupedWeeks.changed) {
+    db.schedule_weeks = dedupedWeeks.weeks
     migrated = true
   }
 

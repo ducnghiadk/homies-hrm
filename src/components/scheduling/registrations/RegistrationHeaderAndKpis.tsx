@@ -8,13 +8,13 @@ import {
   ChevronRight,
   ChevronLeft,
   RefreshCw,
-  Sparkles,
   ArrowRight,
   Users,
   Layers,
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Lock,
   HelpCircle,
 } from 'lucide-react'
 import { mockStores } from '@/lib/mock-data'
@@ -30,11 +30,11 @@ export interface RegistrationHeaderAndKpisProps {
   prevMonStr: string
   isSyncing: boolean
   onRefresh: () => void
-  onApproveAll: () => void
-  pendingTotal: number
+  onApproveAll?: () => void
+  pendingTotal?: number
   coverageData: CoverageRateResult
   totalRegistrations: number
-  approvedTotal: number
+  approvedTotal?: number
   riskCount: number
   emptyCount: number
   fullCount: number
@@ -42,6 +42,8 @@ export interface RegistrationHeaderAndKpisProps {
   onSelectFilterStatus: (status: 'ALL' | 'RISK' | 'PENDING' | 'APPROVED') => void
   dataSource?: 'ipos_cloud' | 'homies_native' | 'internal_db'
   stores?: Array<{ id: string; name: string; is_active?: boolean }>
+  weekStatus?: 'draft' | 'published'
+  scheduleHref?: string
 }
 
 function formatWeekRange(mondayYmd: string): string {
@@ -64,11 +66,8 @@ export default function RegistrationHeaderAndKpis({
   prevMonStr,
   isSyncing,
   onRefresh,
-  onApproveAll,
-  pendingTotal,
   coverageData,
   totalRegistrations,
-  approvedTotal,
   riskCount,
   emptyCount,
   fullCount,
@@ -76,16 +75,17 @@ export default function RegistrationHeaderAndKpis({
   onSelectFilterStatus,
   dataSource = 'ipos_cloud',
   stores,
+  weekStatus = 'draft',
+  scheduleHref,
 }: RegistrationHeaderAndKpisProps) {
   const isHomiesNative = dataSource === 'homies_native'
   const isInternalDb = dataSource === 'internal_db'
+  const isWeekPublished = weekStatus === 'published'
   const activeStores = (stores && stores.length > 0 ? stores : mockStores).filter(
     s => s.is_active !== false
   )
 
   const missingCount = coverageData.missingEmployees.length
-  const approvalPercent =
-    totalRegistrations > 0 ? Math.round((approvedTotal / totalRegistrations) * 100) : 0
   const avgPerStaff =
     coverageData.submittedCount > 0
       ? (totalRegistrations / coverageData.submittedCount).toFixed(1)
@@ -103,17 +103,17 @@ export default function RegistrationHeaderAndKpis({
           {/* Cột trái: Breadcrumb + Tiêu đề gọn + 2 nhãn trạng thái */}
           <div className="space-y-0.5">
             <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-              <Link href="/schedule" className="hover:text-[#2F6FA8] transition flex items-center gap-1">
+              <Link href={scheduleHref || '/schedule'} className="hover:text-[#2F6FA8] transition flex items-center gap-1">
                 <CalendarDays size={12} />
                 <span>Lịch làm việc</span>
               </Link>
               <ChevronRight size={12} className="text-gray-400" />
-              <span className="text-[#2F6FA8] font-bold">Duyệt Đăng Ký Ca Tuần</span>
+              <span className="text-[#2F6FA8] font-bold">Lịch Rảnh Tuần</span>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg sm:text-xl font-bold text-[#001D3D] tracking-tight">
-                Duyệt Đăng Ký Ca Tuần
+                Lịch Rảnh Tuần
               </h1>
 
               {isHomiesNative ? (
@@ -133,13 +133,15 @@ export default function RegistrationHeaderAndKpis({
                 </span>
               )}
 
-              {pendingTotal > 0 ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200 font-mono tabular-nums">
-                  {pendingTotal} ca chờ duyệt
+              {isWeekPublished ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                  <Lock size={11} />
+                  Đã chốt lịch chính thức
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Đã duyệt đủ
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide bg-sky-50 text-[#2F6FA8] border border-sky-200 inline-flex items-center gap-1">
+                  <Clock size={11} />
+                  Chưa chốt lịch trên Homies
                 </span>
               )}
             </div>
@@ -222,25 +224,14 @@ export default function RegistrationHeaderAndKpis({
               <RefreshCw size={14} className={`text-[#2F6FA8] ${isSyncing ? 'animate-spin' : ''}`} />
             </button>
 
-            {/* Xem Bảng Lịch */}
+            {/* Nút chính duy nhất: Mở Bảng Xếp Lịch đúng chi nhánh & tuần đang xem */}
             <Link
-              href="/schedule"
-              className="px-3 py-1.5 min-h-[36px] rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold inline-flex items-center gap-1.5 transition"
+              href={scheduleHref || '/schedule'}
+              className="px-4 py-1.5 min-h-[36px] rounded-xl bg-[#2F6FA8] hover:bg-[#1D3E61] text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition active:scale-98"
             >
-              <span>Xem Bảng Lịch</span>
-              <ArrowRight size={13} className="text-gray-400" />
+              <span>Mở Bảng Xếp Lịch tuần này</span>
+              <ArrowRight size={14} />
             </Link>
-
-            {/* Duyệt & Điền nhanh */}
-            <button
-              type="button"
-              onClick={onApproveAll}
-              className="px-3.5 py-1.5 min-h-[36px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer active:scale-98"
-              title="Chấp thuận toàn bộ ca đăng ký hợp lệ và chuyển vào Bảng Xếp Lịch"
-            >
-              <Sparkles size={14} className="text-emerald-100" />
-              <span>Chốt &amp; Điền vào Xếp Ca</span>
-            </button>
           </div>
         </div>
       </div>
@@ -300,59 +291,37 @@ export default function RegistrationHeaderAndKpis({
             </div>
           </div>
 
-          {/* Card 2: Tiến Độ Duyệt (Click để lọc Chờ duyệt) */}
-          <button
-            type="button"
-            onClick={() => onSelectFilterStatus(filterStatus === 'PENDING' ? 'ALL' : 'PENDING')}
-            className={`text-left rounded-2xl p-3.5 border shadow-xs flex flex-col justify-between gap-2 cursor-pointer transition ${
-              filterStatus === 'PENDING'
-                ? 'bg-blue-50/40 border-[#2F6FA8]/40 ring-2 ring-[#2F6FA8]'
-                : 'bg-white border-gray-100 hover:border-blue-200'
-            }`}
-          >
+          {/* Card 2: Tổng Khung Giờ Rảnh */}
+          <div className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-xs flex flex-col justify-between gap-2">
             <div className="flex items-center justify-between text-xs font-semibold text-gray-500 w-full">
               <span className="flex items-center gap-1.5">
                 <Clock size={14} className="text-[#2F6FA8]" />
-                Tiến Độ Duyệt
+                Tổng Khung Giờ Rảnh
               </span>
-              {pendingTotal > 0 ? (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tabular-nums bg-amber-50 text-amber-800 border border-amber-200">
-                  {pendingTotal} chờ
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Hoàn tất
-                </span>
-              )}
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tabular-nums bg-blue-50 text-[#2F6FA8] border border-blue-200/70">
+                {coverageData.submittedCount} bạn nộp
+              </span>
             </div>
 
             <div className="w-full">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-2xl font-bold font-mono text-[#001D3D] tabular-nums">
-                  {approvedTotal}
+                  {totalRegistrations}
                 </span>
                 <span className="text-xs font-medium text-gray-500">
-                  / {totalRegistrations} ca đăng ký
+                  ca rảnh trong tuần
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, approvalPercent)}%` }}
-                />
-              </div>
+              <p className="text-[11px] text-gray-500 mt-1">
+                TB <strong className="font-mono font-bold tabular-nums text-gray-700">{avgPerStaff}</strong> ca/nhân sự
+              </p>
             </div>
 
             <div className="w-full text-[11px] text-gray-500 flex items-center justify-between pt-2 border-t border-gray-100">
-              <span>
-                TB <strong className="font-mono font-bold tabular-nums text-gray-700">{avgPerStaff}</strong> ca/bạn
-              </span>
-              <span className="text-[#2F6FA8] font-bold flex items-center gap-0.5">
-                <Layers size={11} />
-                {filterStatus === 'PENDING' ? 'Đang lọc chờ duyệt' : 'Lọc chờ duyệt'}
-              </span>
+              <span>Nguồn tham khảo xếp ca trên Homies</span>
+              <Layers size={11} className="text-[#2F6FA8]" />
             </div>
-          </button>
+          </div>
 
           {/* Card 3: Ca Cần Xử Lý Gấp (Click để lọc Ca thiếu) */}
           <button

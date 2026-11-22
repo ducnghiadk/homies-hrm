@@ -5,6 +5,10 @@ import {
   getShiftSlotDedupeKey,
   mergeShiftRecords,
   dedupeServerShifts,
+  normalizeStoreId,
+  getCalendarWeekStart,
+  getWeekMetaInDb,
+  isWeekPublishedInDb,
   ServerShiftRegistration,
 } from '@/lib/server/db'
 import { isIposModuleEnabled } from '@/lib/server/data-mode'
@@ -109,22 +113,33 @@ export async function GET(req: NextRequest) {
       list = list.filter((s) => s.status.toUpperCase() === status.toUpperCase())
     }
 
-    if (storeId && storeId !== 'ALL') {
-      list = list.filter((s) => s.store_id === storeId)
+    const normStoreFilter = storeId && storeId !== 'ALL' ? normalizeStoreId(storeId) : null
+    if (normStoreFilter) {
+      list = list.filter((s) => normalizeStoreId(s.store_id) === normStoreFilter)
     }
 
-    if (week) {
-      list = list.filter((s) => s.week_start_date === week)
+    const normWeekFilter = week ? getCalendarWeekStart(week) : null
+    if (normWeekFilter) {
+      list = list.filter(
+        (s) => getCalendarWeekStart(s.week_start_date || s.date) === normWeekFilter
+      )
     }
 
     if (employeeId) {
       list = list.filter((s) => s.employee_id === employeeId)
     }
 
+    const weekMeta =
+      normStoreFilter && normWeekFilter
+        ? getWeekMetaInDb(db, normStoreFilter, normWeekFilter) || null
+        : null
+
     return NextResponse.json({
       success: true,
       source: dataSource,
       count: list.length,
+      week_status: weekMeta?.status || 'draft',
+      week_meta: weekMeta,
       data: list,
     })
   } catch (error: unknown) {
@@ -170,15 +185,46 @@ export async function POST(req: NextRequest) {
     if (!db.shifts) db.shifts = []
     const { checkShiftOverlap } = await import('@/lib/server/db')
 
+    // 0. CHẶN GỬI / SỬA LỊCH RẢNH KHI TUẦN ĐÃ CHỐT CHÍNH THỨC TRÊN HOMIES
+    for (const item of rawItems) {
+      const checkEmpId = String(item.employee_id || body.employee_id || '')
+      const matchedEmp = checkEmpId ? db.employees.find((e) => e.id === checkEmpId) : undefined
+      const rawStore = String(item.store_id || body.store_id || matchedEmp?.store_id || '')
+      const checkStoreId = rawStore ? normalizeStoreId(rawStore) : ''
+      const checkDate = String(item.date || '').slice(0, 10)
+      const checkWeekRaw = checkDate || String(item.week_start_date || body.week_start_date || '')
+      const checkWeekStart = checkWeekRaw ? getCalendarWeekStart(checkWeekRaw) : ''
+
+      if (checkStoreId && checkWeekStart && isWeekPublishedInDb(db, checkStoreId, checkWeekStart)) {
+        return NextResponse.json(
+          {
+            success: false,
+            locked: true,
+            code: 'WEEK_ALREADY_PUBLISHED',
+            error:
+              'Quản lý đã chốt lịch chính thức cho tuần này, bạn không thể gửi hoặc sửa lịch rảnh nữa. Nếu cần thay đổi ca vui lòng dùng mục Xin đổi ca.',
+          },
+          { status: 409 }
+        )
+      }
+    }
+
     // Nếu gửi gói tuần từ Mobile (body.items), chỉ xóa các ca PENDING của chính store_id đó trong tuần đó để cập nhật mới
     const isWeeklyBundle = body && Array.isArray(body.items) && body.items.length > 0
     if (isWeeklyBundle) {
       const firstEmpId = rawItems[0]?.employee_id as string
-      const firstWeek = rawItems[0]?.week_start_date as string
-      const firstStoreId = rawItems[0]?.store_id as string
+      const firstDateOrWeek = String(rawItems[0]?.date || rawItems[0]?.week_start_date || '')
+      const firstWeek = firstDateOrWeek ? getCalendarWeekStart(firstDateOrWeek) : ''
+      const firstStoreId = rawItems[0]?.store_id ? normalizeStoreId(String(rawItems[0].store_id)) : ''
       if (firstEmpId && firstWeek && firstStoreId) {
         db.shifts = db.shifts.filter(
-          (s) => !(s.employee_id === firstEmpId && s.store_id === firstStoreId && s.week_start_date === firstWeek && s.status === 'PENDING')
+          (s) =>
+            !(
+              s.employee_id === firstEmpId &&
+              normalizeStoreId(s.store_id) === firstStoreId &&
+              getCalendarWeekStart(s.week_start_date || s.date) === firstWeek &&
+              s.status === 'PENDING'
+            )
         )
       }
     }
@@ -245,10 +291,13 @@ export async function POST(req: NextRequest) {
 
     for (const item of rawItems) {
       const employee_id = String(item.employee_id || '')
-      const store_id = String(item.store_id || '')
-      const date = String(item.date || '')
+      const rawStoreId = String(item.store_id || '')
+      const store_id = rawStoreId ? normalizeStoreId(rawStoreId) : ''
+      const date = String(item.date || '').slice(0, 10)
       const shift_id = String(item.shift_id || item.shiftId || '')
-      const week_start_date = String(item.week_start_date || date)
+      const week_start_date = date
+        ? getCalendarWeekStart(date)
+        : getCalendarWeekStart(String(item.week_start_date || ''))
 
       if (!employee_id || !store_id || !date || !shift_id) {
         return NextResponse.json(

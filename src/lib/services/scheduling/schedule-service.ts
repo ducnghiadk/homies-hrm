@@ -3,9 +3,9 @@ import {
   saveSchedulesToStorage,
   getAllSchedulesByEmployee,
   getSchedulesByStoreWeek,
-  getScheduleByEmployeeDate,
   addSchedule as apiAddSchedule,
   removeSchedule as apiRemoveSchedule,
+  replaceSchedulesForStoreWeek,
   type Schedule,
   mockSchedules,
   mockEmployees,
@@ -30,8 +30,6 @@ import {
   savePreferences,
 } from '@/lib/mock-data-preferences'
 import { checkScheduleWarnings, scanWeekWarnings, type WarningLevel } from '@/lib/mock-data-schedule-rules'
-import { scheduleAdapter } from '@/lib/adapters/schedule-adapter'
-import { isRealDbMode } from '@/lib/adapters/repository-config'
 import { getImportWeekStarts } from '@/lib/services/scheduling/schedule-import-batch'
 
 type ScheduleWeekStatus = 'draft' | 'published' | 'locked'
@@ -55,24 +53,6 @@ export type ScheduleAssignResult = ScheduleDbSyncResult & {
 export type ScheduleImportResult = ScheduleDbSyncResult & {
   count: number
   valueOf: () => number
-}
-
-function buildLocalOnlyResult(count: number): ScheduleDbSyncResult {
-  return {
-    trangThai: 'chi_luu_may',
-    soGhiThanhCong: count,
-    soBiLoai: 0,
-  }
-}
-
-function mapAdapterSyncResult(result: { ok: boolean; soGhiThanhCong: number; soBiLoai: number; lyDo?: string[] }): ScheduleDbSyncResult {
-  if (!isRealDbMode()) return buildLocalOnlyResult(result.soGhiThanhCong)
-  return {
-    trangThai: result.ok ? 'da_luu_db' : 'that_bai',
-    soGhiThanhCong: result.soGhiThanhCong,
-    soBiLoai: result.soBiLoai,
-    lyDo: result.lyDo,
-  }
 }
 
 export type ScheduleWeekMeta = {
@@ -179,11 +159,14 @@ export type ScheduleChangeLog = {
   week_start: string
   assignment_id: string
   employee_id: string
+  employee_name?: string
   date: string
+  shift_id?: string
   action: 'create' | 'update' | 'cancel' | 'delete' | 'publish'
-  before_state?: Schedule | null
-  after_state?: Schedule | null
+  before_state?: Partial<Schedule> | null
+  after_state?: Partial<Schedule> | null
   changed_by: string
+  changed_by_name?: string
   changed_at: string
   reason: string
 }
@@ -227,10 +210,236 @@ const CHANGE_LOG_KEY = 'homies_schedule_change_logs'
 const SHIFT_DEMAND_POSITION_NOTE_PREFIX = '[hrm-demand-position]'
 
 export class ScheduleService {
+  private static hydratedWeeks = new Set<string>()
+  private static serverWeekMetas = new Map<string, ScheduleWeekMeta | null>()
+  private static serverChangeLogs = new Map<string, ScheduleChangeLog[]>()
+
   private static readonly BLOCKING_WARNING_TYPES = new Set([
     'invalid_employee',
     'missing_reason',
   ])
+
+  private static getWeekKey(storeId: string, weekStart: string): string {
+    return `${(storeId || 'store-001').trim()}|${this.getWeekStartDate(weekStart)}`
+  }
+
+  private static mapServerScheduleToClient(raw: Record<string, unknown>): Schedule {
+    return {
+      id: String(raw.id || `sch-srv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+      org_id: 'org-001',
+      store_id: String(raw.store_id || 'store-001'),
+      employee_id: String(raw.employee_id || ''),
+      employee_name: raw.employee_name ? String(raw.employee_name) : undefined,
+      shift_id: String(raw.shift_id || 'shift-001'),
+      assigned_position_id: raw.assigned_position_id
+        ? String(raw.assigned_position_id)
+        : raw.position_id
+        ? String(raw.position_id)
+        : undefined,
+      date: String(raw.date || ''),
+      notes: raw.notes ? String(raw.notes) : undefined,
+      status: String(raw.status || '').toLowerCase() === 'published' ? 'published' : 'draft',
+      modified_after_publish: Boolean(raw.modified_after_publish),
+      change_reason: raw.change_reason ? String(raw.change_reason) : undefined,
+      updated_by: raw.updated_by ? String(raw.updated_by) : undefined,
+      updated_at: raw.updated_at ? String(raw.updated_at) : undefined,
+    }
+  }
+
+  private static syncWeekMetaCache(storeId: string, weekStart: string, meta: ScheduleWeekMeta | null) {
+    const normWeek = this.getWeekStartDate(weekStart)
+    const key = this.getWeekKey(storeId, normWeek)
+    this.hydratedWeeks.add(key)
+    this.serverWeekMetas.set(key, meta)
+
+    const localList = this.getWeekMetaDb().filter(
+      item => !(isStoreMatch(item.store_id, storeId) && item.week_start === normWeek)
+    )
+    if (meta) {
+      localList.push(meta)
+    }
+    this.saveWeekMetaDb(localList)
+  }
+
+  private static syncChangeLogsCache(storeId: string, weekStart: string, logs: ScheduleChangeLog[]) {
+    const normWeek = this.getWeekStartDate(weekStart)
+    const key = this.getWeekKey(storeId, normWeek)
+    this.serverChangeLogs.set(key, logs)
+
+    const existingLocal = this.getChangeLogDb().filter(
+      item => !(isStoreMatch(item.store_id, storeId) && item.week_start === normWeek)
+    )
+    this.saveChangeLogDb([...logs, ...existingLocal].slice(0, 500))
+  }
+
+  static async hydrateWeekFromServer(storeId: string, weekStart: string): Promise<{
+    ok: boolean
+    schedules: Schedule[]
+    weekMeta: ScheduleWeekMeta | null
+    changeLogs: ScheduleChangeLog[]
+    isPublished: boolean
+  }> {
+    this.init()
+    const normWeek = this.getWeekStartDate(weekStart)
+    const weekDates = this.getWeekDates(normWeek)
+    const key = this.getWeekKey(storeId, normWeek)
+
+    if (typeof window === 'undefined' || !storeId || !normWeek) {
+      return { ok: false, schedules: [], weekMeta: null, changeLogs: [], isPublished: false }
+    }
+
+    try {
+      const params = new URLSearchParams({
+        store_id: storeId,
+        week_start: normWeek,
+        include_meta: '1',
+        include_logs: '1',
+      })
+      const res = await fetch(`/api/schedules?${params.toString()}`, { cache: 'no-store' })
+      if (!res.ok) {
+        return {
+          ok: false,
+          schedules: getSchedulesByStoreWeek(storeId, weekDates),
+          weekMeta: this.getWeekMeta(storeId, normWeek),
+          changeLogs: [],
+          isPublished: this.isWeekPublished(storeId, normWeek),
+        }
+      }
+
+      const json = await res.json()
+      if (!json?.success) {
+        return { ok: false, schedules: [], weekMeta: null, changeLogs: [], isPublished: false }
+      }
+
+      const mapped: Schedule[] = Array.isArray(json.data)
+        ? json.data.map((raw: Record<string, unknown>) => this.mapServerScheduleToClient(raw))
+        : []
+      replaceSchedulesForStoreWeek(storeId, weekDates, mapped)
+
+      const rawMeta = json.week_meta as Record<string, unknown> | null | undefined
+      const serverMeta: ScheduleWeekMeta | null = rawMeta
+        ? {
+            store_id: String(rawMeta.store_id || storeId),
+            week_start: String(rawMeta.week_start || normWeek),
+            week_end: String(rawMeta.week_end || weekDates[6] || normWeek),
+            status: rawMeta.status === 'published' ? 'published' : 'draft',
+            published_at: rawMeta.published_at ? String(rawMeta.published_at) : undefined,
+            published_by: rawMeta.published_by ? String(rawMeta.published_by) : undefined,
+            updated_at: String(rawMeta.updated_at || new Date().toISOString()),
+            updated_by: String(rawMeta.updated_by || 'manager'),
+          }
+        : null
+
+      this.syncWeekMetaCache(storeId, normWeek, serverMeta)
+
+      const logs: ScheduleChangeLog[] = Array.isArray(json.change_logs)
+        ? json.change_logs.map((l: Record<string, unknown>) => {
+            const rawAction = String(l.action || 'update')
+            const mappedAction: ScheduleChangeLog['action'] =
+              rawAction === 'seed_draft'
+                ? 'create'
+                : rawAction === 'unpublish'
+                ? 'update'
+                : rawAction === 'create' ||
+                  rawAction === 'update' ||
+                  rawAction === 'cancel' ||
+                  rawAction === 'delete' ||
+                  rawAction === 'publish'
+                ? rawAction
+                : 'update'
+            return {
+              id: String(l.id || `sch-log-${Date.now()}`),
+              store_id: String(l.store_id || storeId),
+              week_start: String(l.week_start || normWeek),
+              assignment_id: String(l.assignment_id || ''),
+              employee_id: String(l.employee_id || ''),
+              employee_name: l.employee_name ? String(l.employee_name) : undefined,
+              date: String(l.date || normWeek),
+              shift_id: l.shift_id ? String(l.shift_id) : undefined,
+              action: mappedAction,
+              before_state: (l.before_state as Partial<Schedule> | null | undefined) ?? null,
+              after_state: (l.after_state as Partial<Schedule> | null | undefined) ?? null,
+              changed_by: String(l.changed_by || 'manager'),
+              changed_by_name: l.changed_by_name ? String(l.changed_by_name) : undefined,
+              changed_at: String(l.changed_at || new Date().toISOString()),
+              reason: String(l.reason || ''),
+            }
+          })
+        : []
+
+      this.syncChangeLogsCache(storeId, normWeek, logs)
+
+      const registrationWeek = getRegistrationWeekByWeek(storeId, normWeek)
+      if (registrationWeek && serverMeta) {
+        updateRegistrationStatus(
+          registrationWeek.id,
+          serverMeta.status === 'published' ? 'published' : 'reviewing'
+        )
+      }
+
+      return {
+        ok: true,
+        schedules: mapped,
+        weekMeta: serverMeta,
+        changeLogs: logs,
+        isPublished: serverMeta?.status === 'published',
+      }
+    } catch (err) {
+      console.warn(`[ScheduleService] Lỗi hydrate tuần ${key}:`, err)
+      return { ok: false, schedules: [], weekMeta: null, changeLogs: [], isPublished: false }
+    }
+  }
+
+  static async seedDraftFromAvailability(
+    currentUser: AuthUser,
+    storeId: string,
+    weekStart: string,
+    mode: 'merge' | 'replace' = 'merge'
+  ): Promise<{ ok: boolean; addedCount: number; totalCount: number; message: string }> {
+    if (currentUser.role === 'employee') {
+      return { ok: false, addedCount: 0, totalCount: 0, message: 'Tài khoản nhân viên không có quyền xếp lịch.' }
+    }
+
+    const normWeek = this.getWeekStartDate(weekStart)
+    try {
+      const res = await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'seed_from_availability',
+          store_id: storeId,
+          week_start: normWeek,
+          mode,
+          actor_id: currentUser.id,
+          actor_name: currentUser.full_name,
+        }),
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.success) {
+        return {
+          ok: false,
+          addedCount: 0,
+          totalCount: 0,
+          message: json?.error || 'Không thể nạp lịch rảnh vào Bản Nháp.',
+        }
+      }
+
+      await this.hydrateWeekFromServer(storeId, normWeek)
+      return {
+        ok: true,
+        addedCount: Number(json.added_count || 0),
+        totalCount: Number(json.total_week_count || 0),
+        message: String(json.message || 'Đã điền nhanh lịch rảnh vào Bản Nháp.'),
+      }
+    } catch {
+      return {
+        ok: false,
+        addedCount: 0,
+        totalCount: 0,
+        message: 'Lỗi kết nối máy chủ khi điền nhanh lịch rảnh vào Bản Nháp.',
+      }
+    }
+  }
 
   private static isBlockingWarning(warning: ScheduleValidationWarning) {
     return warning.level === 'block' || this.BLOCKING_WARNING_TYPES.has(warning.type)
@@ -363,8 +572,13 @@ export class ScheduleService {
   }
 
   static getWeekMeta(storeId: string, weekStartDate: string): ScheduleWeekMeta | null {
+    const key = this.getWeekKey(storeId, weekStartDate)
+    if (this.hydratedWeeks.has(key)) {
+      return this.serverWeekMetas.get(key) || null
+    }
+    const normWeek = this.getWeekStartDate(weekStartDate)
     const db = this.getWeekMetaDb()
-    return db.find(item => item.store_id === storeId && item.week_start === weekStartDate) || null
+    return db.find(item => isStoreMatch(item.store_id, storeId) && item.week_start === normWeek) || null
   }
 
   private static toCycleStatus(weekMeta: ScheduleWeekMeta | null, registrationStatus?: string): ScheduleCycleStatus {
@@ -375,25 +589,38 @@ export class ScheduleService {
   }
 
   static getScheduleWeek(storeId: string, weekStartDate: string): ScheduleWeek | null {
+    const key = this.getWeekKey(storeId, weekStartDate)
+    const isHydrated = this.hydratedWeeks.has(key)
     const weekMeta = this.getWeekMeta(storeId, weekStartDate)
     const registrationWeek = getRegistrationWeekByWeek(storeId, weekStartDate)
 
     if (!weekMeta && !registrationWeek) return null
 
     const weekDates = this.getWeekDates(weekStartDate)
+    const resolvedStatus: ScheduleWeekStatus = isHydrated
+      ? (weekMeta?.status === 'published' ? 'published' : 'draft')
+      : (weekMeta?.status || (registrationWeek?.status === 'published' ? 'published' : 'draft'))
+    const effectiveRegStatus =
+      isHydrated && resolvedStatus !== 'published' && registrationWeek?.status === 'published'
+        ? 'reviewing'
+        : registrationWeek?.status
+
     return {
       store_id: storeId,
-      week_start: weekStartDate,
+      week_start: this.getWeekStartDate(weekStartDate),
       week_end: weekDates[6] || weekStartDate,
-      status: weekMeta?.status || (registrationWeek?.status === 'published' ? 'published' : 'draft'),
-      published_at: weekMeta?.published_at || registrationWeek?.published_at,
-      published_by: weekMeta?.published_by,
+      status: resolvedStatus,
+      published_at: resolvedStatus === 'published' ? (weekMeta?.published_at || registrationWeek?.published_at) : undefined,
+      published_by: resolvedStatus === 'published' ? weekMeta?.published_by : undefined,
       updated_at: weekMeta?.updated_at || registrationWeek?.updated_at || new Date().toISOString(),
       updated_by: weekMeta?.updated_by || registrationWeek?.created_by || '',
       registration_open_at: registrationWeek?.registration_open_date,
       registration_deadline: registrationWeek?.registration_deadline,
       target_publish_at: undefined,
-      cycle_status: this.toCycleStatus(weekMeta, registrationWeek?.status),
+      cycle_status: this.toCycleStatus(
+        weekMeta || (isHydrated ? { store_id: storeId, week_start: weekStartDate, week_end: weekDates[6] || weekStartDate, status: 'draft', updated_at: '', updated_by: '' } : null),
+        effectiveRegStatus
+      ),
       registration_week_id: registrationWeek?.id,
     }
   }
@@ -972,9 +1199,11 @@ export class ScheduleService {
     storeId: string,
     employeeId: string,
     date: string,
-    changeReason?: string
+    changeReason?: string,
+    shiftId?: string,
+    scheduleId?: string
   ): boolean {
-    return this.deleteSchedule(currentUser, storeId, employeeId, date, changeReason)
+    return this.deleteSchedule(currentUser, storeId, employeeId, date, changeReason, shiftId, scheduleId)
   }
 
   static validateWeekForPublish(currentUser: AuthUser, storeId: string, weekStart: string): {
@@ -1012,42 +1241,156 @@ export class ScheduleService {
     const weekEndDate = weekDates[6]
     if (!weekStartDate || !weekEndDate) return false
 
-    const db = this.getWeekMetaDb()
-    const index = db.findIndex(item => item.store_id === storeId && item.week_start === weekStartDate)
+    const existing = this.getWeekMeta(storeId, weekStartDate)
+    const nextStatus: ScheduleWeekStatus = existing?.status === 'published' ? 'published' : 'draft'
     const base: ScheduleWeekMeta = {
+      ...existing,
       store_id: storeId,
       week_start: weekStartDate,
       week_end: weekEndDate,
-      status: 'draft',
+      status: nextStatus,
       updated_at: new Date().toISOString(),
       updated_by: currentUser.id,
     }
 
-    if (index === -1) {
-      db.push(base)
-    } else {
-      db[index] = {
-        ...db[index],
-        ...base,
-        status: db[index].status === 'published' ? 'published' : 'draft',
-      }
+    this.syncWeekMetaCache(storeId, weekStartDate, base)
+    this.moveWeekToDrafting(storeId, weekStartDate)
+
+    if (typeof window !== 'undefined') {
+      void fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_draft_meta',
+          store_id: storeId,
+          week_start: weekStartDate,
+          actor_id: currentUser.id,
+          actor_name: currentUser.full_name,
+        }),
+      }).catch(() => {})
     }
 
-    this.saveWeekMetaDb(db)
-    this.moveWeekToDrafting(storeId, weekStartDate)
     return true
   }
 
   static isWeekPublished(storeId: string, weekStartDate: string): boolean {
     const meta = this.getWeekMeta(storeId, weekStartDate)
-    if (meta?.status === 'published') return true
-    const weekDates = this.getWeekDates(weekStartDate)
-    const schedules = getSchedulesByStoreWeek(storeId, weekDates)
-    if (schedules.some(s => s.status === 'published' || (s.status as string) === 'APPROVED')) {
-      return true
+    return meta?.status === 'published'
+  }
+
+  private static notifyAfterPublish(
+    currentUser: AuthUser,
+    storeId: string,
+    weekStartDate: string,
+    weekEndDate: string,
+    schedules: Schedule[]
+  ) {
+    const impactedEmployeeIds = Array.from(new Set(schedules.map(schedule => schedule.employee_id)))
+    const impactedEmployees = impactedEmployeeIds
+      .map(employeeId => EmployeeService.getEmployeeById(employeeId))
+      .filter(Boolean)
+
+    const storeName = getStoreById(storeId)?.name || storeId
+    notifySchedulePublished({
+      userIds: impactedEmployeeIds,
+      weekStart: weekStartDate,
+      weekEnd: weekEndDate,
+      storeId,
+      storeName,
+      publishedByName: currentUser.full_name,
+    })
+
+    impactedEmployees.forEach(employee => {
+      if (!employee?.email) return
+      ScheduleEmailService.sendEmail({
+        type: 'schedule_published',
+        to: employee.email,
+        subject: `Lịch tuần ${weekStartDate} - ${weekEndDate} đã được xuất bản`,
+        body_preview: `${currentUser.full_name} đã xuất bản lịch tuần tại ${storeName}. Vui lòng vào web để kiểm tra ca làm của bạn.`,
+        related_week: weekStartDate,
+      })
+    })
+  }
+
+  static async publishWeekAsync(
+    currentUser: AuthUser,
+    storeId: string,
+    weekDates: string[],
+    options?: { allowSoftWarnings?: boolean }
+  ): Promise<{ ok: boolean; publishedCount: number; error?: string }> {
+    this.init()
+    this.ensureWeekMetaStorage()
+
+    if (currentUser.role === 'employee') {
+      return { ok: false, publishedCount: 0, error: 'Tài khoản nhân viên không có quyền chốt lịch.' }
     }
-    // Đồng bộ trực tiếp API: Các ca APPROVED từ máy chủ luôn được công nhận
-    return true
+
+    if (['store_manager', 'shift_leader'].includes(currentUser.role) && currentUser.store_id !== storeId) {
+      return { ok: false, publishedCount: 0, error: 'Tài khoản không có quyền chốt lịch cho cửa hàng này.' }
+    }
+
+    const weekStartDate = weekDates[0]
+    const weekEndDate = weekDates[6]
+    if (!weekStartDate || !weekEndDate) {
+      return { ok: false, publishedCount: 0, error: 'Thiếu thông tin ngày đầu/cuối tuần.' }
+    }
+
+    const publishValidation = this.validateWeekForPublish(currentUser, storeId, weekStartDate)
+    if (publishValidation.hardWarnings.length > 0) {
+      return {
+        ok: false,
+        publishedCount: 0,
+        error: publishValidation.hardWarnings[0]?.message || 'Có lỗi chặn chưa thể chốt lịch.',
+      }
+    }
+    if (!options?.allowSoftWarnings && publishValidation.softWarnings.length > 0) {
+      return {
+        ok: false,
+        publishedCount: 0,
+        error: publishValidation.softWarnings[0]?.message || 'Có cảnh báo chưa thể chốt lịch.',
+      }
+    }
+
+    const currentWeekSchedules = getSchedulesByStoreWeek(storeId, weekDates)
+    try {
+      const res = await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'publish_week',
+          store_id: storeId,
+          week_start: weekStartDate,
+          week_end: weekEndDate,
+          actor_id: currentUser.id,
+          actor_name: currentUser.full_name,
+          sync_items: currentWeekSchedules,
+        }),
+      })
+
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.success) {
+        return {
+          ok: false,
+          publishedCount: 0,
+          error: json?.error || 'Không thể lưu trạng thái chốt lịch lên máy chủ.',
+        }
+      }
+
+      const hydrated = await this.hydrateWeekFromServer(storeId, weekStartDate)
+      const finalSchedules = hydrated.schedules.length > 0 ? hydrated.schedules : currentWeekSchedules
+      this.notifyAfterPublish(currentUser, storeId, weekStartDate, weekEndDate, finalSchedules)
+
+      return {
+        ok: true,
+        publishedCount: Number(json.published_count ?? finalSchedules.length),
+      }
+    } catch {
+      return {
+        ok: false,
+        publishedCount: 0,
+        error: 'Lỗi kết nối máy chủ khi chốt lịch chính thức.',
+      }
+    }
   }
 
   static publishWeek(
@@ -1078,20 +1421,13 @@ export class ScheduleService {
     if (!options?.allowSoftWarnings && publishValidation.softWarnings.length > 0) return false
 
     const schedules = getSchedulesByStoreWeek(storeId, weekDates)
-    const impactedEmployeeIds = Array.from(new Set(schedules.map(schedule => schedule.employee_id)))
+    const now = new Date().toISOString()
     schedules.forEach(schedule => {
       schedule.status = 'published'
-      schedule.updated_at = new Date().toISOString()
+      schedule.updated_at = now
       schedule.updated_by = currentUser.id
     })
-    saveSchedulesToStorage()
 
-    // Sync trực tiếp trạng thái chốt lịch với DB Supabase 'lich_phan_ca'
-    void scheduleAdapter.publishWeekSchedules(storeId, weekStartDate, weekEndDate)
-
-    const db = this.getWeekMetaDb()
-    const now = new Date().toISOString()
-    const index = db.findIndex(item => item.store_id === storeId && item.week_start === weekStartDate)
     const nextMeta: ScheduleWeekMeta = {
       store_id: storeId,
       week_start: weekStartDate,
@@ -1103,12 +1439,7 @@ export class ScheduleService {
       updated_by: currentUser.id,
     }
 
-    if (index === -1) {
-      db.push(nextMeta)
-    } else {
-      db[index] = { ...db[index], ...nextMeta }
-    }
-    this.saveWeekMetaDb(db)
+    this.syncWeekMetaCache(storeId, weekStartDate, nextMeta)
     const registrationWeek = getRegistrationWeekByWeek(storeId, weekStartDate)
     if (registrationWeek) {
       updateRegistrationStatus(registrationWeek.id, 'published')
@@ -1127,31 +1458,23 @@ export class ScheduleService {
       reason: `Chốt lịch tuần (${schedules.length} ca chính thức)`,
     })
 
-    const impactedEmployees = impactedEmployeeIds
-      .map(employeeId => EmployeeService.getEmployeeById(employeeId))
-      .filter(Boolean)
+    if (typeof window !== 'undefined') {
+      void fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'publish_week',
+          store_id: storeId,
+          week_start: weekStartDate,
+          week_end: weekEndDate,
+          actor_id: currentUser.id,
+          actor_name: currentUser.full_name,
+          sync_items: schedules,
+        }),
+      }).catch(() => {})
+    }
 
-    const storeName = getStoreById(storeId)?.name || storeId
-    notifySchedulePublished({
-      userIds: impactedEmployeeIds,
-      weekStart: weekStartDate,
-      weekEnd: weekEndDate,
-      storeId,
-      storeName,
-      publishedByName: currentUser.full_name,
-    })
-
-    impactedEmployees.forEach(employee => {
-      if (!employee?.email) return
-      ScheduleEmailService.sendEmail({
-        type: 'schedule_published',
-        to: employee.email,
-        subject: `Lịch tuần ${weekStartDate} - ${weekEndDate} đã được xuất bản`,
-        body_preview: `${currentUser.full_name} đã xuất bản lịch tuần tại ${storeName}. Vui lòng vào web để kiểm tra ca làm của bạn.`,
-        related_week: weekStartDate,
-      })
-    })
-
+    this.notifyAfterPublish(currentUser, storeId, weekStartDate, weekEndDate, schedules)
     return true
   }
 
@@ -1165,6 +1488,7 @@ export class ScheduleService {
     const weekStartDate = weekDates[0]
     const weekEndDate = weekDates[6]
     if (!weekStartDate || !weekEndDate) return false
+    if (this.isWeekPublished(storeId, weekStartDate)) return false
 
     const removedCount = mockSchedules.filter(s => isStoreMatch(s.store_id, storeId) && weekDates.includes(s.date)).length
 
@@ -1175,10 +1499,14 @@ export class ScheduleService {
       }
     }
 
-    saveSchedulesToStorage()
-
-    // Sync xóa toàn bộ ca tuần trên CSDL Supabase
-    void scheduleAdapter.clearStoreWeekShifts(storeId, weekStartDate, weekEndDate)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams({
+        store_id: storeId,
+        week_start: weekStartDate,
+        scope: 'draft_week',
+      })
+      void fetch(`/api/schedules?${params.toString()}`, { method: 'DELETE' }).catch(() => {})
+    }
 
     this.addChangeLog({
       store_id: storeId,
@@ -1239,17 +1567,32 @@ export class ScheduleService {
       })
     }
 
+    const affectedWeekStarts = getImportWeekStarts(
+      shifts.map(shift => shift.date),
+      options?.weekDates
+    )
+
     if (options?.clearExisting) {
-      const importWeekStarts = getImportWeekStarts(
-        shifts.map(shift => shift.date),
-        options.weekDates
-      )
-      importWeekStarts.forEach(weekStart => {
-        this.clearWeekSchedules(currentUser, storeId, this.getWeekDates(weekStart))
-      })
+      for (const weekStart of affectedWeekStarts) {
+        if (this.isWeekPublished(storeId, weekStart)) {
+          return buildImportResult(0, {
+            trangThai: 'that_bai',
+            soGhiThanhCong: 0,
+            soBiLoai: shifts.length,
+            lyDo: [`Tuần ${weekStart} đã chốt lịch chính thức, không thể ghi đè khi import.`],
+          })
+        }
+        const weekDates = this.getWeekDates(weekStart)
+        for (let i = mockSchedules.length - 1; i >= 0; i--) {
+          const s = mockSchedules[i]
+          if (isStoreMatch(s.store_id, storeId) && weekDates.includes(s.date)) {
+            mockSchedules.splice(i, 1)
+          }
+        }
+      }
     }
 
-    const defaultStatus = options?.status || 'published'
+    const defaultStatus = options?.status || 'draft'
     const createdRecords: Schedule[] = []
 
     shifts.forEach(shift => {
@@ -1267,20 +1610,79 @@ export class ScheduleService {
       createdRecords.push(record)
     })
 
-    saveSchedulesToStorage()
+    let totalSynced = 0
+    const errors: string[] = []
 
-    // Đồng bộ hàng loạt vào CSDL Supabase
-    const adapterResult = await scheduleAdapter.bulkAssignShifts(
-      shifts.map(s => ({
-        employee_id: s.employee_id,
-        store_id: storeId,
-        shift_id: s.shift_id,
-        date: s.date,
-        notes: s.notes,
-        status: (s.status || defaultStatus) === 'published' ? 'da_xac_nhan' : 'da_xep',
-      }))
-    )
-    const syncResult = mapAdapterSyncResult(adapterResult)
+    const shiftsByWeek = new Map<string, typeof shifts>()
+    shifts.forEach(s => {
+      const ws = this.getWeekStartDate(s.date)
+      const list = shiftsByWeek.get(ws) || []
+      list.push(s)
+      shiftsByWeek.set(ws, list)
+    })
+
+    for (const [weekStart, weekItems] of shiftsByWeek.entries()) {
+      try {
+        const payload = options?.clearExisting
+          ? {
+              action: 'replace_week_draft',
+              store_id: storeId,
+              week_start: weekStart,
+              source: 'imported_excel',
+              actor_id: currentUser.id,
+              actor_name: currentUser.full_name,
+              items: weekItems.map(s => ({
+                employee_id: s.employee_id,
+                store_id: storeId,
+                shift_id: s.shift_id,
+                date: s.date,
+                notes: s.notes,
+                assigned_position_id: s.assigned_position_id,
+              })),
+            }
+          : {
+              action: 'upsert',
+              actor_id: currentUser.id,
+              actor_name: currentUser.full_name,
+              items: weekItems.map(s => ({
+                employee_id: s.employee_id,
+                store_id: storeId,
+                shift_id: s.shift_id,
+                date: s.date,
+                notes: s.notes,
+                assigned_position_id: s.assigned_position_id,
+              })),
+            }
+
+        const res = await fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const json = await res.json().catch(() => null)
+        if (!res.ok || !json?.success) {
+          errors.push(json?.error || `Lỗi đồng bộ tuần ${weekStart}`)
+        } else {
+          totalSynced += Number(json.count ?? weekItems.length)
+          await this.hydrateWeekFromServer(storeId, weekStart)
+        }
+      } catch {
+        errors.push(`Lỗi kết nối khi đồng bộ tuần ${weekStart}`)
+      }
+    }
+
+    const syncResult: ScheduleDbSyncResult = errors.length > 0
+      ? {
+          trangThai: 'that_bai',
+          soGhiThanhCong: totalSynced,
+          soBiLoai: Math.max(0, shifts.length - totalSynced),
+          lyDo: errors,
+        }
+      : {
+          trangThai: 'da_luu_db',
+          soGhiThanhCong: totalSynced,
+          soBiLoai: 0,
+        }
 
     if (shifts.length > 0) {
       const weekStart = this.getWeekStartDate(shifts[0].date)
@@ -1725,7 +2127,7 @@ export class ScheduleService {
         employee_id: employeeId,
         date,
         shift_id: shiftId,
-        message: `${employee.full_name} đang có ca ${firstShiftName} cùng ngày. Gán ca này sẽ chuyển lịch.`,
+        message: `${employee.full_name} đang có ca ${firstShiftName} cùng ngày (nhân sự sẽ làm thêm ca trong ngày).`,
       })
     }
 
@@ -1790,31 +2192,107 @@ export class ScheduleService {
       return { schedule: null, trangThai: 'that_bai', soGhiThanhCong: 0, soBiLoai: 1, lyDo: ['Cần nhập lý do khi sửa lịch đã chốt'] }
     }
 
-    const existing = getSchedulesByStoreWeek(storeId, [date]).find(schedule => schedule.employee_id === employeeId && schedule.date === date) || null
-    const next = apiAddSchedule(storeId, employeeId, shiftId, date, notes, wasPublished ? 'published' : 'draft', assignedPositionId)
+    const existing =
+      getSchedulesByStoreWeek(storeId, [date]).find(
+        schedule => schedule.employee_id === employeeId && schedule.date === date && schedule.shift_id === shiftId
+      ) || null
+    const snapshotExisting = existing ? { ...existing } : null
+
+    const next = apiAddSchedule(
+      storeId,
+      employeeId,
+      shiftId,
+      date,
+      notes,
+      wasPublished ? 'published' : 'draft',
+      assignedPositionId
+    )
+    next.employee_name = employee.full_name
     next.updated_by = currentUser.id
     next.updated_at = new Date().toISOString()
     if (wasPublished) {
       next.modified_after_publish = true
       next.change_reason = changeReason?.trim()
     }
-    saveSchedulesToStorage()
 
-    // Sync trực tiếp với DB Supabase 'lich_phan_ca'
-    const adapterResult = await scheduleAdapter.assignShift({
-      employee_id: employeeId,
-      store_id: storeId,
-      shift_id: shiftId,
-      date,
-      notes,
-      status: wasPublished ? 'da_xac_nhan' : 'da_xep',
-    })
-    const syncResult = mapAdapterSyncResult(adapterResult)
+    const syncResult: ScheduleDbSyncResult = {
+      trangThai: 'da_luu_db',
+      soGhiThanhCong: 1,
+      soBiLoai: 0,
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'upsert',
+            actor_id: currentUser.id,
+            actor_name: currentUser.full_name,
+            store_id: storeId,
+            employee_id: employeeId,
+            employee_name: employee.full_name,
+            date,
+            shift_id: shiftId,
+            shift_name: ShiftTemplateService.getById(shiftId)?.name,
+            assigned_position_id: assignedPositionId || employee.position_id,
+            notes,
+            change_reason: changeReason?.trim() || undefined,
+          }),
+        })
+        const json = await res.json().catch(() => null)
+        if (!res.ok || !json?.success) {
+          apiRemoveSchedule(employeeId, date, next.id, shiftId)
+          if (snapshotExisting) {
+            mockSchedules.push(snapshotExisting)
+          }
+          return {
+            schedule: null,
+            trangThai: 'that_bai',
+            soGhiThanhCong: 0,
+            soBiLoai: 1,
+            lyDo: [json?.error || 'Không thể lưu ca lên máy chủ.'],
+          }
+        }
+        if (json.data?.id) {
+          next.id = String(json.data.id)
+        }
+        if (json.data?.status === 'published' || json.data?.status === 'draft') {
+          next.status = json.data.status
+        }
+        if (json.week_meta) {
+          const rawMeta = json.week_meta as Record<string, unknown>
+          this.syncWeekMetaCache(storeId, weekStart, {
+            store_id: String(rawMeta.store_id || storeId),
+            week_start: String(rawMeta.week_start || weekStart),
+            week_end: String(rawMeta.week_end || this.getWeekDates(weekStart)[6] || weekStart),
+            status: rawMeta.status === 'published' ? 'published' : 'draft',
+            published_at: rawMeta.published_at ? String(rawMeta.published_at) : undefined,
+            published_by: rawMeta.published_by ? String(rawMeta.published_by) : undefined,
+            updated_at: String(rawMeta.updated_at || new Date().toISOString()),
+            updated_by: String(rawMeta.updated_by || currentUser.id),
+          })
+        }
+      } catch {
+        apiRemoveSchedule(employeeId, date, next.id, shiftId)
+        if (snapshotExisting) {
+          mockSchedules.push(snapshotExisting)
+        }
+        return {
+          schedule: null,
+          trangThai: 'that_bai',
+          soGhiThanhCong: 0,
+          soBiLoai: 1,
+          lyDo: ['Lỗi kết nối máy chủ khi lưu ca phân công.'],
+        }
+      }
+    }
 
     if (wasPublished) {
       this.touchPublishedWeek(currentUser, storeId, weekStart)
     } else {
-      this.saveDraftWeek(currentUser, storeId, this.getWeekDates(weekStart))
+      this.moveWeekToDrafting(storeId, weekStart)
     }
 
     this.addChangeLog({
@@ -1822,11 +2300,14 @@ export class ScheduleService {
       week_start: weekStart,
       assignment_id: next.id,
       employee_id: employeeId,
+      employee_name: employee.full_name,
       date,
-      action: existing ? 'update' : 'create',
-      before_state: existing ? { ...existing } : null,
+      shift_id: shiftId,
+      action: snapshotExisting ? 'update' : 'create',
+      before_state: snapshotExisting,
       after_state: { ...next },
       changed_by: currentUser.id,
+      changed_by_name: currentUser.full_name,
       reason: wasPublished ? (changeReason || 'Sửa lịch sau khi chốt') : 'Xếp ca nháp',
     })
 
@@ -1855,53 +2336,61 @@ export class ScheduleService {
     return { schedule: next, ...syncResult }
   }
 
-  static deleteSchedule(
+  private static resolveDeleteTarget(
+    storeId: string,
+    employeeId: string,
+    date: string,
+    shiftId?: string,
+    scheduleId?: string
+  ): Schedule | undefined {
+    const daySchedules = getSchedulesByStoreWeek(storeId, [date])
+    if (scheduleId) {
+      const byId = daySchedules.find(s => s.id === scheduleId)
+      if (byId) return byId
+    }
+    if (shiftId) {
+      const exact = daySchedules.find(
+        s => s.employee_id === employeeId && s.date === date && s.shift_id === shiftId
+      )
+      if (exact) return exact
+    }
+    return daySchedules.find(s => s.employee_id === employeeId && s.date === date)
+  }
+
+  private static recordLocalDeletionSideEffects(
     currentUser: AuthUser,
     storeId: string,
     employeeId: string,
     date: string,
+    existing: Schedule,
+    wasPublished: boolean,
     changeReason?: string
-  ): boolean {
-    this.init()
-
-    if (currentUser.role === 'employee') return false
-    if (['store_manager', 'shift_leader'].includes(currentUser.role) && currentUser.store_id !== storeId) return false
-
-    const existing = getSchedulesByStoreWeek(storeId, [date]).find(schedule => schedule.employee_id === employeeId && schedule.date === date)
-    if (!existing) return false
-
+  ) {
     const weekStart = this.getWeekStartDate(date)
-    const wasPublished = this.isWeekPublished(storeId, weekStart)
-    if (wasPublished && !changeReason?.trim()) {
-      return false
-    }
-
-    const success = apiRemoveSchedule(employeeId, date)
-    if (!success) return false
-
-    // Sync trực tiếp xóa khỏi DB Supabase 'lich_phan_ca'
-    void scheduleAdapter.removeShift(employeeId, storeId, date, existing.shift_id)
-
     if (wasPublished) {
       this.touchPublishedWeek(currentUser, storeId, weekStart)
     } else {
-      this.saveDraftWeek(currentUser, storeId, this.getWeekDates(weekStart))
+      this.moveWeekToDrafting(storeId, weekStart)
     }
+
+    const employee = EmployeeService.getEmployeeById(employeeId)
 
     this.addChangeLog({
       store_id: storeId,
       week_start: weekStart,
       assignment_id: existing.id,
       employee_id: employeeId,
+      employee_name: employee?.full_name || existing.employee_name,
       date,
+      shift_id: existing.shift_id,
       action: wasPublished ? 'cancel' : 'delete',
       before_state: { ...existing },
       after_state: null,
       changed_by: currentUser.id,
+      changed_by_name: currentUser.full_name,
       reason: wasPublished ? (changeReason || 'Hủy ca sau khi chốt') : 'Gỡ ca nháp',
     })
 
-    const employee = EmployeeService.getEmployeeById(employeeId)
     if (wasPublished && employee?.email) {
       notifyScheduleChangedAfterPublish({
         userId: employeeId,
@@ -1922,8 +2411,145 @@ export class ScheduleService {
         related_week: weekStart,
       })
     }
+  }
+
+  static deleteSchedule(
+    currentUser: AuthUser,
+    storeId: string,
+    employeeId: string,
+    date: string,
+    changeReason?: string,
+    shiftId?: string,
+    scheduleId?: string
+  ): boolean {
+    this.init()
+
+    if (currentUser.role === 'employee') return false
+    if (['store_manager', 'shift_leader'].includes(currentUser.role) && currentUser.store_id !== storeId) return false
+
+    const existing = this.resolveDeleteTarget(storeId, employeeId, date, shiftId, scheduleId)
+    if (!existing) return false
+
+    const weekStart = this.getWeekStartDate(date)
+    const wasPublished = this.isWeekPublished(storeId, weekStart)
+    if (wasPublished && !changeReason?.trim()) {
+      return false
+    }
+
+    const success = apiRemoveSchedule(employeeId, date, existing.id, existing.shift_id)
+    if (!success) return false
+
+    if (typeof window !== 'undefined') {
+      void fetch('/api/schedules', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: existing.id,
+          store_id: storeId,
+          employee_id: employeeId,
+          date,
+          shift_id: existing.shift_id,
+          reason: changeReason?.trim() || undefined,
+          actor_id: currentUser.id,
+          actor_name: currentUser.full_name,
+        }),
+      }).catch(() => {})
+    }
+
+    this.recordLocalDeletionSideEffects(
+      currentUser,
+      storeId,
+      employeeId,
+      date,
+      existing,
+      wasPublished,
+      changeReason
+    )
 
     return true
+  }
+
+  static async deleteScheduleAsync(
+    currentUser: AuthUser,
+    storeId: string,
+    employeeId: string,
+    date: string,
+    options?: { shiftId?: string; scheduleId?: string; changeReason?: string }
+  ): Promise<{ ok: boolean; error?: string }> {
+    this.init()
+
+    if (currentUser.role === 'employee') {
+      return { ok: false, error: 'Tài khoản nhân viên không có quyền gỡ ca.' }
+    }
+    if (['store_manager', 'shift_leader'].includes(currentUser.role) && currentUser.store_id !== storeId) {
+      return { ok: false, error: 'Tài khoản không có quyền thao tác cửa hàng này.' }
+    }
+
+    const existing = this.resolveDeleteTarget(
+      storeId,
+      employeeId,
+      date,
+      options?.shiftId,
+      options?.scheduleId
+    )
+    if (!existing) {
+      return { ok: false, error: 'Không tìm thấy ca phân công cần gỡ.' }
+    }
+
+    const weekStart = this.getWeekStartDate(date)
+    const wasPublished = this.isWeekPublished(storeId, weekStart)
+    const cleanReason = options?.changeReason?.trim()
+    if (wasPublished && !cleanReason) {
+      return { ok: false, error: 'Cần nhập lý do khi gỡ ca trong tuần đã chốt.' }
+    }
+
+    const removedLocally = apiRemoveSchedule(employeeId, date, existing.id, existing.shift_id)
+    if (!removedLocally) {
+      return { ok: false, error: 'Không thể gỡ ca cục bộ.' }
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/schedules', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: existing.id,
+            store_id: storeId,
+            employee_id: employeeId,
+            date,
+            shift_id: existing.shift_id,
+            reason: cleanReason || undefined,
+            actor_id: currentUser.id,
+            actor_name: currentUser.full_name,
+          }),
+        })
+        const json = await res.json().catch(() => null)
+        if (!res.ok || !json?.success) {
+          // Hoàn tác lại trạng thái thật từ máy chủ nếu xóa bị từ chối
+          await this.hydrateWeekFromServer(storeId, weekStart)
+          return {
+            ok: false,
+            error: json?.error || 'Không thể xóa ca khỏi máy chủ.',
+          }
+        }
+      } catch {
+        await this.hydrateWeekFromServer(storeId, weekStart)
+        return { ok: false, error: 'Lỗi kết nối máy chủ khi xóa ca.' }
+      }
+    }
+
+    this.recordLocalDeletionSideEffects(
+      currentUser,
+      storeId,
+      employeeId,
+      date,
+      existing,
+      wasPublished,
+      cleanReason
+    )
+
+    return { ok: true }
   }
 
   static copyPreviousWeek(currentUser: AuthUser, storeId: string, fromWeek: string[], toWeek: string[]): number {
@@ -1940,7 +2566,7 @@ export class ScheduleService {
 
     const eligibleIds = new Set(this.getEligibleEmployees(currentUser, storeId).map(emp => emp.id))
     const sourceSchedules = getSchedulesByStoreWeek(storeId, fromWeek)
-    let copied = 0
+    const copiedItems: Schedule[] = []
     let skippedInvalidEmployee = 0
     let skippedExistingAssignment = 0
 
@@ -1955,7 +2581,14 @@ export class ScheduleService {
 
       const targetDate = toWeek[sourceIndex]
       if (!targetDate) return
-      if (getScheduleByEmployeeDate(schedule.employee_id, targetDate, storeId)) {
+      const alreadyHasSlot = mockSchedules.some(
+        x =>
+          x.employee_id === schedule.employee_id &&
+          x.date === targetDate &&
+          x.shift_id === schedule.shift_id &&
+          isStoreMatch(x.store_id, storeId)
+      )
+      if (alreadyHasSlot) {
         skippedExistingAssignment += 1
         return
       }
@@ -1966,30 +2599,55 @@ export class ScheduleService {
         schedule.shift_id,
         targetDate,
         schedule.notes,
-        'draft'
+        'draft',
+        schedule.assigned_position_id
       )
       next.modified_after_publish = false
       next.change_reason = undefined
       next.updated_by = currentUser.id
       next.updated_at = new Date().toISOString()
-      copied += 1
+      copiedItems.push(next)
     })
 
-    if (copied > 0) {
-      saveSchedulesToStorage()
+    if (copiedItems.length > 0) {
       this.saveDraftWeek(currentUser, storeId, toWeek)
-      this.moveWeekToDrafting(storeId, toWeek[0] || '')
+      if (typeof window !== 'undefined') {
+        void fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'upsert',
+            actor_id: currentUser.id,
+            actor_name: currentUser.full_name,
+            items: copiedItems.map(item => ({
+              id: item.id,
+              store_id: storeId,
+              employee_id: item.employee_id,
+              shift_id: item.shift_id,
+              date: item.date,
+              notes: item.notes,
+              assigned_position_id: item.assigned_position_id,
+            })),
+          }),
+        }).catch(() => {})
+      }
     }
 
     return {
-      copied,
+      copied: copiedItems.length,
       skipped_invalid_employee: skippedInvalidEmployee,
       skipped_existing_assignment: skippedExistingAssignment,
     }
   }
 
   static getChangeLogs(currentUser: AuthUser, options?: { storeId?: string; weekStart?: string }) {
-    let logs = this.getChangeLogDb()
+    let logs: ScheduleChangeLog[] = []
+    if (options?.storeId && options?.weekStart) {
+      const serverLogs = this.serverChangeLogs.get(this.getWeekKey(options.storeId, options.weekStart))
+      logs = serverLogs ? [...serverLogs] : this.getChangeLogDb()
+    } else {
+      logs = this.getChangeLogDb()
+    }
 
     if (currentUser.role === 'employee') {
       return logs.filter(log => log.employee_id === currentUser.id)
@@ -2000,11 +2658,12 @@ export class ScheduleService {
     }
 
     if (options?.storeId) {
-      logs = logs.filter(log => log.store_id === options.storeId)
+      logs = logs.filter(log => isStoreMatch(log.store_id, options.storeId!))
     }
 
     if (options?.weekStart) {
-      logs = logs.filter(log => log.week_start === options.weekStart)
+      const normWeek = this.getWeekStartDate(options.weekStart)
+      logs = logs.filter(log => log.week_start === normWeek)
     }
 
     return logs

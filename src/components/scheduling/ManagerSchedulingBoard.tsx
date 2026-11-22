@@ -7,9 +7,9 @@ import { ScheduleService, type ShiftDemand, type ScheduleValidationWarning } fro
 import { ShiftTemplateService } from '@/lib/services/shift-template-service'
 import { EmployeeService } from '@/lib/services/employees/employee-service'
 import { ShiftRegistrationService } from '@/lib/services/scheduling/shift-registration-service'
-import { employeeAdapter, scheduleAdapter } from '@/lib/adapters'
+import { employeeAdapter } from '@/lib/adapters'
 import { exportWeekScheduleToExcel } from '@/lib/services/scheduling/schedule-export-service'
-import { addSchedule, getPositionById, getShiftById, getStoreById, mockPositions, mockStores, getStoresList, isStoreMatch, mockEmployees, getEmployeeById } from '@/lib/mock-data'
+import { getPositionById, getShiftById, getStoreById, mockPositions, mockStores, getStoresList, isStoreMatch, mockEmployees, getEmployeeById } from '@/lib/mock-data'
 import {
   extractDateFromHeader,
   getMappedImportPreviewDates,
@@ -209,12 +209,17 @@ function detectStoreFromExcelText(headers: string[], fileName: string, stores: A
 type DemandFormState = Record<string, number>
 
 type PendingPublishedChange = {
-  action: 'assign' | 'remove'
+  action: 'assign' | 'remove' | 'move'
   employeeId: string
   employeeName: string
   date: string
   shiftTemplateId: string
   positionId: string
+  scheduleId?: string
+  fromDate?: string
+  fromShiftId?: string
+  fromPositionId?: string
+  notes?: string
 }
 
 type SlotModalTarget = {
@@ -336,9 +341,11 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
   // Modal chỉnh nhu cầu tuần
   const [showDemandEditor, setShowDemandEditor] = useState(false)
 
-  // Sửa sau khi chốt
+  // Sửa sau khi chốt & trạng thái thao tác đám mây
   const [pendingPublishedChange, setPendingPublishedChange] = useState<PendingPublishedChange | null>(null)
   const [publishedChangeReason, setPublishedChangeReason] = useState('')
+  const [isSeedingDraft, setIsSeedingDraft] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
 
   // Modal Nhập Excel & Dữ liệu thật (Hỗ trợ nạp cùng lúc nhiều file)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -363,6 +370,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
 
   // Trạng thái Drag & Drop Kéo - Thả Ca làm việc
   const [draggedAssignment, setDraggedAssignment] = useState<{
+    scheduleId?: string
     employeeId: string
     employeeName: string
     fromDate: string
@@ -374,6 +382,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
 
   // Trạng thái Modal Dời Ca Làm Nhanh (Click nút dời ca)
   const [moveModalData, setMoveModalData] = useState<{
+    scheduleId?: string
     employeeId: string
     employeeName: string
     fromDate: string
@@ -459,20 +468,21 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     }
   }, [activeStoreId, importSelectedStoreId])
 
-  // Tự động nạp ca từ Supabase DB (public.lich_phan_ca) để hỗ trợ đa thiết bị (máy tính khác, điện thoại)
+  // Tự động nạp Bản Nháp / Lịch Đã Chốt của Homies từ đám mây (/api/schedules) — không bao giờ bị iPOS đè ngược
   useEffect(() => {
-    if (!activeStoreId || !weekDates[0] || !weekDates[6]) return
+    if (!activeStoreId || !activeWeekStart) return
     let isMounted = true
-    scheduleAdapter.getShiftsByStoreAndWeek(activeStoreId, weekDates[0], weekDates[6]).then(dbShifts => {
-      if (isMounted && dbShifts && dbShifts.length > 0) {
-        ScheduleService.syncFromAdapter(dbShifts, activeStoreId, weekDates)
-        setRefreshKey(k => k + 1)
-      }
-    }).catch(err => {
-      console.warn('[ManagerSchedulingBoard] Notice syncing schedules from Supabase:', err)
-    })
-    return () => { isMounted = false }
-  }, [activeStoreId, activeWeekStart, weekDates])
+    ScheduleService.hydrateWeekFromServer(activeStoreId, activeWeekStart)
+      .then(() => {
+        if (isMounted) setRefreshKey(k => k + 1)
+      })
+      .catch(err => {
+        console.warn('[ManagerSchedulingBoard] Lỗi nạp lịch chính thức từ đám mây:', err)
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [activeStoreId, activeWeekStart])
 
   const board = useMemo(() => {
     void refreshKey
@@ -480,12 +490,16 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
   }, [activeStoreId, activeWeekStart, refreshKey, user])
   const weekStateMeta = board ? ScheduleService.getWeekStateMeta(board.week) : null
 
-  const pendingRegistrationsCount = useMemo(() => {
+  const availabilityCount = useMemo(() => {
     void refreshKey
-    return activeStoreId ? ShiftRegistrationService.getPendingCount(activeStoreId, activeWeekStart) : 0
+    if (!activeStoreId || !activeWeekStart) return 0
+    return ShiftRegistrationService.getHeatmapData(activeStoreId, activeWeekStart).reduce(
+      (sum, cell) => sum + cell.count,
+      0
+    )
   }, [activeStoreId, activeWeekStart, refreshKey])
 
-  // Tự động đồng bộ ca đăng ký từ Database máy chủ (/api/shifts/register)
+  // Tự động đồng bộ Lịch Rảnh đầu vào (từ iPOS hoặc Homies) để gợi ý khi xếp ca & điền nhanh vào Nháp
   useEffect(() => {
     if (activeStoreId && activeWeekStart) {
       ShiftRegistrationService.syncRegistrationsFromServer(activeStoreId, activeWeekStart).then(() => {
@@ -1152,15 +1166,21 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
 
   const handleClearWeekSchedules = () => {
     if (!activeStoreId || !user) return
+    if (isPublished) {
+      setMessageTone('warning')
+      setMessage('Tuần này đã chốt lịch chính thức, không thể xóa trắng toàn tuần.')
+      return
+    }
     const currentStoreObj = stores.find(s => s.id === activeStoreId)
     const confirmed = confirm(
-      `Bạn có chắc chắn muốn xóa toàn bộ ca làm việc trong tuần (${formatShortDate(weekDates[0])} - ${formatShortDate(weekDates[6])}) của ${currentStoreObj?.name || 'cửa hàng'} không?\n\nHành động này sẽ làm sạch toàn bộ bảng để bạn có thể nhập dữ liệu thật hoặc xếp lại từ đầu.`
+      `Bạn có chắc chắn muốn xóa toàn bộ ca làm việc trong tuần (${formatShortDate(weekDates[0])} - ${formatShortDate(weekDates[6])}) của ${currentStoreObj?.name || 'cửa hàng'} không?\n\nHành động này sẽ làm sạch toàn bộ bản nháp tuần này để bạn xếp lại từ đầu.`
     )
     if (!confirmed) return
 
     ScheduleService.clearWeekSchedules(user, activeStoreId, weekDates)
     setRefreshKey(prev => prev + 1)
-    setMessage('Đã xóa sạch toàn bộ ca làm việc trong tuần!')
+    setMessageTone('info')
+    setMessage('Đã xóa sạch toàn bộ bản nháp tuần này.')
   }
 
   const handleConfirmImport = async () => {
@@ -1266,18 +1286,6 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
             status: 'draft',
           })
           totalBatchShifts += importResult.count
-
-          // Đấu nối đồng bộ hàng loạt vào CSDL Supabase lich_phan_ca
-          await scheduleAdapter.bulkAssignShifts(
-            fileShifts.map(s => ({
-              employee_id: s.employee_id,
-              store_id: targetStoreId,
-              shift_id: s.shift_id,
-              date: s.date,
-              notes: s.notes,
-              status: 'da_xep' as const,
-            }))
-          )
         }
       }
 
@@ -1370,18 +1378,6 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     })
     const addedCount = importResult.count
 
-    // Đấu nối đồng bộ hàng loạt vào CSDL Supabase public.lich_phan_ca
-    await scheduleAdapter.bulkAssignShifts(
-      shiftsToImport.map(s => ({
-        employee_id: s.employee_id,
-        store_id: targetStoreId,
-        shift_id: s.shift_id,
-        date: s.date,
-        notes: s.notes,
-        status: 'da_xep' as const,
-      }))
-    )
-
     // Tự động chuyển bảng xếp lịch sang đúng cơ sở & tuần vừa nhập
     if (importSelectedStoreId) {
       setSelectedStoreId(importSelectedStoreId)
@@ -1461,35 +1457,83 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     }
   }
 
-  const handleMoveShift = (
+  const handleMoveShift = async (
     employeeId: string,
     fromDate: string,
     fromShiftId: string,
     targetDate: string,
     targetShiftId: string,
     targetPositionId?: string,
-    notes?: string
+    notes?: string,
+    fromScheduleId?: string,
+    fromPositionId?: string,
+    changeReason?: string
   ) => {
     if (!activeStoreId || !user) return
+    if (
+      fromDate === targetDate &&
+      fromShiftId === targetShiftId &&
+      (!fromPositionId || fromPositionId === (targetPositionId || fromPositionId))
+    ) {
+      return
+    }
 
-    ScheduleService.removeAssignment(user, activeStoreId, employeeId, fromDate)
-    addSchedule(
+    const emp = board?.employees.find(e => e.employee.id === employeeId)?.employee
+    const empName = emp?.full_name || employeeId
+
+    if (isPublished && !changeReason?.trim()) {
+      setPendingPublishedChange({
+        action: 'move',
+        employeeId,
+        employeeName: empName,
+        date: targetDate,
+        shiftTemplateId: targetShiftId,
+        positionId: targetPositionId || fromPositionId || emp?.position_id || 'pos-001',
+        scheduleId: fromScheduleId,
+        fromDate,
+        fromShiftId,
+        fromPositionId: fromPositionId || emp?.position_id || 'pos-001',
+        notes,
+      })
+      return
+    }
+
+    const delRes = await ScheduleService.deleteScheduleAsync(user, activeStoreId, employeeId, fromDate, {
+      shiftId: fromShiftId,
+      scheduleId: fromScheduleId,
+      changeReason: changeReason?.trim(),
+    })
+    if (!delRes.ok) {
+      setMessageTone('error')
+      setMessage(delRes.error || 'Không thể gỡ ca cũ khi dời ca.')
+      setRefreshKey(k => k + 1)
+      return
+    }
+
+    const assignRes = await ScheduleService.assignSchedule(
+      user,
       activeStoreId,
       employeeId,
       targetShiftId,
       targetDate,
       notes,
-      isPublished ? 'published' : 'draft',
+      changeReason?.trim(),
       targetPositionId
     )
 
     setRefreshKey(k => k + 1)
-    const emp = board?.employees.find(e => e.employee.id === employeeId)?.employee
-    const empName = emp?.full_name || employeeId
+    if (!assignRes.schedule || assignRes.trangThai === 'that_bai') {
+      await ScheduleService.hydrateWeekFromServer(activeStoreId, activeWeekStart)
+      setRefreshKey(k => k + 1)
+      setMessageTone('error')
+      setMessage(assignRes.lyDo?.[0] || 'Không thể lưu ca mới sau khi dời.')
+      return
+    }
+
     const targetTpl = allTemplates.find(t => t.id === targetShiftId)
     const targetPos = getPositionById(targetPositionId || '')
-
-    setMessage(`Đã dời ca làm của ${empName} sang ${targetTpl?.name || 'ca mới'}${targetPos ? ` (${targetPos.name})` : ''} (${formatCalendarDate(targetDate)}) thành công!`)
+    setMessageTone('info')
+    setMessage(`Đã dời ca làm của ${empName} sang ${targetTpl?.name || 'ca mới'}${targetPos ? ` (${targetPos.name})` : ''} (${formatCalendarDate(targetDate)}) thành công.`)
   }
 
   const handleDownloadSampleExcel = () => {
@@ -1518,8 +1562,8 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     URL.revokeObjectURL(url)
   }
 
-  const handleAddFlexShift = () => {
-    if (!flexShiftModalDate || !activeStoreId) return
+  const handleAddFlexShift = async () => {
+    if (!flexShiftModalDate || !activeStoreId || !user) return
     if (!flexShiftForm.employeeId) {
       setMessage('Vui lòng chọn nhân viên cho ca phát sinh!')
       return
@@ -1531,18 +1575,41 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     const timeNote = `${shiftName}${posLabel} (${flexShiftForm.startTime}-${flexShiftForm.endTime})${flexShiftForm.isOvertime ? ' [Tăng ca]' : ''}`
     const flexShiftId = `shift-flex-${Date.now()}`
 
-    addSchedule(
+    if (isPublished) {
+      const empObj = board?.employees.find(e => e.employee.id === flexShiftForm.employeeId)?.employee
+      setPendingPublishedChange({
+        action: 'assign',
+        employeeId: flexShiftForm.employeeId,
+        employeeName: empObj?.full_name || flexShiftForm.employeeId,
+        date: flexShiftModalDate,
+        shiftTemplateId: flexShiftId,
+        positionId: flexShiftForm.positionId || empObj?.position_id || 'pos-001',
+        notes: timeNote,
+      })
+      setFlexShiftModalDate(null)
+      return
+    }
+
+    const res = await ScheduleService.assignSchedule(
+      user,
       activeStoreId,
       flexShiftForm.employeeId,
       flexShiftId,
       flexShiftModalDate,
       timeNote,
-      'published',
+      undefined,
       flexShiftForm.positionId || undefined
     )
 
-    setMessage(`Đã thêm ${timeNote} thành công!`)
     setRefreshKey(prev => prev + 1)
+    if (!res.schedule || res.trangThai === 'that_bai') {
+      setMessageTone('error')
+      setMessage(res.lyDo?.[0] || 'Không thể thêm ca phát sinh.')
+      return
+    }
+
+    setMessageTone('info')
+    setMessage(`Đã thêm ${timeNote} vào Bản Nháp thành công.`)
     setFlexShiftModalDate(null)
   }
 
@@ -1781,7 +1848,12 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     setMessage(messageText)
   }
 
-  const handleAssign = async (employeeId: string, targetSlot: SlotModalTarget, changeReason?: string) => {
+  const handleAssign = async (
+    employeeId: string,
+    targetSlot: SlotModalTarget,
+    changeReason?: string,
+    note?: string
+  ) => {
     const result = await ScheduleService.assignEmployeeToSlot({
       currentUser: user,
       storeId: activeStoreId,
@@ -1790,13 +1862,14 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
       date: targetSlot.date,
       shiftTemplateId: targetSlot.shiftTemplateId,
       assignedPositionId: targetSlot.positionId,
+      note,
       changeReason,
     })
     if (!result.schedule) {
       const overMaxWarn = result.warnings.find(w => w.type === 'over_max_headcount')
       const msg = overMaxWarn
         ? overMaxWarn.message
-        : 'Không thể xếp ca. Ca này đã đạt số người tối đa cho phép hoặc nhân sự bị trùng ca.'
+        : result.lyDo?.[0] || 'Không thể xếp ca. Ca này đã đạt số người tối đa cho phép hoặc nhân sự bị trùng ca.'
       setMessageTone('error')
       setMessage(msg)
       return
@@ -1822,46 +1895,84 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     setMessage('Đã xếp ca thành công.')
   }
 
-  const handleRemove = (employeeId: string, date: string, changeReason?: string) => {
-    const success = ScheduleService.removeAssignment(user, activeStoreId, employeeId, date, changeReason)
-    if (!success) {
-      setMessage('Không thể gỡ phân công này.')
+  const handleRemove = async (
+    employeeId: string,
+    date: string,
+    shiftId?: string,
+    scheduleId?: string,
+    changeReason?: string
+  ) => {
+    const res = await ScheduleService.deleteScheduleAsync(user, activeStoreId, employeeId, date, {
+      shiftId,
+      scheduleId,
+      changeReason,
+    })
+    setRefreshKey(prev => prev + 1)
+    if (!res.ok) {
+      setMessageTone('error')
+      setMessage(res.error || 'Không thể gỡ phân công này.')
       return
     }
-    setRefreshKey(prev => prev + 1)
-    setMessage('Đã gỡ phân công.')
+    setMessageTone('info')
+    setMessage('Đã gỡ phân công thành công.')
   }
 
-  const submitPublishedChange = () => {
+  const submitPublishedChange = async () => {
     if (!pendingPublishedChange || !publishedChangeReason.trim()) {
       setMessage('Cần nhập lý do thay đổi khi sửa lịch đã chốt.')
       return
     }
 
-    if (pendingPublishedChange.action === 'assign') {
-      handleAssign(
-        pendingPublishedChange.employeeId,
+    const cleanReason = publishedChangeReason.trim()
+    const currentChange = pendingPublishedChange
+    setPendingPublishedChange(null)
+    setPublishedChangeReason('')
+
+    if (currentChange.action === 'move' && currentChange.fromDate && currentChange.fromShiftId) {
+      await handleMoveShift(
+        currentChange.employeeId,
+        currentChange.fromDate,
+        currentChange.fromShiftId,
+        currentChange.date,
+        currentChange.shiftTemplateId,
+        currentChange.positionId,
+        currentChange.notes,
+        currentChange.scheduleId,
+        currentChange.fromPositionId,
+        cleanReason
+      )
+      return
+    }
+
+    if (currentChange.action === 'assign') {
+      await handleAssign(
+        currentChange.employeeId,
         {
-          date: pendingPublishedChange.date,
-          shiftTemplateId: pendingPublishedChange.shiftTemplateId,
-          positionId: pendingPublishedChange.positionId,
+          date: currentChange.date,
+          shiftTemplateId: currentChange.shiftTemplateId,
+          positionId: currentChange.positionId,
           templateName: '',
           positionName: '',
           startTime: '',
           endTime: '',
         },
-        publishedChangeReason.trim()
+        cleanReason,
+        currentChange.notes
       )
     } else {
-      handleRemove(pendingPublishedChange.employeeId, pendingPublishedChange.date, publishedChangeReason.trim())
+      await handleRemove(
+        currentChange.employeeId,
+        currentChange.date,
+        currentChange.shiftTemplateId,
+        currentChange.scheduleId,
+        cleanReason
+      )
     }
-
-    setPendingPublishedChange(null)
-    setPublishedChangeReason('')
   }
 
   const handleSaveDraftWeek = () => {
     const success = ScheduleService.saveDraftWeek(user, activeStoreId, weekDates)
+    setMessageTone('info')
     setMessage(success ? 'Đã lưu bản nháp tuần xếp lịch.' : 'Không thể lưu bản nháp tuần này.')
   }
 
@@ -1882,29 +1993,37 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     setValidationFilterTab(validate.hardWarnings.length > 0 ? 'block' : 'all')
   }
 
-  const handleConfirmPublishFinal = () => {
-    const success = ScheduleService.publishWeek(user, activeStoreId, weekDates, {
-      allowSoftWarnings: true,
-    })
-    if (!success) {
-      setMessage('Chốt lịch thất bại. Vui lòng kiểm tra lại dữ liệu.')
-      return
+  const handleConfirmPublishFinal = async () => {
+    if (!user || !activeStoreId || isPublishing) return
+    setIsPublishing(true)
+    try {
+      const res = await ScheduleService.publishWeekAsync(user, activeStoreId, weekDates, {
+        allowSoftWarnings: true,
+      })
+      if (!res.ok) {
+        setMessageTone('error')
+        setMessage(res.error || 'Chốt lịch thất bại. Vui lòng kiểm tra lại dữ liệu.')
+        return
+      }
+      setValidationModalData(null)
+      setRefreshKey(prev => prev + 1)
+      setMessageTone('info')
+      setMessage(`Đã chốt và phát hành lịch làm việc chính thức tuần này (${res.publishedCount} ca). Nhân viên đã có thể xem lịch trên điện thoại.`)
+    } finally {
+      setIsPublishing(false)
     }
-    setValidationModalData(null)
-    setRefreshKey(prev => prev + 1)
-    setMessage('🎉 Đã chốt & phát hành lịch làm việc tuần thành công! Hệ thống đã gửi thông báo đến toàn bộ nhân sự.')
   }
 
-  const handleApproveAllPendingRegistrations = () => {
-    if (!activeStoreId) return
-    const res = ShiftRegistrationService.approveAllPendingForWeek(activeStoreId, activeWeekStart)
-    if (res.approvedCount > 0) {
-      setMessage(`⚡ Đã tự động chấp thuận và xếp ${res.approvedCount} ca đăng ký hợp lệ vào bảng tuần!`)
-      setMessageTone('info')
+  const handleSeedDraftFromAvailability = async () => {
+    if (!activeStoreId || !user || isSeedingDraft) return
+    setIsSeedingDraft(true)
+    try {
+      const res = await ScheduleService.seedDraftFromAvailability(user, activeStoreId, activeWeekStart, 'merge')
       setRefreshKey(prev => prev + 1)
-    } else {
-      setMessage('Không có ca đăng ký ca rảnh nào đang chờ duyệt cho chi nhánh và tuần này.')
-      setMessageTone('warning')
+      setMessageTone(res.ok ? 'info' : 'warning')
+      setMessage(res.message)
+    } finally {
+      setIsSeedingDraft(false)
     }
   }
 
@@ -1928,7 +2047,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
 
     // Nếu không phải thao tác click vào tên để đổi người và ca đã đủ -> Chặn mở modal
     if (!targetEmployeeId && assignedInCell.length >= targetQuota) {
-      setMessage(`⛔ Vị trí ${pos.name} trong ca ${tpl.name} đã đủ số lượng người (${assignedInCell.length}/${targetQuota}). Bấm vào tên nhân viên để ĐỔI NGUỜI.`)
+      setMessage(`Vị trí ${pos.name} trong ca ${tpl.name} đã đủ số lượng người (${assignedInCell.length}/${targetQuota}). Bấm vào tên nhân viên để đổi người.`)
       return
     }
 
@@ -1945,32 +2064,38 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
   }
 
   // Toggle "Chọn tất cả" trong modal
-  const handleToggleSelectAll = () => {
+  const handleToggleSelectAll = async () => {
     if (!activeSlotModal || !activeModalSlotData) return
     const allAssigned = activeModalRecommendations.every(r => r.is_assigned)
 
     if (allAssigned) {
-      // Gỡ tất cả
-      activeModalRecommendations.forEach(r => {
+      for (const r of activeModalRecommendations) {
         if (r.is_assigned) {
-          if (isPublished) {
-            handleRemove(r.employee_id, activeSlotModal.date, 'Thay đổi ca xuất bản (hàng loạt)')
-          } else {
-            handleRemove(r.employee_id, activeSlotModal.date)
-          }
+          const matchedAsg = (board?.assignments || []).find(
+            a =>
+              a.employee_id === r.employee_id &&
+              a.date === activeSlotModal.date &&
+              a.shift_id === activeSlotModal.shiftTemplateId
+          )
+          await handleRemove(
+            r.employee_id,
+            activeSlotModal.date,
+            activeSlotModal.shiftTemplateId,
+            matchedAsg?.id,
+            isPublished ? 'Thay đổi ca xuất bản (hàng loạt)' : undefined
+          )
         }
-      })
+      }
     } else {
-      // Gán tất cả chưa gán
-      activeModalRecommendations.forEach(r => {
+      for (const r of activeModalRecommendations) {
         if (!r.is_assigned) {
           if (isPublished) {
-            handleAssign(r.employee_id, activeSlotModal, 'Phân công ca xuất bản (hàng loạt)')
+            await handleAssign(r.employee_id, activeSlotModal, 'Phân công ca xuất bản (hàng loạt)')
           } else {
-            handleAssign(r.employee_id, activeSlotModal)
+            await handleAssign(r.employee_id, activeSlotModal)
           }
         }
-      })
+      }
     }
   }
 
@@ -2090,21 +2215,23 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                 Xem theo nhân viên
               </button>
               <Link
-                href="/schedule/registrations"
+                href={`/schedule/registrations?storeId=${encodeURIComponent(activeStoreId)}&weekStart=${encodeURIComponent(activeWeekStart)}`}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-100 transition cursor-pointer"
-                title="Xem bản đồ thời gian rảnh của nhân viên tuần tới và tỷ lệ nộp lịch"
+                title="Xem bản đồ lịch rảnh tuần từ iPOS / Homies để xếp ca"
               >
                 <Layers size={14} className="text-amber-600" />
-                <span>Bản đồ trống {pendingRegistrationsCount > 0 ? `(${pendingRegistrationsCount})` : ''}</span>
+                <span>Lịch Rảnh Tuần {availabilityCount > 0 ? `(${availabilityCount})` : ''}</span>
               </Link>
-              {!isPublished && pendingRegistrationsCount > 0 && (
+              {!isPublished && availabilityCount > 0 && (
                 <button
-                  onClick={handleApproveAllPendingRegistrations}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-1.5 text-xs font-bold text-sky-900 shadow-2xs hover:bg-sky-100 transition cursor-pointer"
-                  title="Chấp thuận toàn bộ các đăng ký ca rảnh của nhân viên cho tuần này"
+                  type="button"
+                  disabled={isSeedingDraft}
+                  onClick={handleSeedDraftFromAvailability}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-1.5 text-xs font-bold text-sky-900 shadow-2xs hover:bg-sky-100 transition cursor-pointer disabled:opacity-50"
+                  title="Đổ nhanh lịch rảnh vào Bản Nháp để kéo-thả tinh chỉnh trước khi chốt"
                 >
                   <Zap size={14} className="text-amber-500" />
-                  <span>Duyệt đăng ký ca ({pendingRegistrationsCount})</span>
+                  <span>{isSeedingDraft ? 'Đang điền...' : `Điền nhanh vào Bản Nháp (${availabilityCount})`}</span>
                 </button>
               )}
               <button
@@ -2230,8 +2357,8 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
           </div>
         </div>
 
-        {/* Banner đăng ký ca tuần chờ duyệt (1-chạm) - chỉ hiện khi tuần chưa chốt */}
-        {!isPublished && pendingRegistrationsCount > 0 && (
+        {/* Banner gợi ý nguồn Lịch Rảnh Tuần - chỉ hiện khi tuần chưa chốt */}
+        {!isPublished && availabilityCount > 0 && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50/70 p-3.5 shadow-xs animate-fade-in">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-[#2F6FA8] text-white flex items-center justify-center shrink-0 shadow-2xs">
@@ -2239,28 +2366,29 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
               </div>
               <div>
                 <p className="text-xs font-bold text-[#001D3D]">
-                  Có {pendingRegistrationsCount} ca đăng ký tuần từ nhân sự đang chờ duyệt
+                  Đang có {availabilityCount} khung giờ rảnh từ iPOS / Homies để tham khảo xếp ca
                 </p>
                 <p className="text-[11px] text-gray-600">
-                  Nhân viên part-time đã gửi lịch rảnh qua app di động cho tuần làm việc này.
+                  Nhân viên chỉ thấy lịch đi làm sau khi bạn thiết kế xong Bản Nháp và bấm Chốt &amp; Phát hành.
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Link
-                href="/schedule/registrations"
+                href={`/schedule/registrations?storeId=${encodeURIComponent(activeStoreId)}&weekStart=${encodeURIComponent(activeWeekStart)}`}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-xs font-bold text-sky-800 shadow-xs hover:bg-sky-50 transition cursor-pointer"
               >
                 <Layers size={14} className="text-sky-600" />
-                <span>Xem Bản Đồ Trống</span>
+                <span>Xem Lịch Rảnh Tuần</span>
               </Link>
               <button
                 type="button"
-                onClick={handleApproveAllPendingRegistrations}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2F6FA8] to-[#1D3E61] px-4 py-2 text-xs font-bold text-white shadow-xs hover:from-[#1D3E61] hover:to-[#001D3D] transition cursor-pointer shrink-0 active:scale-98"
+                disabled={isSeedingDraft}
+                onClick={handleSeedDraftFromAvailability}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2F6FA8] to-[#1D3E61] px-4 py-2 text-xs font-bold text-white shadow-xs hover:from-[#1D3E61] hover:to-[#001D3D] transition cursor-pointer shrink-0 active:scale-98 disabled:opacity-50"
               >
                 <Zap size={14} className="text-amber-300" />
-                <span>Chấp thuận toàn bộ</span>
+                <span>{isSeedingDraft ? 'Đang điền vào Nháp...' : 'Điền nhanh từ lịch rảnh vào Nháp'}</span>
               </button>
             </div>
           </div>
@@ -2590,14 +2718,16 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                             onDrop={e => {
                               e.preventDefault()
                               if (draggedAssignment) {
-                                handleMoveShift(
+                                void handleMoveShift(
                                   draggedAssignment.employeeId,
                                   draggedAssignment.fromDate,
                                   draggedAssignment.fromShiftId,
                                   date,
                                   template.id,
                                   draggedAssignment.fromPositionId,
-                                  draggedAssignment.notes
+                                  draggedAssignment.notes,
+                                  draggedAssignment.scheduleId,
+                                  draggedAssignment.fromPositionId
                                 )
                                 setDraggedAssignment(null)
                                 setDropTargetKey(null)
@@ -2671,10 +2801,11 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                                         onDragStart={e => {
                                           e.dataTransfer.setData('text/plain', asg.employee_id)
                                           setDraggedAssignment({
+                                            scheduleId: asg.id,
                                             employeeId: asg.employee_id,
                                             employeeName: empName,
                                             fromDate: date,
-                                            fromShiftId: template.id,
+                                            fromShiftId: asg.shift_id,
                                             fromPositionId: effectivePosId || 'pos-001',
                                             notes: asg.notes,
                                           })
@@ -2781,10 +2912,11 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                                             onClick={e => {
                                               e.stopPropagation()
                                               setMoveModalData({
+                                                scheduleId: asg.id,
                                                 employeeId: asg.employee_id,
                                                 employeeName: empName,
                                                 fromDate: date,
-                                                fromShiftId: template.id,
+                                                fromShiftId: asg.shift_id,
                                                 fromPositionId: effectivePosId || 'pos-001',
                                                 notes: asg.notes,
                                               })
@@ -2807,11 +2939,12 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                                                   employeeId: asg.employee_id,
                                                   employeeName: empName,
                                                   date,
-                                                  shiftTemplateId: template.id,
+                                                  shiftTemplateId: asg.shift_id,
                                                   positionId: effectivePosId || 'pos-001',
+                                                  scheduleId: asg.id,
                                                 })
                                               } else {
-                                                handleRemove(asg.employee_id, date)
+                                                void handleRemove(asg.employee_id, date, asg.shift_id, asg.id)
                                               }
                                             }}
                                             className="flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition cursor-pointer shadow-2xs"
@@ -2905,7 +3038,19 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                                   type="button"
                                   onClick={e => {
                                     e.stopPropagation()
-                                    handleRemove(asg.employee_id, date)
+                                    if (isPublished) {
+                                      setPendingPublishedChange({
+                                        action: 'remove',
+                                        employeeId: asg.employee_id,
+                                        employeeName: empName,
+                                        date,
+                                        shiftTemplateId: asg.shift_id,
+                                        positionId: asg.assigned_position_id || 'pos-001',
+                                        scheduleId: asg.id,
+                                      })
+                                    } else {
+                                      void handleRemove(asg.employee_id, date, asg.shift_id, asg.id)
+                                    }
                                   }}
                                   className="absolute right-1 top-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 transition cursor-pointer shadow-2xs"
                                   title="Gỡ ca phát sinh"
@@ -3065,8 +3210,14 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                   return (
                     <div
                       key={rec.employee_id}
-                      onClick={() => {
+                      onClick={async () => {
                         const isFull = activeModalSlotData ? activeModalSlotData.missing_count === 0 : false
+                        const matchedAsg = (board?.assignments || []).find(
+                          a =>
+                            a.employee_id === rec.employee_id &&
+                            a.date === activeSlotModal.date &&
+                            a.shift_id === activeSlotModal.shiftTemplateId
+                        )
                         if (rec.is_assigned) {
                           if (isPublished) {
                             setPendingPublishedChange({
@@ -3076,17 +3227,34 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                               date: activeSlotModal.date,
                               shiftTemplateId: activeSlotModal.shiftTemplateId,
                               positionId: activeSlotModal.positionId,
+                              scheduleId: matchedAsg?.id,
                             })
                           } else {
-                            handleRemove(rec.employee_id, activeSlotModal.date)
+                            await handleRemove(
+                              rec.employee_id,
+                              activeSlotModal.date,
+                              activeSlotModal.shiftTemplateId,
+                              matchedAsg?.id
+                            )
                           }
                         } else {
                           // Tự động gỡ người cũ nếu ca đã đầy để hoán đổi người mới
-                          if (isFull) {
+                          if (isFull && !isPublished) {
                             const currentlyAssigned = activeModalRecommendations.filter(r => r.is_assigned)
-                            currentlyAssigned.forEach(oldRec => {
-                              handleRemove(oldRec.employee_id, activeSlotModal.date)
-                            })
+                            for (const oldRec of currentlyAssigned) {
+                              const oldAsg = (board?.assignments || []).find(
+                                a =>
+                                  a.employee_id === oldRec.employee_id &&
+                                  a.date === activeSlotModal.date &&
+                                  a.shift_id === activeSlotModal.shiftTemplateId
+                              )
+                              await handleRemove(
+                                oldRec.employee_id,
+                                activeSlotModal.date,
+                                activeSlotModal.shiftTemplateId,
+                                oldAsg?.id
+                              )
+                            }
                           }
 
                           if (isPublished) {
@@ -3099,7 +3267,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                               positionId: activeSlotModal.positionId,
                             })
                           } else {
-                            handleAssign(rec.employee_id, activeSlotModal)
+                            await handleAssign(rec.employee_id, activeSlotModal)
                           }
                         }
                       }}
@@ -3301,7 +3469,12 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
             </div>
 
             <p className="text-xs text-gray-600">
-              Lịch tuần này đã được xuất bản. Vui lòng nhập lý do {pendingPublishedChange.action === 'assign' ? 'gán' : 'gỡ'}{' '}
+              Lịch tuần này đã được chốt chính thức. Vui lòng nhập lý do{' '}
+              {pendingPublishedChange.action === 'assign'
+                ? 'gán'
+                : pendingPublishedChange.action === 'move'
+                ? 'dời ca'
+                : 'gỡ'}{' '}
               nhân sự <strong className="text-gray-800">{pendingPublishedChange.employeeName}</strong>.
             </p>
 
@@ -4646,14 +4819,16 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
               <button
                 type="button"
                 onClick={() => {
-                  handleMoveShift(
+                  void handleMoveShift(
                     moveModalData.employeeId,
                     moveModalData.fromDate,
                     moveModalData.fromShiftId,
                     targetMoveDate,
                     targetMoveShiftId,
                     targetMovePosId,
-                    moveModalData.notes
+                    moveModalData.notes,
+                    moveModalData.scheduleId,
+                    moveModalData.fromPositionId
                   )
                   setMoveModalData(null)
                 }}
@@ -4859,15 +5034,15 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
 
                 <button
                   type="button"
-                  disabled={validationModalData.hardWarnings.length > 0}
+                  disabled={validationModalData.hardWarnings.length > 0 || isPublishing}
                   onClick={handleConfirmPublishFinal}
                   className={`rounded-xl px-5 py-2 text-xs font-bold text-white transition shadow-sm cursor-pointer ${
-                    validationModalData.hardWarnings.length > 0
+                    validationModalData.hardWarnings.length > 0 || isPublishing
                       ? 'bg-gray-400 opacity-60 cursor-not-allowed'
                       : 'bg-[#001D3D] hover:bg-slate-900'
                   }`}
                 >
-                  Xác nhận &amp; Chốt phát hành lịch
+                  {isPublishing ? 'Đang chốt lên đám mây...' : 'Xác nhận & Chốt phát hành lịch'}
                 </button>
               </div>
             </div>

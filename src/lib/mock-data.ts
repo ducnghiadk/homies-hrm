@@ -515,46 +515,44 @@ export function initSchedules() {
 
   if (typeof window !== 'undefined' && !isSyncingShifts) {
     isSyncingShifts = true
-    fetch('/api/shifts')
-      .then(res => res.ok ? res.json() : null)
+    fetch('/api/schedules?include_meta=0', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
       .then(json => {
-        if (json?.success && Array.isArray(json.data) && json.data.length > 0) {
-          const serverSchedules: Schedule[] = json.data.map((s: Record<string, unknown>) => ({
-            id: String(s.id || `sch-${Date.now()}`),
-            org_id: 'org-001',
-            store_id: String(s.store_id || 'store-001'),
-            employee_id: String(s.employee_id || ''),
-            shift_id: String(s.shift_id || 'shift-001'),
-            assigned_position_id: s.position_id ? String(s.position_id) : undefined,
-            date: String(s.date || ''),
-            notes: s.notes
-              ? String(s.notes)
-              : s.shift_name
-              ? String(s.shift_name)
-              : (s.start_time && s.end_time)
-              ? `${s.start_time} - ${s.end_time}`
-              : undefined,
-            status: String(s.status || '').toLowerCase() === 'approved' ? 'published' : 'draft',
-          }))
-
-          if (serverSchedules.length > 0) {
-            const seenIds = new Set<string>()
-            const deduplicated: Schedule[] = []
-            serverSchedules.forEach((s, idx) => {
-              let id = s.id
-              if (!id || seenIds.has(id)) {
-                id = `sch-unique-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`
-                s.id = id
-              }
-              seenIds.add(id)
-              deduplicated.push(s)
+        if (json?.success && Array.isArray(json.data)) {
+          const seenIds = new Set<string>()
+          const deduplicated: Schedule[] = []
+          json.data.forEach((raw: Record<string, unknown>, idx: number) => {
+            let id = String(raw.id || '')
+            if (!id || seenIds.has(id)) {
+              id = `sch-srv-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`
+            }
+            seenIds.add(id)
+            deduplicated.push({
+              id,
+              org_id: 'org-001',
+              store_id: String(raw.store_id || 'store-001'),
+              employee_id: String(raw.employee_id || ''),
+              employee_name: raw.employee_name ? String(raw.employee_name) : undefined,
+              shift_id: String(raw.shift_id || 'shift-001'),
+              assigned_position_id: raw.assigned_position_id
+                ? String(raw.assigned_position_id)
+                : raw.position_id
+                ? String(raw.position_id)
+                : undefined,
+              date: String(raw.date || ''),
+              notes: raw.notes ? String(raw.notes) : undefined,
+              status: String(raw.status || '').toLowerCase() === 'published' ? 'published' : 'draft',
+              modified_after_publish: Boolean(raw.modified_after_publish),
+              change_reason: raw.change_reason ? String(raw.change_reason) : undefined,
+              updated_by: raw.updated_by ? String(raw.updated_by) : undefined,
+              updated_at: raw.updated_at ? String(raw.updated_at) : undefined,
             })
-            mockSchedules.splice(0, mockSchedules.length, ...deduplicated)
-          }
+          })
+          mockSchedules.splice(0, mockSchedules.length, ...deduplicated)
         }
       })
       .catch(err => {
-        console.warn('[mock-data] Không thể tải lịch ca từ /api/shifts:', err)
+        console.warn('[mock-data] Không thể tải lịch chính thức từ /api/schedules:', err)
       })
       .finally(() => {
         isSyncingShifts = false
@@ -563,15 +561,7 @@ export function initSchedules() {
 }
 
 export function saveSchedulesToStorage() {
-  if (typeof window !== 'undefined') {
-    fetch('/api/shifts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(mockSchedules),
-    }).catch(err => {
-      console.warn('[mock-data] Lỗi đồng bộ lịch phân ca lên máy chủ (/api/shifts):', err)
-    })
-  }
+  // Đã ngừng ghi đè kho Lịch Rảnh (/api/shifts); việc lưu thật thực hiện qua /api/schedules trong ScheduleService.
 }
 
 export function getSchedulesByStoreWeek(storeId: string, weekDates: string[]): Schedule[] {
@@ -702,16 +692,20 @@ export function addSchedule(
   return record
 }
 
-export function removeSchedule(employeeId: string, date: string, scheduleId?: string): boolean {
+export function removeSchedule(
+  employeeId: string,
+  date: string,
+  scheduleId?: string,
+  shiftId?: string
+): boolean {
   initSchedules()
-  const idx = mockSchedules.findIndex(s =>
-    scheduleId
-      ? s.id === scheduleId
-      : (s.employee_id === employeeId && s.date === date)
-  )
+  const idx = mockSchedules.findIndex(s => {
+    if (scheduleId) return s.id === scheduleId
+    if (shiftId) return s.employee_id === employeeId && s.date === date && s.shift_id === shiftId
+    return s.employee_id === employeeId && s.date === date
+  })
   if (idx === -1) return false
   mockSchedules.splice(idx, 1)
-  saveSchedulesToStorage()
   return true
 }
 
@@ -727,8 +721,6 @@ export function replaceSchedulesForStoreWeek(storeId: string, weekDates: string[
   schedules.forEach(schedule => {
     mockSchedules.push(schedule)
   })
-
-  saveSchedulesToStorage()
 }
 
 export function copyWeekSchedules(storeId: string, fromWeek: string[], toWeek: string[]): number {

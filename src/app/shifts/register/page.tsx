@@ -5,14 +5,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import { useAuthStore } from '@/store/auth-store'
-import { mockStores, getStoreById, mockPositions } from '@/lib/mock-data'
+import { mockStores } from '@/lib/mock-data'
 import { ShiftRegistrationService } from '@/lib/services/scheduling/shift-registration-service'
 import {
   Calendar,
-  Clock,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Store,
   Briefcase,
   AlertCircle,
@@ -21,7 +18,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Lock,
-  Unlock
 } from 'lucide-react'
 
 // Danh sách 3 ca làm việc chuẩn Homies Milk Tea
@@ -39,16 +35,21 @@ const DESIRED_POSITIONS = [
 
 const DAY_NAMES = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật']
 
-// Helper tính thứ 2 của một ngày
+// Helper tính Thứ 2 theo lịch địa phương (tránh lệch ngày UTC)
 function getMonday(d: Date): Date {
   const date = new Date(d)
+  date.setHours(12, 0, 0, 0)
   const day = date.getDay()
   const diff = date.getDate() - day + (day === 0 ? -6 : 1)
-  return new Date(date.setDate(diff))
+  date.setDate(diff)
+  return date
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0]
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function formatDisplayDate(dateStr: string): string {
@@ -65,24 +66,20 @@ export default function ShiftRegisterPage() {
 
   // Mặc định chọn tuần sau (Tuần kế tiếp tính từ hôm nay)
   const [weekOffset, setWeekOffset] = useState<number>(1) // 0: tuần này, 1: tuần tới
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('store-001')
-  const [desiredPositionId, setDesiredPositionId] = useState<string>('pos-001')
+  const [customStoreId, setCustomStoreId] = useState<string | null>(null)
+  const [customPositionId, setCustomPositionId] = useState<string | null>(null)
   const [notes, setNotes] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [successToast, setSuccessToast] = useState<string | null>(null)
+  const [publishedWeekKeys, setPublishedWeekKeys] = useState<Record<string, boolean>>({})
 
-  // Cấu trúc selections: Record<date, Set<shift_id>>
+  // Cấu trúc selections: Record<date, shift_id[]>
   const [selectedShifts, setSelectedShifts] = useState<Record<string, string[]>>({})
 
-  // Khởi tạo store ban đầu từ user
-  useEffect(() => {
-    if (user?.store_id) {
-      setSelectedStoreId(user.store_id)
-    }
-    if (user?.position_id === 'pos-002') {
-      setDesiredPositionId('pos-002')
-    }
-  }, [user])
+  const selectedStoreId = customStoreId || user?.store_id || 'store-001'
+  const desiredPositionId =
+    customPositionId || (user?.position_id === 'pos-002' ? 'pos-002' : 'pos-001')
 
   // Tính 7 ngày của tuần được chọn
   const { weekStartStr, weekDays } = useMemo(() => {
@@ -108,36 +105,67 @@ export default function ShiftRegisterPage() {
     }
   }, [weekOffset])
 
-  // Tự động kiểm tra hạn chốt 22:00 tối Thứ 6 hàng tuần
-  const { isLocked, deadlineText } = useMemo(() => {
-    // Quản lý hoặc CEO luôn có thể mở khóa để chỉnh sửa
+  const weekLockKey = `${selectedStoreId}|${weekStartStr}`
+
+  // Kiểm tra trạng thái tuần đã chốt chính thức trên Homies từ máy chủ
+  useEffect(() => {
+    if (!selectedStoreId || !weekStartStr) return
+    let active = true
+    const params = new URLSearchParams({
+      store_id: selectedStoreId,
+      week: weekStartStr,
+      status: 'all',
+    })
+    fetch(`/api/shifts/register?${params.toString()}`, { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(json => {
+        if (!active || !json?.success) return
+        setPublishedWeekKeys(prev => ({
+          ...prev,
+          [weekLockKey]: json.week_status === 'published',
+        }))
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [selectedStoreId, weekStartStr, weekLockKey])
+
+  // Tự động kiểm tra hạn chốt 22:00 tối Thứ 6 hàng tuần & trạng thái tuần đã chốt từ Quản lý
+  const { isDeadlineLocked, deadlineText } = useMemo(() => {
     const isManagerOrCeo = user?.role === 'ceo' || user?.role === 'store_manager' || user?.role === 'hr_admin'
 
     const now = new Date()
-    const targetMonday = new Date(weekStartStr)
+    const [y, m, d] = weekStartStr.split('-').map(Number)
+    const targetMonday = new Date(y, m - 1, d, 0, 0, 0, 0)
     const deadlineFriday = new Date(targetMonday)
     deadlineFriday.setDate(deadlineFriday.getDate() - 3) // Thứ 6 trước tuần làm
     deadlineFriday.setHours(22, 0, 0, 0)
 
     const locked = !isManagerOrCeo && now.getTime() > deadlineFriday.getTime()
-    const deadlineText = `22:00 Thứ 6 (${deadlineFriday.getDate().toString().padStart(2, '0')}/${(deadlineFriday.getMonth() + 1).toString().padStart(2, '0')})`
+    const formattedDeadline = `22:00 Thứ 6 (${deadlineFriday.getDate().toString().padStart(2, '0')}/${(deadlineFriday.getMonth() + 1).toString().padStart(2, '0')})`
 
-    return { isLocked: locked, deadlineText }
+    return { isDeadlineLocked: locked, deadlineText: formattedDeadline }
   }, [weekStartStr, user?.role])
 
-  // Lọc danh sách store mà nhân viên này được phép đăng ký (quán chính + allowed_store_ids)
+  const isWeekPublished = Boolean(publishedWeekKeys[weekLockKey])
+  const effectiveLocked = isWeekPublished || isDeadlineLocked
+
+  // Lọc danh sách store đang hoạt động
   const availableStores = useMemo(() => {
-    if (!user) return mockStores
-    return mockStores.filter(s => {
+    const activeStores = mockStores.filter(s => s.is_active !== false)
+    if (!user) return activeStores
+    return activeStores.filter(s => {
       if (s.id === user.store_id) return true
       if (user.secondary_store_ids?.includes(s.id)) return true
-      return true // Cho phép linh hoạt chọn cả 2 cơ sở Homies
+      return true // Cho phép linh hoạt chọn các cơ sở Homies đang hoạt động
     })
   }, [user])
 
   // Toggle chọn ca
   const toggleShift = (dateStr: string, shiftId: string) => {
-    if (isLocked) return
+    if (effectiveLocked) return
+    setSubmitError(null)
     setSelectedShifts(prev => {
       const current = prev[dateStr] || []
       const exists = current.includes(shiftId)
@@ -151,6 +179,8 @@ export default function ShiftRegisterPage() {
 
   // Chọn nhanh: Cả ngày (3 ca)
   const selectAllDay = (dateStr: string) => {
+    if (effectiveLocked) return
+    setSubmitError(null)
     setSelectedShifts(prev => ({
       ...prev,
       [dateStr]: ['shift-001', 'shift-002', 'shift-003'],
@@ -159,6 +189,8 @@ export default function ShiftRegisterPage() {
 
   // Chọn nhanh: Nghỉ ngày này (0 ca)
   const clearDay = (dateStr: string) => {
+    if (effectiveLocked) return
+    setSubmitError(null)
     setSelectedShifts(prev => ({
       ...prev,
       [dateStr]: [],
@@ -172,19 +204,20 @@ export default function ShiftRegisterPage() {
 
   // Xử lý gửi đăng ký
   const handleSubmit = async () => {
+    if (effectiveLocked) return
     if (!user) {
-      alert('Vui lòng đăng nhập để đăng ký ca làm việc!')
+      setSubmitError('Vui lòng đăng nhập để đăng ký ca làm việc.')
       return
     }
 
     if (totalSelectedShiftsCount === 0) {
-      alert('Bạn chưa chọn ca làm việc nào. Vui lòng chọn ít nhất 1 ca rảnh trong tuần!')
+      setSubmitError('Bạn chưa chọn ca làm việc nào. Vui lòng chọn ít nhất 1 ca rảnh trong tuần.')
       return
     }
 
+    setSubmitError(null)
     setIsSubmitting(true)
 
-    // Tạo mảng đăng ký
     const items: { date: string; shiftId: string; positionId: string; notes?: string }[] = []
     Object.entries(selectedShifts).forEach(([date, shiftIds]) => {
       shiftIds.forEach(shiftId => {
@@ -198,19 +231,41 @@ export default function ShiftRegisterPage() {
     })
 
     try {
-      await ShiftRegistrationService.submitRegistrationsAsync(
-        user.id,
-        selectedStoreId,
-        weekStartStr,
-        items
-      )
+      const res = await fetch('/api/shifts/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_id: user.id,
+          store_id: selectedStoreId,
+          week_start_date: weekStartStr,
+          items,
+        }),
+      })
+      const json = await res.json().catch(() => null)
 
-      setSuccessToast(`Gửi đăng ký ${items.length} ca rảnh thành công! Quản lý sẽ sớm xét duyệt vào lịch tuần.`)
+      if (res.status === 409 || json?.code === 'WEEK_ALREADY_PUBLISHED') {
+        setPublishedWeekKeys(prev => ({ ...prev, [weekLockKey]: true }))
+        setSubmitError(
+          json?.error ||
+            'Quản lý đã chốt lịch chính thức cho tuần này, bạn không thể gửi hoặc sửa lịch rảnh nữa.'
+        )
+        return
+      }
+
+      if (!res.ok || !json?.success) {
+        setSubmitError(json?.error || 'Có lỗi xảy ra khi gửi đăng ký. Vui lòng thử lại.')
+        return
+      }
+
+      await ShiftRegistrationService.syncRegistrationsFromServer(selectedStoreId, weekStartStr)
+      setSuccessToast(
+        `Đã gửi ${items.length} khung giờ rảnh thành công! Quản lý sẽ căn cứ vào đây để xếp và chốt lịch tuần.`
+      )
       setTimeout(() => {
         router.push('/my-schedule')
       }, 1600)
     } catch {
-      alert('Có lỗi xảy ra khi gửi đăng ký. Vui lòng thử lại!')
+      setSubmitError('Lỗi kết nối máy chủ khi gửi lịch rảnh. Vui lòng thử lại.')
     } finally {
       setIsSubmitting(false)
     }
@@ -256,20 +311,59 @@ export default function ShiftRegisterPage() {
             </div>
           </div>
 
-          {/* Banner thông báo đã khóa hạn chốt 22h00 Thứ 6 */}
-          {isLocked && (
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-4 border border-amber-200 shadow-xs flex items-start gap-3 animate-fade-in">
-              <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Lock size={16} />
+          {/* Banner khóa khi Quản lý đã chốt lịch chính thức hoặc quá hạn Thứ 6 */}
+          {isWeekPublished ? (
+            <div className="bg-gradient-to-r from-rose-50 to-amber-50 rounded-2xl p-4 border border-rose-200 shadow-xs space-y-3 animate-fade-in">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Lock size={16} />
+                </div>
+                <div className="text-xs text-rose-900 leading-relaxed">
+                  <p className="font-bold text-sm mb-0.5 text-rose-950">
+                    Tuần này Quản lý đã chốt lịch chính thức
+                  </p>
+                  <p className="text-rose-800">
+                    Bạn không thể gửi hoặc chỉnh sửa lịch rảnh cho tuần này nữa. Hãy xem lịch đi làm của bạn hoặc gửi yêu cầu đổi ca nếu cần thay đổi.
+                  </p>
+                </div>
               </div>
-              <div className="text-xs text-amber-900 leading-relaxed">
-                <p className="font-bold text-sm mb-0.5 text-amber-950">
-                  Đã chốt hạn đăng ký ca tuần ({deadlineText})
-                </p>
-                <p className="text-amber-800">
-                  Form đăng ký ca rảnh đã <strong>tự động khóa lúc 22h00 tối Thứ 6</strong> để Quản lý chốt lịch Thứ 7. Nếu cần đăng ký bổ sung gấp, vui lòng liên hệ trực tiếp Quản lý cửa hàng.
-                </p>
+              <div className="flex flex-wrap items-center gap-2 pl-11">
+                <Link
+                  href="/my-schedule"
+                  className="px-3 py-1.5 rounded-xl bg-[#2F6FA8] hover:bg-[#1D3E61] text-white text-xs font-bold transition"
+                >
+                  Xem Lịch của tôi
+                </Link>
+                <Link
+                  href="/schedule/swap"
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 text-xs font-bold transition"
+                >
+                  Xin đổi ca
+                </Link>
               </div>
+            </div>
+          ) : (
+            isDeadlineLocked && (
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-4 border border-amber-200 shadow-xs flex items-start gap-3 animate-fade-in">
+                <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Lock size={16} />
+                </div>
+                <div className="text-xs text-amber-900 leading-relaxed">
+                  <p className="font-bold text-sm mb-0.5 text-amber-950">
+                    Đã chốt hạn đăng ký ca tuần ({deadlineText})
+                  </p>
+                  <p className="text-amber-800">
+                    Form đăng ký ca rảnh đã <strong>tự động khóa lúc 22h00 tối Thứ 6</strong> để Quản lý chốt lịch Thứ 7. Nếu cần đăng ký bổ sung gấp, vui lòng liên hệ trực tiếp Quản lý cửa hàng.
+                  </p>
+                </div>
+              </div>
+            )
+          )}
+
+          {submitError && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800 flex items-start gap-2">
+              <AlertCircle size={15} className="shrink-0 mt-0.5 text-rose-600" />
+              <span>{submitError}</span>
             </div>
           )}
 
@@ -315,7 +409,7 @@ export default function ShiftRegisterPage() {
               </label>
               <select
                 value={selectedStoreId}
-                onChange={e => setSelectedStoreId(e.target.value)}
+                onChange={e => setCustomStoreId(e.target.value)}
                 className="w-full text-xs font-medium bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-800 focus:outline-none focus:border-[#2F6FA8] focus:bg-white transition-all"
               >
                 {availableStores.map(store => (
@@ -339,8 +433,9 @@ export default function ShiftRegisterPage() {
                     <button
                       key={pos.id}
                       type="button"
-                      onClick={() => setDesiredPositionId(pos.id)}
-                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      disabled={effectiveLocked}
+                      onClick={() => setCustomPositionId(pos.id)}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                         isSelected
                           ? 'border-[#2F6FA8] bg-blue-50/70 text-[#2F6FA8] shadow-2xs'
                           : 'border-gray-200 bg-gray-50/50 text-gray-600 hover:bg-gray-100/60'
@@ -393,16 +488,18 @@ export default function ShiftRegisterPage() {
                     <div className="flex items-center gap-1.5 text-[11px]">
                       <button
                         type="button"
+                        disabled={effectiveLocked}
                         onClick={() => selectAllDay(day.dateStr)}
-                        className="text-gray-500 hover:text-[#2F6FA8] font-medium px-1.5 py-0.5 rounded hover:bg-gray-100 transition-colors"
+                        className="text-gray-500 hover:text-[#2F6FA8] font-medium px-1.5 py-0.5 rounded hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         Cả ngày
                       </button>
                       <span className="text-gray-300">|</span>
                       <button
                         type="button"
+                        disabled={effectiveLocked}
                         onClick={() => clearDay(day.dateStr)}
-                        className="text-gray-400 hover:text-rose-600 font-medium px-1.5 py-0.5 rounded hover:bg-gray-100 transition-colors"
+                        className="text-gray-400 hover:text-rose-600 font-medium px-1.5 py-0.5 rounded hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         Nghỉ
                       </button>
@@ -417,12 +514,13 @@ export default function ShiftRegisterPage() {
                         <button
                           key={shift.id}
                           type="button"
+                          disabled={effectiveLocked}
                           onClick={() => toggleShift(day.dateStr, shift.id)}
-                          className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 active:scale-95 cursor-pointer ${
+                          className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${
                             isChosen
                               ? 'bg-gradient-to-b from-[#2F6FA8] to-[#1D3E61] text-white border-[#2F6FA8] shadow-xs'
                               : 'bg-gray-50/70 border-gray-200 text-gray-700 hover:bg-gray-100'
-                          }`}
+                          } ${effectiveLocked ? '' : 'cursor-pointer'}`}
                         >
                           <div className="flex items-center gap-1">
                             {isChosen && <Check size={12} className="text-white" />}
@@ -452,10 +550,11 @@ export default function ShiftRegisterPage() {
             </label>
             <input
               type="text"
+              disabled={effectiveLocked}
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="VD: Em bận học sáng T3, có thể tăng ca tối T5..."
-              className="w-full text-xs font-medium bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#2F6FA8] focus:bg-white transition-all"
+              className="w-full text-xs font-medium bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#2F6FA8] focus:bg-white transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
         </div>
@@ -472,15 +571,20 @@ export default function ShiftRegisterPage() {
 
             <button
               type="button"
-              disabled={isSubmitting || totalSelectedShiftsCount === 0 || isLocked}
+              disabled={isSubmitting || totalSelectedShiftsCount === 0 || effectiveLocked}
               onClick={handleSubmit}
               className={`flex-1 max-w-[240px] py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all ${
-                totalSelectedShiftsCount > 0 && !isSubmitting && !isLocked
+                totalSelectedShiftsCount > 0 && !isSubmitting && !effectiveLocked
                   ? 'bg-[#2F6FA8] hover:bg-[#1D3E61] text-white active:scale-98 cursor-pointer'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
-              {isLocked ? (
+              {isWeekPublished ? (
+                <>
+                  <Lock size={15} />
+                  <span>Đã chốt lịch chính thức</span>
+                </>
+              ) : isDeadlineLocked ? (
                 <>
                   <Lock size={15} />
                   <span>Đã chốt hạn Thứ 6</span>

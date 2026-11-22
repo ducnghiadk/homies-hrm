@@ -50,7 +50,26 @@ export default function ShiftRegistrationsHeatmapPage() {
   const [dataVersion, setDataVersion] = useState(0)
   const [stores, setStores] = useState<Array<{ id: string; name: string; is_active?: boolean }>>(() => getStoresList())
   const [dataSource, setDataSource] = useState<'ipos_cloud' | 'homies_native' | 'internal_db'>('ipos_cloud')
+  const [weekStatus, setWeekStatus] = useState<'draft' | 'published'>('draft')
   const [toastNotice, setToastNotice] = useState<{ message: string; type: 'success' | 'info' } | null>(null)
+
+  // Đọc storeId & weekStart từ URL nếu được điều hướng từ Bảng Xếp Lịch
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search)
+      const storeParam = params.get('storeId')
+      const weekParam = params.get('weekStart')
+      if (storeParam) {
+        setSelectedStoreId(storeParam)
+      }
+      if (weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam)) {
+        const [y, m, d] = weekParam.split('-').map(Number)
+        setSelectedWeek(formatDateString(getMondayOfDate(new Date(y, m - 1, d))))
+      }
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   // Hiển thị thông báo Toast nhanh
   const showToast = useCallback((message: string, type: 'success' | 'info' = 'success') => {
@@ -72,12 +91,18 @@ export default function ShiftRegistrationsHeatmapPage() {
       .catch(() => {})
   }, [])
 
-  // Đồng bộ ca đăng ký, nhân sự thực tế từ Database máy chủ & kiểm tra chế độ iPOS / Homies Tự Vận Hành
+  // Đồng bộ ca đăng ký, nhân sự thực tế từ Database máy chủ & kiểm tra chế độ iPOS / Homies Tự Vận Hành + trạng thái chốt tuần
   const syncData = useCallback(async (storeId: string, week: string) => {
     setIsSyncing(true)
     try {
-      const [modeRes] = await Promise.all([
+      const regParams = new URLSearchParams({
+        store_id: storeId,
+        week,
+        status: 'all',
+      })
+      const [modeRes, weekStatusRes] = await Promise.all([
         fetch('/api/ipos/cloud-worker', { cache: 'no-store' }).catch(() => null),
+        fetch(`/api/shifts/register?${regParams.toString()}`, { cache: 'no-store' }).catch(() => null),
         ShiftRegistrationService.syncEmployeesFromServer(),
         ShiftRegistrationService.syncRegistrationsFromServer(storeId, week),
       ])
@@ -87,6 +112,10 @@ export default function ShiftRegistrationsHeatmapPage() {
           ? Boolean(modeJson.data_mode.ipos_master_enabled && modeJson.data_mode.modules?.shifts)
           : modeJson?.config?.is_enabled !== false && modeJson?.config?.sync_shifts !== false
         setDataSource(shiftsEnabled ? 'ipos_cloud' : 'homies_native')
+      }
+      if (weekStatusRes && weekStatusRes.ok) {
+        const weekJson = await weekStatusRes.json().catch(() => null)
+        setWeekStatus(weekJson?.week_status === 'published' ? 'published' : 'draft')
       }
       setDataVersion(v => v + 1)
     } catch (err) {
@@ -277,6 +306,8 @@ export default function ShiftRegistrationsHeatmapPage() {
           onSelectFilterStatus={setFilterStatus}
           dataSource={dataSource}
           stores={stores}
+          weekStatus={weekStatus}
+          scheduleHref={`/schedule?storeId=${encodeURIComponent(selectedStoreId)}&weekStart=${encodeURIComponent(selectedWeek)}`}
         />
 
         {/* TẦNG 3: BẢNG MA TRẬN 7X3 & THEO DÕI NHÂN VIÊN */}
