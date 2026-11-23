@@ -13,6 +13,9 @@
  *   tự động kích hoạt cờ `isFallback: true` để chuyển về đọc CSDL nội bộ `data/server-db.json`.
  */
 
+import type { ServerDatabaseSchema, ServerIposIntegrationConfig } from '@/lib/server/db'
+import type { HrmLoginResult } from '@/lib/services/ipos/ipos-hrm-client'
+
 export interface IposCloudConfig {
   baseUrl: string
   token: string
@@ -61,9 +64,9 @@ export async function getEffectiveIposCloudConfig(): Promise<IposCloudConfig> {
 
   // Nếu biến môi trường chưa có token, thử đọc từ cấu hình người dùng đã lưu trong server-db
   try {
-    let iposConfig: any
-    let dbInstance: any
-    let saveServerDbFn: any
+    let iposConfig: ServerIposIntegrationConfig | undefined
+    let dbInstance: ServerDatabaseSchema | undefined
+    let saveServerDbFn: ((db: ServerDatabaseSchema) => Promise<unknown>) | undefined
 
     try {
       const dbMod = await import('@/lib/server/db')
@@ -77,7 +80,7 @@ export async function getEffectiveIposCloudConfig(): Promise<IposCloudConfig> {
         const dbFile = path.join(process.cwd(), 'data', 'server-db.json')
         if (fs.existsSync(dbFile)) {
           const raw = fs.readFileSync(dbFile, 'utf8')
-          dbInstance = JSON.parse(raw)
+          dbInstance = JSON.parse(raw) as ServerDatabaseSchema
           iposConfig = dbInstance?.ipos_integration
         }
       } catch {}
@@ -90,7 +93,7 @@ export async function getEffectiveIposCloudConfig(): Promise<IposCloudConfig> {
       base.token = existingToken
     } else if (iposConfig?.username && iposConfig?.token_or_password) {
       // Chỉ tự động đăng nhập lại khi token thực sự bị thiếu hoặc đã hết hạn
-      let loginHrm: any
+      let loginHrm: ((emailInput: string, passwordInput: string, baseUrlInput?: string) => Promise<HrmLoginResult>) | undefined
       try {
         const hrmMod = await import('@/lib/services/ipos/ipos-hrm-client')
         loginHrm = hrmMod.loginHrm
@@ -98,13 +101,15 @@ export async function getEffectiveIposCloudConfig(): Promise<IposCloudConfig> {
         const hrmMod = await import('./ipos-hrm-client.ts')
         loginHrm = hrmMod.loginHrm
       }
-      const loginRes = await loginHrm(iposConfig.username, iposConfig.token_or_password, iposConfig.api_endpoint)
-      if (loginRes.success && loginRes.token) {
-        base.token = loginRes.token
-        iposConfig.hrm_jwt_token = loginRes.token
-        iposConfig.is_authenticated = true
-        if (saveServerDbFn && dbInstance) {
-          await saveServerDbFn(dbInstance)
+      if (loginHrm) {
+        const loginRes = await loginHrm(iposConfig.username, iposConfig.token_or_password, iposConfig.api_endpoint)
+        if (loginRes.success && loginRes.token) {
+          base.token = loginRes.token
+          iposConfig.hrm_jwt_token = loginRes.token
+          iposConfig.is_authenticated = true
+          if (saveServerDbFn && dbInstance) {
+            await saveServerDbFn(dbInstance)
+          }
         }
       }
     }
@@ -307,7 +312,7 @@ export async function fetchIposEmployees(): Promise<IposApiResponse<MappedIposEm
         account_status: 'dang_hoat_dong',
         base_salary: baseSalary,
         hourly_rate: hourlyRate,
-        hire_date: String(item.join_date || item.hire_date || item.start_date || new Date().toISOString().slice(0, 10)),
+        hire_date: String(item.join_date || item.hire_date || item.start_date || getVnTodayStr()),
         raw_ipos: item,
       }
     })
@@ -360,6 +365,16 @@ export interface MappedIposSchedule {
   raw_ipos?: Record<string, unknown>
 }
 
+function getVnTodayStr(): string {
+  return new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
+}
+
+function addDaysToYmd(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return dateStr.slice(0, 10)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
 export function getMondayOfWeek(dateStr: string): string {
   try {
     const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number)
@@ -404,8 +419,7 @@ export async function fetchIposWorkSchedule(params: {
 
   try {
     const iposStoreId = mapHomiesStoreToIpos(params.storeId)
-    const now = new Date()
-    const todayStr = now.toISOString().slice(0, 10)
+    const todayStr = getVnTodayStr()
     const fromDate = params.fromDate || todayStr
     const toDate = params.toDate || fromDate
 
@@ -551,22 +565,17 @@ export async function fetchIposShiftRegistrations(params: {
 
   try {
     const iposStoreId = mapHomiesStoreToIpos(params.storeId)
-    const now = new Date()
-    const todayStr = now.toISOString().slice(0, 10)
+    const todayStr = getVnTodayStr()
     let fromDate = params.fromDate
     let toDate = params.toDate
 
     if (params.week) {
-      fromDate = params.week
-      const wDate = new Date(params.week)
-      wDate.setDate(wDate.getDate() + 6)
-      toDate = wDate.toISOString().slice(0, 10)
+      fromDate = params.week.slice(0, 10)
+      toDate = addDaysToYmd(fromDate, 6)
     } else if (!fromDate) {
       const monThisWeek = getMondayOfWeek(todayStr)
       fromDate = monThisWeek
-      const d = new Date(monThisWeek)
-      d.setDate(d.getDate() + 13)
-      toDate = d.toISOString().slice(0, 10)
+      toDate = addDaysToYmd(monThisWeek, 13)
     } else if (!toDate) {
       toDate = fromDate
     }
@@ -590,7 +599,7 @@ export async function fetchIposShiftRegistrations(params: {
     }
 
     const json = await res.json()
-    const rawList: Record<string, any>[] = Array.isArray(json)
+    const rawList: Record<string, unknown>[] = Array.isArray(json)
       ? json
       : Array.isArray(json?.data)
       ? json.data
@@ -608,12 +617,12 @@ export async function fetchIposShiftRegistrations(params: {
         continue
       }
 
-      const rawShift = (item.shift_data && typeof item.shift_data === 'object' ? item.shift_data : {}) as Record<string, any>
+      const rawShift = (item.shift_data && typeof item.shift_data === 'object' ? item.shift_data : {}) as Record<string, unknown>
       const rawEmp = (
         (item.employee_data && typeof item.employee_data === 'object' ? item.employee_data : null) ||
         (Array.isArray(item.arr_employee_data) && typeof item.arr_employee_data[0] === 'object' ? item.arr_employee_data[0] : null) ||
         (item.employee && typeof item.employee === 'object' ? item.employee : {})
-      ) as Record<string, any>
+      ) as Record<string, unknown>
 
       const empName = String(
         rawEmp.full_name ||
@@ -731,8 +740,7 @@ export async function fetchIposTimesheet(params: {
   }
 
   try {
-    const now = new Date()
-    const todayStr = now.toISOString().slice(0, 10)
+    const todayStr = getVnTodayStr()
     const fromDate = params.fromDate || todayStr
     const toDate = params.toDate || fromDate
     const cacheKey = `${params.storeId || 'ALL'}_${fromDate}_${toDate}`
@@ -782,7 +790,7 @@ export async function fetchIposTimesheet(params: {
     }
 
     const json = await res.json()
-    const rawList: Record<string, any>[] = Array.isArray(json)
+    const rawList: Record<string, unknown>[] = Array.isArray(json)
       ? json
       : Array.isArray(json?.data)
       ? json.data
@@ -802,7 +810,12 @@ export async function fetchIposTimesheet(params: {
       if (toDate && dateStr > toDate) continue
 
       // Lấy chi nhánh thực tế từ bản ghi quẹt thẻ của máy chấm công
-      const rawItemStoreId = String(item.store_id || item.employee_info_log?.store_id || '')
+      const empLog = (
+        item.employee_info_log && typeof item.employee_info_log === 'object'
+          ? item.employee_info_log
+          : {}
+      ) as Record<string, unknown>
+      const rawItemStoreId = String(item.store_id || empLog.store_id || '')
       const homiesStoreId = mapIposStoreToHomies(rawItemStoreId)
       const storeName = homiesStoreId === 'store-002' ? 'Homies Milk Tea - Đường 429' : 'Homies Milk Tea - Hồ Bá Phấn'
 
@@ -811,7 +824,6 @@ export async function fetchIposTimesheet(params: {
         continue
       }
 
-      const empLog = item.employee_info_log || {}
       const empName = [empLog.first_name, empLog.last_name].filter(Boolean).join(' ').trim() || String(item.employee_name || 'Nhân viên')
       let empCode = (empLog.code && empLog.code !== '-') ? String(empLog.code) : undefined
       let empId = empCode ? `emp-${empCode.toLowerCase()}` : String(empLog.id || item.employee_id || `emp-${idx}`)
@@ -822,7 +834,13 @@ export async function fetchIposTimesheet(params: {
         empId = 'emp-bh9852'
       }
 
-      const shiftData = item.shift_data || {}
+      const shiftData = (
+        item.shift_data && typeof item.shift_data === 'object'
+          ? item.shift_data
+          : {}
+      ) as Record<string, unknown>
+      const shiftStart = typeof shiftData.time_start === 'string' ? shiftData.time_start : ''
+      const shiftEnd = typeof shiftData.time_end === 'string' ? shiftData.time_end : ''
       const shiftName = String(shiftData.name || item.shift_name || 'Ca làm')
       const shiftId = String(shiftData.id || item.shift_id || 'shift-001')
 
@@ -840,8 +858,8 @@ export async function fetchIposTimesheet(params: {
       let lateMin = 0
       const statusCheckIn = String(item.status_check_in || '')
       const isLate = statusCheckIn === 'GO_LATE' || String(item.status || '').includes('GO_LATE')
-      if (isLate && shiftData.time_start && timeIn) {
-        const [sh, sm] = shiftData.time_start.split(':').map(Number)
+      if (isLate && shiftStart && timeIn) {
+        const [sh, sm] = shiftStart.split(':').map(Number)
         const [ih, im] = timeIn.split(':').map(Number)
         const diff = (ih * 60 + im) - (sh * 60 + sm)
         lateMin = diff > 0 ? diff : 5
@@ -863,15 +881,19 @@ export async function fetchIposTimesheet(params: {
         let durationMin = (outH * 60 + outM) - (inH * 60 + inM)
         if (durationMin < 0) durationMin += 24 * 60
         totalHours = Math.round((durationMin / 60) * 10) / 10
-      } else if (shiftData.time_start && shiftData.time_end) {
-        const [sh, sm] = shiftData.time_start.split(':').map(Number)
-        const [eh, em] = shiftData.time_end.split(':').map(Number)
+      } else if (shiftStart && shiftEnd) {
+        const [sh, sm] = shiftStart.split(':').map(Number)
+        const [eh, em] = shiftEnd.split(':').map(Number)
         let dur = (eh * 60 + em) - (sh * 60 + sm)
         if (dur < 0) dur += 24 * 60
         totalHours = Math.round((dur / 60) * 10) / 10
       }
 
-      const checkInInfo = item.check_in_info || {}
+      const checkInInfo = (
+        item.check_in_info && typeof item.check_in_info === 'object'
+          ? item.check_in_info
+          : {}
+      ) as Record<string, unknown>
 
       allMapped.push({
         id: String(item.id || `ipos-att-${idx}`),

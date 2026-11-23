@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronLeft } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronLeft } from 'lucide-react'
 import { getDesktopSidebarEntries } from '@/lib/navigation/sidebar-config'
 import { OnboardingPolicyService } from '@/lib/services/onboarding-policy-service'
 import { useAuthStore } from '@/store/auth-store'
@@ -20,13 +20,44 @@ type AppShellProps = {
 }
 
 export default function AppShell({ children, showNav = true, className = '', backHref }: AppShellProps) {
-  const { isAuthenticated, user } = useAuthStore()
+  const { isAuthenticated, user, logout } = useAuthStore()
   const mounted = useMounted()
 
   const pathname = usePathname()
+  const router = useRouter()
   const sidebarEntries = useMemo(() => getDesktopSidebarEntries(user?.role), [user?.role])
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const [sessionExpired, setSessionExpired] = useState(false)
+
+  const hasDedicatedSessionBanner =
+    pathname === '/schedule' || pathname === '/schedule/registrations' || pathname === '/login'
+
+  useEffect(() => {
+    if (!mounted || !isAuthenticated || !user?.id || hasDedicatedSessionBanner) {
+      return
+    }
+
+    let active = true
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then((res) => {
+        if (!active) return
+        if (res.status === 401) {
+          setSessionExpired(true)
+        } else if (res.ok) {
+          setSessionExpired(false)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [mounted, isAuthenticated, user?.id, hasDedicatedSessionBanner])
+
+  const showGlobalSessionBanner = Boolean(
+    mounted && isAuthenticated && user && sessionExpired && !hasDedicatedSessionBanner
+  )
 
   const showManagerSidebar = Boolean(
     mounted &&
@@ -224,6 +255,29 @@ export default function AppShell({ children, showNav = true, className = '', bac
           )}
 
           <div className="app-shell-desktop-content min-w-0">
+            {showGlobalSessionBanner && (
+              <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle size={18} className="mt-0.5 shrink-0 text-rose-600" />
+                  <div>
+                    <p className="text-sm font-bold">Phiên đăng nhập cũ đã hết hạn</p>
+                    <p className="mt-0.5 text-xs text-rose-700">
+                      Hệ thống vừa nâng cấp bảo mật nên không thể tải dữ liệu mới cho phiên này. Vui lòng đăng nhập lại để tiếp tục sử dụng đầy đủ.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    logout()
+                    router.push('/login')
+                  }}
+                  className="shrink-0 rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-rose-700"
+                >
+                  Đăng nhập lại ngay
+                </button>
+              </div>
+            )}
             {backHref && (
               <Link
                 href={backHref}

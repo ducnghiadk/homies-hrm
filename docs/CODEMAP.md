@@ -22,6 +22,7 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `src/lib/server/auth-helper.ts`: module kiem tra va xac thuc phien dang nhap an toan phia server (token/cookie homies_session), ngan chan gia mao vai tro tu client.
   + `src/lib/server/db.ts`: module quan ly doc/ghi CSDL server, seed du lieu chuan cho 2 chi nhanh (HBP & 429), 14 nhan vien that (2 Full-time 6.6tr, 12 Part-time luong gio, 4 nhan su xoay ca 2 quan), 5 khung ca that Homies F&B, 447 ca T8 va 87 ca T9, bang luong quy 43.4 trieu va toa do GPS.
   + `src/app/api/auth/login/route.ts`: POST dang nhap, cap session token cho Bot dong vai (Nhan vien, Quan ly, CEO).
+  + `src/app/api/auth/session/route.ts`: GET kiem tra nhanh phien dang nhap con hieu luc hay da het han de canh bao toan ung dung qua AppShell.
   + `src/app/api/stores/route.ts`: GET & POST quan ly danh sach co so, toa do GPS, ban kinh check-in va ma PIN bao mat cua tung quan.
   + `src/app/api/employees/route.ts`: GET & POST/PUT danh sach 14 nhan vien that va cap nhat ho so/muc luong gio.
   + `src/app/api/schedules/route.ts`: SSOT Lich Chinh Thuc Homies (GET doc draft/published, ho tro `published_only=1` Huong A; POST `publish_week`, `unpublish_week`, `seed_from_availability`, `replace_week_draft`, `save_draft_meta`, `upsert` kem `change_reason`; DELETE `scope=draft_week` hoac dung 1 ca theo `id` / 4 khoa).

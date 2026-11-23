@@ -1,5 +1,16 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-23 (Đợt 1 vá dứt điểm 3 lỗi đồng bộ & phiên đăng nhập: Cảnh báo hết phiên toàn ứng dụng, Đổi ca nhân viên xem ca đồng nghiệp & iPOS múi giờ Việt Nam):
+  1) Nguyên nhân:
+     - Ngoài 2 trang xếp lịch quản lý, các màn hình khác (Đổi ca, Chấm công, Lịch cá nhân, Đăng ký lịch rảnh, Bảng công, Hồ sơ, Bảng điều khiển) vẫn im lặng bỏ qua khi phiên cũ hết hạn, dễ báo nhầm chưa chốt lịch hoặc hiện màn hình trống.
+     - Trang Đổi ca (`/schedule/swap`) của nhân viên bị trả về rỗng khi chọn đồng nghiệp do `GET /api/shifts` sau Chặng 2 chỉ cho phép xem ca của chính mình; đồng thời thiếu khung 14 ngày xuyên tháng khi cuối tháng và chưa tách danh sách ca theo từng đồng nghiệp khi đổi người.
+     - Các hàm kéo lịch rảnh, lịch ca, chấm công và ngày vào làm mặc định trong `src/lib/services/ipos/ipos-cloud-client.ts` vẫn dùng ngày UTC (`new Date().toISOString().slice(0, 10)`), có thể lệch `-1 ngày` khi đồng bộ lúc 0h00–7h00 sáng giờ Việt Nam.
+  2) Cách giải quyết:
+     - Tạo mới `src/app/api/auth/session/route.ts` và tích hợp kiểm tra phiên dùng chung trong `src/components/layout/AppShell.tsx` để hiện ngay thanh cảnh báo đỏ kèm nút `Đăng nhập lại ngay` trên mọi trang nếu phiên cũ hết hạn.
+     - Nâng cấp `GET /api/shifts` hỗ trợ `peer_swap=1` cho phép nhân viên xem đúng các ca đã chốt (`APPROVED`) của đồng nghiệp cùng cửa hàng, giữ kín bản nháp và cửa hàng khác; cập nhật `/schedule/swap` dùng `peer_swap=1`, truyền `from_date`/`to_date` đủ 14 ngày xuyên tháng và lọc ca theo đúng đồng nghiệp đang chọn.
+     - Thay toàn bộ tính toán ngày dương lịch UTC trong `ipos-cloud-client.ts` bằng helper thuần giờ Việt Nam (`getVnTodayStr`, `addDaysToYmd`).
+  3) File liên quan: `src/app/api/auth/session/route.ts`, `src/components/layout/AppShell.tsx`, `src/app/api/shifts/route.ts`, `src/app/schedule/swap/page.tsx`, `src/lib/services/ipos/ipos-cloud-client.ts`, `docs/CODEMAP.md`, `docs/KNOWN_ISSUES.md`.
+
 - Đã hoàn thiện 2026-11-23 (Audit 4 Chặng toàn diện — Vá dứt điểm bảo mật phân quyền, Rules of Hooks, Drawer/Mobile Quick Assign, Nhả ca & Lịch sử đám mây, Múi giờ VN và PostCSS):
   1) Các lỗ hổng được phát hiện và vá sạch:
      - **Chặng 1 (UI & Kho xếp lịch)**: Sửa `react-hooks/rules-of-hooks` và `set-state-in-effect` ở `ManagerSchedulingBoard.tsx` và `schedule/registrations/page.tsx`; mở lại khối nhập nhiều file Excel; gỡ toàn bộ nút Duyệt/Từ chối còn sót trong `RegistrationCellDrawer.tsx` & `ApprovalExecutiveHeader.tsx`; đổi `MobileQuickAssignDrawer.tsx` sang lưu thẳng `/api/schedules`, lọc nhân sự đang làm và tính ngày theo giờ Việt Nam.

@@ -43,6 +43,8 @@ export async function GET(req: NextRequest) {
     const toDateParam = searchParams.get('to_date')
     const publishedOnly =
       searchParams.get('published_only') === '1' || searchParams.get('published_only') === 'true'
+    const peerSwap =
+      searchParams.get('peer_swap') === '1' || searchParams.get('peer_swap') === 'true'
 
     // Xác định khoảng thời gian truy vấn theo lịch dương thuần Việt Nam (UTC+7)
     let fromDate = fromDateParam || date
@@ -153,7 +155,28 @@ export async function GET(req: NextRequest) {
     }
 
     if (!isScheduleManagerRole(auth.role)) {
-      list = list.filter((s) => s.employee_id === auth.userId)
+      if (peerSwap) {
+        const authStoreIds = new Set<string>(
+          [
+            auth.employee?.store_id,
+            ...(Array.isArray(auth.employee?.secondary_store_ids) ? auth.employee.secondary_store_ids : []),
+          ]
+            .filter((id): id is string => Boolean(id))
+            .map((id) => normalizeStoreId(id))
+        )
+
+        if (authStoreIds.size > 0) {
+          list = list.filter(
+            (s) =>
+              s.status?.toUpperCase() === 'APPROVED' &&
+              authStoreIds.has(normalizeStoreId(s.store_id))
+          )
+        } else {
+          list = list.filter((s) => s.employee_id === auth.userId)
+        }
+      } else {
+        list = list.filter((s) => s.employee_id === auth.userId)
+      }
     }
 
     const shiftTemplates = (db.shift_templates && db.shift_templates.length > 0)

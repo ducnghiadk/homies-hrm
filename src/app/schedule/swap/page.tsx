@@ -53,10 +53,16 @@ export default function ShiftSwapPage() {
   useEffect(() => {
     if (!user) return
     let active = true
-    fetch(`/api/shifts?employee_id=${user.id}`)
+    const today = new Date()
+    const todayStr = toLocalDateString(today)
+    const future = new Date(today)
+    future.setDate(future.getDate() + 14)
+    const futureStr = toLocalDateString(future)
+
+    fetch(`/api/shifts?employee_id=${encodeURIComponent(user.id)}&from_date=${todayStr}&to_date=${futureStr}`)
       .then(res => res.ok ? res.json() : null)
       .then(json => {
-        if (active && json?.success && Array.isArray(json.data) && json.data.length > 0) {
+        if (active && json?.success && Array.isArray(json.data)) {
           const list: Schedule[] = json.data.map((s: { id: string; employee_id: string; store_id?: string; shift_id: string; date: string; status?: string; notes?: string; shift_name?: string }) => ({
             id: s.id,
             org_id: 'org-001',
@@ -78,10 +84,16 @@ export default function ShiftSwapPage() {
   useEffect(() => {
     if (!targetUser) return
     let active = true
-    fetch(`/api/shifts?employee_id=${targetUser.id}`)
+    const today = new Date()
+    const todayStr = toLocalDateString(today)
+    const future = new Date(today)
+    future.setDate(future.getDate() + 14)
+    const futureStr = toLocalDateString(future)
+
+    fetch(`/api/shifts?employee_id=${encodeURIComponent(targetUser.id)}&peer_swap=1&from_date=${todayStr}&to_date=${futureStr}`)
       .then(res => res.ok ? res.json() : null)
       .then(json => {
-        if (active && json?.success && Array.isArray(json.data) && json.data.length > 0) {
+        if (active && json?.success && Array.isArray(json.data)) {
           const list: Schedule[] = json.data.map((s: { id: string; employee_id: string; store_id?: string; shift_id: string; date: string; status?: string; notes?: string; shift_name?: string }) => ({
             id: s.id,
             org_id: 'org-001',
@@ -133,10 +145,15 @@ export default function ShiftSwapPage() {
 
   const targetSchedules = useMemo(() => {
     if (!targetUser || !user) return []
-    const todayStr = toLocalDateString(new Date())
-    const raw = apiTargetSchedules.length > 0 ? apiTargetSchedules : ScheduleService.getPeerSchedulesForSwap(user, targetUser.id)
+    const today = new Date()
+    const todayStr = toLocalDateString(today)
+    const future = new Date(today)
+    future.setDate(future.getDate() + 14)
+    const futureStr = toLocalDateString(future)
+    const apiForTarget = apiTargetSchedules.filter(s => s.employee_id === targetUser.id)
+    const raw = apiForTarget.length > 0 ? apiForTarget : ScheduleService.getPeerSchedulesForSwap(user, targetUser.id)
     return raw.filter(s =>
-      s.employee_id === targetUser.id && s.date >= todayStr
+      s.employee_id === targetUser.id && s.date >= todayStr && s.date <= futureStr
     ).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 14)
   }, [targetUser, user, apiTargetSchedules])
 
