@@ -67,8 +67,38 @@ function getDefaultConfig(): ServerIposIntegrationConfig {
   }
 }
 
+interface HydratePayloadBody {
+  is_authenticated?: boolean
+  username?: string
+  token_or_password?: string
+  fabi_config?: ServerIposIntegrationConfig['fabi_pos_config']
+}
+
+interface WorkerCalculatedPayrollRow {
+  employeeCode: string
+  employeeName: string
+  position: string
+  storeCode: string
+  storeName: string
+  regularHours: number
+  hourlyRate: number
+  netSalary: number
+  bonus: number
+  deductions: number
+  allowanceResponsibility: number
+  terminalId: string
+  missingCheckoutCount: number
+  overtimeHours: number
+  bankName: string
+  bankAccountNo: string
+}
+
 // Khôi phục phiên đăng nhập từ Cookie 30 ngày hoặc Client Body vào bộ nhớ máy chủ Serverless
-function hydrateFromCookieOrPayload(req: NextRequest, body?: any, dbIntegration?: ServerIposIntegrationConfig) {
+function hydrateFromCookieOrPayload(
+  req: NextRequest,
+  body?: HydratePayloadBody | null,
+  dbIntegration?: ServerIposIntegrationConfig
+) {
   if (!dbIntegration) return
 
   // 1. Đọc Cookie session homies_ipos_session_v2
@@ -681,7 +711,7 @@ export async function POST(req: NextRequest) {
       ]
 
       // Tính toán giờ làm và lương chi tiết: Ưu tiên tính từ số liệu quẹt thẻ thực tế của máy vân tay
-      let rawDataCalculated: any[] = []
+      let rawDataCalculated: WorkerCalculatedPayrollRow[] = []
 
       if (isAuth) {
         try {
@@ -895,7 +925,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const records_preview = syncPayrollPayload.raw_data.map((r: any) => ({
+      const records_preview = syncPayrollPayload.raw_data.map((r: WorkerCalculatedPayrollRow) => ({
         code: r.employeeCode,
         name: r.employeeName,
         role: r.position,
