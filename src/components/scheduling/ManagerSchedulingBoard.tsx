@@ -361,7 +361,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
   const [manualEmpMapping, setManualEmpMapping] = useState<Record<number, string>>({})
   const [customShiftMapping, setCustomShiftMapping] = useState<Record<string, { templateId: string; positionId?: string }>>({})
   const [ignoredShiftTexts, setIgnoredShiftTexts] = useState<Set<string>>(new Set())
-  const [importSelectedStoreId, setImportSelectedStoreId] = useState<string>('')
+  const [importStoreOverride, setImportSelectedStoreId] = useState<string>('')
   const [autoDetectedStoreId, setAutoDetectedStoreId] = useState<string | null>(null)
 
   // Modal Cài đặt ca làm việc trực tiếp
@@ -461,12 +461,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
   const activeWeekStart = useMemo(() => plusDays(anchorWeekStart, weekOffset * 7), [anchorWeekStart, weekOffset])
   const weekDates = useMemo(() => getWeekDates(activeWeekStart), [activeWeekStart])
   const activeStoreId = selectedStoreId || storeIdQuery || stores[0]?.id || user?.store_id || ''
-
-  useEffect(() => {
-    if (activeStoreId && !importSelectedStoreId) {
-      setImportSelectedStoreId(activeStoreId)
-    }
-  }, [activeStoreId, importSelectedStoreId])
+  const importSelectedStoreId = importStoreOverride || activeStoreId
 
   // Tự động nạp Bản Nháp / Lịch Đã Chốt của Homies từ đám mây (/api/schedules) — không bao giờ bị iPOS đè ngược
   useEffect(() => {
@@ -482,6 +477,17 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     return () => {
       isMounted = false
     }
+  }, [activeStoreId, activeWeekStart])
+
+  useEffect(() => {
+    if (!activeStoreId || !activeWeekStart) return
+    const handleScheduleUpdated = () => {
+      void ScheduleService.hydrateWeekFromServer(activeStoreId, activeWeekStart)
+        .then(() => setRefreshKey(k => k + 1))
+        .catch(() => {})
+    }
+    window.addEventListener('homies-schedule-updated', handleScheduleUpdated)
+    return () => window.removeEventListener('homies-schedule-updated', handleScheduleUpdated)
   }, [activeStoreId, activeWeekStart])
 
   const board = useMemo(() => {
@@ -1164,7 +1170,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     setColumnMapping(newMap)
   }
 
-  const handleClearWeekSchedules = () => {
+  const handleClearWeekSchedules = async () => {
     if (!activeStoreId || !user) return
     if (isPublished) {
       setMessageTone('warning')
@@ -1177,17 +1183,22 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     )
     if (!confirmed) return
 
-    ScheduleService.clearWeekSchedules(user, activeStoreId, weekDates)
+    const res = await ScheduleService.clearWeekSchedulesAsync(user, activeStoreId, weekDates)
     setRefreshKey(prev => prev + 1)
+    if (!res.ok) {
+      setMessageTone('error')
+      setMessage(res.error || 'Không thể xóa bản nháp tuần trên máy chủ.')
+      return
+    }
     setMessageTone('info')
-    setMessage('Đã xóa sạch toàn bộ bản nháp tuần này.')
+    setMessage('Đã xóa sạch toàn bộ bản nháp tuần này trên máy chủ.')
   }
 
   const handleConfirmImport = async () => {
     const effectiveStoreId = activeStoreId || selectedStoreId || stores[0]?.id || 'store-001'
     const effectiveUser = user || ({ id: 'u-001', full_name: 'Quản lý cửa hàng', role: 'manager', store_id: effectiveStoreId } as unknown as AuthUser)
 
-    if (parsedRows.length === 0) {
+    if (parsedRows.length === 0 && selectedFiles.length <= 1) {
       setMessage('Không tìm thấy dữ liệu file Excel để nhập!')
       return
     }
@@ -1354,12 +1365,21 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     const isBatchImport = selectedFiles.length > 1
     if (isBatchImport && clearExistingOnImport) {
       const clearedWeeks = new Set<string>()
-      shiftsToImport.forEach(shift => {
+      for (const shift of shiftsToImport) {
         const weekStart = getWeekStart(parseDateKey(shift.date))
-        if (clearedWeeks.has(weekStart)) return
+        if (clearedWeeks.has(weekStart)) continue
         clearedWeeks.add(weekStart)
-        ScheduleService.clearWeekSchedules(effectiveUser, importSelectedStoreId || effectiveStoreId, getWeekDates(weekStart))
-      })
+        const clr = await ScheduleService.clearWeekSchedulesAsync(
+          effectiveUser,
+          importSelectedStoreId || effectiveStoreId,
+          getWeekDates(weekStart)
+        )
+        if (!clr.ok) {
+          setMessageTone('error')
+          setMessage(clr.error || `Không thể xóa nháp tuần ${weekStart} trước khi nhập Excel.`)
+          return
+        }
+      }
     }
 
     const sampleDate = shiftsToImport[0]?.date || Object.values(columnMapping)[0] || detectedWeekStart
@@ -1498,6 +1518,12 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
       return
     }
 
+    const originalShift = board?.assignments.find(
+      a =>
+        (fromScheduleId && a.id === fromScheduleId) ||
+        (a.employee_id === employeeId && a.date === fromDate && a.shift_id === fromShiftId)
+    )
+
     const delRes = await ScheduleService.deleteScheduleAsync(user, activeStoreId, employeeId, fromDate, {
       shiftId: fromShiftId,
       scheduleId: fromScheduleId,
@@ -1523,10 +1549,22 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
 
     setRefreshKey(k => k + 1)
     if (!assignRes.schedule || assignRes.trangThai === 'that_bai') {
+      await ScheduleService.assignSchedule(
+        user,
+        activeStoreId,
+        employeeId,
+        fromShiftId,
+        fromDate,
+        originalShift?.notes ?? notes,
+        isPublished ? (changeReason?.trim() || 'Khôi phục ca gốc sau khi dời ca thất bại') : undefined,
+        fromPositionId || originalShift?.assigned_position_id
+      )
       await ScheduleService.hydrateWeekFromServer(activeStoreId, activeWeekStart)
       setRefreshKey(k => k + 1)
       setMessageTone('error')
-      setMessage(assignRes.lyDo?.[0] || 'Không thể lưu ca mới sau khi dời.')
+      setMessage(
+        `Không thể dời ca (${assignRes.lyDo?.[0] || 'lỗi máy chủ'}). Hệ thống đã tự động giữ lại ca cũ cho nhân viên.`
+      )
       return
     }
 
@@ -1677,11 +1715,15 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     return nextState
   }, [boardDemands, positions, templates, weekDates])
 
-  const [draftDemand, setDraftDemand] = useState<DemandFormState>({})
-
-  useEffect(() => {
-    setDraftDemand(demandForm)
-  }, [demandForm])
+  const [draftDemandState, setDraftDemandState] = useState<{
+    scopeKey: string
+    overrides: DemandFormState
+  }>({ scopeKey: '', overrides: {} })
+  const demandScopeKey = `${activeStoreId}|${activeWeekStart}|${refreshKey}`
+  const draftDemand = useMemo<DemandFormState>(() => {
+    if (draftDemandState.scopeKey !== demandScopeKey) return demandForm
+    return { ...demandForm, ...draftDemandState.overrides }
+  }, [demandForm, draftDemandState, demandScopeKey])
 
   // Thông tin slot đang mở Modal xếp lịch (kèm fallback virtual slot nếu chưa có nhu cầu lưu trước)
   const activeModalSlotData = useMemo(() => {
@@ -1743,21 +1785,11 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     })
   }, [rawModalRecommendations, modalStaffFilter, modalSearchTerm])
 
-  if (!user || !board) return null
-
-  const validate = ScheduleService.validateWeekForPublish(user, activeStoreId, activeWeekStart)
-  const selectedStore = getStoreById(activeStoreId)
-  const totalDemand = board.demands.reduce((sum, slot) => sum + slot.required_count, 0)
-  const totalAssigned = board.assignments.length
-  const isPublished = board.week.status === 'published' || board.week.cycle_status === 'published'
-  const weekNum = getWeekNumber(activeWeekStart)
-  const yearNum = parseDateKey(activeWeekStart).getFullYear()
-
   const activeStaffCount = useMemo(() => {
-    if (!board?.assignments) return 0
+    if (!board) return 0
     const uniqueIds = new Set(board.assignments.map(a => a.employee_id))
     return uniqueIds.size
-  }, [board?.assignments])
+  }, [board])
 
   const radarReport = useMemo(() => {
     if (!board || !templates.length) return null
@@ -1819,6 +1851,16 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
       hasIssue,
     }
   }, [board, templates, weekDates])
+
+  if (!user || !board) return null
+
+  const validate = ScheduleService.validateWeekForPublish(user, activeStoreId, activeWeekStart)
+  const selectedStore = getStoreById(activeStoreId)
+  const totalDemand = board.demands.reduce((sum, slot) => sum + slot.required_count, 0)
+  const totalAssigned = board.assignments.length
+  const isPublished = board.week.status === 'published' || board.week.cycle_status === 'published'
+  const weekNum = getWeekNumber(activeWeekStart)
+  const yearNum = parseDateKey(activeWeekStart).getFullYear()
 
   const saveDemandState = (nextForm: DemandFormState, messageText: string) => {
     const nextDemands: ShiftDemand[] = Object.entries(nextForm).map(([key, requiredCount]) => {
@@ -3421,7 +3463,10 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
                                   value={draftDemand[key] ?? 1}
                                   onChange={e => {
                                     const val = Math.max(0, parseInt(e.target.value) || 0)
-                                    setDraftDemand(prev => ({ ...prev, [key]: val }))
+                                    setDraftDemandState(prev => ({
+                                      scopeKey: demandScopeKey,
+                                      overrides: prev.scopeKey === demandScopeKey ? { ...prev.overrides, [key]: val } : { [key]: val },
+                                    }))
                                   }}
                                   className="w-11 rounded-lg border border-gray-300 text-center py-1 text-xs font-bold text-gray-900 focus:outline-hidden focus:ring-2 focus:ring-purple-500 bg-gray-50/50"
                                 />

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthenticatedUser, isScheduleManagerRole } from '@/lib/server/auth-helper'
 import {
   getServerDb,
   saveServerDb,
@@ -14,13 +15,23 @@ import {
 import { isIposModuleEnabled } from '@/lib/server/data-mode'
 import { fetchIposShiftRegistrations } from '@/lib/services/ipos/ipos-cloud-client'
 
-// 1. GET: Quản lý lấy danh sách ca đăng ký chờ duyệt từ Database máy chủ & iPOS Cloud
+// 1. GET: Quản lý lấy danh sách ca đăng ký từ Database máy chủ & iPOS Cloud (nhân viên chỉ xem ca của chính mình)
 export async function GET(req: NextRequest) {
   try {
+    const auth = await getAuthenticatedUser(req)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'Vui lòng đăng nhập để xem lịch rảnh tuần.' },
+        { status: 401 }
+      )
+    }
+
+    const isManager = isScheduleManagerRole(auth.role)
     const { searchParams } = new URL(req.url)
     const storeId = searchParams.get('store_id')
     const week = searchParams.get('week') || searchParams.get('week_start_date')
     const employeeId = searchParams.get('employee_id')
+    const effectiveEmployeeId = isManager ? employeeId : auth.userId
     const status = searchParams.get('status') || 'PENDING'
 
     const db = await getServerDb()
@@ -125,8 +136,8 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    if (employeeId) {
-      list = list.filter((s) => s.employee_id === employeeId)
+    if (effectiveEmployeeId) {
+      list = list.filter((s) => s.employee_id === effectiveEmployeeId)
     }
 
     const weekMeta =
@@ -151,7 +162,16 @@ export async function GET(req: NextRequest) {
 // 2. POST: Nhân viên gửi ca rảnh từ điện thoại lên Database máy chủ
 export async function POST(req: NextRequest) {
   try {
+    const auth = await getAuthenticatedUser(req)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'Vui lòng đăng nhập để gửi lịch rảnh tuần.' },
+        { status: 401 }
+      )
+    }
+
     const body = await req.json()
+    const isManager = isScheduleManagerRole(auth.role)
 
     // Hỗ trợ cả 2 định dạng:
     // Format A: { employee_id, store_id, week_start_date, items: [{ date, shift_id, notes }] }
@@ -160,7 +180,7 @@ export async function POST(req: NextRequest) {
 
     if (body && Array.isArray(body.items)) {
       rawItems = body.items.map((it: Record<string, unknown>) => ({
-        employee_id: body.employee_id,
+        employee_id: body.employee_id || it.employee_id,
         store_id: body.store_id,
         week_start_date: body.week_start_date,
         date: it.date,
@@ -179,6 +199,28 @@ export async function POST(req: NextRequest) {
         { success: false, error: 'Không có dữ liệu ca đăng ký' },
         { status: 400 }
       )
+    }
+
+    if (!isManager) {
+      if (body && typeof body === 'object' && !Array.isArray(body) && body.employee_id && String(body.employee_id) !== auth.userId) {
+        return NextResponse.json(
+          { success: false, error: 'Bạn chỉ được gửi lịch rảnh cho chính tài khoản của mình.' },
+          { status: 403 }
+        )
+      }
+      for (const item of rawItems) {
+        const reqEmpId = String(item.employee_id || '').trim()
+        if (reqEmpId && reqEmpId !== auth.userId) {
+          return NextResponse.json(
+            { success: false, error: 'Bạn chỉ được gửi lịch rảnh cho chính tài khoản của mình.' },
+            { status: 403 }
+          )
+        }
+        item.employee_id = auth.userId
+      }
+      if (body && typeof body === 'object' && !Array.isArray(body)) {
+        body.employee_id = auth.userId
+      }
     }
 
     const db = await getServerDb()

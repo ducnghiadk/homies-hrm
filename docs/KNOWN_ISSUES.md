@@ -1,5 +1,12 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã hoàn thiện 2026-11-23 (Audit 4 Chặng toàn diện — Vá dứt điểm bảo mật phân quyền, Rules of Hooks, Drawer/Mobile Quick Assign, Nhả ca & Lịch sử đám mây, Múi giờ VN và PostCSS):
+  1) Các lỗ hổng được phát hiện và vá sạch:
+     - **Chặng 1 (UI & Kho xếp lịch)**: Sửa `react-hooks/rules-of-hooks` và `set-state-in-effect` ở `ManagerSchedulingBoard.tsx` và `schedule/registrations/page.tsx`; mở lại khối nhập nhiều file Excel; gỡ toàn bộ nút Duyệt/Từ chối còn sót trong `RegistrationCellDrawer.tsx` & `ApprovalExecutiveHeader.tsx`; đổi `MobileQuickAssignDrawer.tsx` sang lưu thẳng `/api/schedules`, lọc nhân sự đang làm và tính ngày theo giờ Việt Nam.
+     - **Chặng 2 (Bảo mật & Phiên đăng nhập)**: Không để `syncAuthCookie()` ghi đè mất `homies_session` khi F5 trong `auth-store.ts`; bổ sung xác thực HMAC (`hrm-role-sig`) + lọc nhân sự mở khóa trong `auth-helper.ts`; khóa `/schedule/registrations` trong `proxy.ts`; bắt buộc đăng nhập + phân quyền quản lý ở `/api/schedules`, `/api/shifts`, `/api/shifts/register`.
+     - **Chặng 3 (Đám mây & An toàn thao tác)**: Cho `releasePublishedShift` nhận thẳng ca từ đám mây trên `/my-schedule`; cho `/schedule/history` tải nhật ký & tên nhân sự từ `/api/schedules?include_logs=1`; nâng cấp `saveServerDb` thử lại 1 lần và trả HTTP `503` khi lỗi ghi đám mây trên Vercel; thêm `clearWeekSchedulesAsync` và tự khôi phục ca cũ khi dời ca lỗi.
+     - **Chặng 4 (Múi giờ VN, Route cũ & Bảo mật thư viện)**: Sửa `toISOString().split('T')[0]` lệch `-1 ngày` ở `schedule-service.ts`, `schedule/by-shift/page.tsx`, `schedule/manage/page.tsx`, `schedule/swap/page.tsx`; chuyển hướng route cũ `/my-schedule/registration` sang `/shifts/register`; nâng `postcss` lên `8.5.33` vá lỗ hổng bảo mật mức Cao.
+
 - Đã hoàn thiện 2026-11-22 (Tách biệt kho Lịch Rảnh vs Lịch Chính Thức theo Hướng A — Vá dứt điểm 6 lỗ hổng xếp lịch qua Pass A + B + C):
   1) Nguyên nhân (6 lỗ hổng):
      - Lịch rảnh từ iPOS/nhân viên nộp chung kho với lịch phân ca chính thức, dễ bị lẫn hoặc iPOS ghi đè sau khi quản lý chốt lịch.

@@ -88,6 +88,7 @@ const ROUTE_PERMISSIONS: RoutePermission[] = [
     paths: [
       '/leave/approval',
       '/schedules',
+      '/schedule/registrations',
       '/schedule/assign',
       '/schedule/manage',
       '/schedule/admin/review',

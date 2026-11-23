@@ -360,8 +360,8 @@ function MySchedulePageContent() {
 
   const releaseShift = (schedule: Schedule) => {
     const info = getShiftDisplayInfo(schedule)
-    const store = getStoreById(schedule.store_id)
-    if (!user || !store) return
+    const storeName = getStoreById(schedule.store_id)?.name || schedule.store_id
+    if (!user) return
     const confirmed = window.confirm(
       `Nhả ${info.name} (${info.timeRange}) ngày ${schedule.date} ra danh sách ca trống để đồng nghiệp có thể đăng ký nhận?`
     )
@@ -369,13 +369,24 @@ function MySchedulePageContent() {
     const created = releasePublishedShift(
       schedule.id,
       user.id,
-      `Nhân viên ${user.full_name} chủ động nhả ca cần hỗ trợ`
+      `Nhân viên ${user.full_name} chủ động nhả ca cần hỗ trợ`,
+      {
+        schedule,
+        employee: {
+          id: user.id,
+          full_name: user.full_name,
+          position_id: schedule.assigned_position_id || user.position_id || 'pos-001',
+        },
+      }
     )
-    if (!created) return
+    if (!created) {
+      window.alert('Không thể nhả ca này. Chỉ chủ ca chính thức mới được nhả ca ra danh sách ca trống.')
+      return
+    }
     notifyOpenShiftCreated({
       openShiftId: created.id,
       storeId: created.store_id,
-      storeName: store.name,
+      storeName,
       shiftId: created.shift_id,
       shiftName: info.name,
       startTime: info.startTime,

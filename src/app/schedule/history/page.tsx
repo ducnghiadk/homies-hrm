@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
@@ -106,20 +106,187 @@ function ScheduleHistoryPageContent() {
 
   const requestedStoreId = searchParams.get('storeId') || undefined
   const requestedWeekStart = searchParams.get('weekStart') || undefined
+  const requestKey = `${requestedStoreId || 'ALL'}|${requestedWeekStart || 'ALL'}`
+
+  const [cloudState, setCloudState] = useState<{
+    key: string
+    logs: ScheduleChangeLogFeed[]
+    cloudWeekStatus: 'draft' | 'published' | null
+    employeeNames: Record<string, string>
+  }>({
+    key: '',
+    logs: [],
+    cloudWeekStatus: null,
+    employeeNames: {},
+  })
+
+  useEffect(() => {
+    if (!user || user.role === 'employee') return
+    let active = true
+
+    const params = new URLSearchParams({
+      include_logs: '1',
+      include_meta: '1',
+    })
+    if (requestedStoreId) params.set('store_id', requestedStoreId)
+    if (requestedWeekStart) params.set('week_start', requestedWeekStart)
+
+    Promise.all([
+      fetch(`/api/schedules?${params.toString()}`, { cache: 'no-store' }).then(res =>
+        res.ok ? res.json() : null
+      ),
+      fetch('/api/employees', { cache: 'no-store' }).then(res => (res.ok ? res.json() : null)),
+    ])
+      .then(([schJson, empJson]) => {
+        if (!active) return
+
+        const empNames: Record<string, string> = {}
+        if (Array.isArray(empJson?.data)) {
+          empJson.data.forEach((e: Record<string, unknown>) => {
+            const id = String(e.id || '')
+            const name = String(e.full_name || '')
+            if (id && name) empNames[id] = name
+          })
+        }
+
+        const rawLogs = Array.isArray(schJson?.change_logs)
+          ? (schJson.change_logs as Array<Record<string, unknown>>)
+          : []
+
+        const mappedLogs: ScheduleChangeLogFeed[] = rawLogs.map(l => {
+          const rawAction = String(l.action || 'update')
+          const mappedAction: ScheduleChangeLogFeed['action'] =
+            rawAction === 'seed_draft'
+              ? 'create'
+              : rawAction === 'unpublish'
+              ? 'update'
+              : rawAction === 'create' ||
+                rawAction === 'update' ||
+                rawAction === 'cancel' ||
+                rawAction === 'delete' ||
+                rawAction === 'publish'
+              ? rawAction
+              : 'update'
+
+          const storeId = String(l.store_id || requestedStoreId || 'store-001')
+          const empId = String(l.employee_id || '')
+          const changedBy = String(l.changed_by || 'manager')
+          const beforeState = (l.before_state as ScheduleChangeLogFeed['before_state']) ?? null
+          const afterState = (l.after_state as ScheduleChangeLogFeed['after_state']) ?? null
+
+          const formatShiftName = (state: ScheduleChangeLogFeed['before_state']) => {
+            if (!state) return undefined
+            const rawShiftName = (state as unknown as Record<string, unknown>)?.shift_name
+            if (typeof rawShiftName === 'string' && rawShiftName.trim()) return rawShiftName.trim()
+            if (state.shift_id) {
+              const info = getShiftById(state.shift_id)
+              return info ? `${info.name} (${info.start_time} - ${info.end_time})` : state.shift_id
+            }
+            return undefined
+          }
+
+          return {
+            id: String(l.id || `cloud-log-${Date.now()}`),
+            store_id: storeId,
+            store_name: getStoreById(storeId)?.name || storeId,
+            week_start: String(l.week_start || requestedWeekStart || ''),
+            assignment_id: String(l.assignment_id || ''),
+            employee_id: empId,
+            employee_name: l.employee_name
+              ? String(l.employee_name)
+              : empNames[empId] ||
+                EmployeeService.getEmployeeById(empId)?.full_name ||
+                empId ||
+                'Thay đổi cấp tuần / hệ thống',
+            date: String(l.date || ''),
+            shift_id: l.shift_id ? String(l.shift_id) : undefined,
+            action: mappedAction,
+            before_state: beforeState,
+            after_state: afterState,
+            before_shift_name: formatShiftName(beforeState),
+            after_shift_name: formatShiftName(afterState),
+            changed_by: changedBy,
+            actor_name:
+              (l.changed_by_name ? String(l.changed_by_name) : '') ||
+              empNames[changedBy] ||
+              EmployeeService.getEmployeeById(changedBy)?.full_name ||
+              changedBy,
+            changed_at: String(l.changed_at || new Date().toISOString()),
+            reason: String(l.reason || ''),
+          }
+        })
+
+        const metaStatus =
+          requestedStoreId && requestedWeekStart && schJson?.week_meta
+            ? schJson.week_meta.status === 'published'
+              ? 'published'
+              : 'draft'
+            : null
+
+        setCloudState({
+          key: requestKey,
+          logs: mappedLogs,
+          cloudWeekStatus: metaStatus,
+          employeeNames: empNames,
+        })
+      })
+      .catch(() => {
+        if (!active) return
+        setCloudState(prev => ({
+          key: requestKey,
+          logs: prev.key === requestKey ? prev.logs : [],
+          cloudWeekStatus: null,
+          employeeNames: prev.employeeNames,
+        }))
+      })
+
+    return () => {
+      active = false
+    }
+  }, [requestKey, requestedStoreId, requestedWeekStart, user])
+
+  const isLoadingCloud = Boolean(user && user.role !== 'employee' && cloudState.key !== requestKey)
 
   const weekStateMeta = useMemo(() => {
     if (!user || !requestedStoreId || !requestedWeekStart) return null
+    if (cloudState.key === requestKey && cloudState.cloudWeekStatus) {
+      if (cloudState.cloudWeekStatus === 'published') {
+        return {
+          key: 'published',
+          label: 'Đã chốt chính thức',
+          description: 'Lịch chính thức tuần này đã chốt trên Homies Cloud và nhân viên đã nhìn thấy.',
+          tone: 'bg-emerald-50 text-emerald-700',
+        }
+      }
+      return {
+        key: 'drafting',
+        label: 'Đang lên bản nháp',
+        description: 'Tuần này đang ở trạng thái Bản Nháp, chưa chốt chính thức cho nhân viên.',
+        tone: 'bg-sky-50 text-sky-700',
+      }
+    }
     const week = ScheduleService.getScheduleWeek(requestedStoreId, requestedWeekStart)
     return week ? ScheduleService.getWeekStateMeta(week) : null
-  }, [requestedStoreId, requestedWeekStart, user])
+  }, [cloudState, requestKey, requestedStoreId, requestedWeekStart, user])
 
   const allLogs = useMemo<ScheduleChangeLogFeed[]>(() => {
     if (!user) return []
-    return ScheduleService.getChangeLogFeed(user, {
+    const localLogs = ScheduleService.getChangeLogFeed(user, {
       storeId: requestedStoreId,
       weekStart: requestedWeekStart,
     })
-  }, [requestedStoreId, requestedWeekStart, user])
+    const cloudLogs = cloudState.key === requestKey ? cloudState.logs : []
+    const mergedMap = new Map<string, ScheduleChangeLogFeed>()
+    cloudLogs.forEach(item => mergedMap.set(item.id, item))
+    localLogs.forEach(item => {
+      if (!mergedMap.has(item.id)) {
+        mergedMap.set(item.id, item)
+      }
+    })
+    return Array.from(mergedMap.values()).sort((a, b) =>
+      String(b.changed_at || '').localeCompare(String(a.changed_at || ''))
+    )
+  }, [cloudState, requestKey, requestedStoreId, requestedWeekStart, user])
 
   const logs = useMemo<ScheduleChangeLogFeed[]>(() => {
     return allLogs.filter(log => {
@@ -132,18 +299,36 @@ function ScheduleHistoryPageContent() {
   }, [actionFilter, actorFilter, allLogs, dateFilter, employeeFilter])
 
   const employeeOptions = useMemo(() => {
-    const ids = Array.from(new Set(allLogs.map(log => log.employee_id).filter(Boolean)))
-    return ids
-      .map(id => ({ id, name: EmployeeService.getEmployeeById(id)?.full_name || id }))
+    const nameById = new Map<string, string>()
+    allLogs.forEach(log => {
+      if (!log.employee_id) return
+      const resolved =
+        log.employee_name ||
+        cloudState.employeeNames[log.employee_id] ||
+        EmployeeService.getEmployeeById(log.employee_id)?.full_name ||
+        log.employee_id
+      nameById.set(log.employee_id, resolved)
+    })
+    return Array.from(nameById.entries())
+      .map(([id, name]) => ({ id, name }))
       .sort((left, right) => left.name.localeCompare(right.name))
-  }, [allLogs])
+  }, [allLogs, cloudState.employeeNames])
 
   const actorOptions = useMemo(() => {
-    const ids = Array.from(new Set(allLogs.map(log => log.changed_by).filter(Boolean)))
-    return ids
-      .map(id => ({ id, name: EmployeeService.getEmployeeById(id)?.full_name || id }))
+    const nameById = new Map<string, string>()
+    allLogs.forEach(log => {
+      if (!log.changed_by) return
+      const resolved =
+        log.actor_name ||
+        cloudState.employeeNames[log.changed_by] ||
+        EmployeeService.getEmployeeById(log.changed_by)?.full_name ||
+        log.changed_by
+      nameById.set(log.changed_by, resolved)
+    })
+    return Array.from(nameById.entries())
+      .map(([id, name]) => ({ id, name }))
       .sort((left, right) => left.name.localeCompare(right.name))
-  }, [allLogs])
+  }, [allLogs, cloudState.employeeNames])
 
   if (!user) return null
 
@@ -251,7 +436,13 @@ function ScheduleHistoryPageContent() {
         </div>
 
         <div className="space-y-3">
-          {logs.length === 0 && (
+          {isLoadingCloud && logs.length === 0 && (
+            <div className="rounded-2xl border border-gray-100 bg-white px-4 py-8 text-center text-sm text-gray-500">
+              Đang tải lịch sử thay đổi từ máy chủ đám mây...
+            </div>
+          )}
+
+          {!isLoadingCloud && logs.length === 0 && (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-12 text-center text-sm text-gray-400">
               Chưa có lịch sử thay đổi nào trong phạm vi đang xem.
             </div>

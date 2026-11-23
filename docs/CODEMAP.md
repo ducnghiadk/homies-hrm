@@ -136,22 +136,25 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - Dung khi: sua dinh muc ca, nhu cau tuan, cong cu tinh nhan su
 
 ### Dang ky ca ranh va Xep lich chinh thuc (Tach kho Input vs Official - Huong A)
-- Mo ta: Tach biet hoan toan kho Lich Ranh dau vao (`/schedule/registrations` va `/shifts/register`) voi kho Lich Chinh Thuc Homies (`Draft -> Published` tai `/schedule` qua `/api/schedules`). Nhan vien xem `/my-schedule` theo che do Huong A (`published_only=1`, ho tro nhieu ca/ngay). Sau khi quan ly `Chot Lich Chinh Thuc`, nhan vien bi khoa chinh sua lich ranh tuan do (`409 WEEK_ALREADY_PUBLISHED`) va iPOS khong bao gio ghi de lich da chot.
+- Mo ta: Tach biet hoan toan kho Lich Ranh dau vao (`/schedule/registrations` va `/shifts/register`) voi kho Lich Chinh Thuc Homies (`Draft -> Published` tai `/schedule` qua `/api/schedules`). Nhan vien xem `/my-schedule` theo che do Huong A (`published_only=1`, ho tro nhieu ca/ngay, nha ca truc tiep tu du lieu dam may). Sau khi quan ly `Chot Lich Chinh Thuc`, nhan vien bi khoa chinh sua lich ranh tuan do (`409 WEEK_ALREADY_PUBLISHED`) va iPOS khong bao gio ghi de lich da chot. Toan bo API xep lich duoc bao ve bang phien/HMAC may chu (`auth-helper.ts`, `auth-store.ts`) va trang `/schedule/registrations` khoa quyen quan ly trong `proxy.ts`.
 - File chinh:
-  + `src/app/api/schedules/route.ts`: API SSOT quan ly Draft/Published va audit log thay doi lich (`official_schedules`, `schedule_weeks`, `schedule_change_logs`)
-  + `src/app/shifts/register/page.tsx`: dang ky ca ranh cho nhan vien (chuan hoa ngay local khong lech UTC, tu dong khoa va hien banner khi tuan da chot)
-  + `src/app/my-schedule/page.tsx`: xem lich lam viec ca nhan theo Huong A (`published_only=1`, gom nhom da ca moi ngay `schedulesByDate`, dong bo nhan su qua `/api/employees?status=active`)
-  + `src/app/schedule/page.tsx`: bang dieu hanh xep ca tong the
+  + `src/app/api/schedules/route.ts`: API SSOT quan ly Draft/Published va audit log thay doi lich (`official_schedules`, `schedule_weeks`, `schedule_change_logs`), bat buoc xac thuc dang nhap va phan quyen quan ly
+  + `src/app/shifts/register/page.tsx`: dang ky ca ranh cho nhan vien (chuan hoa ngay local VN khong lech UTC, tu dong khoa va hien banner khi tuan da chot)
+  + `src/app/my-schedule/registration/page.tsx`: route cu tu dong chuyen huong sang `/shifts/register`
+  + `src/app/my-schedule/page.tsx`: xem lich lam viec ca nhan theo Huong A (`published_only=1`, gom nhom da ca moi ngay `schedulesByDate`, dong bo nhan su qua `/api/employees?status=active`, nha ca tu du lieu dam may qua `mock-data-open-shifts.ts`)
+  + `src/app/schedule/page.tsx`: bang dieu hanh xep ca tong the + `MobileQuickAssignDrawer.tsx` gan ca nhanh 1 cham luu thang `/api/schedules`
+  + `src/app/schedule/history/page.tsx`: nhat ky thay doi lich tai truc tiep tu dam may (`/api/schedules?include_logs=1`)
   + `src/app/schedule/registrations/page.tsx`: trang **Lich Ranh Tuan** (ban do tham khao ca ranh iPOS & tu nop, link `?storeId=...&weekStart=...` sang `/schedule`, hien trang thai tuan da chot/chua chot)
   + `src/components/scheduling/registrations/RegistrationHeaderAndKpis.tsx`: Tang 1 Header **Lich Ranh Tuan**, badge trang thai chot lich, nut `Mo Bang Xep Lich tuan nay`, va KPI `Tong Khung Gio Ranh`
   + `src/components/scheduling/registrations/RegistrationMatrixAndStaffView.tsx`: Tang 3 Ma tran 7x3 va bang theo doi chi xem/loc (`Tat ca`, `Can bu`, `Du nguoi`), khong con luong duyet o ca
-  + `src/components/scheduling/registrations/RegistrationCellDrawer.tsx`: Drawer chi tiet o ca & Modal nhac Zalo
-  + `src/components/scheduling/ManagerSchedulingBoard.tsx`: bang phan ca truc quan cho quan ly (hydrate `/api/schedules`, nut `Dien nhanh vao Ban Nhap` tu lich ranh, nut `Chot Lich Chinh Thuc`, xoa/doi dung `shiftId + scheduleId`)
+  + `src/components/scheduling/registrations/RegistrationCellDrawer.tsx`: Drawer chi xem danh sach nhan su ranh, nut `Mo Bang Xep Lich tuan nay` & Modal nhac Zalo (da bo toan bo nut duyet)
+  + `src/components/scheduling/ManagerSchedulingBoard.tsx`: bang phan ca truc quan cho quan ly (hydrate `/api/schedules`, nut `Dien nhanh vao Ban Nhap` tu lich ranh, nut `Chot Lich Chinh Thuc`, xoa/doi dung `shiftId + scheduleId`, doi ca tu khoi phuc khi loi)
   + `src/lib/services/scheduling/shift-registration-service.ts`: service xu ly du lieu dang ky ca ranh, dong bo nhan su that tu `/api/employees?status=active` (`syncEmployeesFromServer`), tinh ty le coverage va loc loai bo CEO khoi chi nhanh
   + `src/app/api/shifts/approve/route.ts`: API di san phe duyet ca (khong dung trong luong Lich Ranh Tuan moi)
   + `src/app/api/stores/route.ts`: API danh sach chi nhanh (mac dinh chi tra cac co so dang hoat dong `is_active !== false`)
-  + `src/lib/services/scheduling/schedule-service.ts`: quan ly ban nhap & lich phan ca chinh thuc (`hydrateWeekFromServer`, `seedDraftFromAvailability`, `publishWeekAsync`, `deleteScheduleAsync`, xoa/chuyen dung `shiftId + scheduleId`)
-- Dung khi: sua flow dang ky ca ranh, bang xep ca quan ly, chot lich chinh thuc, xem lich ca nhan Huong A.
+  + `src/lib/services/scheduling/schedule-service.ts`: quan ly ban nhap & lich phan ca chinh thuc (`hydrateWeekFromServer`, `seedDraftFromAvailability`, `publishWeekAsync`, `deleteScheduleAsync`, `clearWeekSchedulesAsync`, chuan hoa ngay VN)
+  + `src/lib/server/auth-helper.ts`, `src/store/auth-store.ts`, `src/proxy.ts`: xac thuc session + chu ky so HMAC ben vung qua F5 va bao ve route quan ly
+- Dung khi: sua flow dang ky ca ranh, bang xep ca quan ly, chot lich chinh thuc, xem lich ca nhan Huong A, nhat ky va bao mat phan quyen xep lich.
 
 ### CÃ i Ä‘áº·t vÃ  Danh má»¥c chuáº©n SaaS
 - Mo ta: he thong cai dat duoc gom thanh 5 nhom SaaS chuyen nghiep (Doanh nghiep, Danh muc nhan su, Luong & Phu cap, Phan ca & Cham cong, He thong & Phan quyen).

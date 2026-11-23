@@ -1,30 +1,26 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 import {
   X,
   CheckCircle2,
-  Clock,
   XCircle,
   AlertTriangle,
   Users,
   Copy,
   Check,
-  Calendar,
-  Send,
   MessageSquare,
   Sparkles,
-  Phone,
+  ArrowRight,
 } from 'lucide-react'
-import type { HeatmapCell, HeatmapEmployeeItem } from '@/lib/services/scheduling/shift-registration-service'
+import type { HeatmapCell } from '@/lib/services/scheduling/shift-registration-service'
 
 interface RegistrationCellDrawerProps {
   isOpen: boolean
   cell: HeatmapCell | null
   onClose: () => void
-  onApproveOne: (registrationId: string) => void
-  onRejectOne: (registrationId: string) => void
-  onApproveCell: (date: string, shiftId: string) => void
+  scheduleHref?: string
 }
 
 interface ZaloReminderModalProps {
@@ -39,15 +35,12 @@ export function RegistrationCellDrawer({
   isOpen,
   cell,
   onClose,
-  onApproveOne,
-  onRejectOne,
-  onApproveCell,
+  scheduleHref,
 }: RegistrationCellDrawerProps) {
   if (!isOpen || !cell) return null
 
   const isFull = cell.status === 'FULL'
   const isRisk = cell.status === 'RISK'
-  const isEmpty = cell.status === 'EMPTY'
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-2xs flex justify-end animate-in fade-in duration-200">
@@ -57,7 +50,7 @@ export function RegistrationCellDrawer({
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                Chi Tiết Phân Bổ Ca
+                Chi Tiết Nhân Sự Rảnh
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-white/40" />
               <span className="text-xs text-white/80 font-mono">{cell.date}</span>
@@ -99,31 +92,27 @@ export function RegistrationCellDrawer({
             <div className="space-y-0.5 text-xs">
               <div className="font-bold">
                 {isFull
-                  ? `Đủ nhân sự trực ca (${cell.count} bạn đăng ký)`
+                  ? `Đủ nhân sự sẵn sàng (${cell.count} bạn đăng ký rảnh)`
                   : isRisk
-                  ? `Cảnh báo ca mỏng (chỉ có 1 bạn đăng ký)`
-                  : `Báo động: Ca trống không có ai đăng ký`}
+                  ? `Cảnh báo ca mỏng (chỉ có 1 bạn báo rảnh)`
+                  : `Báo động: Chưa có ai báo rảnh khung giờ này`}
               </div>
               <p className="text-gray-600 text-[11px] leading-relaxed">
                 {isFull
-                  ? `Đã đạt tiêu chuẩn tối thiểu 2 nhân sự/ca (1 pha chế + 1 thu ngân) theo quy chuẩn Homies Milk Tea.`
+                  ? `Đã đạt tối thiểu 2 người báo rảnh (pha chế + thu ngân). Bạn có thể mở Bảng Xếp Lịch để điền nhanh và chốt ca.`
                   : isRisk
-                  ? `Khung giờ này có rủi ro quá tải khi khách đông. Cần liên hệ thêm 1 bạn làm ca hỗ trợ/tăng ca.`
-                  : `Chi nhánh có nguy cơ không thể mở cửa trong khung giờ này. Cần điều động nhân sự gấp.`}
+                  ? `Khung giờ này thiếu nguồn dự phòng. Cần nhắc thêm nhân sự hoặc điều chuyển khi xếp lịch chính thức.`
+                  : `Khung giờ này đang trống lịch rảnh. Cần liên hệ nhân sự bổ sung trước khi chốt lịch tuần.`}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Drawer Body: Danh sách nhân viên trong ca */}
+        {/* Drawer Body: Danh sách nhân viên báo rảnh */}
         <div className="flex-1 overflow-y-auto p-6 space-y-3">
           <div className="flex items-center justify-between text-xs text-gray-500 font-medium pb-1">
-            <span>Danh sách đăng ký ({cell.registeredEmployees.length} nhân sự)</span>
-            <span>
-              Đã duyệt:{' '}
-              <strong className="text-emerald-700">{cell.approvedCount}</strong> /{' '}
-              <strong className="text-gray-700">{cell.count}</strong>
-            </span>
+            <span>Danh sách nhân sự rảnh ({cell.registeredEmployees.length} người)</span>
+            <span className="text-[11px] text-gray-400">Chỉ xem tham khảo để xếp lịch</span>
           </div>
 
           {cell.registeredEmployees.length === 0 ? (
@@ -131,110 +120,50 @@ export function RegistrationCellDrawer({
               <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto">
                 <Users size={24} />
               </div>
-              <div className="text-sm font-bold text-gray-700">Chưa có ai đăng ký ca này</div>
+              <div className="text-sm font-bold text-gray-700">Chưa có ai báo rảnh ca này</div>
               <p className="text-xs text-gray-500 max-w-xs mx-auto">
                 Bạn có thể thông báo trên nhóm Zalo chi nhánh để tìm nhân sự sẵn sàng làm bù ca này.
               </p>
             </div>
           ) : (
             <div className="space-y-2.5">
-              {cell.registeredEmployees.map(emp => {
-                const isApproved = emp.status === 'APPROVED'
-                const isRejected = emp.status === 'REJECTED'
-                const isPending = emp.status === 'PENDING'
-
-                return (
-                  <div
-                    key={emp.registrationId}
-                    className="p-3.5 rounded-xl border border-gray-100 hover:border-gray-300 transition bg-white shadow-2xs space-y-2.5"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      {/* Cột trái: Tên & Thông tin nhân viên */}
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-[#2F6FA8]/10 text-[#2F6FA8] font-bold flex items-center justify-center text-xs font-mono shrink-0">
-                          {emp.name.slice(0, 1)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-[#001D3D] truncate">{emp.name}</div>
-                          <div className="text-[11px] text-gray-500 flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono text-gray-400">{emp.code || 'NV'}</span>
-                            <span className="px-1.5 py-0.2 rounded bg-gray-100 text-gray-700 font-medium text-[10px]">
-                              {emp.positionName}
-                            </span>
-                          </div>
-                        </div>
+              {cell.registeredEmployees.map(emp => (
+                <div
+                  key={emp.registrationId}
+                  className="p-3.5 rounded-xl border border-gray-100 hover:border-gray-300 transition bg-white shadow-2xs space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    {/* Cột trái: Tên & Thông tin nhân viên */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-[#2F6FA8]/10 text-[#2F6FA8] font-bold flex items-center justify-center text-xs font-mono shrink-0">
+                        {emp.name.slice(0, 1)}
                       </div>
-
-                      {/* Trạng thái duyệt */}
-                      <div className="shrink-0">
-                        {isApproved && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 size={11} /> Đã duyệt
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-[#001D3D] truncate">{emp.name}</div>
+                        <div className="text-[11px] text-gray-500 flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono text-gray-400">{emp.code || 'NV'}</span>
+                          <span className="px-1.5 py-0.2 rounded bg-gray-100 text-gray-700 font-medium text-[10px]">
+                            {emp.positionName}
                           </span>
-                        )}
-                        {isPending && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            <Clock size={11} /> Chờ duyệt
-                          </span>
-                        )}
-                        {isRejected && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                            <XCircle size={11} /> Từ chối
-                          </span>
-                        )}
+                        </div>
                       </div>
                     </div>
 
-                    {emp.notes && (
-                      <p className="text-[11px] text-gray-500 bg-gray-50 p-2 rounded-lg italic">
-                        &ldquo;{emp.notes}&rdquo;
-                      </p>
-                    )}
-
-                    {/* Hàng nút bấm duyệt hoặc từ chối từng người */}
-                    <div className="pt-2 border-t border-gray-100 flex items-center justify-end gap-2">
-                      {isPending && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => onRejectOne(emp.registrationId)}
-                            className="px-2.5 py-1 rounded-lg text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition"
-                          >
-                            Từ chối
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onApproveOne(emp.registrationId)}
-                            className="px-3 py-1 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition shadow-2xs flex items-center gap-1"
-                          >
-                            <Check size={12} /> Duyệt ca này
-                          </button>
-                        </>
-                      )}
-
-                      {isApproved && (
-                        <button
-                          type="button"
-                          onClick={() => onRejectOne(emp.registrationId)}
-                          className="px-2.5 py-1 rounded-lg text-xs font-medium text-gray-500 hover:text-rose-600 hover:bg-rose-50 transition"
-                        >
-                          Hủy duyệt ca này
-                        </button>
-                      )}
-
-                      {isRejected && (
-                        <button
-                          type="button"
-                          onClick={() => onApproveOne(emp.registrationId)}
-                          className="px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition"
-                        >
-                          Duyệt lại ca này
-                        </button>
-                      )}
+                    {/* Trạng thái đã gửi lịch rảnh */}
+                    <div className="shrink-0">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle2 size={11} /> Đã gửi lịch rảnh
+                      </span>
                     </div>
                   </div>
-                )
-              })}
+
+                  {emp.notes && (
+                    <p className="text-[11px] text-gray-500 bg-gray-50 p-2 rounded-lg italic">
+                      &ldquo;{emp.notes}&rdquo;
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -249,18 +178,15 @@ export function RegistrationCellDrawer({
             Đóng lại
           </button>
 
-          {cell.pendingCount > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                onApproveCell(cell.date, cell.shiftId)
-                onClose()
-              }}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition shadow-xs flex items-center gap-1.5"
+          {scheduleHref && (
+            <Link
+              href={scheduleHref}
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#001D3D] hover:bg-[#002957] transition shadow-xs flex items-center gap-1.5"
             >
-              <CheckCircle2 size={14} />
-              <span>Duyệt cả ca ({cell.pendingCount} bạn)</span>
-            </button>
+              <span>Mở Bảng Xếp Lịch tuần này</span>
+              <ArrowRight size={14} />
+            </Link>
           )}
         </div>
       </div>

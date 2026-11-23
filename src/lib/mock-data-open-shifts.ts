@@ -7,6 +7,7 @@ import {
   getShiftById, getStoreById, getPositionById,
   addSchedule,
   saveSchedulesToStorage,
+  type Schedule,
 } from './mock-data'
 import type { Warning } from './mock-data-smart-schedule'
 import { isEmployeeCompatibleWithPositionId } from './scheduling/position-compatibility'
@@ -200,9 +201,10 @@ export function createOpenShift(
   note: string,
   autoApprove: boolean,
   createdBy: string,
+  creatorNameOverride?: string,
 ): OpenShift {
   const creator = mockEmployees.find(e => e.id === createdBy)
-  const creatorName = creator ? creator.full_name : 'Quản lý'
+  const creatorName = creatorNameOverride || (creator ? creator.full_name : 'Quản lý')
   
   const os: OpenShift = {
     id: `os-${openShiftCounter++}`,
@@ -233,9 +235,24 @@ export function createOpenShift(
   return os
 }
 
-export function releasePublishedShift(sourceScheduleId: string, releasedBy: string, note: string): OpenShift | null {
-  const schedule = mockSchedules.find(item => item.id === sourceScheduleId)
-  const employee = mockEmployees.find(item => item.id === releasedBy)
+export function releasePublishedShift(
+  sourceScheduleId: string,
+  releasedBy: string,
+  note: string,
+  context?: {
+    schedule?: Schedule
+    employee?: { id: string; full_name: string; position_id?: string }
+  },
+): OpenShift | null {
+  const schedule = context?.schedule || mockSchedules.find(item => item.id === sourceScheduleId)
+  const mockEmp = mockEmployees.find(item => item.id === releasedBy)
+  const employee = context?.employee
+    ? {
+        id: context.employee.id,
+        full_name: context.employee.full_name,
+        position_id: context.employee.position_id || mockEmp?.position_id || schedule?.assigned_position_id || 'pos-001',
+      }
+    : mockEmp
   if (!schedule || !employee) return null
   if (schedule.employee_id !== releasedBy) return null
 
@@ -249,11 +266,12 @@ export function releasePublishedShift(sourceScheduleId: string, releasedBy: stri
     schedule.store_id,
     schedule.shift_id,
     schedule.date,
-    employee.position_id,
+    employee.position_id || schedule.assigned_position_id || 'pos-001',
     1,
     note || `Nhân viên ${employee.full_name} cần nhả ca`,
     false,
-    releasedBy
+    releasedBy,
+    employee.full_name,
   )
 
   created.source_schedule_id = sourceScheduleId

@@ -32,6 +32,13 @@ import {
 import { checkScheduleWarnings, scanWeekWarnings, type WarningLevel } from '@/lib/mock-data-schedule-rules'
 import { getImportWeekStarts } from '@/lib/services/scheduling/schedule-import-batch'
 
+function formatLocalDateYmd(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 type ScheduleWeekStatus = 'draft' | 'published' | 'locked'
 
 export type ScheduleCycleStatus = 'registration_open' | 'registration_closed' | 'drafting' | 'published'
@@ -641,8 +648,8 @@ export class ScheduleService {
       store_id: storeId,
       week_start_date: weekStartDate,
       status: 'open',
-      registration_open_date: openDate.toISOString().split('T')[0],
-      registration_deadline: `${deadline.toISOString().split('T')[0]}T23:59`,
+      registration_open_date: formatLocalDateYmd(openDate),
+      registration_deadline: `${formatLocalDateYmd(deadline)}T23:59`,
       created_by: currentUser?.id || 'system',
     })
 
@@ -1414,7 +1421,11 @@ export class ScheduleService {
     const weekEndDate = weekDates[6]
     if (!weekStartDate || !weekEndDate) return false
 
-    const publishValidation = this.validateWeekForPublish(currentUser, storeId, weekDates[0] || this.getWeekStartDate(new Date().toISOString().split('T')[0]))
+    const publishValidation = this.validateWeekForPublish(
+      currentUser,
+      storeId,
+      weekDates[0] || this.getWeekStartDate(formatLocalDateYmd(new Date()))
+    )
     if (publishValidation.hardWarnings.length > 0) {
       return false
     }
@@ -1522,6 +1533,89 @@ export class ScheduleService {
     })
 
     return true
+  }
+
+  static async clearWeekSchedulesAsync(
+    currentUser: AuthUser,
+    storeId: string,
+    weekDates: string[]
+  ): Promise<{ ok: boolean; removedCount: number; error?: string }> {
+    this.init()
+    this.ensureWeekMetaStorage()
+
+    if (currentUser.role === 'employee') {
+      return { ok: false, removedCount: 0, error: 'Bạn không có quyền xóa bản nháp tuần.' }
+    }
+    if (['store_manager', 'shift_leader'].includes(currentUser.role) && currentUser.store_id !== storeId) {
+      return { ok: false, removedCount: 0, error: 'Bạn chỉ được xóa bản nháp tại chi nhánh mình phụ trách.' }
+    }
+
+    const weekStartDate = weekDates[0]
+    const weekEndDate = weekDates[6]
+    if (!weekStartDate || !weekEndDate) {
+      return { ok: false, removedCount: 0, error: 'Thiếu khoảng ngày tuần cần xóa.' }
+    }
+    if (this.isWeekPublished(storeId, weekStartDate)) {
+      return { ok: false, removedCount: 0, error: 'Tuần này đã chốt lịch chính thức, không thể xóa trắng toàn tuần.' }
+    }
+
+    let serverRemovedCount: number | null = null
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams({
+          store_id: storeId,
+          week_start: weekStartDate,
+          scope: 'draft_week',
+        })
+        const res = await fetch(`/api/schedules?${params.toString()}`, { method: 'DELETE' })
+        const json = await res.json().catch(() => null)
+        if (!res.ok || !json?.success) {
+          await this.hydrateWeekFromServer(storeId, weekStartDate)
+          return {
+            ok: false,
+            removedCount: 0,
+            error: json?.error || 'Không thể xóa bản nháp tuần trên máy chủ.',
+          }
+        }
+        if (typeof json?.removed_count === 'number') {
+          serverRemovedCount = json.removed_count
+        }
+      } catch {
+        return {
+          ok: false,
+          removedCount: 0,
+          error: 'Lỗi kết nối máy chủ khi xóa bản nháp tuần.',
+        }
+      }
+    }
+
+    const localRemoved = mockSchedules.filter(
+      s => isStoreMatch(s.store_id, storeId) && weekDates.includes(s.date)
+    ).length
+
+    for (let i = mockSchedules.length - 1; i >= 0; i--) {
+      const schedule = mockSchedules[i]
+      if (isStoreMatch(schedule.store_id, storeId) && weekDates.includes(schedule.date)) {
+        mockSchedules.splice(i, 1)
+      }
+    }
+    saveSchedulesToStorage()
+
+    const removedCount = serverRemovedCount ?? localRemoved
+    this.addChangeLog({
+      store_id: storeId,
+      week_start: weekStartDate,
+      assignment_id: `clear-${storeId}-${weekStartDate}`,
+      employee_id: '',
+      date: weekStartDate,
+      action: 'delete',
+      before_state: null,
+      after_state: null,
+      changed_by: currentUser.id,
+      reason: `Làm sạch tuần (Đã xóa ${removedCount} ca)`,
+    })
+
+    return { ok: true, removedCount }
   }
 
   static async importShifts(

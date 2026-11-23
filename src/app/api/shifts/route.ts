@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthenticatedUser, isScheduleManagerRole } from '@/lib/server/auth-helper'
 import {
   getServerDb,
   saveServerDb,
@@ -23,6 +24,14 @@ type CompatibilityShiftItem = (ServerShiftRegistration | MappedIposSchedule) & {
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await getAuthenticatedUser(req)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'Vui lòng đăng nhập để xem lịch ca làm việc.' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(req.url)
     const storeId = searchParams.get('store_id')
     const weekStart = searchParams.get('week_start') || searchParams.get('week_start_date')
@@ -143,6 +152,10 @@ export async function GET(req: NextRequest) {
       list = list.filter((s) => s.employee_id === employeeId)
     }
 
+    if (!isScheduleManagerRole(auth.role)) {
+      list = list.filter((s) => s.employee_id === auth.userId)
+    }
+
     const shiftTemplates = (db.shift_templates && db.shift_templates.length > 0)
       ? db.shift_templates
       : Object.values(STANDARD_FNB_SHIFTS).map(s => ({
@@ -169,6 +182,23 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await getAuthenticatedUser(req)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'Vui lòng đăng nhập để quản lý ca làm việc.' },
+        { status: 401 }
+      )
+    }
+    if (!isScheduleManagerRole(auth.role)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Không đủ thẩm quyền: Chỉ Quản lý cửa hàng, Quản lý khu vực, HR hoặc CEO mới được chỉnh sửa khung ca hoặc lịch ca.',
+        },
+        { status: 403 }
+      )
+    }
+
     const body = await req.json()
     const db = await getServerDb()
     // 0. Xóa mẫu ca (delete_template_id)

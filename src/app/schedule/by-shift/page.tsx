@@ -11,6 +11,18 @@ import { ChevronLeft, ChevronRight, Users } from 'lucide-react'
 
 const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
 
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function parseLocalDateString(ymd: string): Date {
+  const [y, m, d] = ymd.slice(0, 10).split('-').map(Number)
+  return new Date(y, (m || 1) - 1, d || 1, 12, 0, 0, 0)
+}
+
 export default function ScheduleByShiftPage() {
   const { user, isAuthenticated } = useAuthStore()
   const router = useRouter()
@@ -24,21 +36,21 @@ export default function ScheduleByShiftPage() {
 
   const weekDates = useMemo(() => {
     const now = new Date()
-    const monday = new Date(now)
-    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7) + weekOffset * 7)
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0)
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + weekOffset * 7)
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday)
       d.setDate(monday.getDate() + i)
-      return d.toISOString().split('T')[0]
+      return toLocalDateString(d)
     })
   }, [weekOffset])
 
-  const today = useMemo(() => new Date().toISOString().split('T')[0], [])
+  const today = useMemo(() => toLocalDateString(new Date()), [])
 
   const weekLabel = useMemo(() => {
     if (weekDates.length < 7) return ''
-    const s = new Date(weekDates[0])
-    const e = new Date(weekDates[6])
+    const s = parseLocalDateString(weekDates[0])
+    const e = parseLocalDateString(weekDates[6])
     return `${s.getDate()}/${s.getMonth() + 1} - ${e.getDate()}/${e.getMonth() + 1}`
   }, [weekDates])
 

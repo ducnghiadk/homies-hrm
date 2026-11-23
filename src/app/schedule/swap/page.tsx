@@ -20,6 +20,13 @@ import {
 } from 'lucide-react'
 import type { Schedule, Employee } from '@/lib/mock-data'
 
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 const shiftIcon = (shiftName: string) => {
   if (shiftName.includes('sáng') || shiftName.includes('Sáng')) return Sun
   if (shiftName.includes('chiều') || shiftName.includes('Chiều')) return Sunset
@@ -96,10 +103,10 @@ export default function ShiftSwapPage() {
   const mySchedules = useMemo(() => {
     if (!user) return []
     const raw = apiMySchedules.length > 0 ? apiMySchedules : ScheduleService.getSchedulesForUser(user, user.id)
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = toLocalDateString(new Date())
     const future = new Date()
     future.setDate(future.getDate() + 14)
-    const futureStr = future.toISOString().split('T')[0]
+    const futureStr = toLocalDateString(future)
     return raw.filter(s => s.date >= todayStr && s.date <= futureStr)
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [user, apiMySchedules])
@@ -126,7 +133,7 @@ export default function ShiftSwapPage() {
 
   const targetSchedules = useMemo(() => {
     if (!targetUser || !user) return []
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = toLocalDateString(new Date())
     const raw = apiTargetSchedules.length > 0 ? apiTargetSchedules : ScheduleService.getPeerSchedulesForSwap(user, targetUser.id)
     return raw.filter(s =>
       s.employee_id === targetUser.id && s.date >= todayStr

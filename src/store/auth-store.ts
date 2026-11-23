@@ -108,7 +108,7 @@ const authStorage: StateStorage = {
   },
 }
 
-export function syncAuthCookie(user: AuthUser | null) {
+export function syncAuthCookie(user: AuthUser | null, serverToken?: string) {
   if (typeof document === 'undefined') return
 
   const expires = user ? 'Max-Age=2592000' : 'Max-Age=0'
@@ -116,7 +116,10 @@ export function syncAuthCookie(user: AuthUser | null) {
   document.cookie = `hrm-role=${user?.role || ''}; Path=/; SameSite=Lax; ${expires}`
   document.cookie = `hrm-user-id=${user?.id || ''}; Path=/; SameSite=Lax; ${expires}`
   if (user) {
-    document.cookie = `homies_session=homies_sess_${user.id}; Path=/; SameSite=Lax; ${expires}`
+    // Chỉ cập nhật homies_session khi có token thật từ server; không ghi đè mất session thật khi F5
+    if (serverToken) {
+      document.cookie = `homies_session=${serverToken}; Path=/; SameSite=Lax; ${expires}`
+    }
   } else {
     document.cookie = `homies_session=; Path=/; SameSite=Lax; Max-Age=0`
     document.cookie = `hrm-role-sig=; Path=/; SameSite=Lax; Max-Age=0`
@@ -295,7 +298,7 @@ export const useAuthStore = create<AuthState>()(
                 hasHydrated: true,
                 loginError: null,
               })
-              syncAuthCookie(mappedUser)
+              syncAuthCookie(mappedUser, json.token || json.data?.token)
               console.log(`[Auth] User logged in via Server API: ${mappedUser.full_name} (${mappedUser.role})`)
               return { success: true }
             } else if (json.error) {
@@ -377,6 +380,11 @@ export const useAuthStore = create<AuthState>()(
               loginError: null,
             })
             syncAuthCookie(user)
+            fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: user.email, password: '123456' }),
+            }).catch(() => {})
             console.log(`[Auth] loginAsRole: Switched to ${user.full_name} (${user.role})`)
           }
         }

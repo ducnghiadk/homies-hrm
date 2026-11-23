@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthenticatedUser, isScheduleManagerRole } from '@/lib/server/auth-helper'
 import {
   getServerDb,
   saveServerDb,
+  clearServerDbCache,
   normalizeStoreId,
   getCalendarWeekStart,
   getCalendarWeekEnd,
@@ -22,6 +24,36 @@ function ensureOfficialDbArrays(db: ServerDatabaseSchema) {
   if (!Array.isArray(db.official_schedules)) db.official_schedules = []
   if (!Array.isArray(db.schedule_weeks)) db.schedule_weeks = []
   if (!Array.isArray(db.schedule_change_logs)) db.schedule_change_logs = []
+}
+
+async function persistScheduleDb(db: ServerDatabaseSchema): Promise<{
+  errorResponse: NextResponse | null
+  cloudSynced: boolean
+  cloudWarning?: string
+}> {
+  const saveRes = await saveServerDb(db)
+  if (!saveRes.cloudSynced && saveRes.cloudRequired) {
+    clearServerDbCache()
+    return {
+      errorResponse: NextResponse.json(
+        {
+          success: false,
+          cloud_synced: false,
+          error: saveRes.reason
+            ? `Chưa lưu được lên kho đám mây (${saveRes.reason}). Vui lòng thử lại sau vài giây.`
+            : 'Chưa lưu được lên kho đám mây. Vui lòng thử lại sau vài giây.',
+        },
+        { status: 503 }
+      ),
+      cloudSynced: false,
+      cloudWarning: saveRes.reason,
+    }
+  }
+  return {
+    errorResponse: null,
+    cloudSynced: saveRes.cloudSynced,
+    cloudWarning: saveRes.reason,
+  }
 }
 
 function resolveShiftDisplayName(
@@ -153,17 +185,29 @@ function sortOfficialSchedules(
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await getAuthenticatedUser(req)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'Vui lòng đăng nhập để xem lịch làm việc.' },
+        { status: 401 }
+      )
+    }
+
+    const isManager = isScheduleManagerRole(auth.role)
     const { searchParams } = req.nextUrl
     const storeIdParam = searchParams.get('store_id')
     const weekStartParam = searchParams.get('week_start') || searchParams.get('week_start_date')
     const fromDateParam = searchParams.get('from_date')
     const toDateParam = searchParams.get('to_date')
-    const employeeIdParam = searchParams.get('employee_id')
+    const employeeIdParam = isManager ? searchParams.get('employee_id') : auth.userId
     const publishedOnly =
-      searchParams.get('published_only') === '1' || searchParams.get('published_only') === 'true'
-    const includeMeta = searchParams.get('include_meta') !== '0'
+      !isManager ||
+      searchParams.get('published_only') === '1' ||
+      searchParams.get('published_only') === 'true'
+    const includeMeta = isManager && searchParams.get('include_meta') !== '0'
     const includeLogs =
-      searchParams.get('include_logs') === '1' || searchParams.get('include_logs') === 'true'
+      isManager &&
+      (searchParams.get('include_logs') === '1' || searchParams.get('include_logs') === 'true')
 
     const db = await getServerDb()
     ensureOfficialDbArrays(db)
@@ -267,6 +311,23 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await getAuthenticatedUser(req)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'Vui lòng đăng nhập để thao tác xếp lịch.' },
+        { status: 401 }
+      )
+    }
+    if (!isScheduleManagerRole(auth.role)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Không đủ thẩm quyền: Chỉ Quản lý cửa hàng, Quản lý khu vực, HR hoặc CEO mới được xếp và chốt lịch.',
+        },
+        { status: 403 }
+      )
+    }
+
     const body = await req.json()
     const db = await getServerDb()
     ensureOfficialDbArrays(db)
@@ -276,14 +337,12 @@ export async function POST(req: NextRequest) {
         ? String(body.action || '').trim()
         : 'upsert'
 
-    const actorId =
-      !Array.isArray(body) && body && typeof body === 'object'
-        ? String(body.actor_id || body.updated_by || 'manager')
-        : 'manager'
+    const actorId = auth.userId
     const actorName =
-      !Array.isArray(body) && body && typeof body === 'object' && body.actor_name
-        ? String(body.actor_name)
-        : db.employees.find((e) => e.id === actorId)?.full_name
+      auth.employee?.full_name ||
+      db.employees.find((e) => e.id === actorId)?.full_name ||
+      auth.email ||
+      actorId
 
     // 1. Chốt lịch chính thức toàn tuần
     if (action === 'publish_week') {
@@ -376,10 +435,13 @@ export async function POST(req: NextRequest) {
         changed_by_name: actorName,
       })
 
-      await saveServerDb(db)
+      const persisted = await persistScheduleDb(db)
+      if (persisted.errorResponse) return persisted.errorResponse
 
       return NextResponse.json({
         success: true,
+        cloud_synced: persisted.cloudSynced,
+        ...(persisted.cloudWarning ? { cloud_warning: persisted.cloudWarning } : {}),
         message: `Đã chốt lịch chính thức tuần ${normWeekStart} (${publishedItems.length} ca).`,
         published_count: publishedItems.length,
         week_meta: weekMeta,
@@ -431,10 +493,13 @@ export async function POST(req: NextRequest) {
         changed_by_name: actorName,
       })
 
-      await saveServerDb(db)
+      const persisted = await persistScheduleDb(db)
+      if (persisted.errorResponse) return persisted.errorResponse
 
       return NextResponse.json({
         success: true,
+        cloud_synced: persisted.cloudSynced,
+        ...(persisted.cloudWarning ? { cloud_warning: persisted.cloudWarning } : {}),
         message: 'Đã mở khóa tuần về trạng thái Bản Nháp.',
         week_meta: weekMeta,
       })
@@ -551,7 +616,8 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      await saveServerDb(db)
+      const persisted = await persistScheduleDb(db)
+      if (persisted.errorResponse) return persisted.errorResponse
 
       const weekSchedules = sortOfficialSchedules(
         db.official_schedules!.filter((s) =>
@@ -562,6 +628,8 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
+        cloud_synced: persisted.cloudSynced,
+        ...(persisted.cloudWarning ? { cloud_warning: persisted.cloudWarning } : {}),
         message:
           addedCount > 0
             ? `Đã nạp ${addedCount} ca từ lịch rảnh vào Bản Nháp.`
@@ -656,10 +724,13 @@ export async function POST(req: NextRequest) {
         source,
       })
 
-      await saveServerDb(db)
+      const persisted = await persistScheduleDb(db)
+      if (persisted.errorResponse) return persisted.errorResponse
 
       return NextResponse.json({
         success: true,
+        cloud_synced: persisted.cloudSynced,
+        ...(persisted.cloudWarning ? { cloud_warning: persisted.cloudWarning } : {}),
         message: `Đã lưu ${added.length} ca vào Bản Nháp tuần ${normWeekStart}.`,
         count: added.length,
         week_meta: weekMeta,
@@ -683,8 +754,14 @@ export async function POST(req: NextRequest) {
         actor_id: actorId,
         actor_name: actorName,
       })
-      await saveServerDb(db)
-      return NextResponse.json({ success: true, week_meta: weekMeta })
+      const persisted = await persistScheduleDb(db)
+      if (persisted.errorResponse) return persisted.errorResponse
+      return NextResponse.json({
+        success: true,
+        cloud_synced: persisted.cloudSynced,
+        ...(persisted.cloudWarning ? { cloud_warning: persisted.cloudWarning } : {}),
+        week_meta: weekMeta,
+      })
     }
 
     // 6. Upsert 1 ca đơn lẻ hoặc mảng ca (action: 'upsert' / mặc định)
@@ -833,11 +910,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await saveServerDb(db)
+    const persisted = await persistScheduleDb(db)
+    if (persisted.errorResponse) return persisted.errorResponse
 
     const isBatchPayload = Array.isArray(body) || Array.isArray(body?.items)
     return NextResponse.json({
       success: true,
+      cloud_synced: persisted.cloudSynced,
+      ...(persisted.cloudWarning ? { cloud_warning: persisted.cloudWarning } : {}),
       message: `Đã lưu ${saved.length} ca vào lịch Homies.`,
       count: saved.length,
       week_meta: latestWeekMeta,
@@ -851,6 +931,23 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await getAuthenticatedUser(req)
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'Vui lòng đăng nhập để gỡ ca làm việc.' },
+        { status: 401 }
+      )
+    }
+    if (!isScheduleManagerRole(auth.role)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Không đủ thẩm quyền: Chỉ Quản lý cửa hàng, Quản lý khu vực, HR hoặc CEO mới được xóa lịch ca.',
+        },
+        { status: 403 }
+      )
+    }
+
     const { searchParams } = req.nextUrl
     let body: Record<string, unknown> = {}
     try {
@@ -931,10 +1028,13 @@ export async function DELETE(req: NextRequest) {
         )
       }
 
-      await saveServerDb(db)
+      const persisted = await persistScheduleDb(db)
+      if (persisted.errorResponse) return persisted.errorResponse
 
       return NextResponse.json({
         success: true,
+        cloud_synced: persisted.cloudSynced,
+        ...(persisted.cloudWarning ? { cloud_warning: persisted.cloudWarning } : {}),
         message: `Đã xóa ${removedCount} ca nháp của tuần ${normWeekStart}.`,
         removed_count: removedCount,
       })
@@ -951,10 +1051,12 @@ export async function DELETE(req: NextRequest) {
     const reason = String(
       searchParams.get('reason') || searchParams.get('change_reason') || body.reason || body.change_reason || ''
     ).trim()
-    const actorId = String(searchParams.get('actor_id') || body.actor_id || 'manager').trim()
-    const actorName = body.actor_name
-      ? String(body.actor_name)
-      : db.employees.find((e) => e.id === actorId)?.full_name
+    const actorId = auth.userId
+    const actorName =
+      auth.employee?.full_name ||
+      db.employees.find((e) => e.id === actorId)?.full_name ||
+      auth.email ||
+      actorId
 
     if (!idParam && (!storeIdParam || !employeeIdParam || !dateParam || !shiftIdParam)) {
       return NextResponse.json(
@@ -1041,7 +1143,8 @@ export async function DELETE(req: NextRequest) {
       })
     }
 
-    await saveServerDb(db)
+    const persisted = await persistScheduleDb(db)
+    if (persisted.errorResponse) return persisted.errorResponse
 
     const remainingSameDay = db.official_schedules!.filter(
       (s) => s.employee_id === removed.employee_id && s.date === removed.date
@@ -1049,6 +1152,8 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      cloud_synced: persisted.cloudSynced,
+      ...(persisted.cloudWarning ? { cloud_warning: persisted.cloudWarning } : {}),
       message: `Đã xóa ca ${removed.shift_name || removed.shift_id} ngày ${removed.date}.`,
       deleted_id: removed.id,
       remaining_same_day: remainingSameDay,

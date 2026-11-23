@@ -21,7 +21,10 @@ const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
 type CoverageFilter = 'all' | 'assigned' | 'unassigned'
 
 function toDateString(date: Date) {
-  return date.toISOString().split('T')[0]
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function getWeekAnchor(rawWeekStart: string | null): Date {

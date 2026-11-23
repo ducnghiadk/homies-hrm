@@ -14,7 +14,15 @@ function SchedulePageInner() {
   return (
     <>
       <ManagerSchedulingBoard weekStartQuery={weekStart} storeIdQuery={storeId} />
-      <MobileQuickAssignDrawer storeId={storeId} weekStart={weekStart} />
+      <MobileQuickAssignDrawer
+        storeId={storeId}
+        weekStart={weekStart}
+        onSuccess={() => {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('homies-schedule-updated'))
+          }
+        }}
+      />
     </>
   )
 }

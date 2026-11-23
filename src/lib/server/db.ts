@@ -4,6 +4,7 @@ import os from 'os'
 import { calculateDistance } from '@/lib/utils'
 import { hashPassword } from '@/lib/security/token-signer'
 import {
+  getStorageStatus,
   loadCollectionsFromSupabase,
   saveCollectionsToSupabase,
 } from '@/lib/server/supabase-store'
@@ -2631,12 +2632,39 @@ export async function getServerDb(): Promise<ServerDatabaseSchema> {
   }
 }
 
-export async function saveServerDb(db: ServerDatabaseSchema): Promise<void> {
+export interface SaveServerDbResult {
+  ok: boolean
+  cloudSynced: boolean
+  cloudRequired: boolean
+  reason?: string
+}
+
+export async function saveServerDb(db: ServerDatabaseSchema): Promise<SaveServerDbResult> {
   inMemoryCache = db
   await mirrorDbToLocalFile(db)
-  const synced = await saveCollectionsToSupabase(db as unknown as Record<string, unknown>)
+  let synced = await saveCollectionsToSupabase(db as unknown as Record<string, unknown>)
+
+  if (!synced) {
+    const statusBeforeRetry = await getStorageStatus()
+    if (statusBeforeRetry.status !== 'unconfigured') {
+      await new Promise((resolve) => setTimeout(resolve, 400))
+      synced = await saveCollectionsToSupabase(db as unknown as Record<string, unknown>, {
+        forceAll: true,
+      })
+    }
+  }
+
   if (synced) {
     lastCloudSyncAt = Date.now()
+  }
+
+  const finalStatus = synced ? null : await getStorageStatus()
+  const cloudRequired = Boolean(process.env.VERCEL)
+  return {
+    ok: !cloudRequired || synced,
+    cloudSynced: synced,
+    cloudRequired,
+    reason: synced ? undefined : finalStatus?.reason,
   }
 }
 

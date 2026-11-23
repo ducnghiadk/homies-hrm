@@ -16,7 +16,6 @@ import {
   RegistrationCellDrawer,
   ZaloReminderModal,
 } from '@/components/scheduling/registrations/RegistrationCellDrawer'
-import { CheckCircle2, AlertCircle } from 'lucide-react'
 
 export default function ShiftRegistrationsHeatmapPage() {
   // 1. Quản lý Tuần được chọn
@@ -44,14 +43,13 @@ export default function ShiftRegistrationsHeatmapPage() {
 
   // State tương tác UI
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'RISK' | 'PENDING' | 'APPROVED'>('ALL')
-  const [selectedCell, setSelectedCell] = useState<HeatmapCell | null>(null)
+  const [selectedCellKey, setSelectedCellKey] = useState<{ date: string; shiftId: string } | null>(null)
   const [isZaloModalOpen, setIsZaloModalOpen] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [dataVersion, setDataVersion] = useState(0)
   const [stores, setStores] = useState<Array<{ id: string; name: string; is_active?: boolean }>>(() => getStoresList())
   const [dataSource, setDataSource] = useState<'ipos_cloud' | 'homies_native' | 'internal_db'>('ipos_cloud')
   const [weekStatus, setWeekStatus] = useState<'draft' | 'published'>('draft')
-  const [toastNotice, setToastNotice] = useState<{ message: string; type: 'success' | 'info' } | null>(null)
 
   // Đọc storeId & weekStart từ URL nếu được điều hướng từ Bảng Xếp Lịch
   useEffect(() => {
@@ -69,14 +67,6 @@ export default function ShiftRegistrationsHeatmapPage() {
       }
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [])
-
-  // Hiển thị thông báo Toast nhanh
-  const showToast = useCallback((message: string, type: 'success' | 'info' = 'success') => {
-    setToastNotice({ message, type })
-    setTimeout(() => {
-      setToastNotice(null)
-    }, 3000)
   }, [])
 
   // Nạp danh sách chi nhánh đang hoạt động từ máy chủ (/api/stores)
@@ -126,9 +116,11 @@ export default function ShiftRegistrationsHeatmapPage() {
   }, [])
 
   useEffect(() => {
-    if (selectedStoreId && selectedWeek) {
-      syncData(selectedStoreId, selectedWeek)
-    }
+    if (!selectedStoreId || !selectedWeek) return
+    const timer = window.setTimeout(() => {
+      void syncData(selectedStoreId, selectedWeek)
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [selectedStoreId, selectedWeek, syncData])
 
   // Tự động cập nhật ngay khi gạt Công tắc Vận hành trên thanh Header
@@ -193,92 +185,17 @@ export default function ShiftRegistrationsHeatmapPage() {
     }
   }, [heatmapCells])
 
-  // Cập nhật selectedCell khi dữ liệu thay đổi
-  useEffect(() => {
-    if (selectedCell) {
-      const updated = heatmapCells.find(
-        c => c.date === selectedCell.date && c.shiftId === selectedCell.shiftId
-      )
-      if (updated) setSelectedCell(updated)
-    }
-  }, [heatmapCells, selectedCell])
-
-  // 3. Handlers phê duyệt & từ chối
-  const handleApproveOne = async (registrationId: string) => {
-    ShiftRegistrationService.approveRegistration(registrationId, 'Quản lý cửa hàng')
-    setDataVersion(v => v + 1)
-    showToast('Đã duyệt thành công 1 ca đăng ký')
-
-    // Gọi API lưu DB máy chủ ngầm
-    fetch('/api/shifts/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        registration_ids: [registrationId],
-        action: 'approve',
-      }),
-    }).catch(err => console.error('Lỗi API approve:', err))
-  }
-
-  const handleRejectOne = async (registrationId: string) => {
-    ShiftRegistrationService.rejectRegistration(registrationId)
-    setDataVersion(v => v + 1)
-    showToast('Đã từ chối 1 ca đăng ký', 'info')
-
-    fetch('/api/shifts/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        registration_ids: [registrationId],
-        action: 'reject',
-      }),
-    }).catch(err => console.error('Lỗi API reject:', err))
-  }
-
-  const handleApproveCell = (date: string, shiftId: string) => {
-    const res = ShiftRegistrationService.approveCell(
-      selectedStoreId,
-      date,
-      shiftId,
-      'Quản lý cửa hàng'
+  const selectedCell = useMemo(() => {
+    if (!selectedCellKey) return null
+    return (
+      heatmapCells.find(
+        c => c.date === selectedCellKey.date && c.shiftId === selectedCellKey.shiftId
+      ) || null
     )
-    setDataVersion(v => v + 1)
-    showToast(`Đã duyệt thành công ${res.approvedCount} ca trong khung giờ này`)
-  }
-
-  const handleApproveAll = () => {
-    const res = ShiftRegistrationService.approveAllPendingForWeek(
-      selectedStoreId,
-      selectedWeek
-    )
-    setDataVersion(v => v + 1)
-    showToast(`Đã duyệt toàn bộ ${res.approvedCount} ca rảnh của tuần`)
-  }
-
-  const handleApproveStaffAll = async (staffId: string) => {
-    const staffRegs = heatmapCells
-      .flatMap(c => c.registrations)
-      .filter(r => r.employee_id === staffId && r.status === 'PENDING')
-
-    staffRegs.forEach(r => {
-      ShiftRegistrationService.approveRegistration(r.id, 'Quản lý cửa hàng')
-    })
-    setDataVersion(v => v + 1)
-    showToast(`Đã duyệt toàn bộ ${staffRegs.length} ca của nhân sự`)
-
-    if (staffRegs.length > 0) {
-      fetch('/api/shifts/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          registration_ids: staffRegs.map(r => r.id),
-          action: 'approve',
-        }),
-      }).catch(err => console.error('Lỗi API approve staff:', err))
-    }
-  }
+  }, [heatmapCells, selectedCellKey])
 
   const currentStore = stores.find(s => s.id === selectedStoreId) || stores[0] || mockStores[0]
+  const scheduleHref = `/schedule?storeId=${encodeURIComponent(selectedStoreId)}&weekStart=${encodeURIComponent(selectedWeek)}`
 
   return (
     <AppShell>
@@ -294,11 +211,8 @@ export default function ShiftRegistrationsHeatmapPage() {
           prevMonStr={prevMonStr}
           isSyncing={isSyncing}
           onRefresh={() => syncData(selectedStoreId, selectedWeek)}
-          onApproveAll={handleApproveAll}
-          pendingTotal={stats.pendingTotal}
           coverageData={coverageData}
           totalRegistrations={stats.totalRegistrations}
-          approvedTotal={stats.approvedTotal}
           riskCount={stats.riskCount}
           emptyCount={stats.emptyCount}
           fullCount={stats.fullCount}
@@ -307,7 +221,7 @@ export default function ShiftRegistrationsHeatmapPage() {
           dataSource={dataSource}
           stores={stores}
           weekStatus={weekStatus}
-          scheduleHref={`/schedule?storeId=${encodeURIComponent(selectedStoreId)}&weekStart=${encodeURIComponent(selectedWeek)}`}
+          scheduleHref={scheduleHref}
         />
 
         {/* TẦNG 3: BẢNG MA TRẬN 7X3 & THEO DÕI NHÂN VIÊN */}
@@ -320,10 +234,8 @@ export default function ShiftRegistrationsHeatmapPage() {
             coverageData={coverageData}
             filterStatus={filterStatus}
             onSelectFilterStatus={setFilterStatus}
-            onSelectCell={setSelectedCell}
-            onApproveCell={handleApproveCell}
+            onSelectCell={cell => setSelectedCellKey({ date: cell.date, shiftId: cell.shiftId })}
             onOpenZaloModal={() => setIsZaloModalOpen(true)}
-            onApproveStaffAll={handleApproveStaffAll}
           />
         </div>
 
@@ -331,10 +243,8 @@ export default function ShiftRegistrationsHeatmapPage() {
         <RegistrationCellDrawer
           isOpen={!!selectedCell}
           cell={selectedCell}
-          onClose={() => setSelectedCell(null)}
-          onApproveOne={handleApproveOne}
-          onRejectOne={handleRejectOne}
-          onApproveCell={handleApproveCell}
+          onClose={() => setSelectedCellKey(null)}
+          scheduleHref={scheduleHref}
         />
 
         {/* MODAL SOẠN NHẮC NHỞ QUA ZALO */}
@@ -345,22 +255,6 @@ export default function ShiftRegistrationsHeatmapPage() {
           weekStartDate={selectedWeek}
           missingStaff={coverageData.missingEmployees}
         />
-
-        {/* TOAST THÔNG BÁO THÀNH CÔNG */}
-        {toastNotice && (
-          <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 duration-300">
-            <div
-              className={`px-4 py-3 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold text-white ${
-                toastNotice.type === 'success'
-                  ? 'bg-emerald-600 border-emerald-500'
-                  : 'bg-[#2F6FA8] border-blue-500'
-              }`}
-            >
-              <CheckCircle2 size={16} />
-              <span>{toastNotice.message}</span>
-            </div>
-          </div>
-        )}
       </div>
     </AppShell>
   )

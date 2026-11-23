@@ -1,17 +1,24 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import {
-  Zap, X, Calendar, Clock, User, Check, AlertCircle, CheckCircle2, ChevronRight, Sparkles
-} from 'lucide-react'
+import { Zap, X, Calendar, Clock, User, Check, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { addSchedule, mockPositions, mockStores } from '@/lib/mock-data'
+import { useAuthStore } from '@/store/auth-store'
 
 interface Props {
   storeId?: string | null
   weekStart?: string | null
   onSuccess?: () => void
+}
+
+interface QuickAssignEmployee {
+  id: string
+  full_name: string
+  employee_code?: string
+  department_name?: string
+  position_id?: string
+  status?: string
 }
 
 const SHIFT_OPTIONS = [
@@ -22,110 +29,188 @@ const SHIFT_OPTIONS = [
 
 const DAY_NAMES = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật']
 
+function parseLocalDateKey(value: string): Date {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+  return new Date(year, (month || 1) - 1, day || 1, 12, 0, 0, 0)
+}
+
+function formatLocalDateKey(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function getLocalWeekStart(rawWeekStart?: string | null): string {
+  const base =
+    rawWeekStart && /^\d{4}-\d{2}-\d{2}/.test(rawWeekStart)
+      ? parseLocalDateKey(rawWeekStart)
+      : (() => {
+          const now = new Date()
+          return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0)
+        })()
+  const day = base.getDay()
+  base.setDate(base.getDate() - (day === 0 ? 6 : day - 1))
+  return formatLocalDateKey(base)
+}
+
 export default function MobileQuickAssignDrawer({ storeId = 'store-001', weekStart, onSuccess }: Props) {
+  const { user } = useAuthStore()
   const [isOpen, setIsOpen] = useState(false)
   const [selectedDayOffset, setSelectedDayOffset] = useState(0) // 0: Thứ 2 ... 6: Chủ nhật
   const [selectedShiftId, setSelectedShiftId] = useState('shift-001')
-  const [selectedEmpId, setSelectedEmpId] = useState('')
-  const [employees, setEmployees] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
+  const [chosenEmpId, setChosenEmpId] = useState('')
+  const [changeReason, setChangeReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [drawerData, setDrawerData] = useState<{
+    key: string
+    employees: QuickAssignEmployee[]
+    isWeekPublished: boolean
+  }>({ key: '', employees: [], isWeekPublished: false })
 
-  // Tính 7 ngày trong tuần
+  const targetStore = storeId || 'store-001'
+  const targetWeekStart = useMemo(() => getLocalWeekStart(weekStart), [weekStart])
+  const fetchKey = isOpen ? `${targetStore}|${targetWeekStart}` : ''
+
+  // Tính 7 ngày trong tuần theo lịch local Việt Nam (không lệch UTC)
   const weekDays = useMemo(() => {
-    let monday: Date
-    if (weekStart) {
-      monday = new Date(weekStart)
-    } else {
-      const today = new Date()
-      const day = today.getDay()
-      const diff = today.getDate() - day + (day === 0 ? -6 : 1)
-      monday = new Date(today.setDate(diff))
-    }
-
+    const monday = parseLocalDateKey(targetWeekStart)
     return DAY_NAMES.map((name, idx) => {
       const d = new Date(monday)
       d.setDate(monday.getDate() + idx)
-      const dateStr = d.toISOString().split('T')[0]
-      const displayDate = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`
+      const dateStr = formatLocalDateKey(d)
+      const displayDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
       return { name, dateStr, displayDate }
     })
-  }, [weekStart])
+  }, [targetWeekStart])
 
-  // Lấy danh sách nhân viên từ Server API
+  // Tải nhân sự đang làm việc + trạng thái Nháp/Đã chốt của tuần từ máy chủ
   useEffect(() => {
-    async function loadStaff() {
-      try {
-        setLoading(true)
-        const targetStore = storeId || 'store-001'
-        const res = await fetch(`/api/employees?store_id=${targetStore}`)
-        const json = await res.json()
-        if (json.success && json.data) {
-          setEmployees(json.data)
-          if (json.data.length > 0 && !selectedEmpId) {
-            setSelectedEmpId(json.data[0].id)
-          }
-        }
-      } catch {
-        // Fallback
-      } finally {
-        setLoading(false)
-      }
-    }
-    if (isOpen) {
-      loadStaff()
-    }
-  }, [isOpen, storeId])
+    if (!fetchKey) return
+    let active = true
 
-  // Xử lý gán ca nhanh (1 chạm không cần kéo thả)
+    Promise.all([
+      fetch(`/api/employees?store_id=${encodeURIComponent(targetStore)}&status=active`, {
+        cache: 'no-store',
+      }).then(res => (res.ok ? res.json() : null)),
+      fetch(
+        `/api/schedules?store_id=${encodeURIComponent(targetStore)}&week_start=${encodeURIComponent(targetWeekStart)}&include_meta=0`,
+        { cache: 'no-store' }
+      ).then(res => (res.ok ? res.json() : null)),
+    ])
+      .then(([empJson, schJson]) => {
+        if (!active) return
+        const rawEmployees = Array.isArray(empJson?.data) ? (empJson.data as QuickAssignEmployee[]) : []
+        const activeEmployees = rawEmployees.filter(
+          e =>
+            e &&
+            e.id &&
+            e.status !== 'resigned' &&
+            e.status !== 'inactive' &&
+            !String(e.full_name || '').includes('[Đã nghỉ]')
+        )
+        setDrawerData({
+          key: fetchKey,
+          employees: activeEmployees,
+          isWeekPublished: Boolean(schJson?.is_week_published),
+        })
+      })
+      .catch(() => {
+        if (!active) return
+        setDrawerData({
+          key: fetchKey,
+          employees: [],
+          isWeekPublished: false,
+        })
+      })
+
+    return () => {
+      active = false
+    }
+  }, [fetchKey, targetStore, targetWeekStart])
+
+  const loading = Boolean(fetchKey) && drawerData.key !== fetchKey
+  const employees = drawerData.key === fetchKey ? drawerData.employees : []
+  const isWeekPublished = drawerData.key === fetchKey ? drawerData.isWeekPublished : false
+  const selectedEmpId =
+    chosenEmpId && employees.some(e => e.id === chosenEmpId) ? chosenEmpId : employees[0]?.id || ''
+
+  // Xử lý gán ca nhanh vào Kho Lịch Chính Thức (/api/schedules)
   const handleAssign = async () => {
     if (!selectedEmpId) return
 
+    if (isWeekPublished && !changeReason.trim()) {
+      setToast({
+        type: 'error',
+        message: 'Tuần này đã chốt lịch chính thức. Vui lòng nhập lý do bổ sung ca.',
+      })
+      return
+    }
+
     const dayObj = weekDays[selectedDayOffset]
-    const shiftObj = SHIFT_OPTIONS.find((s) => s.id === selectedShiftId)
-    const empObj = employees.find((e) => e.id === selectedEmpId)
+    const shiftObj = SHIFT_OPTIONS.find(s => s.id === selectedShiftId)
+    const empObj = employees.find(e => e.id === selectedEmpId)
 
     if (!dayObj || !shiftObj || !empObj) return
 
     try {
       setSubmitting(true)
+      setToast(null)
 
-      // 1. Lưu vào Server API
-      await fetch('/api/shifts/register', {
+      const res = await fetch('/api/schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employee_id: empObj.id,
-          employee_name: empObj.full_name,
-          store_id: storeId || 'store-001',
-          date: dayObj.dateStr,
-          shift_id: shiftObj.id,
-          shift_name: `${shiftObj.name} (${shiftObj.time})`,
-          position_id: empObj.position_id || 'pos-001',
-          notes: '[Mobile 1-Tap] Gán nhanh trên điện thoại',
+          action: 'upsert',
+          actor_id: user?.id || 'manager',
+          actor_name: user?.full_name || 'Quản lý',
+          change_reason: isWeekPublished ? changeReason.trim() : undefined,
+          items: [
+            {
+              store_id: targetStore,
+              employee_id: empObj.id,
+              employee_name: empObj.full_name,
+              date: dayObj.dateStr,
+              shift_id: shiftObj.id,
+              shift_name: `${shiftObj.name} (${shiftObj.time})`,
+              assigned_position_id: empObj.position_id || 'pos-001',
+              notes: '[Mobile 1-Tap] Gán nhanh trên điện thoại',
+            },
+          ],
         }),
       })
 
-      // 2. Lưu vào state bộ nhớ client
-      addSchedule(
-        storeId || 'store-001',
-        empObj.id,
-        shiftObj.id,
-        dayObj.dateStr,
-        '[Mobile 1-Tap] Gán nhanh trên điện thoại',
-        'published',
-        empObj.position_id || 'pos-001'
-      )
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.success) {
+        setToast({
+          type: 'error',
+          message: json?.error || 'Không thể lưu ca lên máy chủ. Vui lòng thử lại.',
+        })
+        return
+      }
 
-      setToast(`Đã gán ${empObj.full_name} vào ${shiftObj.name} ngày ${dayObj.displayDate} thành công!`)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('homies-schedule-updated'))
+      }
+      if (onSuccess) onSuccess()
+
+      setChangeReason('')
+      setToast({
+        type: 'success',
+        message: isWeekPublished
+          ? `Đã bổ sung ${empObj.full_name} vào Lịch Chính Thức (${shiftObj.name} - ${dayObj.displayDate}).`
+          : `Đã lưu ${empObj.full_name} vào Bản Nháp (${shiftObj.name} - ${dayObj.displayDate}).`,
+      })
       setTimeout(() => {
         setToast(null)
         setIsOpen(false)
-        if (onSuccess) onSuccess()
       }, 1500)
     } catch {
-      setToast('Lỗi khi gán ca. Vui lòng thử lại.')
+      setToast({
+        type: 'error',
+        message: 'Lỗi kết nối khi gán ca. Vui lòng thử lại.',
+      })
     } finally {
       setSubmitting(false)
     }
@@ -137,7 +222,10 @@ export default function MobileQuickAssignDrawer({ storeId = 'store-001', weekSta
       <div className="md:hidden fixed bottom-20 right-4 z-40">
         <button
           type="button"
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            setToast(null)
+            setIsOpen(true)
+          }}
           className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-700 text-white font-bold text-xs rounded-full shadow-xl shadow-emerald-700/30 active:scale-95 transition-all border border-emerald-400/40"
         >
           <Zap size={16} className="animate-bounce" />
@@ -157,7 +245,11 @@ export default function MobileQuickAssignDrawer({ storeId = 'store-001', weekSta
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-gray-900 font-['Poppins']">Gán Ca Nhanh Mobile</h2>
-                  <p className="text-[11px] text-gray-500">Thao tác 1 chạm không lo trượt tay khi kéo thả</p>
+                  <p className="text-[11px] text-gray-500">
+                    {isWeekPublished
+                      ? 'Tuần đã chốt — ca thêm mới sẽ lưu vào Lịch Chính Thức'
+                      : 'Ca được lưu vào Bản Nháp chờ quản lý Chốt Lịch'}
+                  </p>
                 </div>
               </div>
               <button
@@ -208,7 +300,7 @@ export default function MobileQuickAssignDrawer({ storeId = 'store-001', weekSta
                   <span>2. Chọn Khung Ca Homies:</span>
                 </label>
                 <div className="grid grid-cols-1 gap-2">
-                  {SHIFT_OPTIONS.map((shift) => {
+                  {SHIFT_OPTIONS.map(shift => {
                     const isSelected = selectedShiftId === shift.id
                     return (
                       <button
@@ -243,15 +335,17 @@ export default function MobileQuickAssignDrawer({ storeId = 'store-001', weekSta
                 </label>
                 {loading ? (
                   <div className="py-4 text-center text-xs text-gray-400">Đang tải danh sách nhân sự...</div>
+                ) : employees.length === 0 ? (
+                  <div className="py-4 text-center text-xs text-gray-400">Không có nhân sự đang làm việc tại chi nhánh này.</div>
                 ) : (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {employees.map((emp) => {
+                    {employees.map(emp => {
                       const isSelected = selectedEmpId === emp.id
                       return (
                         <button
                           key={emp.id}
                           type="button"
-                          onClick={() => setSelectedEmpId(emp.id)}
+                          onClick={() => setChosenEmpId(emp.id)}
                           className={`w-full p-2.5 rounded-xl border flex items-center justify-between text-left transition-all ${
                             isSelected
                               ? 'bg-emerald-50/80 border-emerald-500 shadow-xs ring-1 ring-emerald-500'
@@ -265,7 +359,7 @@ export default function MobileQuickAssignDrawer({ storeId = 'store-001', weekSta
                             <div>
                               <div className="font-bold text-xs text-gray-900">{emp.full_name}</div>
                               <div className="text-[10px] text-gray-500">
-                                {emp.employee_code} • {emp.department_name || 'Nhân viên'}
+                                {emp.employee_code || 'NV'} • {emp.department_name || 'Nhân viên'}
                               </div>
                             </div>
                           </div>
@@ -276,6 +370,21 @@ export default function MobileQuickAssignDrawer({ storeId = 'store-001', weekSta
                   </div>
                 )}
               </div>
+
+              {isWeekPublished && (
+                <div>
+                  <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider mb-1.5">
+                    4. Lý do bổ sung ca sau khi chốt:
+                  </label>
+                  <input
+                    type="text"
+                    value={changeReason}
+                    onChange={e => setChangeReason(e.target.value)}
+                    placeholder="Ví dụ: Tăng cường nhân sự cuối tuần..."
+                    className="w-full rounded-xl border border-amber-300 bg-amber-50/50 px-3 py-2 text-xs text-gray-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Drawer Footer CTA */}
@@ -296,11 +405,11 @@ export default function MobileQuickAssignDrawer({ storeId = 'store-001', weekSta
                 className="flex-1 h-11 text-xs font-bold rounded-xl shadow-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2"
               >
                 {submitting ? (
-                  <span>Đang gán ca...</span>
+                  <span>Đang lưu ca...</span>
                 ) : (
                   <>
                     <CheckCircle2 size={16} />
-                    <span>Xác nhận Gán Ca 1-Chạm</span>
+                    <span>{isWeekPublished ? 'Bổ sung vào Lịch Chính Thức' : 'Lưu vào Bản Nháp 1-Chạm'}</span>
                   </>
                 )}
               </Button>
@@ -308,9 +417,13 @@ export default function MobileQuickAssignDrawer({ storeId = 'store-001', weekSta
 
             {/* Toast thông báo */}
             {toast && (
-              <div className="p-3 bg-emerald-700 text-white text-xs text-center font-semibold flex items-center justify-center gap-2 animate-fade-in">
-                <CheckCircle2 size={16} />
-                <span>{toast}</span>
+              <div
+                className={`p-3 text-white text-xs text-center font-semibold flex items-center justify-center gap-2 animate-fade-in ${
+                  toast.type === 'error' ? 'bg-rose-600' : 'bg-emerald-700'
+                }`}
+              >
+                {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+                <span>{toast.message}</span>
               </div>
             )}
           </div>
