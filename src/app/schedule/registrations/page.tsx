@@ -1,7 +1,10 @@
 'use client'
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { AlertTriangle } from 'lucide-react'
 import AppShell from '@/components/layout/AppShell'
+import { useAuthStore } from '@/store/auth-store'
 import {
   ShiftRegistrationService,
   type HeatmapCell,
@@ -18,6 +21,7 @@ import {
 } from '@/components/scheduling/registrations/RegistrationCellDrawer'
 
 export default function ShiftRegistrationsHeatmapPage() {
+  const router = useRouter()
   // 1. Quản lý Tuần được chọn
   const today = useMemo(() => new Date(), [])
   const thisMon = useMemo(() => getMondayOfDate(today), [today])
@@ -50,6 +54,7 @@ export default function ShiftRegistrationsHeatmapPage() {
   const [stores, setStores] = useState<Array<{ id: string; name: string; is_active?: boolean }>>(() => getStoresList())
   const [dataSource, setDataSource] = useState<'ipos_cloud' | 'homies_native' | 'internal_db'>('ipos_cloud')
   const [weekStatus, setWeekStatus] = useState<'draft' | 'published'>('draft')
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   // Đọc storeId & weekStart từ URL nếu được điều hướng từ Bảng Xếp Lịch
   useEffect(() => {
@@ -103,7 +108,10 @@ export default function ShiftRegistrationsHeatmapPage() {
           : modeJson?.config?.is_enabled !== false && modeJson?.config?.sync_shifts !== false
         setDataSource(shiftsEnabled ? 'ipos_cloud' : 'homies_native')
       }
-      if (weekStatusRes && weekStatusRes.ok) {
+      if (weekStatusRes && weekStatusRes.status === 401) {
+        setSessionExpired(true)
+      } else if (weekStatusRes && weekStatusRes.ok) {
+        setSessionExpired(false)
         const weekJson = await weekStatusRes.json().catch(() => null)
         setWeekStatus(weekJson?.week_status === 'published' ? 'published' : 'draft')
       }
@@ -197,6 +205,15 @@ export default function ShiftRegistrationsHeatmapPage() {
   const currentStore = stores.find(s => s.id === selectedStoreId) || stores[0] || mockStores[0]
   const scheduleHref = `/schedule?storeId=${encodeURIComponent(selectedStoreId)}&weekStart=${encodeURIComponent(selectedWeek)}`
 
+  const handleRelogin = () => {
+    useAuthStore.getState().logout()
+    const redirectTarget =
+      typeof window !== 'undefined'
+        ? `${window.location.pathname}${window.location.search}`
+        : '/schedule/registrations'
+    router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}`)
+  }
+
   return (
     <AppShell>
       <div className="w-full max-w-none bg-[#FFF8E8] min-h-screen pb-12 space-y-6">
@@ -223,6 +240,31 @@ export default function ShiftRegistrationsHeatmapPage() {
           weekStatus={weekStatus}
           scheduleHref={scheduleHref}
         />
+
+        {sessionExpired && (
+          <div className="px-4 sm:px-6 lg:px-8 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3.5 text-rose-950 shadow-xs">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold">
+                    Phiên đăng nhập cũ đã hết hạn bảo mật — chưa tải được Lịch Rảnh Tuần từ đám mây
+                  </p>
+                  <p className="text-[11px] text-rose-800 mt-0.5">
+                    Hệ thống vừa nâng cấp lớp bảo mật phân quyền. Vui lòng đăng nhập lại 1 lần để nạp đầy đủ dữ liệu iPOS và Homies.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRelogin}
+                className="shrink-0 rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+              >
+                Đăng xuất &amp; Đăng nhập lại ngay
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* TẦNG 3: BẢNG MA TRẬN 7X3 & THEO DÕI NHÂN VIÊN */}
         <div className="px-4 sm:px-6 lg:px-8 w-full">

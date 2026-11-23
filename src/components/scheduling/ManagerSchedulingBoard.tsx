@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import { ScheduleService, type ShiftDemand, type ScheduleValidationWarning } from '@/lib/services/schedule-service'
 import { ShiftTemplateService } from '@/lib/services/shift-template-service'
@@ -325,6 +326,7 @@ interface Props {
 }
 
 export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }: Props) {
+  const router = useRouter()
   const { user } = useAuthStore()
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
@@ -332,6 +334,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
   const [selectedPositionFilter, setSelectedPositionFilter] = useState<string>('ALL')
   const [message, setMessage] = useState<string | null>(null)
   const [messageTone, setMessageTone] = useState<'info' | 'warning' | 'error'>('info')
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   // Modal xếp lịch cho Ca (Pop-up iPOS Style)
   const [activeSlotModal, setActiveSlotModal] = useState<SlotModalTarget | null>(null)
@@ -468,8 +471,10 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     if (!activeStoreId || !activeWeekStart) return
     let isMounted = true
     ScheduleService.hydrateWeekFromServer(activeStoreId, activeWeekStart)
-      .then(() => {
-        if (isMounted) setRefreshKey(k => k + 1)
+      .then(res => {
+        if (!isMounted) return
+        setSessionExpired(Boolean(res.authExpired))
+        setRefreshKey(k => k + 1)
       })
       .catch(err => {
         console.warn('[ManagerSchedulingBoard] Lỗi nạp lịch chính thức từ đám mây:', err)
@@ -483,12 +488,22 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
     if (!activeStoreId || !activeWeekStart) return
     const handleScheduleUpdated = () => {
       void ScheduleService.hydrateWeekFromServer(activeStoreId, activeWeekStart)
-        .then(() => setRefreshKey(k => k + 1))
+        .then(res => {
+          setSessionExpired(Boolean(res.authExpired))
+          setRefreshKey(k => k + 1)
+        })
         .catch(() => {})
     }
     window.addEventListener('homies-schedule-updated', handleScheduleUpdated)
     return () => window.removeEventListener('homies-schedule-updated', handleScheduleUpdated)
   }, [activeStoreId, activeWeekStart])
+
+  const handleRelogin = () => {
+    useAuthStore.getState().logout()
+    const target =
+      typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '/schedule'
+    router.push(`/login?redirect=${encodeURIComponent(target)}`)
+  }
 
   const board = useMemo(() => {
     void refreshKey
@@ -2398,6 +2413,29 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
             </p>
           </div>
         </div>
+
+        {sessionExpired && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3.5 text-rose-950 shadow-xs animate-fade-in">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold">
+                  Phiên đăng nhập cũ đã hết hạn bảo mật — chưa tải được lịch từ đám mây
+                </p>
+                <p className="text-[11px] text-rose-800 mt-0.5">
+                  Hệ thống vừa bật lớp bảo mật phân quyền mới. Vui lòng đăng nhập lại 1 lần để nạp toàn bộ ca làm việc và lịch rảnh tuần.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleRelogin}
+              className="shrink-0 rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+            >
+              Đăng xuất &amp; Đăng nhập lại ngay
+            </button>
+          </div>
+        )}
 
         {/* Banner gợi ý nguồn Lịch Rảnh Tuần - chỉ hiện khi tuần chưa chốt */}
         {!isPublished && availabilityCount > 0 && (

@@ -285,6 +285,8 @@ export class ScheduleService {
     weekMeta: ScheduleWeekMeta | null
     changeLogs: ScheduleChangeLog[]
     isPublished: boolean
+    authExpired?: boolean
+    httpStatus?: number
   }> {
     this.init()
     const normWeek = this.getWeekStartDate(weekStart)
@@ -310,6 +312,8 @@ export class ScheduleService {
           weekMeta: this.getWeekMeta(storeId, normWeek),
           changeLogs: [],
           isPublished: this.isWeekPublished(storeId, normWeek),
+          authExpired: res.status === 401,
+          httpStatus: res.status,
         }
       }
 
@@ -390,6 +394,8 @@ export class ScheduleService {
         weekMeta: serverMeta,
         changeLogs: logs,
         isPublished: serverMeta?.status === 'published',
+        authExpired: false,
+        httpStatus: 200,
       }
     } catch (err) {
       console.warn(`[ScheduleService] Lỗi hydrate tuần ${key}:`, err)

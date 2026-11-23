@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerDb, saveServerDb, type ServerIposIntegrationConfig, type ServerIposSyncLog } from '@/lib/server/db'
+import {
+  getServerDb,
+  saveServerDb,
+  getCalendarWeekStart,
+  getCalendarWeekEnd,
+  getShiftSlotDedupeKey,
+  mergeShiftRecords,
+  type ServerIposIntegrationConfig,
+  type ServerIposSyncLog,
+  type ServerShiftRegistration,
+} from '@/lib/server/db'
 import { getAuthenticatedUser, hasRequiredRole } from '@/lib/server/auth-helper'
-import { getEffectiveDataMode } from '@/lib/server/data-mode'
+import { getEffectiveDataMode, isIposModuleEnabled } from '@/lib/server/data-mode'
 import { getStorageStatus } from '@/lib/server/supabase-store'
+import { fetchIposShiftRegistrations } from '@/lib/services/ipos/ipos-cloud-client'
 import { normalizeIposData } from '@/lib/services/ipos/ipos-normalizer'
 import {
   getSchemaStatus,
@@ -794,6 +805,96 @@ export async function POST(req: NextRequest) {
       // Đẩy qua bộ chuẩn hóa ipos-normalizer & bộ ghi nhận schema
       const normResult = await normalizeIposData(syncPayrollPayload)
 
+      // Nạp lại DB mới nhất sau bước normalizeIposData để không ghi đè dữ liệu lương vừa lưu
+      const latestDb = await getServerDb()
+      if (!latestDb.ipos_integration) {
+        latestDb.ipos_integration = db.ipos_integration
+      }
+      if (clientAuth) {
+        latestDb.ipos_integration.is_authenticated = db.ipos_integration.is_authenticated
+        latestDb.ipos_integration.username = db.ipos_integration.username
+        latestDb.ipos_integration.token_or_password = db.ipos_integration.token_or_password
+      }
+
+      // Đồng bộ kèm Lịch Rảnh Tuần (Kho 1: latestDb.shifts) từ iPOS cho tuần hiện tại + tuần tới
+      let syncedShiftsCount = 0
+      let addedOrUpdatedShiftsCount = 0
+      let shiftWindowLabel = ''
+
+      if (isIposModuleEnabled(latestDb, 'shifts')) {
+        try {
+          const vnNowMs = Date.now() + 7 * 3600_000
+          const vnToday = new Date(vnNowMs).toISOString().slice(0, 10)
+          const thisWeekStart = getCalendarWeekStart(vnToday)
+          const nextWeekAnchor = new Date(vnNowMs + 7 * 86400_000).toISOString().slice(0, 10)
+          const nextWeekEnd = getCalendarWeekEnd(getCalendarWeekStart(nextWeekAnchor))
+          shiftWindowLabel = `${thisWeekStart} → ${nextWeekEnd}`
+
+          const shiftSyncRes = await fetchIposShiftRegistrations({
+            fromDate: thisWeekStart,
+            toDate: nextWeekEnd,
+          })
+
+          if (shiftSyncRes.success && Array.isArray(shiftSyncRes.data) && shiftSyncRes.data.length > 0) {
+            if (!Array.isArray(latestDb.shifts)) latestDb.shifts = []
+            const existingIds = new Set(latestDb.shifts.map((s) => s.id))
+            const slotIndexMap = new Map<string, number>()
+            latestDb.shifts.forEach((s, idx) => {
+              if ((s.status || '').toUpperCase() !== 'REJECTED') {
+                slotIndexMap.set(getShiftSlotDedupeKey(s), idx)
+              }
+            })
+
+            for (const item of shiftSyncRes.data) {
+              if (existingIds.has(item.id)) continue
+              const newReg: ServerShiftRegistration = {
+                id: item.id,
+                employee_id: item.employee_id,
+                employee_name: item.employee_name,
+                store_id: item.store_id,
+                week_start_date: item.week_start_date,
+                date: item.date,
+                shift_id: item.shift_id,
+                shift_name: item.shift_name,
+                position_id: item.position_id || 'pos-001',
+                status: item.status,
+                created_at: item.created_at,
+                notes: item.notes,
+              }
+              const slotKey = getShiftSlotDedupeKey(newReg)
+              const existingSlotIdx = slotIndexMap.get(slotKey)
+
+              if ((newReg.status || '').toUpperCase() !== 'REJECTED' && existingSlotIdx !== undefined) {
+                const before = latestDb.shifts[existingSlotIdx]
+                const merged = mergeShiftRecords(before, newReg)
+                const changed =
+                  (merged.notes || '') !== (before.notes || '') ||
+                  merged.status !== before.status ||
+                  (merged.position_id || '') !== (before.position_id || '') ||
+                  (merged.shift_name || '') !== (before.shift_name || '') ||
+                  (merged.approved_at || '') !== (before.approved_at || '') ||
+                  (merged.employee_name || '') !== (before.employee_name || '')
+                if (changed) {
+                  latestDb.shifts[existingSlotIdx] = merged
+                  addedOrUpdatedShiftsCount += 1
+                }
+                existingIds.add(newReg.id)
+              } else {
+                if ((newReg.status || '').toUpperCase() !== 'REJECTED') {
+                  slotIndexMap.set(slotKey, latestDb.shifts.length)
+                }
+                latestDb.shifts.push(newReg)
+                existingIds.add(newReg.id)
+                addedOrUpdatedShiftsCount += 1
+              }
+            }
+            syncedShiftsCount = shiftSyncRes.data.length
+          }
+        } catch (shiftSyncErr) {
+          console.warn('[iPOS Cloud Worker] Không thể đồng bộ kèm Lịch Rảnh Tuần từ iPOS:', shiftSyncErr)
+        }
+      }
+
       const records_preview = syncPayrollPayload.raw_data.map((r: any) => ({
         code: r.employeeCode,
         name: r.employeeName,
@@ -839,15 +940,25 @@ export async function POST(req: NextRequest) {
         reconciled_at: now,
       }
 
+      const shiftSyncSuffix =
+        syncedShiftsCount > 0
+          ? ` • Đồng bộ kèm ${syncedShiftsCount} ca Lịch Rảnh Tuần (${shiftWindowLabel}${
+              addedOrUpdatedShiftsCount > 0 ? `, cập nhật ${addedOrUpdatedShiftsCount} ca` : ''
+            })`
+          : ''
+
       // Tạo nhật ký đồng bộ với nguồn minh bạch
       const logMessage = isAuth
-        ? `Backend Worker vừa đồng bộ thành công ${normResult.count} bản ghi (${periodLabel}) từ ${matchedStoresLabel} vào Homies HRM • Đối soát khớp 100%`
-        : `Hệ thống vừa nạp thành công ${normResult.count} bản ghi (${periodLabel}) từ ${matchedStoresLabel} • Đối soát khớp 100%`
+        ? `Backend Worker vừa đồng bộ thành công ${normResult.count} bản ghi (${periodLabel}) từ ${matchedStoresLabel} vào Homies HRM${shiftSyncSuffix} • Đối soát khớp 100%`
+        : `Hệ thống vừa nạp thành công ${normResult.count} bản ghi (${periodLabel}) từ ${matchedStoresLabel}${shiftSyncSuffix} • Đối soát khớp 100%`
 
       const newLog: ServerIposSyncLog = {
         id: `log-worker-${Date.now()}`,
         executed_at: now,
-        module: `Toàn bộ luồng iPOS - ${periodLabel} (Lương, Giờ công, Nhân sự)`,
+        module:
+          syncedShiftsCount > 0
+            ? `Toàn bộ luồng iPOS - ${periodLabel} (Lương, Giờ công, Nhân sự, Lịch Rảnh Tuần)`
+            : `Toàn bộ luồng iPOS - ${periodLabel} (Lương, Giờ công, Nhân sự)`,
         status: 'success',
         record_count: normResult.count,
         message: logMessage,
@@ -855,18 +966,18 @@ export async function POST(req: NextRequest) {
         records_preview,
       }
 
-      if (!db.ipos_integration.sync_logs) {
-        db.ipos_integration.sync_logs = []
+      if (!latestDb.ipos_integration.sync_logs) {
+        latestDb.ipos_integration.sync_logs = []
       }
-      db.ipos_integration.sync_logs.unshift(newLog)
-      if (db.ipos_integration.sync_logs.length > 20) {
-        db.ipos_integration.sync_logs = db.ipos_integration.sync_logs.slice(0, 20)
+      latestDb.ipos_integration.sync_logs.unshift(newLog)
+      if (latestDb.ipos_integration.sync_logs.length > 20) {
+        latestDb.ipos_integration.sync_logs = latestDb.ipos_integration.sync_logs.slice(0, 20)
       }
 
-      db.ipos_integration.last_synced_at = now
-      db.ipos_integration.last_sync_status = 'success'
+      latestDb.ipos_integration.last_synced_at = now
+      latestDb.ipos_integration.last_sync_status = 'success'
 
-      await saveServerDb(db)
+      await saveServerDb(latestDb)
 
       const schemaStatus = await getSchemaStatus()
 
@@ -874,9 +985,10 @@ export async function POST(req: NextRequest) {
         {
           success: true,
           count: normResult.count,
+          shifts_synced_count: syncedShiftsCount,
           message: newLog.message,
           log: newLog,
-          config: db.ipos_integration,
+          config: latestDb.ipos_integration,
           schema_status: schemaStatus,
           audit_checksum: auditChecksum,
         },
