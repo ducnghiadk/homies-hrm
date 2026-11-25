@@ -14,8 +14,8 @@
      - `payroll-engine`: ca gãy cần đủ giờ ra ca trước và giờ vào ca sau; ca 0 giờ không tính ca/ngày công; ngày vượt công chuẩn trả theo hệ số ngày nghỉ (mặc định 200%); giờ làm quá giờ chuẩn/ngày tính tăng ca theo loại ngày; làm trong giờ chuẩn ngày lễ được trả thêm cho đủ hệ số ngày lễ (mặc định 300%). Các hệ số lấy từ Cài đặt lương.
      - `src/lib/scheduling/availability-fill.ts` (có test): mỗi ca chỉ lấy đủ số người tối đa của mẫu ca, ưu tiên người ít giờ trong tuần, còn lại vào danh sách dự bị hiện trong thông báo.
      - `/api/schedules`: gửi thông báo cho từng nhân viên khi chốt lịch tuần và khi sửa/gỡ ca đã chốt; `/api/notifications` chỉ trả thông báo của đúng người nhận.
-  3) Còn lại: bảng lương (khi chưa bật Supabase thật) vẫn đọc dữ liệu chấm công trên trình duyệt thay vì kho chấm công máy chủ (`/api/attendance`); cần một đợt riêng.
-  4) File liên quan: `src/app/api/stores/route.ts`, `src/app/api/attendance/checkin/route.ts`, `src/lib/payroll-engine.ts`, `src/lib/scheduling/availability-fill.ts`, `src/app/api/schedules/route.ts`, `src/lib/services/scheduling/schedule-service.ts`, `src/app/api/notifications/route.ts`.
+  3) Bảng lương (khi chưa bật Supabase thật) nay đọc chấm công từ máy chủ qua `/api/attendance` (`AttendanceService.getAttendanceRecordsForPeriod`), ghi đè các ca quản lý đã sửa trên bảng công; ca chưa tan ca không tính giờ; chỉ quay về dữ liệu trên trình duyệt khi máy chủ không trả được dữ liệu.
+  4) File liên quan: `src/app/api/stores/route.ts`, `src/app/api/attendance/checkin/route.ts`, `src/lib/payroll-engine.ts`, `src/lib/scheduling/availability-fill.ts`, `src/app/api/schedules/route.ts`, `src/lib/services/scheduling/schedule-service.ts`, `src/app/api/notifications/route.ts`, `src/lib/services/attendance/attendance-service.ts`.
 
 - Đã fix 2026-11-25 (Chấm công bằng Wi-Fi quán thay cho quét QR):
   1) Nguyên nhân: nhân viên bắt buộc quét mã QR mỗi lần vào ca/tan ca; trang `/settings/wifi` cũ chỉ lưu tên Wi-Fi trên trình duyệt, không có tác dụng (trình duyệt không đọc được tên Wi-Fi).

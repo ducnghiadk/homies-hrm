@@ -693,12 +693,100 @@ export class AttendanceService {
     return merged
   }
 
+  private static serverAttendanceCache = new Map<string, { at: number; records: PayrollAttendanceRecord[] }>()
+
+  /** Chuyển 1 lượt chấm công của máy chủ (/api/attendance) sang dạng bảng lương dùng. */
+  static mapServerAttendanceLog(log: Record<string, unknown>): PayrollAttendanceRecord | null {
+    const employeeId = typeof log.employee_id === 'string' ? log.employee_id : ''
+    const date = typeof log.date === 'string' ? log.date.slice(0, 10) : ''
+    if (!employeeId || !date) return null
+
+    const checkIn = typeof log.check_in_time === 'string' ? log.check_in_time : ''
+    const checkOut = typeof log.check_out_time === 'string' && log.check_out_time ? log.check_out_time : undefined
+    const rawStatus = typeof log.status === 'string' ? log.status : ''
+    const isLate = log.is_late === true || rawStatus === 'late'
+    const isOpenShift = !checkOut || rawStatus === 'working' || rawStatus === 'missing_checkout'
+    const lateMinutes = typeof log.late_minutes === 'number' && log.late_minutes > 0 ? log.late_minutes : 0
+    const totalHours = typeof log.total_hours === 'number' && log.total_hours > 0 ? log.total_hours : 0
+    const status: Attendance['status'] = isLate ? 'late' : log.is_early === true ? 'early' : 'on_time'
+
+    return {
+      id: typeof log.id === 'string' ? log.id : `srv-${employeeId}-${date}-${checkIn}`,
+      org_id: 'org-001',
+      employee_id: employeeId,
+      store_id: typeof log.store_id === 'string' ? log.store_id : '',
+      shift_id: typeof log.shift_id === 'string' ? log.shift_id : undefined,
+      date,
+      check_in_time: checkIn,
+      check_out_time: checkOut,
+      status,
+      late_minutes: isOpenShift ? 0 : lateMinutes,
+      total_hours: isOpenShift ? 0 : totalHours,
+      // Để 0: bộ tính lương tự tính tăng ca từ số giờ thực tế trong ngày
+      overtime_hours: 0,
+      chuaCheckOut: isOpenShift,
+    } as PayrollAttendanceRecord
+  }
+
+  /**
+   * Đọc chấm công thật từ máy chủ (kho /api/attendance). Trả về null nếu không đọc được,
+   * để bảng lương quay về dữ liệu trên trình duyệt như trước.
+   */
+  private static async fetchServerAttendanceForPeriod(periodStart: string, periodEnd: string): Promise<PayrollAttendanceRecord[] | null> {
+    if (typeof window === 'undefined' || typeof fetch !== 'function') return null
+    const key = `${periodStart}|${periodEnd}`
+    const cached = this.serverAttendanceCache.get(key)
+    if (cached && Date.now() - cached.at < 30_000) return cached.records
+
+    try {
+      const params = new URLSearchParams({ from_date: periodStart, to_date: periodEnd })
+      const res = await fetch(`/api/attendance?${params.toString()}`, { cache: 'no-store', credentials: 'include' })
+      if (!res.ok) return null
+      const json = await res.json() as { success?: boolean; data?: unknown }
+      if (!json?.success || !Array.isArray(json.data) || json.data.length === 0) return null
+      const records = json.data
+        .map(item => (item && typeof item === 'object' ? this.mapServerAttendanceLog(item as Record<string, unknown>) : null))
+        .filter((r): r is PayrollAttendanceRecord => r !== null)
+      if (records.length === 0) return null
+      this.serverAttendanceCache.set(key, { at: Date.now(), records })
+      return records
+    } catch (error) {
+      console.warn('[AttendanceService] Không đọc được chấm công máy chủ, dùng dữ liệu trên trình duyệt:', error)
+      return null
+    }
+  }
+
+  /** Ghi đè các ca quản lý đã sửa/nhập trên bảng công lên dữ liệu gốc, không nhân đôi ca. */
+  private static overlayTimesheetEdits<T extends Attendance>(base: T[], periodStart: string, periodEnd: string, employeeId?: string): T[] {
+    const merged = base
+    this.loadPersistedTimesheetRecords()
+      .filter(r => r.date >= periodStart && r.date <= periodEnd && (!employeeId || r.employee_id === employeeId))
+      .forEach(timesheetRecord => {
+        const sameDay = merged.filter(r => r.employee_id === timesheetRecord.employee_id && r.date === timesheetRecord.date)
+        const matchIndex = merged.findIndex(r =>
+          r.employee_id === timesheetRecord.employee_id &&
+          r.date === timesheetRecord.date &&
+          ((r.shift_id && timesheetRecord.shift_id && r.shift_id === timesheetRecord.shift_id) ||
+            (!r.shift_id && !timesheetRecord.shift_id && sameDay.length === 1) ||
+            (sameDay.length === 1 && (!r.shift_id || !timesheetRecord.shift_id)))
+        )
+        if (matchIndex === -1) merged.push(timesheetRecord as T)
+        else merged[matchIndex] = { ...merged[matchIndex], ...timesheetRecord, chuaCheckOut: false } as T
+      })
+    return merged
+  }
+
   /**
    * Read the same attendance sources used by the timesheet before payroll runs.
    * Manager corrections/imports override one matching attendance record instead of duplicating it.
    */
   static async getAttendanceRecordsForPeriod(periodStart: string, periodEnd: string, employeeId?: string): Promise<PayrollAttendanceRecord[]> {
-    if (!isRealDbMode()) return this.getLocalAttendanceRecordsForPeriod(periodStart, periodEnd, employeeId)
+    if (!isRealDbMode()) {
+      const serverRecords = await this.fetchServerAttendanceForPeriod(periodStart, periodEnd)
+      if (!serverRecords) return this.getLocalAttendanceRecordsForPeriod(periodStart, periodEnd, employeeId)
+      const scoped = employeeId ? serverRecords.filter(r => r.employee_id === employeeId) : serverRecords
+      return this.overlayTimesheetEdits(scoped.map(r => ({ ...r })), periodStart, periodEnd, employeeId)
+    }
 
     const result = await attendanceAdapter.getAttendanceByPeriod(periodStart, periodEnd, employeeId)
     if (result.coLoi) return this.getLocalAttendanceRecordsForPeriod(periodStart, periodEnd, employeeId)
