@@ -46,6 +46,12 @@ export interface ServerStore {
   pin_code?: string
   phone: string
   is_active: boolean
+  /** Cách chấm công: 'wifi_or_qr' (mặc định) | 'wifi' | 'qr'. */
+  checkin_method?: 'wifi_or_qr' | 'wifi' | 'qr'
+  /** IP công cộng của Wi-Fi quán (lưu bằng nút "Dùng mạng hiện tại"). */
+  wifi_public_ips?: string[]
+  /** Có kiểm tra vị trí GPS trong bán kính không (mặc định có). */
+  require_gps?: boolean
 }
 
 export interface ServerEmployee {

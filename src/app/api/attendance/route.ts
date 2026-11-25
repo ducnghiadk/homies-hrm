@@ -30,6 +30,7 @@ import {
   normalizeOperationSettings,
 } from '@/lib/attendance/operation-settings'
 import { resolveShiftForCheckin, verifyStorePresence } from '@/lib/server/attendance-schedule'
+import { extractClientIp } from '@/lib/attendance/checkin-method'
 
 /**
  * Lưu các bản ghi chấm công từ iPOS Cloud vào CSDL nội bộ (server-db.json)
@@ -383,7 +384,7 @@ export async function POST(req: NextRequest) {
     const storeNameOf = (storeId?: string) =>
       db.stores.find((s) => s.id === storeId)?.name ||
       (storeId === 'store-002' ? 'Homies Milk Tea - Đường 429' : 'Homies Milk Tea - Hồ Bá Phấn')
-    // Nhân viên tự chấm (kể cả quản lý tự chấm cho mình) phải có mặt tại quán: mã QR + bán kính GPS.
+    // Nhân viên tự chấm (kể cả quản lý tự chấm cho mình) phải có mặt tại quán: Wi-Fi quán hoặc mã QR (theo cài đặt chi nhánh) + bán kính GPS.
     // Quản lý ghi công hộ người khác (sửa công thủ công) thì không cần.
     const isSelfAction = !isOperator || body.employee_id === gate.user.userId
     if (isOperator && isSelfAction) {
@@ -398,7 +399,7 @@ export async function POST(req: NextRequest) {
       if (!isSelfAction) return null
       const store = db.stores.find((s) => s.id === storeId)
       if (!store) return NextResponse.json({ success: false, error: 'Không xác định được cơ sở để chấm công.' }, { status: 400 })
-      const check = verifyStorePresence(store, body.qr_code, body.latitude ?? body.check_out_lat ?? body.check_in_lat, body.longitude ?? body.check_out_lng ?? body.check_in_lng)
+      const check = verifyStorePresence(store, body.qr_code, body.latitude ?? body.check_out_lat ?? body.check_in_lat, body.longitude ?? body.check_out_lng ?? body.check_in_lng, Date.now(), extractClientIp((n) => req.headers.get(n)))
       if (!check.ok) return NextResponse.json({ success: false, error: check.error }, { status: 400 })
       return null
     }

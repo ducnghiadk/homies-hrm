@@ -1,5 +1,11 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-25 (Chấm công bằng Wi-Fi quán thay cho quét QR):
+  1) Nguyên nhân: nhân viên bắt buộc quét mã QR mỗi lần vào ca/tan ca; trang `/settings/wifi` cũ chỉ lưu tên Wi-Fi trên trình duyệt, không có tác dụng (trình duyệt không đọc được tên Wi-Fi).
+  2) Cách giải quyết: mỗi chi nhánh chọn cách chấm công: "Wi-Fi quán hoặc mã QR" (mặc định), "Chỉ Wi-Fi quán", "Chỉ mã QR", kèm tùy chọn có kiểm tra GPS hay không. Wi-Fi quán được nhận biết bằng địa chỉ mạng công cộng của quán; quản lý đứng tại quán bấm "Dùng mạng hiện tại" để lưu. Máy chủ kiểm tra ở cả `/api/attendance/checkin` và tan ca qua `/api/attendance`. Sửa thêm: lưu thông tin chi nhánh qua `/api/stores` không còn xóa mất cài đặt chấm công; ẩn danh sách mạng của quán với nhân viên.
+  3) Lưu ý vận hành: nhà mạng có thể đổi địa chỉ mạng của quán (thường sau khi khởi động lại modem); khi đó nhân viên sẽ được hỏi quét QR, quản lý bấm lại "Dùng mạng hiện tại". Nhân viên phải tắt 4G và bắt Wi-Fi quán.
+  4) File liên quan: `src/lib/attendance/checkin-method.ts`, `src/lib/server/attendance-schedule.ts`, `src/app/api/stores/checkin-method/route.ts`, `src/app/api/stores/route.ts`, `src/app/api/attendance/checkin/route.ts`, `src/app/api/attendance/route.ts`, `src/app/checkin/page.tsx`, `src/app/settings/wifi/page.tsx`, `src/components/settings/StoreCheckinMethodPanel.tsx`, `src/lib/server/db.ts`.
+
 - Đã fix 2026-11-25 (Audit trước khi triển khai — Đợt 3 bảng lương, thuế TNCN và chấm công):
   1) Nguyên nhân:
      - Mức giảm trừ gia cảnh (11 triệu / 4,4 triệu) và biểu thuế 7 bậc viết cứng trong công thức, không còn đúng từ kỳ tính thuế 2026 và kế toán không tự chỉnh được.

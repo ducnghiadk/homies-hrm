@@ -1,20 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerDb, saveServerDb, ServerAttendanceLog, calculateDistance } from '@/lib/server/db'
-import { verifyQrPayload } from '@/lib/security/token-signer'
+import { getServerDb, saveServerDb, ServerAttendanceLog } from '@/lib/server/db'
+import { verifyStorePresence } from '@/lib/server/attendance-schedule'
+import { extractClientIp, getStoreCheckinConfig, isIpAllowed } from '@/lib/attendance/checkin-method'
 import { getActiveUser } from '@/lib/server/auth-helper'
 import { getVnClock, parseHhmmToMinutes } from '@/lib/time/vn-time'
+
+/**
+ * GET ?store_id=...: cho trang chấm công biết chi nhánh dùng cách nào và điện thoại
+ * có đang ở Wi-Fi quán không (không trả về danh sách địa chỉ mạng của quán).
+ */
+export async function GET(req: NextRequest) {
+  const auth = await getActiveUser(req)
+  if (!auth) {
+    return NextResponse.json({ success: false, error: 'Bạn cần đăng nhập để chấm công.' }, { status: 401 })
+  }
+  const storeId = new URL(req.url).searchParams.get('store_id') || ''
+  const db = await getServerDb()
+  const store = db.stores.find((s) => s.id === storeId)
+  if (!store) {
+    return NextResponse.json({ success: false, error: 'Không tìm thấy chi nhánh.' }, { status: 404 })
+  }
+  const config = getStoreCheckinConfig(store)
+  const onShopWifi = config.checkin_method !== 'qr' && isIpAllowed(extractClientIp((n) => req.headers.get(n)), config.wifi_public_ips)
+  return NextResponse.json({
+    success: true,
+    data: {
+      checkin_method: config.checkin_method,
+      require_gps: config.require_gps,
+      wifi_configured: config.wifi_public_ips.length > 0,
+      on_shop_wifi: onShopWifi,
+    },
+  })
+}
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { employee_id, store_id, latitude, longitude, qr_code, shift_id } = body
 
-    if (!employee_id || !store_id || latitude === undefined || longitude === undefined) {
+    if (!employee_id || !store_id) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Thiếu thông tin bắt buộc (employee_id, store_id, latitude, longitude)',
-        },
+        { success: false, error: 'Thiếu thông tin bắt buộc (employee_id, store_id)' },
         { status: 400 }
       )
     }
@@ -54,105 +80,21 @@ export async function POST(req: NextRequest) {
     const employee = db.employees.find((e) => e.id === effectiveEmployeeId)
     const employeeName = employee?.full_name || 'Nhân viên Homies'
 
-    // 3. Tính khoảng cách GPS thực tế từ tọa độ gửi lên tới tọa độ gốc của cửa hàng
-    const userLat = Number(latitude)
-    const userLng = Number(longitude)
-    const distanceMeters = Math.round(
-      calculateDistance(userLat, userLng, store.latitude, store.longitude)
-    )
-
-    // 3b. Kiểm tra tính hợp lệ của mã QR động chống gian lận
-    if (!qr_code || typeof qr_code !== 'string') {
+    // 3. Có mặt tại quán theo cách chấm công của chi nhánh: Wi-Fi quán hoặc mã QR, kèm GPS nếu bật
+    const presence = verifyStorePresence(store, qr_code, latitude, longitude, Date.now(), extractClientIp((n) => req.headers.get(n)))
+    if (!presence.ok) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Vui lòng quét mã QR tại quầy bar của quán để hoàn tất chấm công.',
-        },
-        { status: 400 }
-      )
-    }
-
-    if (qr_code.startsWith('HOMIES_DYN_')) {
-      try {
-        // base64url có thể chứa dấu "_" nên tách chữ ký ở dấu "_" cuối cùng
-        const match = /^HOMIES_DYN_(.+)_([0-9a-f]{64})$/.exec(qr_code)
-        if (match) {
-          const payloadBase64 = match[1]
-          const clientSignature = match[2]
-          const decoded = Buffer.from(payloadBase64, 'base64url').toString('utf-8')
-
-          if (!verifyQrPayload(decoded, clientSignature)) {
-            return NextResponse.json(
-              {
-                success: false,
-                error: 'Mã QR không hợp lệ hoặc đã bị can thiệp chữ ký bảo mật.',
-              },
-              { status: 400 }
-            )
-          }
-
-          const [tokenStoreId, tokenTimestampStr] = decoded.split(':')
-          const tokenTimestamp = Number(tokenTimestampStr)
-
-          if (tokenStoreId && tokenStoreId !== store_id) {
-            return NextResponse.json(
-              {
-                success: false,
-                error: 'Mã QR không thuộc cơ sở bạn đang chấm công. Vui lòng quét đúng mã của quán.',
-              },
-              { status: 400 }
-            )
-          }
-
-          if (Date.now() - tokenTimestamp > 60000) {
-            return NextResponse.json(
-              {
-                success: false,
-                error: 'Mã QR đã hết hạn (chỉ có hiệu lực trong 60 giây). Vui lòng quét mã mới hiển thị tại quầy bar.',
-              },
-              { status: 400 }
-            )
-          }
-        } else {
-          return NextResponse.json(
-            { success: false, error: 'Mã QR không đúng định dạng an toàn của hệ thống' },
-            { status: 400 }
-          )
-        }
-      } catch {
-        return NextResponse.json(
-          { success: false, error: 'Mã QR không đúng định dạng an toàn của hệ thống' },
-          { status: 400 }
-        )
-      }
-    } else {
-      // Mã tĩnh chỉ chấp nhận mã PIN của cửa hàng (mã chi nhánh như "store-001" dễ đoán nên không còn được chấp nhận)
-      if (!store.pin_code || qr_code !== store.pin_code) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Mã QR không khớp với cơ sở bạn đang chấm công.',
-          },
-          { status: 400 }
-        )
-      }
-    }
-
-    const allowedRadius = store.checkin_radius_meters || 100
-
-    // 4. Đối soát khoảng cách GPS (Bắt buộc Dual-Verification: Bán kính cho phép <= 100m)
-    if (distanceMeters > allowedRadius) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Vị trí chấm công không hợp lệ: Bạn đang cách ${store.name} ${distanceMeters}m (bán kính cho phép tối đa là ${allowedRadius}m).`,
-          distance_meters: distanceMeters,
-          allowed_radius_meters: allowedRadius,
+          error: presence.error,
+          distance_meters: presence.distance,
+          allowed_radius_meters: store.checkin_radius_meters || 100,
           store_name: store.name,
         },
         { status: 400 }
       )
     }
+    const distanceMeters = presence.distance ?? 0
 
     const now = new Date()
     // Máy chủ Vercel chạy giờ UTC: ngày và phút trong ngày phải quy về giờ Việt Nam
@@ -232,13 +174,13 @@ export async function POST(req: NextRequest) {
       store_name: store.name,
       shift_id: targetShiftId,
       check_in_time: now.toISOString(),
-      check_in_lat: userLat,
-      check_in_lng: userLng,
+      check_in_lat: Number(latitude) || 0,
+      check_in_lng: Number(longitude) || 0,
       check_in_distance_meters: distanceMeters,
       status,
       is_late: isLate,
       late_minutes: lateMinutes,
-      qr_code: qr_code || 'QR_VALIDATED',
+      qr_code: presence.method === 'wifi' ? 'WIFI_VALIDATED' : (qr_code || 'QR_VALIDATED'),
       date: todayStr,
       off_schedule: offSchedule,
     }
@@ -280,7 +222,9 @@ export async function POST(req: NextRequest) {
         ? `Chấm công ghi nhận đi trễ ${lateMinutes} phút (đã chuyển vào Sổ lỗi KPI)`
         : offSchedule
           ? `Đã chấm công tại ${store.name}, nhưng hôm nay bạn không có ca trong lịch đã chốt. Quản lý sẽ kiểm tra lại.`
-          : `Chấm công thành công tại ${store.name} (cách ${distanceMeters}m)`,
+          : presence.method === 'wifi'
+            ? `Chấm công thành công tại ${store.name} qua Wi-Fi quán`
+            : `Chấm công thành công tại ${store.name} (cách ${distanceMeters}m)`,
       data: newLog,
     })
   } catch (error: unknown) {

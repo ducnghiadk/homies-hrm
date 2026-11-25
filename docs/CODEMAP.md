@@ -44,6 +44,9 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `src/lib/server/attendance-schedule.ts`: tim ca theo lich da chot truoc, kiem tra QR + GPS khi tan ca.
   + `src/lib/scheduling/publish-validator.ts`: kiem tra tuan lich truoc khi chot (trung ca, nhan vien da nghi, gio/ngay, gio/tuan, nghi giua ca) (co test).
   + `src/lib/payroll/late-penalty.ts`: tinh phat di tre 4 che do theo don gia that (co test).
+  + `src/lib/attendance/checkin-method.ts`: ham thuan cach cham cong theo chi nhanh (Wi-Fi quan theo IP cong cong / ma QR / ca hai), lay IP nguoi goi (co test).
+  + `src/app/api/stores/checkin-method/route.ts`: GET/POST cai dat cach cham cong tung chi nhanh va nut "Dung mang hien tai" (quan ly chi nhanh, CEO, HR).
+  + `src/components/settings/StoreCheckinMethodPanel.tsx`: khung cai dat cham cong Wi-Fi tai `/settings/wifi`.
   + `src/components/settings/OperationSettingsPanel.tsx`: khung "Cai dat van hanh" o tab Dang ky cua `/settings/schedule-rules`.
   + `src/app/api/attendance/checkin/route.ts`: POST cham cong ma QR + GPS doi soat ban kinh <= 100m (loai bo Wifi Simulator).
   + `src/app/api/attendance/qr-token/route.ts`: GET sinh ma QR dong doi token sau 30s het han 60s cho Kiosk/POS.
