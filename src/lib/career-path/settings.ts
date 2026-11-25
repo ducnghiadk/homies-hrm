@@ -78,6 +78,8 @@ export interface CareerPathSettings {
   grades: CareerGradeConfig[]
   ft_pay_method: FullTimePayMethod
   skills: CareerSkillConfig[]
+  /** Mức (1-3) coi là "đạt" với tiêu chuẩn chung bắt buộc (ATTP, SOP...). */
+  common_pass_level: number
   approval: CareerApprovalConfig
   m1: CareerM1Config
 }
@@ -151,6 +153,7 @@ export function getDefaultCareerPathSettings(): CareerPathSettings {
       skill('AD03', 'Hướng dẫn', null, 'advanced', 'Làm mẫu, quan sát, sửa lỗi, kiểm tra lại'),
       skill('AD04', 'Cải tiến', null, 'advanced', 'Nhận biết điểm nghẽn, đề xuất có căn cứ'),
     ],
+    common_pass_level: 2,
     approval: {
       assessor_roles: ['store_manager', 'area_manager', 'hr_admin', 'ceo'],
       approver_roles: ['ceo', 'hr_admin'],
@@ -223,6 +226,9 @@ export function validateCareerPathSettings(s: CareerPathSettings): string[] {
     if (!s.skills.some((sk) => sk.active && sk.group === 'core' && sk.position === pos)) {
       errors.push(`Vị trí ${pos === 'cashier' ? 'Thu ngân' : 'Pha chế'} chưa có kỹ năng chính nào đang dùng.`)
     }
+  }
+  if (!isWholeNonNegative(s.common_pass_level) || s.common_pass_level < 1 || s.common_pass_level > 3) {
+    errors.push('Mức đạt tiêu chuẩn chung phải từ 1 đến 3.')
   }
   const a = s.approval
   if (!a.approver_roles?.length) errors.push('Phải chọn ít nhất một vai trò được duyệt nâng bậc.')
