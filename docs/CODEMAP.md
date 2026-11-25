@@ -39,6 +39,12 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `src/app/forgot-password/page.tsx`: trang Quen mat khau voi Hotline 1 phut 0919.246.273 va form gui yeu cau cap lai.
   + `src/app/api/shifts/approve/route.ts`: POST duyet ca lam viec (kiem tra quyen Store Manager / CEO).
   + `src/app/api/attendance/route.ts`: GET & POST lich su cham cong, loc theo chi nhanh, ngay, thang va nhan vien.
+  + `src/app/api/operation-settings/route.ts`: GET/POST cai dat van hanh (han chot nop lich ranh, cach tinh gio cong, di tre); chi CEO/HR duoc sua.
+  + `src/lib/attendance/operation-settings.ts`: ham thuan cai dat van hanh, tinh han chot, gio cong, chon ca doi soat (co test).
+  + `src/lib/server/attendance-schedule.ts`: tim ca theo lich da chot truoc, kiem tra QR + GPS khi tan ca.
+  + `src/lib/scheduling/publish-validator.ts`: kiem tra tuan lich truoc khi chot (trung ca, nhan vien da nghi, gio/ngay, gio/tuan, nghi giua ca) (co test).
+  + `src/lib/payroll/late-penalty.ts`: tinh phat di tre 4 che do theo don gia that (co test).
+  + `src/components/settings/OperationSettingsPanel.tsx`: khung "Cai dat van hanh" o tab Dang ky cua `/settings/schedule-rules`.
   + `src/app/api/attendance/checkin/route.ts`: POST cham cong ma QR + GPS doi soat ban kinh <= 100m (loai bo Wifi Simulator).
   + `src/app/api/attendance/qr-token/route.ts`: GET sinh ma QR dong doi token sau 30s het han 60s cho Kiosk/POS.
   + `src/app/api/requests/route.ts`: GET & POST danh sach don tu (nghi phep, doi ca, tam ung, giai trinh cham cong, ca hoc viec), tao don moi va phe duyet don.

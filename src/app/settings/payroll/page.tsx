@@ -1847,6 +1847,8 @@ function SettingsPayrollContent() {
                           {[
                             { id: 'fixed', label: 'Phạt cố định mỗi lần', desc: 'Đồng giá cho mọi lần vi phạm (VD: 50.000đ/lần)' },
                             { id: 'tiered', label: 'Bậc thang số phút', desc: 'Muộn ít phạt nhẹ, muộn nhiều phạt nặng' },
+                            { id: 'per_minute', label: 'Trừ theo số phút trễ', desc: 'Trừ đúng tiền những phút đến trễ theo đơn giá giờ của từng người' },
+                            { id: 'none', label: 'Không phạt tiền', desc: 'Chỉ ghi nhận đi trễ để nhắc nhở, không trừ lương' },
                           ].map(modeItem => {
                             const isSelected = (policy.latePenaltyPolicy?.mode ?? 'fixed') === modeItem.id
                             return (
@@ -1895,7 +1897,40 @@ function SettingsPayrollContent() {
                     </div>
 
                     {/* Hàng 2: Chi tiết mức phạt tương ứng với chế độ đang chọn */}
-                    {(policy.latePenaltyPolicy?.mode ?? 'fixed') === 'fixed' ? (
+                    {(() => {
+                      const lateMode = policy.latePenaltyPolicy?.mode ?? 'fixed'
+                      if (lateMode === 'none') return (
+                      <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 text-xs text-gray-600">
+                        Đi trễ vẫn được ghi nhận trên bảng công và sổ lỗi, nhưng không trừ tiền trên bảng lương.
+                      </div>
+                      )
+                      if (lateMode === 'per_minute') return (
+                      <div className="rounded-xl border border-rose-100 bg-rose-50/40 p-4 grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                        <label className="text-[11px] text-gray-700 block">Hệ số nhân
+                          <input type="number" min={0.5} max={5} step={0.5} disabled={!canEdit}
+                            value={policy.latePenaltyPolicy?.perMinuteMultiplier ?? 1}
+                            onChange={e => updateLatePolicy('perMinuteMultiplier', Math.max(0.5, Number(e.target.value) || 1))}
+                            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-mono" />
+                          <span className="text-[10px] text-gray-500 block mt-1">1 = trừ đúng tiền các phút trễ; 2 = trừ gấp đôi</span>
+                        </label>
+                        <div className="text-[11px] text-gray-700">
+                          <span className="block mb-1">Trừ tối đa mỗi lần (0 = không giới hạn)</span>
+                          <MoneyNumberInput
+                            value={policy.latePenaltyPolicy?.perMinuteMaxPerOccurrence ?? 0}
+                            step={10000}
+                            disabled={!canEdit}
+                            onChange={val => updateLatePolicy('perMinuteMaxPerOccurrence', val)}
+                          />
+                        </div>
+                        <label className="flex items-start gap-2 text-[11px] text-gray-700">
+                          <input type="checkbox" className="mt-0.5" disabled={!canEdit}
+                            checked={policy.latePenaltyPolicy?.perMinuteApplyToPartTime === true}
+                            onChange={e => updateLatePolicy('perMinuteApplyToPartTime', e.target.checked)} />
+                          <span>Trừ cả nhân viên bán thời gian. Mặc định tắt vì phút đến trễ của họ đã không được tính công (tránh phạt 2 lần).</span>
+                        </label>
+                      </div>
+                      )
+                      if (lateMode === 'fixed') return (
                       <div className="rounded-xl border border-rose-100 bg-rose-50/40 p-4 space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-xs font-bold text-gray-700">Mức phạt cố định mỗi lần vi phạm</span>
@@ -1914,7 +1949,8 @@ function SettingsPayrollContent() {
                         />
                         <span className="text-[11px] text-gray-500 block">Áp dụng từ lần đi muộn thứ {(policy.latePenaltyPolicy?.graceOccurrences ?? 2) + 1} trở đi</span>
                       </div>
-                    ) : (
+                      )
+                      return (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                         {/* Bậc 1: Muộn nhẹ */}
                         <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 space-y-2">
@@ -1931,7 +1967,12 @@ function SettingsPayrollContent() {
                               onChange={val => updateLatePolicy('tier1Amount', val)}
                             />
                           </div>
-                          <span className="text-[10px] text-gray-500 block">Vi phạm dưới {policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15} phút</span>
+                          <label className="text-[11px] text-gray-600 block">Đến tối đa (phút)
+                            <input type="number" min={1} max={120} disabled={!canEdit}
+                              value={policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15}
+                              onChange={e => updateLatePolicy('tier1MaxMinutes', Math.max(1, parseInt(e.target.value, 10) || 1))}
+                              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-mono" />
+                          </label>
                         </div>
 
                         {/* Bậc 2: Muộn vừa */}
@@ -1951,7 +1992,12 @@ function SettingsPayrollContent() {
                               onChange={val => updateLatePolicy('tier2Amount', val)}
                             />
                           </div>
-                          <span className="text-[10px] text-gray-500 block">Vi phạm từ {(policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15) + 1} đến {policy.latePenaltyPolicy?.tier2MaxMinutes ?? 30} phút</span>
+                          <label className="text-[11px] text-gray-600 block">Đến tối đa (phút)
+                            <input type="number" min={(policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15) + 1} max={240} disabled={!canEdit}
+                              value={policy.latePenaltyPolicy?.tier2MaxMinutes ?? 30}
+                              onChange={e => updateLatePolicy('tier2MaxMinutes', Math.max((policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15) + 1, parseInt(e.target.value, 10) || 0))}
+                              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-mono" />
+                          </label>
                         </div>
 
                         {/* Bậc 3: Muộn nặng */}
@@ -1960,19 +2006,38 @@ function SettingsPayrollContent() {
                             <span className="text-xs font-bold text-rose-900">Bậc 3: Muộn nặng</span>
                             <span className="font-mono text-xs font-bold text-rose-800">&gt; {policy.latePenaltyPolicy?.tier2MaxMinutes ?? 30} phút</span>
                           </div>
-                          <div>
-                            <label className="text-[11px] text-gray-600 block mb-1">Mức phạt (VNĐ)</label>
-                            <MoneyNumberInput
-                              value={policy.latePenaltyPolicy?.tier3Amount ?? 100000}
-                              step={10000}
-                              disabled={!canEdit}
-                              onChange={val => updateLatePolicy('tier3Amount', val)}
-                            />
-                          </div>
+                          <label className="flex items-center gap-2 text-[11px] text-gray-700">
+                            <input type="checkbox" disabled={!canEdit}
+                              checked={policy.latePenaltyPolicy?.tier3HalfShiftDeduction === true}
+                              onChange={e => updateLatePolicy('tier3HalfShiftDeduction', e.target.checked)} />
+                            Trừ 50% tiền ca (theo đơn giá từng người)
+                          </label>
+                          {policy.latePenaltyPolicy?.tier3HalfShiftDeduction !== true && (
+                            <div>
+                              <label className="text-[11px] text-gray-600 block mb-1">Mức phạt (VNĐ)</label>
+                              <MoneyNumberInput
+                                value={policy.latePenaltyPolicy?.tier3Amount ?? 100000}
+                                step={10000}
+                                disabled={!canEdit}
+                                onChange={val => updateLatePolicy('tier3Amount', val)}
+                              />
+                            </div>
+                          )}
                           <span className="text-[10px] text-gray-500 block">Vi phạm nghiêm trọng trên {policy.latePenaltyPolicy?.tier2MaxMinutes ?? 30} phút</span>
                         </div>
                       </div>
-                    )}
+                      )
+                    })()}
+                    <div className="mt-3.5 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-gray-700 block">Giữ thưởng chuyên cần khi đi trễ tối đa</span>
+                        <span className="text-[11px] text-gray-500 block">0 = đi trễ 1 lần là mất thưởng chuyên cần tháng đó</span>
+                      </div>
+                      <input type="number" min={0} max={10} step={1} disabled={!canEdit}
+                        value={policy.latePenaltyPolicy?.attendanceBonusMaxLate ?? 0}
+                        onChange={e => updateLatePolicy('attendanceBonusMaxLate', Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        className="w-24 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-mono font-bold" />
+                    </div>
                   </div>
 
                   {/* Quy Chuẩn Ca Làm Việc F&B */}
