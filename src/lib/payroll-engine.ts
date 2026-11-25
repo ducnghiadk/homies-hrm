@@ -425,6 +425,8 @@ export interface AttendanceSummaryForPayroll {
   overtimeHoursWeekday?: number
   overtimeHoursWeekend?: number
   overtimeHoursHoliday?: number
+  /** Giờ làm trong giờ chuẩn vào ngày lễ (full-time được trả thêm cho đủ mức ngày lễ). */
+  holidayRegularHours?: number
   totalHours: number
   soCaChoDuyet: number
   soCaChuaCheckOut: number
@@ -494,6 +496,7 @@ function summarizeAttendanceRecords(
   let soCaChoDuyet = 0
   let soCaChuaCheckOut = 0
   const dailyHoursMap = new Map<string, number>()
+  const dailyRecordedOtMap = new Map<string, number>()
   const anomalies: PayrollAnomaly[] = []
 
   for (const r of records) {
@@ -515,17 +518,21 @@ function summarizeAttendanceRecords(
     const recHours = r.total_hours || 0
     const policy = getActivePayrollPolicy()
     const minShiftHours = policy.shiftRules?.minShiftHours ?? 2
-    const countsAsShift = recHours >= minShiftHours || recHours === 0
+    // Ca 0 giờ (chấm vào rồi ra ngay, hoặc giờ không hợp lệ) không tính là ca/ngày công.
+    // Dữ liệu cũ không ghi số giờ (undefined) vẫn được tính như trước.
+    const hoursKnown = typeof r.total_hours === 'number'
+    const countsAsShift = hoursKnown ? recHours >= minShiftHours : true
+    const countsAsDay = hoursKnown ? recHours > 0 : true
 
     switch (r.status) {
       case 'on_time':
       case 'early':
         if (countsAsShift) totalShifts++
-        if (r.date) workedDates.add(r.date)
+        if (r.date && countsAsDay) workedDates.add(r.date)
         break
       case 'late':
         if (countsAsShift) totalShifts++
-        if (r.date) workedDates.add(r.date)
+        if (r.date && countsAsDay) workedDates.add(r.date)
         lateCount++
         break
       case 'leave':
@@ -553,8 +560,30 @@ function summarizeAttendanceRecords(
     totalHours += recHours
     if (r.date) {
       dailyHoursMap.set(r.date, (dailyHoursMap.get(r.date) ?? 0) + recHours)
+      if (otH > 0) dailyRecordedOtMap.set(r.date, (dailyRecordedOtMap.get(r.date) ?? 0) + otH)
     }
   }
+
+  // Tăng ca full-time lấy từ giờ chấm công thực tế: ngày nào làm quá giờ chuẩn mà
+  // dữ liệu chấm công chưa ghi sẵn giờ tăng ca thì phần vượt được tính là tăng ca.
+  const stdHoursPerDay = (() => {
+    const p = getActivePayrollPolicy()
+    return typeof p.standardHoursPerDay === 'number' && p.standardHoursPerDay > 0 ? p.standardHoursPerDay : 8
+  })()
+  let holidayRegularHours = 0
+  for (const [date, dayHours] of dailyHoursMap) {
+    const recordedOt = dailyRecordedOtMap.get(date) ?? 0
+    if (isHolidayDay(date)) {
+      holidayRegularHours += Math.min(Math.max(dayHours - recordedOt, 0), stdHoursPerDay)
+    }
+    if (recordedOt > 0 || dayHours <= stdHoursPerDay) continue
+    const extra = Math.round((dayHours - stdHoursPerDay) * 100) / 100
+    overtimeHours += extra
+    if (isHolidayDay(date)) overtimeHoursHoliday += extra
+    else if (isWeekendDay(date)) overtimeHoursWeekend += extra
+    else overtimeHoursWeekday += extra
+  }
+  holidayRegularHours = Math.round(holidayRegularHours * 100) / 100
 
   const workDays = workedDates.size > 0 ? workedDates.size : totalShifts
 
@@ -647,10 +676,8 @@ function summarizeAttendanceRecords(
             hasQualifyingBreak = true
             break
           }
-        } else {
-          hasQualifyingBreak = true
-          break
         }
+        // Thiếu giờ ra ca trước hoặc giờ vào ca sau: không đủ căn cứ để trả phụ cấp ca gãy
       }
 
       if (hasQualifyingBreak) {
@@ -671,6 +698,7 @@ function summarizeAttendanceRecords(
     overtimeHoursWeekday,
     overtimeHoursWeekend,
     overtimeHoursHoliday,
+    holidayRegularHours,
     totalHours,
     soCaChoDuyet,
     soCaChuaCheckOut,
@@ -1032,7 +1060,12 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     absentDeduction = 0
   } else {
     const effectiveDays = att.workDays + att.leavePaid
-    baseEarned = Math.round(baseSalary * (effectiveDays / standardDays))
+    // Lương cơ bản tối đa đủ số ngày công chuẩn; ngày làm vượt chuẩn trả theo hệ số ngày nghỉ (mặc định 200%)
+    const paidDays = Math.min(effectiveDays, standardDays)
+    const extraDays = Math.max(0, att.workDays - Math.max(0, standardDays - att.leavePaid))
+    baseEarned = Math.round(baseSalary * (paidDays / standardDays))
+    const restDayRate = policy.rates?.otWeekend || 2.0
+    const extraDaysAmount = Math.round((baseSalary / standardDays) * extraDays * restDayRate)
 
     // ── Step 4: Overtime (BUG-G FIX: differentiate weekday, weekend, holiday rates)
     const otWeekday = att.overtimeHoursWeekday ?? att.overtimeHours
@@ -1041,13 +1074,24 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     const otWeekdayAmt = calculateOvertimeAmount(baseSalary, otWeekday, 'weekday')
     const otWeekendAmt = calculateOvertimeAmount(baseSalary, otWeekend, 'weekend')
     const otHolidayAmt = calculateOvertimeAmount(baseSalary, otHoliday, 'holiday')
-    overtimeAmount = otWeekdayAmt + otWeekendAmt + otHolidayAmt
-    overtimeHoursToReport = att.overtimeHours
     const standardHoursPerDay = (typeof policy.standardHoursPerDay === 'number' && policy.standardHoursPerDay > 0)
       ? policy.standardHoursPerDay
       : 8
     const normalHourlyRate = baseSalary / standardDays / standardHoursPerDay
-    overtimeTaxExempt = calculateOvertimeTaxExemption(overtimeAmount, otWeekday + otWeekend + otHoliday, normalHourlyRate)
+    // Làm trong giờ chuẩn vào ngày lễ: lương ngày đã có 100%, trả thêm phần chênh cho đủ hệ số ngày lễ (mặc định 300%)
+    const holidayRate = policy.rates?.otHoliday || 3.0
+    const holidayPremium = Math.round((att.holidayRegularHours || 0) * normalHourlyRate * Math.max(0, holidayRate - 1))
+    overtimeAmount = otWeekdayAmt + otWeekendAmt + otHolidayAmt + extraDaysAmount + holidayPremium
+    overtimeHoursToReport = att.overtimeHours
+    const extraDaysHours = extraDays * standardHoursPerDay
+    overtimeTaxExempt = calculateOvertimeTaxExemption(
+      otWeekdayAmt + otWeekendAmt + otHolidayAmt,
+      otWeekday + otWeekend + otHoliday,
+      normalHourlyRate,
+    )
+      + calculateOvertimeTaxExemption(extraDaysAmount, extraDaysHours, normalHourlyRate)
+      // Phần trả thêm ngày lễ đều là phần chênh so với lương thường nên được miễn thuế toàn bộ
+      + holidayPremium
 
     dailyRate = Math.round(baseSalary / standardDays)
     absentDeduction = att.absentDays * dailyRate
