@@ -79,6 +79,8 @@ const ROUTE_PERMISSIONS: RoutePermission[] = [
       '/settings/master-data',
       '/settings/organization',
       '/settings/branches',
+      '/settings/career-path',
+      '/career-path/placement',
     ],
     requiredRoles: ['hr_admin', 'ceo'],
   },

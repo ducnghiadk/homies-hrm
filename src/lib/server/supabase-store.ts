@@ -38,6 +38,9 @@ export const PERSISTED_KEYS = [
   'incidents',
   'notifications',
   'ipos_integration',
+  'career_settings',
+  'career_placements',
+  'career_grade_history',
 ] as const
 
 const TABLE_NAME = 'homies_runtime_store'

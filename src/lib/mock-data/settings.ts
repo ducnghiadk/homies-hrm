@@ -56,6 +56,12 @@ export const settingItems: SettingItem[] = [
     href: '/settings/bsc', status: 'completed', statusText: 'Chuẩn Homies • Auto-Lock',
     isRequired: true, setupOrder: 3.5,
   },
+  {
+    id: 'career-path', category: 'payroll', icon: '🪜', iconBg: 'bg-indigo-100',
+    title: 'Lộ Trình Thăng Tiến', description: 'Bậc T0 → G4 theo vị trí chính, mốc tháng/giờ, mức cộng lương, kỹ năng và người duyệt',
+    href: '/settings/career-path', status: 'in_progress', statusText: 'Playbook V7',
+    isRequired: false, setupOrder: 3.6,
+  },
 
   // === 4. PHÂN CA & CHẤM CÔNG ===
   {
