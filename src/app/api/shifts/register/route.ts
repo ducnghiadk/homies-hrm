@@ -14,6 +14,11 @@ import {
 } from '@/lib/server/db'
 import { isIposModuleEnabled } from '@/lib/server/data-mode'
 import { fetchIposShiftRegistrations } from '@/lib/services/ipos/ipos-cloud-client'
+import {
+  getAvailabilityDeadline,
+  isAvailabilityDeadlinePassed,
+  normalizeOperationSettings,
+} from '@/lib/attendance/operation-settings'
 
 // 1. GET: Quản lý lấy danh sách ca đăng ký từ Database máy chủ & iPOS Cloud (nhân viên chỉ xem ca của chính mình)
 export async function GET(req: NextRequest) {
@@ -151,6 +156,7 @@ export async function GET(req: NextRequest) {
       count: list.length,
       week_status: weekMeta?.status || 'draft',
       week_meta: weekMeta,
+      availability_deadline: buildDeadlineInfo(db, normWeekFilter),
       data: list,
     })
   } catch (error: unknown) {
@@ -248,6 +254,29 @@ export async function POST(req: NextRequest) {
           },
           { status: 409 }
         )
+      }
+    }
+
+    // 0b. HẠN CHÓT NỘP LỊCH RẢNH (theo Cài đặt vận hành). Quản lý không bị chặn.
+    if (!isManager) {
+      const deadlineSettings = normalizeOperationSettings(db.operation_settings).availability_deadline
+      for (const item of rawItems) {
+        const checkDate = String(item.date || '').slice(0, 10)
+        const checkWeekRaw = checkDate || String(item.week_start_date || body.week_start_date || '')
+        const checkWeekStart = checkWeekRaw ? getCalendarWeekStart(checkWeekRaw) : ''
+        if (checkWeekStart && isAvailabilityDeadlinePassed(checkWeekStart, deadlineSettings)) {
+          const dl = getAvailabilityDeadline(checkWeekStart, deadlineSettings)
+          const [y, m, d] = dl.date.split('-')
+          return NextResponse.json(
+            {
+              success: false,
+              locked: true,
+              code: 'AVAILABILITY_DEADLINE_PASSED',
+              error: `Đã quá hạn nộp lịch rảnh tuần này (hạn chót ${dl.time} ngày ${d}/${m}/${y}). Vui lòng liên hệ quản lý nếu cần thay đổi.`,
+            },
+            { status: 409 }
+          )
+        }
       }
     }
 
@@ -381,5 +410,18 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Lỗi hệ thống'
     return NextResponse.json({ success: false, error: message }, { status: 500 })
+  }
+}
+
+/** Thông tin hạn chót nộp lịch rảnh của tuần đang xem (để màn hình nhân viên hiển thị). */
+function buildDeadlineInfo(db: Awaited<ReturnType<typeof getServerDb>>, weekStart: string | null) {
+  const settings = normalizeOperationSettings(db.operation_settings).availability_deadline
+  if (!settings.enabled || !weekStart) return { enabled: settings.enabled }
+  const dl = getAvailabilityDeadline(weekStart, settings)
+  return {
+    enabled: true,
+    date: dl.date,
+    time: dl.time,
+    passed: isAvailabilityDeadlinePassed(weekStart, settings),
   }
 }

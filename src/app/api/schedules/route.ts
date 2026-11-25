@@ -19,6 +19,7 @@ import {
   type ServerScheduleWeekMeta,
   type ServerScheduleChangeLog,
 } from '@/lib/server/db'
+import { validateWeekForPublish, type PublishItem, type PublishRule } from '@/lib/scheduling/publish-validator'
 
 function ensureOfficialDbArrays(db: ServerDatabaseSchema) {
   if (!Array.isArray(db.official_schedules)) db.official_schedules = []
@@ -359,6 +360,9 @@ export async function POST(req: NextRequest) {
       const normWeekEnd = getCalendarWeekEnd(normWeekStart)
       const nowIso = new Date().toISOString()
 
+      // Giữ bản sao để hoàn tác nếu lịch không qua bước kiểm tra
+      const schedulesSnapshot: ServerOfficialSchedule[] = JSON.parse(JSON.stringify(db.official_schedules || []))
+
       // Nếu client truyền kèm danh sách sync_items chưa kịp lưu riêng lẻ, hợp nhất trước khi chốt
       if (Array.isArray(body.sync_items) && body.sync_items.length > 0) {
         for (const raw of body.sync_items) {
@@ -403,6 +407,48 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // KIỂM TRA TRÊN MÁY CHỦ trước khi chốt: trùng giờ, nhân sự đã nghỉ, quy tắc xếp ca đang bật.
+      const toPublishItem = (s: ServerOfficialSchedule): PublishItem => {
+        const r = getShiftTimeRange(s.shift_id, db.shift_templates)
+        return { employee_id: s.employee_id, employee_name: s.employee_name, date: s.date, shift_id: s.shift_id, startMin: r.startMin, endMin: r.endMin }
+      }
+      const weekItems = db.official_schedules!.filter((s) => isScheduleInStoreWeek(s, storeId, normWeekStart, normWeekEnd))
+      const weekEmpIds = new Set(weekItems.map((s) => s.employee_id))
+      const otherItems = db.official_schedules!
+        .filter(
+          (s) =>
+            s.status === 'published' &&
+            weekEmpIds.has(s.employee_id) &&
+            s.date >= normWeekStart &&
+            s.date <= normWeekEnd &&
+            !isScheduleInStoreWeek(s, storeId, normWeekStart, normWeekEnd)
+        )
+        .map(toPublishItem)
+      const issues = validateWeekForPublish(weekItems.map(toPublishItem), {
+        otherItems,
+        inactiveEmployeeIds: db.employees
+          .filter((e) => e.status === 'resigned' || e.status === 'inactive' || e.account_status === 'bi_khoa')
+          .map((e) => e.id),
+        rules: (db.schedule_rules || []) as PublishRule[],
+      })
+      const blocking = issues.filter((i) => i.level === 'block')
+      if (blocking.length > 0) {
+        db.official_schedules = schedulesSnapshot
+        return NextResponse.json(
+          {
+            success: false,
+            code: 'PUBLISH_VALIDATION_FAILED',
+            error: `Chưa chốt được lịch: còn ${blocking.length} lỗi cần sửa. ${blocking
+              .slice(0, 3)
+              .map((i) => i.message)
+              .join(' ')}`,
+            issues,
+          },
+          { status: 422 }
+        )
+      }
+      const publishWarnings = issues.filter((i) => i.level === 'warning')
+
       const publishedItems: ServerOfficialSchedule[] = []
       for (const s of db.official_schedules!) {
         if (isScheduleInStoreWeek(s, storeId, normWeekStart, normWeekEnd)) {
@@ -444,6 +490,7 @@ export async function POST(req: NextRequest) {
         ...(persisted.cloudWarning ? { cloud_warning: persisted.cloudWarning } : {}),
         message: `Đã chốt lịch chính thức tuần ${normWeekStart} (${publishedItems.length} ca).`,
         published_count: publishedItems.length,
+        warnings: publishWarnings,
         week_meta: weekMeta,
         data: sortOfficialSchedules(publishedItems, db),
       })

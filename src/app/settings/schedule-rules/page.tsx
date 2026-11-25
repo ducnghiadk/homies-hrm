@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useAuthStore } from '@/store/auth-store'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
+import OperationSettingsPanel from '@/components/settings/OperationSettingsPanel'
 import { mockPositions } from '@/lib/mock-data'
 import { scheduleRulesAdapter } from '@/lib/adapters'
 import {
@@ -897,6 +898,7 @@ function ScheduleRulesContent() {
         {/* TAB 2: REGISTRATION & DEADLINE CONFIGURATION */}
         {activeTab === 'registration' && (
           <div className="space-y-4">
+            <OperationSettingsPanel canEdit={user?.role === 'ceo' || user?.role === 'hr_admin'} />
             
             {/* Header Overview Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs">
@@ -907,7 +909,7 @@ function ScheduleRulesContent() {
                 </div>
                 <span className="text-xs text-gray-400 hidden sm:inline">|</span>
                 <span className="text-xs text-gray-500 hidden sm:inline">
-                  Hạn chốt: Khóa trước {prefSettings.deadlineDays} ngày (23h59 {prefSettings.deadlineDays === 3 ? 'Thứ Sáu' : prefSettings.deadlineDays === 2 ? 'Thứ Bảy' : prefSettings.deadlineDays === 1 ? 'Chủ Nhật' : 'hàng tuần'})
+                  Hạn chót nộp lịch rảnh: xem mục “Cài đặt vận hành” phía trên
                 </span>
               </div>
 
@@ -988,63 +990,6 @@ function ScheduleRulesContent() {
                       <td className="py-4 px-4 align-middle">
                         <span className="text-xs text-gray-500 leading-relaxed">
                           Nhân viên truy cập mục <strong>Đăng ký ca</strong> trên app để gửi nguyện vọng.
-                        </span>
-                      </td>
-                    </tr>
-
-                    {/* DÒNG 2: Hạn chốt đóng đăng ký tự động */}
-                    <tr className={`transition-colors ${prefSettings.enabled ? 'hover:bg-primary-50/20' : 'bg-gray-50/40 opacity-60'}`}>
-                      <td className="py-4 px-5">
-                        <div className="flex items-start gap-3.5">
-                          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                            <Clock size={18} />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-gray-900 text-sm">Hạn chốt đóng đăng ký (Deadline)</span>
-                              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                                Tự động
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1 line-clamp-2 max-w-lg leading-relaxed">
-                              Số ngày tự động khóa đợt đăng ký trước Thứ Hai tuần làm việc tiếp theo.
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-4 px-4 text-center align-middle">
-                        <span className="inline-flex items-center text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
-                          Khóa 23h59
-                        </span>
-                      </td>
-
-                      <td className="py-4 px-4 align-middle">
-                        {prefSettings.enabled ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {[1, 2, 3, 5, 7].map(days => (
-                              <button
-                                key={days}
-                                type="button"
-                                onClick={() => updatePref('deadlineDays', days)}
-                                className={`py-1.5 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                                  prefSettings.deadlineDays === days
-                                    ? 'bg-primary-600 text-white border-primary-600 shadow-xs'
-                                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-primary-300 hover:bg-white'
-                                }`}
-                              >
-                                {days} ngày {days === 3 ? '★' : ''}
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400 italic">-</span>
-                        )}
-                      </td>
-
-                      <td className="py-4 px-4 align-middle">
-                        <span className="text-xs text-gray-600 bg-vanilla-50/80 p-2 rounded-xl border border-gray-200/60 block leading-relaxed">
-                          Ví dụ: Chốt trước <strong>{prefSettings.deadlineDays} ngày</strong> ➔ Khóa lúc <strong>23h59 {prefSettings.deadlineDays === 3 ? 'Thứ Sáu' : prefSettings.deadlineDays === 2 ? 'Thứ Bảy' : prefSettings.deadlineDays === 1 ? 'Chủ Nhật' : 'hàng tuần'}</strong>.
                         </span>
                       </td>
                     </tr>

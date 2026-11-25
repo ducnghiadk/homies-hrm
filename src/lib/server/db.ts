@@ -1,4 +1,5 @@
 import type { PitSettings } from '@/lib/payroll/pit'
+import type { OperationSettings } from '@/lib/attendance/operation-settings'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
@@ -231,6 +232,10 @@ export interface ServerAttendanceLog {
   total_hours?: number
   qr_code?: string
   date: string
+  /** Ca dùng để đối soát lấy từ đâu: lịch đã chốt, lịch rảnh hay không có ca */
+  schedule_source?: 'official' | 'availability' | 'none'
+  /** Chấm công khi không có ca trong lịch đã chốt */
+  off_schedule?: boolean
 }
 
 export interface ServerSalarySlip {
@@ -623,6 +628,8 @@ export interface ServerDatabaseSchema {
   bsc_settings?: ServerBscSettings
   /** Cài đặt thuế TNCN (giảm trừ, biểu thuế) đồng bộ từ Cài đặt lương để máy chủ tính thuế thưởng. */
   payroll_tax_settings?: PitSettings
+  /** Cài đặt vận hành: hạn chót nộp lịch rảnh, cách tính giờ công, ngưỡng đi trễ. */
+  operation_settings?: OperationSettings
   ipos_integration?: ServerIposIntegrationConfig
   notifications?: ServerNotification[]
   sessions: Record<string, { userId: string; role: string; email: string; createdAt: string; mustChangePassword?: boolean }>
