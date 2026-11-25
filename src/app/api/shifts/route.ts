@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedUser, isScheduleManagerRole } from '@/lib/server/auth-helper'
+import { getActiveUser, isScheduleManagerRole } from '@/lib/server/auth-helper'
 import {
   getServerDb,
   saveServerDb,
@@ -24,7 +24,7 @@ type CompatibilityShiftItem = (ServerShiftRegistration | MappedIposSchedule) & {
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await getAuthenticatedUser(req)
+    const auth = await getActiveUser(req)
     if (!auth) {
       return NextResponse.json(
         { success: false, error: 'Vui lòng đăng nhập để xem lịch ca làm việc.' },
@@ -205,7 +205,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await getAuthenticatedUser(req)
+    const auth = await getActiveUser(req)
     if (!auth) {
       return NextResponse.json(
         { success: false, error: 'Vui lòng đăng nhập để quản lý ca làm việc.' },

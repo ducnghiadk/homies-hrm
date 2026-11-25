@@ -1,5 +1,6 @@
 import { masterPositions, settingsPayroll } from '@/lib/mock-data-settings'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { DEFAULT_PIT_SETTINGS, type PitBracket, type PitSettings } from '@/lib/payroll/pit'
 import { isRealDbMode } from '@/lib/adapters/repository-config'
 import {
   type PayrollPolicyMeta,
@@ -109,6 +110,12 @@ export type PayrollPolicy = {
     dependentDeduction: number
     minRegionSalary: number
     maxInsuranceSalary: number
+    /** Biểu thuế TNCN lũy tiến theo tháng; thiếu thì dùng mặc định trong `@/lib/payroll/pit`. */
+    taxBrackets?: PitBracket[]
+    /** Khấu trừ cố định cho lao động bán thời gian / HĐ dưới 3 tháng. */
+    partTimeFlatTaxEnabled?: boolean
+    partTimeFlatTaxRate?: number
+    partTimeFlatTaxThreshold?: number
   }
 }
 
@@ -200,8 +207,12 @@ export function buildDefaultPayrollPolicy(): PayrollPolicy {
       { name: 'Thưởng chuyên cần', type: 'Điều kiện', amount: 500000, taxable: 'Tính PIT', appliesTo: 'Không đi trễ, không vắng' },
     ],
     legal: {
-      personalDeduction: 11000000,
-      dependentDeduction: 4400000,
+      personalDeduction: DEFAULT_PIT_SETTINGS.personalDeduction,
+      dependentDeduction: DEFAULT_PIT_SETTINGS.dependentDeduction,
+      taxBrackets: DEFAULT_PIT_SETTINGS.brackets,
+      partTimeFlatTaxEnabled: DEFAULT_PIT_SETTINGS.partTimeFlatTaxEnabled,
+      partTimeFlatTaxRate: DEFAULT_PIT_SETTINGS.partTimeFlatTaxRate,
+      partTimeFlatTaxThreshold: DEFAULT_PIT_SETTINGS.partTimeFlatTaxThreshold,
       maxInsuranceSalary: 29800000,
       minRegionSalary: 20000,
     },
@@ -713,4 +724,17 @@ function formatMoney(value: number) {
 
 function formatPercent(value: number) {
   return `${Math.round(value * 1000) / 10}%`
+}
+
+/** Cài đặt thuế TNCN đang áp dụng, lấy từ chính sách lương (Cài đặt lương). */
+export function getPitSettingsFromPolicy(policy: PayrollPolicy): PitSettings {
+  const legal = policy.legal || ({} as PayrollPolicy['legal'])
+  return {
+    personalDeduction: legal.personalDeduction ?? DEFAULT_PIT_SETTINGS.personalDeduction,
+    dependentDeduction: legal.dependentDeduction ?? DEFAULT_PIT_SETTINGS.dependentDeduction,
+    brackets: legal.taxBrackets ?? DEFAULT_PIT_SETTINGS.brackets,
+    partTimeFlatTaxEnabled: legal.partTimeFlatTaxEnabled ?? DEFAULT_PIT_SETTINGS.partTimeFlatTaxEnabled,
+    partTimeFlatTaxRate: legal.partTimeFlatTaxRate ?? DEFAULT_PIT_SETTINGS.partTimeFlatTaxRate,
+    partTimeFlatTaxThreshold: legal.partTimeFlatTaxThreshold ?? DEFAULT_PIT_SETTINGS.partTimeFlatTaxThreshold,
+  }
 }

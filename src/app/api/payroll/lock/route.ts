@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb } from '@/lib/server/db'
-import { getAuthenticatedUser } from '@/lib/server/auth-helper'
+import { getActiveUser } from '@/lib/server/auth-helper'
 
 // Chỉ CEO hoặc HR Admin mới có quyền khóa sổ lương
 const ALLOWED_PAYROLL_LOCK_ROLES = ['ceo', 'hr_admin']
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await getAuthenticatedUser(req)
+    const auth = await getActiveUser(req)
     if (!auth) {
       return NextResponse.json(
         { success: false, error: 'Vui lòng đăng nhập để thực hiện khóa bảng lương' },

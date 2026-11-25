@@ -1,5 +1,23 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-25 (Audit trước khi triển khai — Đợt 3 bảng lương, thuế TNCN và chấm công):
+  1) Nguyên nhân:
+     - Mức giảm trừ gia cảnh (11 triệu / 4,4 triệu) và biểu thuế 7 bậc viết cứng trong công thức, không còn đúng từ kỳ tính thuế 2026 và kế toán không tự chỉnh được.
+     - Tiền tăng ca bị tính thuế toàn bộ; lương thực nhận có thể âm; nhân viên part-time thiếu đơn giá bị đoán theo tên chức danh.
+     - `POST /api/payroll` nhận mọi số tiền (kể cả âm) và cho trình duyệt tự đổi trạng thái phiếu; duyệt thưởng BSC cộng thẳng vào lương không khấu trừ thuế, ghép phiếu theo tên và ghi đè cả kỳ đã khóa.
+     - Máy chủ chấm công so giờ UTC với giờ ca Việt Nam nên không bao giờ bắt được đi trễ trên Vercel; tìm ca trong kho lịch rảnh thay vì lịch đã chốt; lần đi trễ đầu tiên tự tạo phiếu lương nháp làm trang Bảng lương chỉ còn vài người.
+     - Trang `/checkin` chấm công bằng GPS hoặc "thủ công" ghi thẳng vào bộ nhớ trình duyệt, không qua QR + GPS ở máy chủ; tài khoản còn mật khẩu mặc định vẫn gọi được API.
+  2) Cách giải quyết:
+     - Tạo `src/lib/payroll/pit.ts` (hàm thuế thuần dùng chung), mặc định 15,5 triệu / 6,2 triệu và biểu 5 bậc; toàn bộ mức giảm trừ, biểu thuế, khấu trừ 10% part-time chỉnh tại Cài đặt lương (`PitSettingsPanel`), lưu kèm lịch sử phiên bản và đồng bộ lên máy chủ qua `/api/payroll/tax-settings` (`payroll_tax_settings`).
+     - Bộ tính lương: dùng cài đặt thuế, miễn thuế phần chênh tăng ca, chặn lương âm (gắn cảnh báo `luong_am`), không đoán đơn giá part-time.
+     - `/api/payroll`: kiểm tra số tiền, giữ nguyên trạng thái phiếu (chỉ khóa sổ qua route riêng), ghi người sửa.
+     - `/api/bsc/approve`: chặn khi kỳ lương đã khóa, ghép phiếu theo mã nhân viên, tạm khấu trừ thuế phần thưởng theo cài đặt (`bonus_tax_withheld`), đánh dấu `needs_recalculation`.
+     - `/api/attendance/checkin`: bắt buộc đăng nhập, giờ Việt Nam (`src/lib/time/vn-time.ts`), ưu tiên ca trong lịch đã chốt, đánh dấu `off_schedule`, bỏ hẳn việc tạo/sửa phiếu lương.
+     - `/checkin`: chỉ chấm công qua máy chủ với mã QR Kiosk (camera điện thoại mở `/checkin?qr=...`) hoặc mã PIN quán, kèm GPS; Kiosk sinh QR dạng đường dẫn.
+     - `getActiveUser` chặn tài khoản còn mật khẩu mặc định ở các API nghiệp vụ.
+  3) Lưu ý vận hành: kế toán cần kiểm tra lại số liệu thuế trong Cài đặt lương rồi bấm Lưu (nếu đang lưu 11 triệu / 4,4 triệu sẽ có cảnh báo); thuế thưởng BSC là số tạm khấu trừ, quyết toán lại khi bấm Tính lương; phiếu nháp cũ do lỗi đi trễ tạo ra cần kế toán xóa tay.
+  4) File liên quan: `src/lib/payroll/pit.ts`, `src/components/payroll/PitSettingsPanel.tsx`, `src/app/settings/payroll/page.tsx`, `src/lib/services/payroll/payroll-policy-service.ts`, `src/lib/payroll/policy-registry.ts`, `src/lib/payroll-engine.ts`, `src/app/api/payroll/route.ts`, `src/app/api/payroll/tax-settings/route.ts`, `src/app/api/bsc/approve/route.ts`, `src/app/api/attendance/checkin/route.ts`, `src/app/checkin/page.tsx`, `src/app/checkin/kiosk/page.tsx`, `src/lib/time/vn-time.ts`, `src/lib/server/auth-helper.ts`, `src/lib/server/db.ts`, `src/lib/server/supabase-store.ts`.
+
 - Đã fix 2026-11-25 (Audit bảo mật trước khi triển khai — Đợt 1 nghiêm trọng + Đợt 2 cao):
   1) Nguyên nhân:
      - API đăng nhập còn cửa hậu cho tài khoản CEO; khóa ký `AUTH_SECRET`/`QR_SECRET` có giá trị mặc định trong mã nguồn nên ai cũng có thể tự ký cookie vai trò và mã QR.

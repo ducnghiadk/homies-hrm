@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import { useAuthStore } from '@/store/auth-store'
 import AppShell from '@/components/layout/AppShell'
 import { getShiftById, type Attendance, type Schedule } from '@/lib/mock-data'
-import { saveOfflineCheckin, syncPendingCheckins, getPendingCount } from '@/lib/offline-checkin'
+import { syncPendingCheckins, getPendingCount } from '@/lib/offline-checkin'
 import { isEmployeeOnLeave } from '@/lib/leave-attendance-sync'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { calculateDistance, formatTime } from '@/lib/utils'
@@ -20,6 +20,7 @@ import {
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { ScheduleService } from '@/lib/services/schedule-service'
 import { AttendanceService } from '@/lib/services/attendance-service'
+import { getVnDateString } from '@/lib/time/vn-time'
 
 // Dynamically import Leaflet map (no SSR — uses window)
 const CheckinMap = dynamic(() => import('@/components/checkin/CheckinMap'), {
@@ -74,7 +75,7 @@ function CheckInPageContent() {
   const currentUser = user!
   const [store, setStore] = useState<StoreWithWifi | null>(null)
   const [storeLoadMessage, setStoreLoadMessage] = useState('Đang tải thông tin cửa hàng...')
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = getVnDateString()
 
   const [apiTodaySchedule, setApiTodaySchedule] = useState<Schedule | null>(null)
 
@@ -190,9 +191,27 @@ function CheckInPageContent() {
   const [isOfflineCheckin, setIsOfflineCheckin] = useState(false)
   const [checkinMethod, setCheckinMethod] = useState<CheckinMethod | null>(null)
   const [showQrModal, setShowQrModal] = useState(false)
+  // Mã QR động lấy từ đường link khi nhân viên dùng camera điện thoại quét mã trên Kiosk (…/checkin?qr=…)
+  const [scannedQr, setScannedQr] = useState<string | null>(null)
+  const [qrPurpose, setQrPurpose] = useState<'checkin' | 'checkout'>('checkin')
+  const [pinInput, setPinInput] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const watchIdRef = useRef<number | null>(null)
   const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevOnlineRef = useRef(true)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const qr = params.get('qr')
+    if (qr) {
+      setTimeout(() => setScannedQr(qr), 0)
+      // Xóa mã khỏi thanh địa chỉ để không dùng lại khi tải lại trang
+      params.delete('qr')
+      const query = params.toString()
+      window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+    }
+  }, [])
 
   const noSchedule = !todaySchedule
   const targetStoreId = todaySchedule?.store_id || currentUser.store_id
@@ -351,77 +370,84 @@ function CheckInPageContent() {
     prevOnlineRef.current = isOnline
   }, [isOnline, currentUser.id, todaySchedule?.shift_id])
 
-  // ─── Check-in handler ───
-  const getAttendanceDecision = () => {
-    if (gpsInRange && distance !== null) {
-      return {
-        method: 'gps' as const,
-        distanceMeters: distance,
-        ghiChuViTri: undefined,
-      }
-    }
-
-    const roundedDistance = distance === null ? null : Math.round(distance)
-    return {
-      method: 'thu_cong' as const,
-      distanceMeters: roundedDistance ?? (store ? store.checkin_radius_meters + 1 : 0),
-      ghiChuViTri: roundedDistance === null ? 'Không có GPS' : `Ngoài vùng: cách ${roundedDistance}m`,
-    }
+  const showError = (message: string, ms = 4000) => {
+    setToastTone('error')
+    setToast(message)
+    setTimeout(() => setToast(null), ms)
   }
 
-  const confirmManualAttendance = (actionLabel: string) => {
-    const locationDetail = distance === null
-      ? 'Không có GPS.'
-      : `Khoảng cách thực tế: ${Math.round(distance)}m.`
-    return window.confirm(`${actionLabel} chưa được xác minh bằng GPS.\n${locationDetail}\nCa này sẽ cần quản lý duyệt`)
+  /** Mở hộp quét mã: hướng dẫn dùng camera quét mã Kiosk hoặc nhập mã PIN cửa hàng. */
+  const requestQr = (purpose: 'checkin' | 'checkout') => {
+    setQrPurpose(purpose)
+    setPinInput('')
+    setShowQrModal(true)
   }
 
-  const handleCheckin = async () => {
+  // ─── Check-in: bắt buộc mã QR của quán + GPS trong bán kính, máy chủ kiểm tra lại cả hai ───
+  const submitCheckin = async (qrCode: string) => {
     if (!store) {
-      setToastTone('error')
-      setToast(storeLoadMessage || 'Chưa có thông tin cửa hàng để check-in.')
-      setTimeout(() => setToast(null), 4000)
+      showError(storeLoadMessage || 'Chưa có thông tin cửa hàng để check-in.')
       return
     }
-
-    // ── Validate leave status ──
+    if (!isOnline) {
+      showError('Cần có mạng để chấm công. Vui lòng bật Wi-Fi hoặc 4G rồi thử lại.')
+      return
+    }
+    if (!userPos) {
+      showError('Chưa lấy được vị trí. Vui lòng bật định vị (GPS) cho trình duyệt rồi thử lại.')
+      return
+    }
     const leaveStatus = isEmployeeOnLeave(currentUser.id, todayStr)
     if (leaveStatus.onLeave) {
-      setToast(`Không thể check-in: Bạn đang nghỉ phép (${leaveStatus.leaveType || 'leave'})`)
-      setTimeout(() => setToast(null), 4000)
+      showError(`Không thể check-in: Bạn đang nghỉ phép (${leaveStatus.leaveType || 'leave'})`)
       return
     }
 
-    const decision = getAttendanceDecision()
-    if (decision.method === 'thu_cong' && !confirmManualAttendance('Check-in')) {
-      return
-    }
-    setCheckinMethod(decision.method)
-
-    const timeStr = formatTime(new Date())
-
-    if (isOnline) {
-      // ── Online: write directly ──
-      const result = await AttendanceService.checkinToday(
-        currentUser.id,
-        targetStoreId,
-        userPos?.lat,
-        userPos?.lng,
-        decision.distanceMeters,
-        shift?.id,
-        shift?.start_time,
-        { waitForDb: true, phuongThucCheckIn: decision.method, ghiChuViTri: decision.ghiChuViTri },
-      )
-      if (result.trangThai === 'that_bai' || !result.record) {
-        setToastTone('error')
-        setToast(`Check-in THẤT BẠI, chưa được ghi nhận.${result.loi ? ` ${result.loi}` : ''}`)
-        setTimeout(() => setToast(null), 4000)
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/attendance/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          employee_id: currentUser.id,
+          store_id: store.id,
+          latitude: userPos.lat,
+          longitude: userPos.lng,
+          qr_code: qrCode,
+          shift_id: shift?.id,
+        }),
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.success || !json.data) {
+        showError(`Check-in chưa được ghi nhận. ${json?.error || 'Lỗi kết nối máy chủ.'}`, 5000)
         return
       }
-      const record = result.record
+
+      const rec = json.data
+      const record: Attendance = {
+        id: rec.id,
+        org_id: 'org-001',
+        employee_id: rec.employee_id,
+        store_id: rec.store_id,
+        shift_id: rec.shift_id || shift?.id || '',
+        date: rec.date,
+        check_in_time: rec.check_in_time,
+        check_in_lat: rec.check_in_lat,
+        check_in_lng: rec.check_in_lng,
+        check_in_distance_meters: rec.check_in_distance_meters || 0,
+        status: rec.status === 'late' ? 'late' : 'on_time',
+        late_minutes: rec.late_minutes || 0,
+        total_hours: 0,
+        overtime_hours: 0,
+        qr_code: rec.qr_code,
+      }
       setCheckinRecord(record)
+      setCheckinMethod('gps')
       setStatus('checked_in')
-      setIsOfflineCheckin(result.trangThai === 'chi_luu_may')
+      setIsOfflineCheckin(false)
+      setScannedQr(null)
+      setShowQrModal(false)
 
       confetti({
         particleCount: 120,
@@ -429,147 +455,60 @@ function CheckInPageContent() {
         origin: { y: 0.6 },
         colors: ['#3971B8', '#C8D69B', '#F6E6A5', '#1E9E57'],
       })
-
-      setToastTone(result.trangThai === 'da_luu_db' ? 'success' : 'warning')
-      setToast(
-        result.trangThai === 'da_luu_db'
-          ? `Đã check-in lúc ${timeStr}${decision.method === 'thu_cong' ? ' (Chờ quản lý duyệt)' : ''}`
-          : 'Đã lưu tạm trên máy, CHƯA vào hệ thống. Sẽ tự gửi lại khi có mạng.'
-      )
+      setToastTone(rec.status === 'late' || rec.off_schedule ? 'warning' : 'success')
+      setToast(json.message || `Đã check-in lúc ${formatTime(new Date())}`)
       setTimeout(() => {
         setToast(null)
         router.push('/')
       }, 2500)
-    } else {
-      // ── Offline: save to localStorage ──
-      saveOfflineCheckin(
-        currentUser.id,
-        targetStoreId,
-        userPos?.lat ?? 0,
-        userPos?.lng ?? 0,
-        decision.distanceMeters,
-        shift?.id,
-        shift?.start_time,
-      )
-      setStatus('checked_in')
-      setIsOfflineCheckin(true)
-      setPendingCount(getPendingCount(currentUser.id))
-
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.6 },
-        colors: ['#F6C85F', '#d97706', '#fbbf24'],
-      })
-
-      setToastTone('warning')
-      setToast('Đã lưu tạm trên máy, CHƯA vào hệ thống. Sẽ tự gửi lại khi có mạng.')
-      setTimeout(() => {
-        setToast(null)
-        router.push('/')
-      }, 3000)
+    } catch {
+      showError('Không thể kết nối máy chủ để chấm công. Vui lòng thử lại.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  // ─── QR Code Check-in handler (Fallback chống GPS yếu / treo) ───
-  const handleQrCheckin = async (qrCodeVal?: string) => {
-    if (!store) {
-      setToastTone('error')
-      setToast('Chưa có thông tin cửa hàng để quét QR.')
-      setTimeout(() => setToast(null), 3000)
+  const handleCheckin = async () => {
+    if (scannedQr) {
+      await submitCheckin(scannedQr)
       return
     }
+    requestQr('checkin')
+  }
 
-    const leaveStatus = isEmployeeOnLeave(currentUser.id, todayStr)
-    if (leaveStatus.onLeave) {
-      setToast(`Không thể check-in: Bạn đang nghỉ phép (${leaveStatus.leaveType || 'leave'})`)
-      setTimeout(() => setToast(null), 4000)
+  /** Người dùng nhập mã PIN cửa hàng trong hộp quét mã. */
+  const handlePinSubmit = async () => {
+    const code = pinInput.trim()
+    if (!code) {
+      showError('Vui lòng nhập mã PIN của quán.', 3000)
       return
     }
-
-    setShowQrModal(false)
-    setCheckinMethod('gps')
-    const timeStr = formatTime(new Date())
-    const qrIdentifier = qrCodeVal || `HOMIES-${store.id.toUpperCase()}-POS`
-
-    if (isOnline) {
-      const result = await AttendanceService.checkinToday(
-        currentUser.id,
-        targetStoreId,
-        store.latitude,
-        store.longitude,
-        0, // Coi như tại quầy
-        shift?.id,
-        shift?.start_time,
-        {
-          waitForDb: true,
-          phuongThucCheckIn: 'gps',
-          ghiChuViTri: `Quét QR quầy thu ngân: ${qrIdentifier}`,
-        },
-      )
-      if (result.trangThai === 'that_bai' || !result.record) {
-        setToastTone('error')
-        setToast(`Check-in QR thất bại.${result.loi ? ` ${result.loi}` : ''}`)
-        setTimeout(() => setToast(null), 4000)
-        return
-      }
-
-      setCheckinRecord(result.record)
-      setStatus('checked_in')
-      setIsOfflineCheckin(result.trangThai === 'chi_luu_may')
-
-      confetti({
-        particleCount: 140,
-        spread: 85,
-        origin: { y: 0.6 },
-        colors: ['#2F6FA8', '#F6C85F', '#1E9E57'],
-      })
-
-      setToastTone('success')
-      setToast(`✓ Đã xác thực có mặt bằng QR quầy thu ngân lúc ${timeStr}`)
-      setTimeout(() => {
-        setToast(null)
-        router.push('/')
-      }, 2500)
-    } else {
-      saveOfflineCheckin(
-        currentUser.id,
-        targetStoreId,
-        store.latitude,
-        store.longitude,
-        0,
-        shift?.id,
-        shift?.start_time,
-      )
-      setStatus('checked_in')
-      setIsOfflineCheckin(true)
-      setPendingCount(getPendingCount(currentUser.id))
-
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.6 },
-        colors: ['#F6C85F', '#d97706'],
-      })
-
-      setToastTone('warning')
-      setToast(`Đã lưu xác thực QR offline lúc ${timeStr}, sẽ gửi lại khi có mạng.`)
-      setTimeout(() => {
-        setToast(null)
-        router.push('/')
-      }, 3000)
-    }
+    if (qrPurpose === 'checkin') await submitCheckin(code)
+    else await submitCheckout(code)
   }
 
   // ─── Check-out handler ───
   const handleCheckout = async () => {
-    if (!store) return
+    if (scannedQr) {
+      await submitCheckout(scannedQr)
+      return
+    }
+    requestQr('checkout')
+  }
 
-    const decision = getAttendanceDecision()
-    if (decision.method === 'thu_cong' && !confirmManualAttendance('Check-out')) {
+  // Tan ca cũng phải quét mã của quán và đứng trong bán kính (chống về nhà rồi mới bấm tan ca)
+  const submitCheckout = async (qrCode: string) => {
+    if (!store) return
+    if (!isOnline) {
+      showError('Cần có mạng để ghi nhận tan ca.')
+      return
+    }
+    if (!userPos) {
+      showError('Chưa lấy được vị trí. Vui lòng bật định vị (GPS) rồi thử lại.')
       return
     }
 
+    setSubmitting(true)
     try {
       // Gọi trực tiếp POST /api/attendance với trạng thái check_out lên máy chủ
       const res = await fetch('/api/attendance', {
@@ -583,15 +522,18 @@ function CheckInPageContent() {
           status: 'check_out',
           action: 'check_out',
           check_out_time: new Date().toISOString(),
-          check_out_lat: userPos?.lat || store.latitude,
-          check_out_lng: userPos?.lng || store.longitude,
+          check_out_lat: userPos.lat,
+          check_out_lng: userPos.lng,
+          latitude: userPos.lat,
+          longitude: userPos.lng,
+          qr_code: qrCode,
           date: todayStr,
           shift_id: shift?.id,
           shift_end_time: shift?.end_time,
         }),
       })
 
-      const resJson = await res.json()
+      const resJson = await res.json().catch(() => null)
       if (!res.ok || !resJson?.success) {
         setToastTone('error')
         setToast(`Check-out thất bại: ${resJson?.error || 'Lỗi kết nối máy chủ'}`)
@@ -621,6 +563,8 @@ function CheckInPageContent() {
 
       setCheckinRecord(updatedRecord)
       setStatus('checked_out')
+      setScannedQr(null)
+      setShowQrModal(false)
 
       // Đồng bộ dự phòng cho local storage nếu có
       try {
@@ -647,6 +591,8 @@ function CheckInPageContent() {
       setToastTone('error')
       setToast(`Check-out thất bại: ${msg}`)
       setTimeout(() => setToast(null), 4000)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -776,7 +722,7 @@ function CheckInPageContent() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowQrModal(true)}
+                  onClick={() => requestQr('checkin')}
                   className="text-xs font-bold text-[#2F6FA8] bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
                 >
                   Quét QR
@@ -943,11 +889,11 @@ function CheckInPageContent() {
           {status !== 'checked_in' && status !== 'checked_out' && (
             <button
               type="button"
-              onClick={() => setShowQrModal(true)}
+              onClick={() => requestQr('checkin')}
               className="w-full py-3 rounded-2xl border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 text-sm font-bold flex items-center justify-center gap-2.5 transition-all shadow-xs cursor-pointer active:scale-[0.98]"
             >
               <QrCode size={18} className="text-sky-600" />
-              <span>Chấm công bằng QR Code (Dự phòng sóng yếu)</span>
+              <span>Quét mã QR hoặc nhập mã PIN của quán</span>
             </button>
           )}
         </div>
@@ -1001,7 +947,7 @@ function CheckInPageContent() {
                   <QrCode size={18} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-gray-900">Mã QR Chấm Công Tại Quầy</h3>
+                  <h3 className="text-sm font-extrabold text-gray-900">{qrPurpose === 'checkin' ? 'Xác nhận có mặt tại quán' : 'Xác nhận tan ca tại quán'}</h3>
                   <p className="text-[11px] text-gray-500">{store?.name}</p>
                 </div>
               </div>
@@ -1013,38 +959,43 @@ function CheckInPageContent() {
               </button>
             </div>
 
-            {/* QR Mock Display */}
-            <div className="bg-slate-50 border-2 border-dashed border-sky-300 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-3">
-              <div className="w-36 h-36 bg-white p-3 rounded-2xl shadow-inner border border-gray-200 flex flex-col items-center justify-center relative">
-                <QrCode size={110} className="text-slate-800" />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center shadow-md">
-                    <ScanLine size={18} />
-                  </div>
-                </div>
+            <div className="bg-slate-50 border border-sky-200 rounded-2xl p-4 space-y-2 text-left">
+              <div className="flex items-center gap-2 text-sky-800">
+                <Camera size={16} />
+                <span className="text-xs font-bold">Cách 1: Quét mã trên màn hình Kiosk</span>
               </div>
-              <div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 font-bold">
-                  {`HOMIES-${store?.id.toUpperCase()}-POS-VERIFY`}
-                </span>
-                <p className="text-xs text-gray-600 mt-2 font-medium">
-                  Mã QR tĩnh dán tại quầy thu ngân cơ sở
-                </p>
-                <p className="text-[11px] text-gray-400">
-                  Dùng khi sóng GPS trong quầy bar bị yếu hoặc chập chờn
-                </p>
-              </div>
+              <p className="text-xs text-gray-600 leading-relaxed">
+                Mở ứng dụng Camera của điện thoại, hướng vào mã QR trên màn hình Kiosk tại quầy rồi bấm vào đường link hiện ra.
+                Trang chấm công sẽ tự mở và bạn chỉ cần bấm {qrPurpose === 'checkin' ? 'Check-in' : 'Tan ca'}. Mã đổi sau mỗi 30 giây.
+              </p>
             </div>
 
-            {/* Action button */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-2">
+              <div className="flex items-center gap-2 text-gray-800">
+                <ScanLine size={16} />
+                <span className="text-xs font-bold">Cách 2: Nhập mã PIN của quán</span>
+              </div>
+              <p className="text-[11px] text-gray-500">Hỏi quản lý ca mã PIN. Vẫn cần bật định vị và đứng tại quán.</p>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={pinInput}
+                onChange={e => setPinInput(e.target.value)}
+                placeholder="Mã PIN"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-center text-lg tracking-widest font-bold"
+              />
+            </div>
+
             <div className="space-y-2 pt-1">
               <button
                 type="button"
-                onClick={() => handleQrCheckin(`HOMIES-${store?.id.toUpperCase()}-POS-VERIFY`)}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md hover:from-sky-500 hover:to-blue-600 cursor-pointer active:scale-[0.98] transition-all"
+                disabled={submitting}
+                onClick={() => { void handlePinSubmit() }}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md hover:from-sky-500 hover:to-blue-600 cursor-pointer active:scale-[0.98] transition-all disabled:opacity-60"
               >
-                <Camera size={16} />
-                Xác nhận đã quét mã tại quầy
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+                {qrPurpose === 'checkin' ? 'Check-in bằng mã PIN' : 'Tan ca bằng mã PIN'}
               </button>
               <button
                 type="button"

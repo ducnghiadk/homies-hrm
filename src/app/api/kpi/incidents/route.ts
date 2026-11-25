@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { OPERATOR_ROLES, canAccessStore, getAuthenticatedUser, getStorePinAccess, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
+import { OPERATOR_ROLES, canAccessStore, getActiveUser, getStorePinAccess, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, ServerViolationIncident } from '@/lib/server/db'
 
 // GET /api/kpi/incidents: Lấy danh sách vi phạm kỷ luật chấm công và sự cố vận hành
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 
     // Ai được ghi nhận: quản lý/trưởng ca đã đăng nhập, hoặc cổng công khai đã mở khóa bằng PIN của đúng chi nhánh.
     // Sự cố từ cổng PIN luôn ở trạng thái chờ duyệt.
-    const authUser = await getAuthenticatedUser(req)
+    const authUser = await getActiveUser(req)
     const pinStoreId = getStorePinAccess(req)
     let forcedStatus: 'proposed' | null = null
     if (authUser && hasRequiredRole(authUser.role, OPERATOR_ROLES)) {

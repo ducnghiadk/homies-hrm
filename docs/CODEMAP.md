@@ -49,6 +49,10 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `src/app/api/contracts/[id]/route.ts`: GET & PUT chi tiet, cap nhat ky duyet (e-signature canvas), gia han va thanh ly hop dong.
   + `src/components/contracts/SignaturePadModal.tsx`: bang ve cam ung ngon tay ky dien tu tren dien thoai va may tinh.
   + `src/components/contracts/ContractPrintA4Modal.tsx`: xem truoc va in an hop dong A4 chuan phap ly luu tru thanh tra lao dong.
+  + `src/app/api/payroll/tax-settings/route.ts`: GET doc / POST (CEO, HR) luu cai dat thue TNCN tren may chu (`payroll_tax_settings`), dung cho tam khau tru thue thuong BSC.
+  + `src/lib/payroll/pit.ts`: ham thue TNCN thuan dung chung (giam tru, bieu luy tien, khau tru 10% part-time, mien thue phan chenh tang ca, tam khau tru thue thuong).
+  + `src/components/payroll/PitSettingsPanel.tsx`: khoi cai dat thue TNCN trong `/settings/payroll` (muc giam tru, bieu thue, khau tru part-time).
+  + `src/lib/time/vn-time.ts`: lay ngay/gio theo gio Viet Nam (UTC+7) cho may chu chay UTC.
   + `src/app/api/payroll/route.ts`: GET xuat bang tinh luong chi tiet doi soat tung dong voi iPOS, quan ly cot late_deduction.
   + `src/app/api/kpi/incidents/route.ts`: GET & POST ho so vi pham ky luat cham cong va su co van hanh dong bo giua CSDL server va So loi KPI.
   + `src/app/payroll/lock/route.ts`: POST khoa so bang luong thang (chi CEO / HR Admin).
