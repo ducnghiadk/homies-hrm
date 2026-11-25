@@ -89,7 +89,8 @@ export type PayrollPolicy = {
     latePenaltyPerOccurrence?: number
   }
   latePenaltyPolicy?: {
-    mode: 'fixed' | 'tiered'
+    /** none = không phạt tiền; fixed = cố định mỗi lần; tiered = bậc thang số phút; per_minute = trừ theo số phút trễ × đơn giá */
+    mode: 'none' | 'fixed' | 'tiered' | 'per_minute'
     graceOccurrences: number
     fixedAmount: number
     tier1MaxMinutes: number
@@ -98,6 +99,14 @@ export type PayrollPolicy = {
     tier2Amount: number
     tier3Amount: number
     tier3HalfShiftDeduction?: boolean
+    /** Chế độ theo phút: hệ số nhân (1 = trừ đúng tiền các phút trễ). */
+    perMinuteMultiplier?: number
+    /** Chế độ theo phút: trừ tối đa mỗi lần (0 = không giới hạn). */
+    perMinuteMaxPerOccurrence?: number
+    /** Chế độ theo phút: có trừ cả nhân viên bán thời gian không (mặc định không, vì phút trễ đã không được tính công). */
+    perMinuteApplyToPartTime?: boolean
+    /** Số lần đi trễ tối đa trong tháng mà vẫn giữ thưởng chuyên cần (mặc định 0). */
+    attendanceBonusMaxLate?: number
   }
   netRoundingMethod?: 'none' | 'round_1000' | 'round_5000' | 'round_10000'
   shiftRules?: {

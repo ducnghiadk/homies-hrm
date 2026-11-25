@@ -1,4 +1,5 @@
 import type { PitSettings } from '@/lib/payroll/pit'
+import type { OperationSettings } from '@/lib/attendance/operation-settings'
 import type { CareerPathSettings } from '@/lib/career-path/settings'
 import type { CareerPlacement, CareerGradeHistoryEntry } from '@/lib/career-path/placement'
 import fs from 'fs/promises'
@@ -47,6 +48,12 @@ export interface ServerStore {
   pin_code?: string
   phone: string
   is_active: boolean
+  /** Cách chấm công: 'wifi_or_qr' (mặc định) | 'wifi' | 'qr'. */
+  checkin_method?: 'wifi_or_qr' | 'wifi' | 'qr'
+  /** IP công cộng của Wi-Fi quán (lưu bằng nút "Dùng mạng hiện tại"). */
+  wifi_public_ips?: string[]
+  /** Có kiểm tra vị trí GPS trong bán kính không (mặc định có). */
+  require_gps?: boolean
 }
 
 export interface ServerEmployee {
@@ -233,6 +240,8 @@ export interface ServerAttendanceLog {
   total_hours?: number
   qr_code?: string
   date: string
+  /** Ca dùng để đối soát lấy từ đâu: lịch đã chốt, lịch rảnh hay không có ca */
+  schedule_source?: 'official' | 'availability' | 'none'
   /** Chấm công khi không có ca nào trong lịch chính thức đã chốt của ngày đó. */
   off_schedule?: boolean
 }
@@ -633,6 +642,8 @@ export interface ServerDatabaseSchema {
   bsc_settings?: ServerBscSettings
   /** Cài đặt thuế TNCN (giảm trừ, biểu thuế) đồng bộ từ Cài đặt lương để máy chủ tính thuế thưởng. */
   payroll_tax_settings?: PitSettings
+  /** Cài đặt vận hành: hạn chót nộp lịch rảnh, cách tính giờ công, ngưỡng đi trễ. */
+  operation_settings?: OperationSettings
   ipos_integration?: ServerIposIntegrationConfig
   notifications?: ServerNotification[]
   /** Lộ trình thăng tiến (Playbook V7): cài đặt, bậc hiện tại và lịch sử đổi bậc của nhân viên. */

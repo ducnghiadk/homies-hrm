@@ -277,11 +277,13 @@ export const POLICY_REGISTRY: PolicyFieldDef[] = [
   {
     path: 'latePenaltyPolicy.mode',
     labelVi: 'Chế độ tính phạt đi muộn',
-    helpVi: 'Lựa chọn phương thức phạt: Cố định mỗi lần hoặc Phạt theo bậc thang số phút',
+    helpVi: 'Lựa chọn phương thức phạt: cố định mỗi lần, bậc thang số phút, trừ theo phút hoặc không phạt tiền',
     type: 'enum',
     options: [
       { value: 'fixed', labelVi: 'Phạt cố định mỗi lần' },
       { value: 'tiered', labelVi: 'Phạt theo bậc thang số phút' },
+      { value: 'per_minute', labelVi: 'Trừ theo số phút trễ × đơn giá' },
+      { value: 'none', labelVi: 'Không phạt tiền (chỉ ghi nhận)' },
     ],
     affectsMoney: true,
     requiresApproval: false,

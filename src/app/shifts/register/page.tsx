@@ -73,6 +73,7 @@ export default function ShiftRegisterPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [successToast, setSuccessToast] = useState<string | null>(null)
   const [publishedWeekKeys, setPublishedWeekKeys] = useState<Record<string, boolean>>({})
+  const [deadlineInfo, setDeadlineInfo] = useState<Record<string, { enabled: boolean; date?: string; time?: string; passed?: boolean } | null>>({})
 
   // Cấu trúc selections: Record<date, shift_id[]>
   const [selectedShifts, setSelectedShifts] = useState<Record<string, string[]>>({})
@@ -124,6 +125,7 @@ export default function ShiftRegisterPage() {
           ...prev,
           [weekLockKey]: json.week_status === 'published',
         }))
+        setDeadlineInfo(prev => ({ ...prev, [weekLockKey]: json.availability_deadline || null }))
       })
       .catch(() => {})
     return () => {
@@ -131,22 +133,19 @@ export default function ShiftRegisterPage() {
     }
   }, [selectedStoreId, weekStartStr, weekLockKey])
 
-  // Tự động kiểm tra hạn chốt 22:00 tối Thứ 6 hàng tuần & trạng thái tuần đã chốt từ Quản lý
+  // Hạn chót nộp lịch rảnh lấy từ Cài đặt vận hành trên máy chủ (máy chủ cũng chặn khi quá hạn)
   const { isDeadlineLocked, deadlineText } = useMemo(() => {
     const isManagerOrCeo = user?.role === 'ceo' || user?.role === 'store_manager' || user?.role === 'hr_admin'
-
-    const now = new Date()
-    const [y, m, d] = weekStartStr.split('-').map(Number)
-    const targetMonday = new Date(y, m - 1, d, 0, 0, 0, 0)
-    const deadlineFriday = new Date(targetMonday)
-    deadlineFriday.setDate(deadlineFriday.getDate() - 3) // Thứ 6 trước tuần làm
-    deadlineFriday.setHours(22, 0, 0, 0)
-
-    const locked = !isManagerOrCeo && now.getTime() > deadlineFriday.getTime()
-    const formattedDeadline = `22:00 Thứ 6 (${deadlineFriday.getDate().toString().padStart(2, '0')}/${(deadlineFriday.getMonth() + 1).toString().padStart(2, '0')})`
-
-    return { isDeadlineLocked: locked, deadlineText: formattedDeadline }
-  }, [weekStartStr, user?.role])
+    const info = deadlineInfo[weekLockKey]
+    if (!info?.enabled || !info.date) return { isDeadlineLocked: false, deadlineText: '' }
+    const [, mm, dd] = info.date.split('-')
+    const weekdayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
+    const weekday = weekdayNames[new Date(`${info.date}T12:00:00`).getDay()]
+    return {
+      isDeadlineLocked: !isManagerOrCeo && Boolean(info.passed),
+      deadlineText: `${info.time} ${weekday} (${dd}/${mm})`,
+    }
+  }, [deadlineInfo, weekLockKey, user?.role])
 
   const isWeekPublished = Boolean(publishedWeekKeys[weekLockKey])
   const effectiveLocked = isWeekPublished || isDeadlineLocked
@@ -242,6 +241,12 @@ export default function ShiftRegisterPage() {
         }),
       })
       const json = await res.json().catch(() => null)
+
+      if (json?.code === 'AVAILABILITY_DEADLINE_PASSED') {
+        setDeadlineInfo(prev => ({ ...prev, [weekLockKey]: { ...(prev[weekLockKey] || { enabled: true }), passed: true } }))
+        setSubmitError(json?.error || 'Đã quá hạn nộp lịch rảnh tuần này.')
+        return
+      }
 
       if (res.status === 409 || json?.code === 'WEEK_ALREADY_PUBLISHED') {
         setPublishedWeekKeys(prev => ({ ...prev, [weekLockKey]: true }))
