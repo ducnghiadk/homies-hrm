@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth, canAccessStore, isChainWideRole, hasRequiredRole, MANAGER_ROLES, type AuthenticatedUser } from '@/lib/server/auth-helper'
-import { getServerDb, saveServerDb, type ServerDatabaseSchema } from '@/lib/server/db'
-import { normalizeCareerPathSettings, type CareerPathSettings } from '@/lib/career-path/settings'
-import { applyAssessment, currentSkillLevels, type AssessmentInput } from '@/lib/career-path/assessment'
-import { evaluateNextGrade, fullMonthsBetween, sumWorkedHours } from '@/lib/career-path/eligibility'
-import type { CareerPlacement } from '@/lib/career-path/placement'
+import { requireAuth, canAccessStore, isChainWideRole, hasRequiredRole } from '@/lib/server/auth-helper'
+import { getServerDb, saveServerDb } from '@/lib/server/db'
+import { normalizeCareerPathSettings } from '@/lib/career-path/settings'
+import { applyAssessment, type AssessmentInput } from '@/lib/career-path/assessment'
+import { buildCareerSummary as buildSummary, careerViewScope } from '@/lib/server/career-progress'
 import { getVnDateString } from '@/lib/time/vn-time'
 
 /**
@@ -14,37 +13,6 @@ import { getVnDateString } from '@/lib/time/vn-time'
  * POST: vai trò được đánh giá (theo Cài đặt) chấm kỹ năng cho nhân viên đã được xếp bậc, trong phạm vi chi nhánh.
  */
 
-function buildSummary(db: ServerDatabaseSchema, settings: CareerPathSettings, placement: CareerPlacement, today: string) {
-  const entries = db.career_skill_assessments || []
-  const employee = db.employees.find((e) => e.id === placement.employee_id)
-  const levels = currentSkillLevels(entries, placement.employee_id)
-  const mine = entries.filter((e) => e.employee_id === placement.employee_id)
-  const months = fullMonthsBetween(employee?.hire_date || placement.effective_date, today)
-  const hours = Math.round((placement.carried_hours + sumWorkedHours(db.attendance || [], placement.employee_id)) * 100) / 100
-  return {
-    employee_id: placement.employee_id,
-    levels,
-    assessments_count: mine.length,
-    last_assessed_at: mine.reduce((max, e) => (e.assessed_at > max ? e.assessed_at : max), ''),
-    months,
-    hours,
-    eligibility: evaluateNextGrade(settings, { grade: placement.grade_code, position: placement.primary_position, levels, months, hours }),
-  }
-}
-
-function canSeeFactory(db: ServerDatabaseSchema, user: AuthenticatedUser) {
-  const employeeById = new Map(db.employees.map((e) => [e.id, e]))
-  return (employeeId: string) => {
-    if (employeeId === user.userId) return true
-    if (isChainWideRole(user.role)) return true
-    if (hasRequiredRole(user.role, MANAGER_ROLES)) {
-      const emp = employeeById.get(employeeId)
-      return Boolean(emp && canAccessStore(user, emp.store_id))
-    }
-    return false
-  }
-}
-
 export async function GET(req: NextRequest) {
   const gate = await requireAuth(req)
   if (!gate.ok) return gate.response
@@ -52,7 +20,7 @@ export async function GET(req: NextRequest) {
   try {
     const db = await getServerDb()
     const settings = normalizeCareerPathSettings(db.career_settings)
-    const canSee = canSeeFactory(db, user)
+    const canSee = careerViewScope(db, user)
     const today = getVnDateString()
     const canAssess = hasRequiredRole(user.role, settings.approval.assessor_roles)
     const placements = db.career_placements || []

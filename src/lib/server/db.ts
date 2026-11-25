@@ -2,6 +2,7 @@ import type { PitSettings } from '@/lib/payroll/pit'
 import type { CareerPathSettings } from '@/lib/career-path/settings'
 import type { CareerPlacement, CareerGradeHistoryEntry } from '@/lib/career-path/placement'
 import type { SkillAssessmentEntry } from '@/lib/career-path/assessment'
+import type { PromotionProposal } from '@/lib/career-path/promotion'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
@@ -641,6 +642,7 @@ export interface ServerDatabaseSchema {
   career_placements?: CareerPlacement[]
   career_grade_history?: CareerGradeHistoryEntry[]
   career_skill_assessments?: SkillAssessmentEntry[]
+  career_promotions?: PromotionProposal[]
   sessions: Record<string, { userId: string; role: string; email: string; createdAt: string; mustChangePassword?: boolean }>
 }
 
@@ -2468,6 +2470,7 @@ function normalizeServerDb(db: ServerDatabaseSchema): { db: ServerDatabaseSchema
   if (!Array.isArray(db.career_placements)) db.career_placements = []
   if (!Array.isArray(db.career_grade_history)) db.career_grade_history = []
   if (!Array.isArray(db.career_skill_assessments)) db.career_skill_assessments = []
+  if (!Array.isArray(db.career_promotions)) db.career_promotions = []
   if (!db.shifts) db.shifts = []
   if (!Array.isArray(db.official_schedules)) db.official_schedules = []
   if (!Array.isArray(db.schedule_weeks)) db.schedule_weeks = []
