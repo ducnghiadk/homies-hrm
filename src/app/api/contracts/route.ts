@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { MANAGER_ROLES, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, ServerContract } from '@/lib/server/db'
 
 export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const { searchParams } = new URL(req.url)
     const storeId = searchParams.get('store_id')
-    const employeeId = searchParams.get('employee_id')
+    // Nhân viên chỉ xem hợp đồng của chính mình
+    const isManager = hasRequiredRole(gate.user.role, MANAGER_ROLES)
+    const employeeId = isManager ? searchParams.get('employee_id') : gate.user.userId
     const status = searchParams.get('status')
 
     const db = await getServerDb()
@@ -35,6 +40,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const gate = await requireAuth(req, MANAGER_ROLES)
+  if (!gate.ok) return gate.response
   try {
     const body = await req.json()
     const db = await getServerDb()

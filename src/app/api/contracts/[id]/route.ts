@@ -1,17 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { MANAGER_ROLES, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, ServerContract, ServerContractAuditLog, ServerContractSignature } from '@/lib/server/db'
 
 export async function GET(
   req: NextRequest,
   props: { params: Promise<{ id: string }> }
 ) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const { id } = await props.params
     const db = await getServerDb()
     const list = db.contracts || []
     const contract = list.find((c) => c.id === id)
 
-    if (!contract) {
+    const canView =
+      contract && (hasRequiredRole(gate.user.role, MANAGER_ROLES) || contract.employeeId === gate.user.userId)
+    if (!contract || !canView) {
       return NextResponse.json({ success: false, error: 'Không tìm thấy hợp đồng' }, { status: 404 })
     }
 
@@ -29,10 +34,13 @@ export async function PUT(
   req: NextRequest,
   props: { params: Promise<{ id: string }> }
 ) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const { id } = await props.params
-    const body = await req.json()
+    const rawBody = await req.json()
     const db = await getServerDb()
+    const isManager = hasRequiredRole(gate.user.role, MANAGER_ROLES)
     if (!db.contracts) {
       db.contracts = []
     }
@@ -43,6 +51,16 @@ export async function PUT(
     }
 
     const current = db.contracts[index]
+
+    // Nhân viên chỉ được ký hợp đồng của chính mình (chữ ký vai trò nhân viên), không sửa nội dung/trạng thái
+    let body = rawBody
+    if (!isManager) {
+      const sig = rawBody?.signature as ServerContractSignature | undefined
+      if (current.employeeId !== gate.user.userId || !sig || sig.role !== 'employee') {
+        return NextResponse.json({ success: false, error: 'Bạn không có quyền cập nhật hợp đồng này.' }, { status: 403 })
+      }
+      body = { signature: sig, auditLog: rawBody.auditLog, status: ['signed_by_employee', 'pending_hr_sign'].includes(rawBody.status) ? rawBody.status : undefined }
+    }
 
     // Xử lý các loại hành động cập nhật
     const {

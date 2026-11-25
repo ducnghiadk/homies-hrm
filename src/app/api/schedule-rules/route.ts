@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, ServerScheduleRule, ServerScheduleRuleOverride } from '@/lib/server/db'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const db = await getServerDb()
     return NextResponse.json({
@@ -17,43 +20,14 @@ export async function GET() {
 
 const ALLOWED_SCHEDULE_RULE_ROLES = ['ceo', 'hr_admin', 'store_manager', 'area_manager']
 
-function resolveRole(req: NextRequest, body: Record<string, unknown>, sessions: Record<string, { role: string }>): string | null {
-  const directRole = body.approver_role || body.user_role || body.role
-  if (typeof directRole === 'string' && directRole) return directRole.toLowerCase()
-
-  const authHeader = req.headers.get('authorization')
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.replace('Bearer ', '').trim()
-    if (sessions[token]?.role) return sessions[token].role.toLowerCase()
-  }
-
-  const headerRole = req.headers.get('x-user-role')
-  if (headerRole) return headerRole.toLowerCase()
-
-  const sessionCookie = req.cookies.get('homies_session')?.value
-  if (sessionCookie && sessions[sessionCookie]?.role) {
-    return sessions[sessionCookie].role.toLowerCase()
-  }
-
-  const hrmAuth = req.cookies.get('hrm-auth')?.value
-  if (hrmAuth) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(hrmAuth))
-      const r = parsed?.state?.user?.role || parsed?.user?.role
-      if (r) return String(r).toLowerCase()
-    } catch {}
-  }
-
-  return null
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const db = await getServerDb()
 
-    const role = resolveRole(req, body, db.sessions || {})
-    if (!role || !ALLOWED_SCHEDULE_RULE_ROLES.includes(role.toLowerCase())) {
+    const gate = await requireAuth(req, ALLOWED_SCHEDULE_RULE_ROLES)
+    if (!gate.ok) {
+      if (gate.response.status === 401) return gate.response
       return NextResponse.json(
         {
           success: false,

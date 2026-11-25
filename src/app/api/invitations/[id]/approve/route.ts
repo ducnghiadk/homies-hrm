@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, MANAGER_ROLES } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, ServerEmployee } from '@/lib/server/db'
 
 export async function POST(
   req: NextRequest,
   props: { params: Promise<{ id: string }> }
 ) {
+  const gate = await requireAuth(req, MANAGER_ROLES)
+  if (!gate.ok) return gate.response
   try {
     const { id } = await props.params
     const db = await getServerDb()

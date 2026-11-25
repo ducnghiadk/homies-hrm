@@ -198,13 +198,17 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Chống giả mạo vai trò bằng F12 / DevTools (Kiểm tra mềm dẻo, không đá văng phiên hợp lệ khi F5)
+  // Chống giả mạo vai trò bằng F12 / DevTools: production bắt buộc chữ ký vai trò hợp lệ do máy chủ cấp
   if (isProtectedRoute && roleCookie) {
-    if (roleSig && userId) {
-      const isValid = verifyRoleSignature(roleCookie, userId, roleSig)
-      if (!isValid) {
-        console.warn(`[Proxy] Role signature check warning for user ${userId} with role ${roleCookie}`)
+    const isValid = Boolean(roleSig && userId && verifyRoleSignature(roleCookie, userId, roleSig))
+    if (!isValid) {
+      if (process.env.NODE_ENV === 'production') {
+        const loginUrl = new URL('/login', request.url)
+        loginUrl.searchParams.set('redirect', redirectPath)
+        loginUrl.searchParams.set('denied', 'signature_invalid')
+        return NextResponse.redirect(loginUrl)
       }
+      console.warn(`[Proxy] Role signature check warning for user ${userId} with role ${roleCookie}`)
     }
   }
 

@@ -622,7 +622,7 @@ export interface ServerDatabaseSchema {
   bsc_settings?: ServerBscSettings
   ipos_integration?: ServerIposIntegrationConfig
   notifications?: ServerNotification[]
-  sessions: Record<string, { userId: string; role: string; email: string; createdAt: string }>
+  sessions: Record<string, { userId: string; role: string; email: string; createdAt: string; mustChangePassword?: boolean }>
 }
 
 const DATA_DIR = process.env.VERCEL
@@ -1475,10 +1475,10 @@ function getInitialSeedData(): ServerDatabaseSchema {
       sync_shifts: true,
       sync_pos_revenue: false,
       sync_inventory: false,
-      is_authenticated: true,
+      is_authenticated: Boolean(process.env.IPOS_HRM_TOKEN),
       last_sync_status: 'success',
       sync_logs: [],
-      hrm_jwt_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im5naGlhbmd1eWVuLmRrQGdtYWlsLmNvbSIsImFjY291bnRfaWQiOiI5ZjExY2MzZC1lODRiLTQyZjktOTZiNS0xMDE1YTM5MDk1MWYiLCJlbXBsb3llZV9pZCI6Ijk5Yjg5YTQ0LWYwMzEtNGRjYS1iY2M1LWU5N2Q5OWQwOGEwZCIsImNvbXBhbnlfaWQiOiI3Y2VkMzYxYS1iODQ0LTQ0NzAtOGU5Ny01MjJhNzM2Njc2OWIiLCJsb2dpbl9ieSI6IklBTSIsImV4cCI6MTc5NjM0MjQ5OX0.kHGu53KlgCRJVsHAQe1TcoHrYz8ZuP8NEykyEjyDzJ4',
+      hrm_jwt_token: process.env.IPOS_HRM_TOKEN || '',
       hrm_user: {
         id: '9f11cc3d-e84b-42f9-96b5-1015a390951f',
         name: 'Nguyễn Đức Nghĩa',
@@ -2069,11 +2069,10 @@ function getDefaultIposIntegrationConfig(): ServerIposIntegrationConfig {
     sync_shifts: true,
     sync_pos_revenue: false,
     sync_inventory: false,
-    is_authenticated: true,
+    is_authenticated: Boolean(process.env.IPOS_HRM_TOKEN),
     last_sync_status: 'success',
     sync_logs: [],
-    hrm_jwt_token:
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im5naGlhbmd1eWVuLmRrQGdtYWlsLmNvbSIsImFjY291bnRfaWQiOiI5ZjExY2MzZC1lODRiLTQyZjktOTZiNS0xMDE1YTM5MDk1MWYiLCJlbXBsb3llZV9pZCI6Ijk5Yjg5YTQ0LWYwMzEtNGRjYS1iY2M1LWU5N2Q5OWQwOGEwZCIsImNvbXBhbnlfaWQiOiI3Y2VkMzYxYS1iODQ0LTQ0NzAtOGU5Ny01MjJhNzM2Njc2OWIiLCJsb2dpbl9ieSI6IklBTSIsImV4cCI6MTc5NjM0MjQ5OX0.kHGu53KlgCRJVsHAQe1TcoHrYz8ZuP8NEykyEjyDzJ4',
+    hrm_jwt_token: process.env.IPOS_HRM_TOKEN || '',
     hrm_user: {
       id: '9f11cc3d-e84b-42f9-96b5-1015a390951f',
       name: 'Nguyễn Đức Nghĩa',

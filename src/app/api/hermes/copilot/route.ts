@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { ADMIN_ROLES, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -422,20 +423,25 @@ function detectActionFromText(text: string): HermesAction | null {
   return null;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // Vai trò lấy từ phiên đăng nhập trên máy chủ, không tin user_role do trình duyệt gửi
+  const gate = await requireAuth(req, ALLOWED_ADMIN_ROLES);
+  if (!gate.ok) return gate.response;
+  const user_role = gate.user.role;
+  const user_id = gate.user.userId;
+  const canUseCustomGateway = hasRequiredRole(gate.user.role, ADMIN_ROLES);
   try {
     const body = await req.json();
     const {
       message,
       history,
-      user_role,
-      user_id,
       bot_id = 'auto',
-      client_config,
       test_config,
       current_path,
       active_error,
     } = body;
+    // Chỉ CEO/HR được trỏ sang cổng AI riêng; người khác luôn dùng cổng mặc định của máy chủ
+    const client_config = canUseCustomGateway ? body.client_config : undefined;
 
     // 1. Role Guard
     if (!user_role || !ALLOWED_ADMIN_ROLES.includes(user_role)) {
@@ -455,7 +461,7 @@ export async function POST(req: Request) {
 
     // 2. Handle Connection Ping Test
     if (message === 'PING_TEST') {
-      const cfg = test_config || client_config;
+      const cfg = canUseCustomGateway ? test_config || client_config : undefined;
       let pingEndpoint = cfg?.endpoint?.trim();
       let pingKey = cfg?.apiKey?.trim();
       const pingProvider = cfg?.provider || 'openai_compatible';
@@ -610,7 +616,9 @@ export async function POST(req: Request) {
     if (!resolvedEndpoint && client_config?.mode !== 'local') {
       resolvedEndpoint = `${serverBaseUrl.replace(/\/$/, '')}/chat/completions`;
     }
-    const resolvedApiKey = client_config?.apiKey?.trim() || serverApiKey;
+    // Không bao giờ gửi khóa AI của máy chủ tới cổng do trình duyệt chỉ định
+    const usesClientEndpoint = Boolean(client_config?.endpoint?.trim());
+    const resolvedApiKey = usesClientEndpoint ? client_config?.apiKey?.trim() || '' : serverApiKey;
     const resolvedModel = client_config?.model?.trim() || 'ag/gemini-3.8-flash';
     const resolvedProvider = client_config?.provider || 'openai_compatible';
     const resolvedTemperature = client_config?.temperature ?? 0.7;

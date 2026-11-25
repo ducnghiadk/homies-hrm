@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb } from '@/lib/server/db'
-import { getAuthenticatedUser } from '@/lib/server/auth-helper'
+import { ADMIN_ROLES, canAccessStore, hasRequiredRole, isChainWideRole, requireAuth } from '@/lib/server/auth-helper'
 
-const ALLOWED_PAYROLL_MANAGERS = ['ceo', 'hr_admin']
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,7 +9,9 @@ export async function GET(req: NextRequest) {
     const period = searchParams.get('period') || '2026-08'
     const storeId = searchParams.get('store_id')
 
-    const auth = await getAuthenticatedUser(req)
+    const gate = await requireAuth(req)
+    if (!gate.ok) return gate.response
+    const auth = gate.user
 
     const db = await getServerDb()
 
@@ -25,10 +26,16 @@ export async function GET(req: NextRequest) {
       slips = slips.filter((s) => s.store_id === storeId)
     }
 
-    // Bảo vệ quyền riêng tư: Nhân viên thường chỉ được xem phiếu lương của chính mình
-    if (auth && auth.role === 'employee') {
-      slips = slips.filter((s) => s.employee_id === auth.userId)
-      summaries = []
+    // Phạm vi xem lương: CEO/HR/QL vùng xem toàn chuỗi; QL cửa hàng xem chi nhánh mình;
+    // các vai trò khác chỉ xem phiếu lương của chính mình.
+    if (!isChainWideRole(auth.role)) {
+      if (auth.role === 'store_manager') {
+        summaries = summaries.filter((s) => canAccessStore(auth, s.store_id))
+        slips = slips.filter((s) => canAccessStore(auth, s.store_id) || s.employee_id === auth.userId)
+      } else {
+        slips = slips.filter((s) => s.employee_id === auth.userId)
+        summaries = []
+      }
     }
 
     return NextResponse.json({
@@ -40,15 +47,16 @@ export async function GET(req: NextRequest) {
       salary_slips: slips,
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Lỗi hệ thống'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('[api/payroll]', error)
+    return NextResponse.json({ success: false, error: 'Lỗi hệ thống' }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await getAuthenticatedUser(req)
-    if (!auth || !ALLOWED_PAYROLL_MANAGERS.includes(auth.role)) {
+    const gate = await requireAuth(req)
+    if (!gate.ok) return gate.response
+    if (!hasRequiredRole(gate.user.role, ADMIN_ROLES)) {
       return NextResponse.json(
         { success: false, error: 'Chỉ Ban Giám đốc (CEO) hoặc Quản trị HR mới có quyền điều chỉnh bảng lương' },
         { status: 403 }
@@ -84,9 +92,22 @@ export async function POST(req: NextRequest) {
 
     const db = await getServerDb()
 
-    // 1. Kiểm tra trạng thái khóa sổ kỳ lương của quán/toàn chuỗi
+    const existingSlip = db.salary_slips.find(
+      (s) => (id && s.id === id) || (s.employee_id === employee_id && s.period === period)
+    )
+    // Chi nhánh của phiếu lấy từ phiếu đã có / hồ sơ nhân sự, không tin chi nhánh do client gửi
+    const slipStoreId =
+      existingSlip?.store_id ||
+      db.employees.find((e) => e.id === employee_id)?.store_id ||
+      store_id ||
+      ''
+
+    // 1. Kiểm tra trạng thái khóa sổ kỳ lương: khóa toàn chuỗi hoặc khóa đúng chi nhánh của phiếu đều chặn
     const isPeriodLocked = db.payroll_summaries.some(
-      (p) => p.period === period && (!store_id || p.store_id === store_id) && p.status === 'locked'
+      (p) =>
+        p.period === period &&
+        p.status === 'locked' &&
+        (!p.store_id || ['all', 'ALL'].includes(p.store_id) || !slipStoreId || p.store_id === slipStoreId)
     )
     if (isPeriodLocked) {
       return NextResponse.json(
@@ -117,9 +138,17 @@ export async function POST(req: NextRequest) {
         )
       }
 
+      const numericFields = [
+        'work_days', 'standard_days', 'base_salary', 'allowances', 'bonus', 'deductions', 'net_salary',
+      ] as const
+      const updates: Record<string, unknown> = {}
+      for (const f of numericFields) if (body[f] !== undefined) updates[f] = Number(body[f]) || 0
+      for (const f of ['employee_name', 'employee_code', 'position', 'status'] as const) {
+        if (typeof body[f] === 'string') updates[f] = body[f]
+      }
       slip = {
         ...current,
-        ...body,
+        ...updates,
         late_deduction: late_deduction !== undefined ? Number(late_deduction) : (current.late_deduction || 0),
         id: current.id,
         period: current.period,
@@ -134,7 +163,7 @@ export async function POST(req: NextRequest) {
         employee_name: employee_name || 'Nhân sự',
         employee_code: employee_code || 'NV0000',
         position: position || 'Nhân viên',
-        store_id: store_id || 'store-001',
+        store_id: slipStoreId || 'store-001',
         period,
         work_days: Number(work_days || 0),
         standard_days: Number(standard_days || 26),
@@ -157,8 +186,8 @@ export async function POST(req: NextRequest) {
       data: slip,
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Lỗi hệ thống'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('[api/payroll]', error)
+    return NextResponse.json({ success: false, error: 'Lỗi hệ thống' }, { status: 500 })
   }
 }
 

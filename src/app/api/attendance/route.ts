@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { OPERATOR_ROLES, canAccessStore, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
 import {
   getServerDb,
   saveServerDb,
@@ -231,12 +232,17 @@ ensureIposBackgroundSyncDaemon(async () => {
 })
 
 export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const { searchParams } = new URL(req.url)
     const storeId = searchParams.get('store_id')
     const date = searchParams.get('date')
     const month = searchParams.get('month') || searchParams.get('period')
-    const employeeId = searchParams.get('employee_id')
+    // Nhân viên thường chỉ xem chấm công của chính mình
+    const employeeId = hasRequiredRole(gate.user.role, OPERATOR_ROLES)
+      ? searchParams.get('employee_id')
+      : gate.user.userId
     const fromDateParam = searchParams.get('from_date')
     const toDateParam = searchParams.get('to_date')
     const forceRefresh = searchParams.get('force') === '1' || searchParams.get('forceRefresh') === 'true'
@@ -330,16 +336,38 @@ export async function GET(req: NextRequest) {
       data: list,
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Lỗi hệ thống'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('[api/attendance]', error)
+    return NextResponse.json({ success: false, error: 'Lỗi hệ thống' }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
-    const body = await req.json()
+    const rawBody = await req.json()
     const db = await getServerDb()
     if (!db.attendance) db.attendance = []
+
+    // Quản lý/trưởng ca được ghi công thủ công cho nhân sự chi nhánh mình.
+    // Nhân viên chỉ chấm công cho chính mình, giờ lấy theo máy chủ, không tự khai giờ/số giờ công/trạng thái.
+    const isOperator = hasRequiredRole(gate.user.role, OPERATOR_ROLES)
+    let body = rawBody
+    if (isOperator) {
+      const targetEmp = db.employees.find((e) => e.id === rawBody?.employee_id)
+      if (targetEmp && !canAccessStore(gate.user, targetEmp.store_id) && targetEmp.id !== gate.user.userId) {
+        return NextResponse.json({ success: false, error: 'Bạn không quản lý nhân sự này.' }, { status: 403 })
+      }
+    } else {
+      if (rawBody?.employee_id && rawBody.employee_id !== gate.user.userId) {
+        return NextResponse.json({ success: false, error: 'Bạn chỉ được chấm công cho chính mình.' }, { status: 403 })
+      }
+      body = { ...rawBody, employee_id: gate.user.userId }
+      for (const k of ['check_in_time', 'check_out_time', 'total_hours', 'late_minutes', 'status', 'date', 'id', 'shift_start_time', 'shift_end_time']) {
+        delete (body as Record<string, unknown>)[k]
+      }
+      if (rawBody?.status === 'check_out') body.status = 'check_out'
+    }
     const { getShiftTimeRange, calculateLatePenaltyAmount, parseTimeToMinutes } = await import('@/lib/server/db')
 
     // 1. Xử lý ghi nhận Tan ca / Check-out
@@ -350,8 +378,8 @@ export async function POST(req: NextRequest) {
       }
       const targetDate = body.date || new Date().toISOString().slice(0, 10)
       const outTime = body.check_out_time || new Date().toISOString()
-      const outLat = Number(body.check_out_lat || body.check_in_lat || 10.822435)
-      const outLng = Number(body.check_out_lng || body.check_in_lng || 106.762649)
+      const outLat = Number(body.check_out_lat || body.check_in_lat || 0)
+      const outLng = Number(body.check_out_lng || body.check_in_lng || 0)
 
       // Tìm bản ghi chấm công trong ngày của nhân sự này
       const existingIdx = db.attendance.findIndex(
@@ -391,7 +419,7 @@ export async function POST(req: NextRequest) {
         // Nếu về sớm ➔ tính theo giờ công thực tế, không tính tròn cả ca
         const finalHours = isEarly
           ? (calculatedHours > 0 ? calculatedHours : 0)
-          : (body.total_hours !== undefined ? Number(body.total_hours) : (calculatedHours > 0 ? calculatedHours : 8))
+          : (body.total_hours !== undefined ? Number(body.total_hours) : (calculatedHours > 0 ? calculatedHours : 0))
 
         db.attendance[existingIdx] = {
           ...db.attendance[existingIdx],
@@ -417,7 +445,8 @@ export async function POST(req: NextRequest) {
 
       // Nếu chưa có check-in trước đó, tạo bản ghi tan ca mới
       const emp = db.employees.find((e) => e.id === empId)
-      const calculatedHours = body.total_hours ? Number(body.total_hours) : (isEarly ? 7 : 8)
+      // Không có giờ vào thì không tự cộng công: chỉ quản lý được nhập số giờ thủ công
+      const calculatedHours = body.total_hours ? Number(body.total_hours) : 0
       const checkOutLog: ServerAttendanceLog = {
         id: body.id || `att-out-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         employee_id: empId,
@@ -529,8 +558,8 @@ export async function POST(req: NextRequest) {
       store_name: body.store_name || (body.store_id === 'store-002' ? 'Homies Milk Tea - Đường 429' : 'Homies Milk Tea - Hồ Bá Phấn'),
       shift_id: targetShiftId,
       check_in_time: checkInTime,
-      check_in_lat: Number(body.check_in_lat || 10.822435),
-      check_in_lng: Number(body.check_in_lng || 106.762649),
+      check_in_lat: Number(body.check_in_lat || 0),
+      check_in_lng: Number(body.check_in_lng || 0),
       check_in_distance_meters: Number(body.check_in_distance_meters || 15),
       status,
       is_late: isLate,
@@ -570,7 +599,9 @@ export async function POST(req: NextRequest) {
       const slipIdx = db.salary_slips.findIndex(
         (s) => s.employee_id === empId && s.period === period
       )
-      if (slipIdx >= 0) {
+      if (slipIdx >= 0 && db.salary_slips[slipIdx].status === 'locked') {
+        // Phiếu lương đã khóa sổ: chỉ ghi sổ lỗi, không sửa số liệu kế toán
+      } else if (slipIdx >= 0) {
         const slip = db.salary_slips[slipIdx]
         slip.late_deduction = (slip.late_deduction || 0) + penaltyAmount
         slip.deductions = (slip.deductions || 0) + penaltyAmount
@@ -607,7 +638,7 @@ export async function POST(req: NextRequest) {
       data: newLog,
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Lỗi hệ thống'
-    return NextResponse.json({ success: false, error: message }, { status: 500 })
+    console.error('[api/attendance]', error)
+    return NextResponse.json({ success: false, error: 'Lỗi hệ thống' }, { status: 500 })
   }
 }

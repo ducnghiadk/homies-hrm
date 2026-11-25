@@ -10,7 +10,7 @@ import {
   type ServerIposSyncLog,
   type ServerShiftRegistration,
 } from '@/lib/server/db'
-import { getAuthenticatedUser, hasRequiredRole } from '@/lib/server/auth-helper'
+import { ADMIN_ROLES, getAuthenticatedUser, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
 import { getEffectiveDataMode, isIposModuleEnabled } from '@/lib/server/data-mode'
 import { getStorageStatus } from '@/lib/server/supabase-store'
 import { fetchIposShiftRegistrations } from '@/lib/services/ipos/ipos-cloud-client'
@@ -25,8 +25,8 @@ import { loginFabi, getFabiDailyRevenue } from '@/lib/services/ipos/ipos-fabi-cl
 import { loginHrm, getHrmEmployees, getHrmAttendance } from '@/lib/services/ipos/ipos-hrm-client'
 import { sendIposSyncAlert } from '@/lib/services/ipos/ipos-notifier'
 
+// Không mở CORS cho mọi tên miền: route này trả cấu hình tích hợp và nhận lệnh quản trị
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
@@ -93,6 +93,59 @@ interface WorkerCalculatedPayrollRow {
   bankAccountNo: string
 }
 
+// Bỏ mọi mật khẩu/token trước khi trả cấu hình về trình duyệt
+function sanitizeIposConfig(config: ServerIposIntegrationConfig) {
+  const { token_or_password, hrm_jwt_token, ...rest } = config
+  const safe: Record<string, unknown> = {
+    ...rest,
+    has_password: Boolean(token_or_password),
+    has_hrm_token: Boolean(hrm_jwt_token),
+  }
+  if (config.fabi_pos_config) {
+    const { password, jwt_token, secret_key, ...fabiRest } = config.fabi_pos_config
+    safe.fabi_pos_config = { ...fabiRest, has_password: Boolean(password), has_token: Boolean(jwt_token), has_secret_key: Boolean(secret_key) }
+  }
+  if (config.ivt_config) {
+    const { token, ...ivtRest } = config.ivt_config
+    safe.ivt_config = { ...ivtRest, has_token: Boolean(token) }
+  }
+  if (config.notification_config) {
+    const { telegram_bot_token, ...notiRest } = config.notification_config
+    safe.notification_config = { ...notiRest, has_telegram_bot_token: Boolean(telegram_bot_token) }
+  }
+  return safe
+}
+
+// Giữ lại bí mật đã lưu khi trình duyệt gửi lên cấu hình đã bị che (thiếu hoặc rỗng)
+function mergeKeepingSecrets(
+  current: ServerIposIntegrationConfig,
+  incoming: Partial<ServerIposIntegrationConfig>
+): ServerIposIntegrationConfig {
+  const next: ServerIposIntegrationConfig = { ...current, ...incoming, sync_logs: current.sync_logs || [] }
+  if (!incoming.token_or_password) next.token_or_password = current.token_or_password
+  if (!incoming.hrm_jwt_token) next.hrm_jwt_token = current.hrm_jwt_token
+  if (incoming.fabi_pos_config && current.fabi_pos_config) {
+    next.fabi_pos_config = {
+      ...current.fabi_pos_config,
+      ...incoming.fabi_pos_config,
+      password: incoming.fabi_pos_config.password || current.fabi_pos_config.password,
+      jwt_token: incoming.fabi_pos_config.jwt_token || current.fabi_pos_config.jwt_token,
+      secret_key: incoming.fabi_pos_config.secret_key || current.fabi_pos_config.secret_key,
+    }
+  }
+  if (incoming.ivt_config && current.ivt_config) {
+    next.ivt_config = { ...current.ivt_config, ...incoming.ivt_config, token: incoming.ivt_config.token || current.ivt_config.token }
+  }
+  if (incoming.notification_config && current.notification_config) {
+    next.notification_config = {
+      ...current.notification_config,
+      ...incoming.notification_config,
+      telegram_bot_token: incoming.notification_config.telegram_bot_token || current.notification_config.telegram_bot_token,
+    }
+  }
+  return next
+}
+
 // Khôi phục phiên đăng nhập từ Cookie 30 ngày hoặc Client Body vào bộ nhớ máy chủ Serverless
 function hydrateFromCookieOrPayload(
   req: NextRequest,
@@ -152,6 +205,9 @@ function hydrateFromCookieOrPayload(
 }
 
 export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
+  const isAdmin = hasRequiredRole(gate.user.role, ADMIN_ROLES)
   try {
     const db = await getServerDb()
     if (!db.ipos_integration) {
@@ -159,8 +215,8 @@ export async function GET(req: NextRequest) {
       await saveServerDb(db)
     }
 
-    // Tự động đồng bộ phiên từ Cookie
-    hydrateFromCookieOrPayload(req, null, db.ipos_integration)
+    // Chỉ quản trị mới được nạp lại phiên iPOS từ cookie
+    if (isAdmin) hydrateFromCookieOrPayload(req, null, db.ipos_integration)
 
     const forceCheckStorage = req.nextUrl.searchParams.get('check_storage') === '1'
     const [schemaStatus, storageStatus] = await Promise.all([
@@ -178,7 +234,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        config: db.ipos_integration,
+        config: isAdmin ? sanitizeIposConfig(db.ipos_integration) : null,
         data_mode: dataMode,
         storage_status: storageStatus,
         schema_status: schemaStatus,
@@ -202,6 +258,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Mọi thao tác ghi/kết nối iPOS chỉ dành cho CEO hoặc HR Admin
+  const gate = await requireAuth(req, ADMIN_ROLES)
+  if (!gate.ok) return gate.response
   try {
     const body = await req.json()
     const action = body.action || 'trigger_sync'
@@ -323,7 +382,7 @@ export async function POST(req: NextRequest) {
           {
             success: true,
             message: loginResult.message,
-            config: db.ipos_integration.fabi_pos_config,
+            config: sanitizeIposConfig(db.ipos_integration).fabi_pos_config,
           },
           { status: 200, headers: corsHeaders }
         )
@@ -373,7 +432,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: true,
-          config: db.ipos_integration,
+          config: sanitizeIposConfig(db.ipos_integration),
           data_mode: dataMode,
           message: statusMsg,
         },
@@ -384,17 +443,13 @@ export async function POST(req: NextRequest) {
     // 2. Lưu cài đặt tích hợp
     if (action === 'save_config') {
       const newConfig: Partial<ServerIposIntegrationConfig> = body.config || {}
-      db.ipos_integration = {
-        ...db.ipos_integration,
-        ...newConfig,
-        sync_logs: db.ipos_integration.sync_logs || [],
-      }
+      db.ipos_integration = mergeKeepingSecrets(db.ipos_integration, newConfig)
       await saveServerDb(db)
 
       return NextResponse.json(
         {
           success: true,
-          config: db.ipos_integration,
+          config: sanitizeIposConfig(db.ipos_integration),
           data_mode: getEffectiveDataMode(db),
           message: 'Đã lưu cấu hình tích hợp iPOS Cloud thành công!',
         },

@@ -444,8 +444,8 @@ export default function PublicViolationLogPage() {
 
   // Database States (2 cơ sở vận hành thật của Homies)
   const [dbStores, setDbStores] = useState<Array<{ id: string; name: string; pin_code?: string }>>([
-    { id: 'store-001', name: 'Homies Milk Tea - Hồ Bá Phấn', pin_code: '3535' },
-    { id: 'store-002', name: 'Homies Milk Tea - Chi Nhánh 429', pin_code: '4290' },
+    { id: 'store-001', name: 'Homies Milk Tea - Hồ Bá Phấn' },
+    { id: 'store-002', name: 'Homies Milk Tea - Chi Nhánh 429' },
   ])
   const [dbEmployees, setDbEmployees] = useState<Array<{ id: string; employee_code: string; full_name: string; store_id: string }>>(getInitialEmployees)
   const [authorizedVerifiers, setAuthorizedVerifiers] = useState<AuthorizedVerifier[]>(() => violationPermissionService.getVerifiers())
@@ -522,7 +522,8 @@ export default function PublicViolationLogPage() {
     if (savedSession) {
       try {
         const parsed = JSON.parse(savedSession)
-        if (parsed.storeId && parsed.authTime) {
+        // Phiên PIN trên máy chủ chỉ có hạn 12 giờ
+        if (parsed.storeId && parsed.authTime && Date.now() - Number(parsed.authTime) < 12 * 60 * 60 * 1000) {
           setSelectedStore(normalizeStoreId(parsed.storeId))
           setIsAuthenticated(true)
         }
@@ -698,29 +699,41 @@ export default function PublicViolationLogPage() {
     return list
   }, [activeCatalog, selectedCategory, searchQuery])
 
-  // Verify PIN
-  const handleVerifyPin = () => {
-    const storePins = violationPermissionService.getStorePins()
-    const activeStoreObj = dbStores.find(s => s.id === selectedStore)
-    const correctPin = activeStoreObj?.pin_code || storePins[selectedStore] || '3535'
-
-    if (pinInput.trim() === correctPin || pinInput.trim() === storePins.admin || pinInput.trim() === '8888') {
-      setIsAuthenticated(true)
-      setPinError('')
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(
-          'homies_public_store_session',
-          JSON.stringify({ storeId: selectedStore, authTime: Date.now() })
-        )
+  // Verify PIN: kiểm tra trên máy chủ, mã PIN không còn nằm trong mã nguồn trình duyệt
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false)
+  const handleVerifyPin = async () => {
+    if (isVerifyingPin) return
+    setIsVerifyingPin(true)
+    try {
+      const res = await fetch('/api/stores/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ store_id: selectedStore, pin: pinInput.trim() }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && json.success) {
+        setIsAuthenticated(true)
+        setPinError('')
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(
+            'homies_public_store_session',
+            JSON.stringify({ storeId: selectedStore, authTime: Date.now() })
+          )
+        }
+        toast.success('Xác thực cơ sở thành công')
+      } else {
+        setPinError(json.error || 'Mã PIN không đúng. Vui lòng liên hệ Admin hoặc Quản lý.')
+        setPinInput('')
       }
-      toast.success('Xác thực cơ sở thành công')
-    } else {
-      setPinError('Mã PIN không đúng. Vui lòng liên hệ Admin hoặc Quản lý.')
-      setPinInput('')
+    } catch {
+      setPinError('Không kết nối được máy chủ. Vui lòng thử lại.')
+    } finally {
+      setIsVerifyingPin(false)
     }
   }
 
   const handleLogout = () => {
+    void fetch('/api/stores/verify-pin', { method: 'DELETE' }).catch(() => undefined)
     setIsAuthenticated(false)
     setPinInput('')
     if (typeof window !== 'undefined') {
@@ -874,7 +887,7 @@ export default function PublicViolationLogPage() {
 
             <button
               onClick={handleVerifyPin}
-              disabled={!pinInput.trim() || isLoadingDb}
+              disabled={!pinInput.trim() || isLoadingDb || isVerifyingPin}
               className="w-full min-h-[42px] bg-[#2F6FA8] hover:bg-[#1D3E61] disabled:opacity-50 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-xs transition"
             >
               <Lock className="w-4 h-4" />

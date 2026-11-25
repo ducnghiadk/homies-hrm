@@ -4,6 +4,7 @@
  */
 document.addEventListener('DOMContentLoaded', async () => {
   const urlInput = document.getElementById('server-url-input')
+  const syncKeyInput = document.getElementById('sync-key-input')
   const saveBtn = document.getElementById('btn-save-server')
   const pingBtn = document.getElementById('btn-ping-server')
   const statusPill = document.getElementById('status-pill')
@@ -14,7 +15,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 1. Tải URL cấu hình từ chrome.storage.local
   if (chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['serverUrl'], (res) => {
+    chrome.storage.local.get(['serverUrl', 'syncKey'], (res) => {
+      if (res.syncKey && syncKeyInput) syncKeyInput.value = res.syncKey
       if (res.serverUrl) {
         urlInput.value = res.serverUrl
       } else {
@@ -69,7 +71,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (chrome.storage && chrome.storage.local) {
-      chrome.storage.local.set({ serverUrl: val }, () => {
+      const syncKey = syncKeyInput ? syncKeyInput.value.trim() : ''
+      chrome.storage.local.set({ serverUrl: val, syncKey }, () => {
         feedbackMsg.style.color = '#10B981'
         feedbackMsg.textContent = 'Đã lưu cấu hình máy chủ!'
         setTimeout(() => {

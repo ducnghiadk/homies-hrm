@@ -1,8 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, MANAGER_ROLES } from '@/lib/server/auth-helper'
 import { sendInvitationEmail } from '@/lib/server/invitation-email-service'
 import type { EmploymentType } from '@/lib/mock-data-employee-ext'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const gate = await requireAuth(request, MANAGER_ROLES)
+  if (!gate.ok) return gate.response
   try {
     // Basic Auth Check: ensure caller specifies valid internal request header or authentication context
     const authHeader = request.headers.get('authorization')
