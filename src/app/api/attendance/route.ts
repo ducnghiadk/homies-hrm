@@ -20,6 +20,17 @@ import {
   type MappedIposSchedule,
 } from '@/lib/services/ipos/ipos-cloud-client'
 import { sendIposSyncAlert } from '@/lib/services/ipos/ipos-notifier'
+import { getShiftTimeRange } from '@/lib/server/db'
+import { getVnClock } from '@/lib/time/vn-time'
+import {
+  computeLateMinutes,
+  computePaidMinutes,
+  isLateBeyondGrace,
+  minutesToHours,
+  normalizeOperationSettings,
+} from '@/lib/attendance/operation-settings'
+import { resolveShiftForCheckin, verifyStorePresence } from '@/lib/server/attendance-schedule'
+import { extractClientIp } from '@/lib/attendance/checkin-method'
 
 /**
  * Lưu các bản ghi chấm công từ iPOS Cloud vào CSDL nội bộ (server-db.json)
@@ -368,7 +379,30 @@ export async function POST(req: NextRequest) {
       }
       if (rawBody?.status === 'check_out') body.status = 'check_out'
     }
-    const { getShiftTimeRange, calculateLatePenaltyAmount, parseTimeToMinutes } = await import('@/lib/server/db')
+    const settings = normalizeOperationSettings(db.operation_settings).attendance
+    const clock = getVnClock()
+    const storeNameOf = (storeId?: string) =>
+      db.stores.find((s) => s.id === storeId)?.name ||
+      (storeId === 'store-002' ? 'Homies Milk Tea - Đường 429' : 'Homies Milk Tea - Hồ Bá Phấn')
+    // Nhân viên tự chấm (kể cả quản lý tự chấm cho mình) phải có mặt tại quán: Wi-Fi quán hoặc mã QR (theo cài đặt chi nhánh) + bán kính GPS.
+    // Quản lý ghi công hộ người khác (sửa công thủ công) thì không cần.
+    const isSelfAction = !isOperator || body.employee_id === gate.user.userId
+    if (isOperator && isSelfAction) {
+      // Quản lý tự chấm công cho mình cũng lấy giờ máy chủ như mọi người.
+      body = { ...body }
+      for (const k of ['check_in_time', 'check_out_time', 'total_hours', 'late_minutes', 'date', 'shift_id']) {
+        delete (body as Record<string, unknown>)[k]
+      }
+    }
+    const canOverride = isOperator && !isSelfAction
+    const requirePresence = (storeId: string | undefined) => {
+      if (!isSelfAction) return null
+      const store = db.stores.find((s) => s.id === storeId)
+      if (!store) return NextResponse.json({ success: false, error: 'Không xác định được cơ sở để chấm công.' }, { status: 400 })
+      const check = verifyStorePresence(store, body.qr_code, body.latitude ?? body.check_out_lat ?? body.check_in_lat, body.longitude ?? body.check_out_lng ?? body.check_in_lng, Date.now(), extractClientIp((n) => req.headers.get(n)))
+      if (!check.ok) return NextResponse.json({ success: false, error: check.error }, { status: 400 })
+      return null
+    }
 
     // 1. Xử lý ghi nhận Tan ca / Check-out
     if (body.status === 'check_out' || body.action === 'check_out' || body.type === 'check_out') {
@@ -376,54 +410,57 @@ export async function POST(req: NextRequest) {
       if (!empId) {
         return NextResponse.json({ success: false, error: 'Thiếu mã nhân sự employee_id' }, { status: 400 })
       }
-      const targetDate = body.date || new Date().toISOString().slice(0, 10)
-      const outTime = body.check_out_time || new Date().toISOString()
-      const outLat = Number(body.check_out_lat || body.check_in_lat || 0)
-      const outLng = Number(body.check_out_lng || body.check_in_lng || 0)
+      const emp = db.employees.find((e) => e.id === empId)
+      const targetDate = body.date || clock.date
+      const outTime = body.check_out_time || clock.iso
+      const outMs = new Date(outTime).getTime()
+      const outLat = Number(body.check_out_lat ?? body.latitude ?? 0)
+      const outLng = Number(body.check_out_lng ?? body.longitude ?? 0)
 
-      // Tìm bản ghi chấm công trong ngày của nhân sự này
-      const existingIdx = db.attendance.findIndex(
-        (a) => a.employee_id === empId && a.date === targetDate
-      )
-
-      // Xác định ca làm việc để đối soát giờ về sớm
-      let targetShiftId = body.shift_id || (existingIdx >= 0 ? db.attendance[existingIdx].shift_id : undefined)
-      if (!targetShiftId && db.shifts) {
-        const registered = db.shifts.find(
-          (s) => s.employee_id === empId && s.date === targetDate && s.status !== 'REJECTED'
-        )
-        if (registered) targetShiftId = registered.shift_id
+      // Tìm lượt VÀO CA ĐANG MỞ (chưa tan ca) gần nhất — không lấy bừa bản ghi đầu tiên trong ngày,
+      // để ca gãy (2 ca/ngày) không bị ca sau ghi đè ca trước. Cho phép ca qua đêm (bản ghi hôm trước).
+      const prevDate = new Date(Date.parse(`${targetDate}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+      let existingIdx = -1
+      if (body.attendance_id) {
+        existingIdx = db.attendance.findIndex((a) => a.id === body.attendance_id && a.employee_id === empId)
+      }
+      if (existingIdx < 0) {
+        let bestMs = -Infinity
+        db.attendance.forEach((a, idx) => {
+          if (a.employee_id !== empId || a.check_out_time) return
+          if (a.date !== targetDate && a.date !== prevDate) return
+          const inMs = new Date(a.check_in_time).getTime()
+          if (Number.isFinite(inMs) && inMs <= outMs && inMs > bestMs) {
+            bestMs = inMs
+            existingIdx = idx
+          }
+        })
       }
 
-      let isEarly = false
-      let earlyMinutes = 0
-      let effectiveEndTime = body.shift_end_time
-      if (!effectiveEndTime && targetShiftId) {
-        const range = getShiftTimeRange(targetShiftId, db.shift_templates)
-        effectiveEndTime = range.endStr
-      }
-
-      if (effectiveEndTime) {
-        const outMinutes = parseTimeToMinutes(outTime)
-        const endMinutes = parseTimeToMinutes(effectiveEndTime)
-        const diff = endMinutes - outMinutes
-        if (diff > 0) {
-          earlyMinutes = diff
-          isEarly = true
-        }
-      }
+      const presenceError = requirePresence(existingIdx >= 0 ? db.attendance[existingIdx].store_id : body.store_id || emp?.store_id)
+      if (presenceError) return presenceError
 
       if (existingIdx >= 0) {
-        const inTime = new Date(db.attendance[existingIdx].check_in_time).getTime()
-        const calculatedHours = Math.round(((new Date(outTime).getTime() - inTime) / (1000 * 60 * 60)) * 100) / 100
-        // Nếu về sớm ➔ tính theo giờ công thực tế, không tính tròn cả ca
-        const finalHours = isEarly
-          ? (calculatedHours > 0 ? calculatedHours : 0)
-          : (body.total_hours !== undefined ? Number(body.total_hours) : (calculatedHours > 0 ? calculatedHours : 0))
+        const record = db.attendance[existingIdx]
+        const targetShiftId = (canOverride && body.shift_id) || record.shift_id
+        const range = targetShiftId ? getShiftTimeRange(targetShiftId, db.shift_templates) : null
+        const inMs = new Date(record.check_in_time).getTime()
+        const checkInMin = getVnClock(new Date(inMs)).minutesOfDay
+        const checkOutMin = checkInMin + Math.max(0, Math.round((outMs - inMs) / 60_000))
+        const shiftEndMin = range ? (range.endMin <= range.startMin ? range.endMin + 1440 : range.endMin) : null
+        const earlyMinutes = shiftEndMin !== null ? Math.max(0, shiftEndMin - checkOutMin) : 0
+        const isEarly = earlyMinutes > 0
+        const paidMinutes = computePaidMinutes(
+          { checkInMin, checkOutMin, shiftStartMin: range?.startMin ?? null, shiftEndMin },
+          settings
+        )
+        // Quản lý sửa công thủ công được nhập thẳng số giờ; còn lại tính theo Cài đặt giờ công.
+        const finalHours =
+          canOverride && body.total_hours !== undefined ? Number(body.total_hours) : minutesToHours(paidMinutes)
 
         db.attendance[existingIdx] = {
-          ...db.attendance[existingIdx],
-          shift_id: targetShiftId || db.attendance[existingIdx].shift_id,
+          ...record,
+          shift_id: targetShiftId,
           check_out_time: outTime,
           check_out_lat: outLat,
           check_out_lng: outLng,
@@ -437,33 +474,33 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           success: true,
           message: isEarly
-            ? `Ghi nhận tan ca thành công (Về sớm ${earlyMinutes} phút - trừ giờ công thực tế)`
+            ? `Ghi nhận tan ca thành công (Về sớm ${earlyMinutes} phút - tính giờ công thực tế)`
             : 'Ghi nhận tan ca / check-out thành công',
           data: db.attendance[existingIdx],
         })
       }
 
-      // Nếu chưa có check-in trước đó, tạo bản ghi tan ca mới
-      const emp = db.employees.find((e) => e.id === empId)
-      // Không có giờ vào thì không tự cộng công: chỉ quản lý được nhập số giờ thủ công
-      const calculatedHours = body.total_hours ? Number(body.total_hours) : 0
+      // Không có lượt vào ca đang mở: tạo bản ghi tan ca, không tự cộng công
+      // (chỉ quản lý được nhập số giờ thủ công).
+      const calculatedHours = canOverride && body.total_hours ? Number(body.total_hours) : 0
+      const storeId = body.store_id || emp?.store_id || 'store-001'
       const checkOutLog: ServerAttendanceLog = {
         id: body.id || `att-out-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         employee_id: empId,
         employee_name: emp?.full_name || body.employee_name || 'Nhân sự',
-        store_id: body.store_id || emp?.store_id || 'store-001',
-        store_name: body.store_name || (body.store_id === 'store-002' ? 'Homies Milk Tea - Đường 429' : 'Homies Milk Tea - Hồ Bá Phấn'),
-        shift_id: targetShiftId,
-        check_in_time: body.check_in_time || outTime,
+        store_id: storeId,
+        store_name: body.store_name || storeNameOf(storeId),
+        shift_id: canOverride ? body.shift_id : undefined,
+        check_in_time: (canOverride && body.check_in_time) || outTime,
         check_out_time: outTime,
         check_in_lat: outLat,
         check_in_lng: outLng,
         check_out_lat: outLat,
         check_out_lng: outLng,
-        check_in_distance_meters: Number(body.check_in_distance_meters || 15),
+        check_in_distance_meters: Number(body.check_in_distance_meters || 0),
         status: 'check_out',
-        is_early: isEarly,
-        early_minutes: earlyMinutes,
+        is_early: false,
+        early_minutes: 0,
         late_minutes: 0,
         total_hours: calculatedHours,
         qr_code: body.qr_code,
@@ -475,9 +512,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: isEarly
-          ? `Ghi nhận tan ca thành công (Về sớm ${earlyMinutes} phút - trừ giờ công thực tế)`
-          : 'Ghi nhận tan ca / check-out thành công',
+        message: 'Ghi nhận tan ca (không tìm thấy lượt vào ca đang mở — cần quản lý bổ sung giờ vào)',
         data: checkOutLog,
       })
     }
@@ -487,24 +522,28 @@ export async function POST(req: NextRequest) {
     if (!empId) {
       return NextResponse.json({ success: false, error: 'Thiếu mã nhân sự employee_id' }, { status: 400 })
     }
+    const emp = db.employees.find((e) => e.id === empId)
+    const storeId = body.store_id || emp?.store_id || 'store-001'
+    const presenceError = requirePresence(storeId)
+    if (presenceError) return presenceError
 
-    const checkInTime = body.check_in_time || new Date().toISOString()
+    const checkInTime = body.check_in_time || clock.iso
     const checkInDate = new Date(checkInTime)
-    const targetDate = body.date || checkInTime.slice(0, 10)
+    const inClock = getVnClock(checkInDate)
+    const targetDate = body.date || inClock.date
 
-    // 2a. CHẶN CHECK-IN ĐÚP (DE-BOUNCE): Trong cùng 1 ngày, nếu đã bấm trong vòng 15 phút thì từ chối
+    // 2a. CHỐNG BẤM ĐÚP: chỉ chặn khi còn một lượt vào ca CHƯA tan ca trong 15 phút gần đây.
+    // Đã tan ca rồi (đổi ca, sai ca) thì được vào ca lại ngay.
     const recentCheckin = db.attendance.find((a) => {
-      if (a.employee_id !== empId || a.date !== targetDate) return false
+      if (a.employee_id !== empId || a.date !== targetDate || a.check_out_time) return false
       const prevTime = new Date(a.check_in_time).getTime()
-      const diffMs = Math.abs(checkInDate.getTime() - prevTime)
-      return diffMs < 15 * 60 * 1000 // trong vòng 15 phút
+      return Math.abs(checkInDate.getTime() - prevTime) < 15 * 60 * 1000
     })
-
     if (recentCheckin) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Bạn vừa thực hiện chấm công cách đây ít hơn 15 phút. Vui lòng không bấm liên tiếp để tránh bị tính trùng công.',
+          error: 'Bạn vừa vào ca cách đây ít hơn 15 phút. Vui lòng không bấm liên tiếp để tránh bị tính trùng công.',
           debounced: true,
           data: recentCheckin,
         },
@@ -512,73 +551,69 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 2b. BẮT ĐI TRỄ TỰ ĐỘNG (> 15 PHÚT)
-    let targetShiftId = body.shift_id
-    if (!targetShiftId && db.shifts) {
-      const registered = db.shifts.find(
-        (s) => s.employee_id === empId && s.date === targetDate && s.status !== 'REJECTED'
+    // 2b. Tìm ca theo LỊCH ĐÃ CHỐT (lịch rảnh chỉ là dự phòng) và giờ Việt Nam
+    let targetShiftId: string | undefined = canOverride ? body.shift_id : undefined
+    let scheduleSource: 'official' | 'availability' | 'none' = 'none'
+    if (targetShiftId) {
+      const isOfficial = (db.official_schedules || []).some(
+        (s) => s.employee_id === empId && s.date === targetDate && s.shift_id === targetShiftId && s.status === 'published'
       )
-      if (registered) targetShiftId = registered.shift_id
-    }
-
-    let effectiveStartTime = body.shift_start_time
-    if (!effectiveStartTime && targetShiftId) {
-      const range = getShiftTimeRange(targetShiftId, db.shift_templates)
-      effectiveStartTime = range.startStr
-    }
-
-    let lateMinutes = Number(body.late_minutes || 0)
-    let isLate = false
-    let status: 'on_time' | 'late' = body.status || 'on_time'
-
-    if (effectiveStartTime) {
-      const inMinutes = parseTimeToMinutes(checkInTime)
-      const startMinutes = parseTimeToMinutes(effectiveStartTime)
-      const diff = inMinutes - startMinutes
-      if (diff > 0) {
-        lateMinutes = diff
-        if (lateMinutes > 15) {
-          status = 'late'
-          isLate = true
-        }
+      scheduleSource = isOfficial ? 'official' : 'availability'
+    } else {
+      const picked = resolveShiftForCheckin(db, empId, targetDate, inClock.minutesOfDay)
+      if (picked) {
+        targetShiftId = picked.shift_id
+        scheduleSource = picked.source
       }
-    } else if (lateMinutes > 15) {
-      status = 'late'
-      isLate = true
+    }
+    const offSchedule = scheduleSource !== 'official'
+    if (offSchedule && isSelfAction && !settings.allow_off_schedule_checkin) {
+      return NextResponse.json(
+        { success: false, error: 'Bạn không có ca trong lịch đã chốt hôm nay. Vui lòng liên hệ quản lý.' },
+        { status: 400 }
+      )
     }
 
-    const emp = db.employees.find((e) => e.id === empId)
+    let lateMinutes = 0
+    if (targetShiftId) {
+      const range = getShiftTimeRange(targetShiftId, db.shift_templates)
+      lateMinutes = computeLateMinutes(inClock.minutesOfDay, range.startMin)
+    } else if (canOverride) {
+      lateMinutes = Number(body.late_minutes || 0)
+    }
+    const isLate = isLateBeyondGrace(lateMinutes, settings)
+    const status: 'on_time' | 'late' = isLate ? 'late' : 'on_time'
     const empName = emp?.full_name || body.employee_name || 'Nhân sự'
 
     const newLog: ServerAttendanceLog = {
       id: body.id || `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       employee_id: empId,
       employee_name: empName,
-      store_id: body.store_id || emp?.store_id || 'store-001',
-      store_name: body.store_name || (body.store_id === 'store-002' ? 'Homies Milk Tea - Đường 429' : 'Homies Milk Tea - Hồ Bá Phấn'),
+      store_id: storeId,
+      store_name: body.store_name || storeNameOf(storeId),
       shift_id: targetShiftId,
       check_in_time: checkInTime,
-      check_in_lat: Number(body.check_in_lat || 0),
-      check_in_lng: Number(body.check_in_lng || 0),
-      check_in_distance_meters: Number(body.check_in_distance_meters || 15),
+      check_in_lat: Number(body.check_in_lat ?? body.latitude ?? 0),
+      check_in_lng: Number(body.check_in_lng ?? body.longitude ?? 0),
+      check_in_distance_meters: Number(body.check_in_distance_meters || 0),
       status,
       is_late: isLate,
       late_minutes: lateMinutes,
       qr_code: body.qr_code,
       date: targetDate,
+      schedule_source: scheduleSource,
+      off_schedule: offSchedule,
     }
 
     db.attendance.unshift(newLog)
 
-    // 2c. KẾT NỐI SỐ PHÚT TRỄ VÀO SỔ LỖI KPI & BẢNG LƯƠNG
+    // 2c. Ghi vi phạm vào Sổ lỗi KPI. KHÔNG tự sửa/tạo phiếu lương ở đây:
+    // tiền trừ đi trễ (nếu có) do Cài đặt lương quyết định khi bấm "Tính lương",
+    // tránh phạt 2 lần và tránh phiếu lương nháp làm sai trang Bảng lương.
     if (isLate) {
       if (!db.incidents) db.incidents = []
-      const penaltyAmount = calculateLatePenaltyAmount(lateMinutes)
-      const incidentId = `inc-att-${empId}-${Date.now()}`
-
-      // Tự động sinh 1 vi phạm vào Sổ lỗi KPI
       db.incidents.unshift({
-        id: incidentId,
+        id: `inc-att-${empId}-${Date.now()}`,
         store_id: newLog.store_id,
         employee_id: empId,
         employee_name: empName,
@@ -586,46 +621,12 @@ export async function POST(req: NextRequest) {
         source: 'attendance',
         status: 'confirmed',
         violation_code: 'attendance_late',
-        reason: `Đi trễ ${lateMinutes} phút (vượt quá 15 phút quy định)`,
-        description: `Lỗi kỷ luật chấm công: Nhân viên ${empName} đi trễ ${lateMinutes} phút trong ca làm việc ngày ${targetDate}`,
-        penalty_amount: penaltyAmount,
+        reason: `Đi trễ ${lateMinutes} phút (vượt ngưỡng ${settings.late_grace_minutes} phút)`,
+        description: `Nhân viên ${empName} đi trễ ${lateMinutes} phút ngày ${targetDate}. Tiền trừ (nếu có) tính theo Cài đặt lương khi tính lương.`,
+        penalty_amount: 0,
         evidence_refs: [newLog.id],
         created_at: checkInTime,
       })
-
-      // Đẩy số tiền phạt tương ứng vào cột late_deduction trên bảng lương
-      const period = targetDate.slice(0, 7)
-      if (!db.salary_slips) db.salary_slips = []
-      const slipIdx = db.salary_slips.findIndex(
-        (s) => s.employee_id === empId && s.period === period
-      )
-      if (slipIdx >= 0 && db.salary_slips[slipIdx].status === 'locked') {
-        // Phiếu lương đã khóa sổ: chỉ ghi sổ lỗi, không sửa số liệu kế toán
-      } else if (slipIdx >= 0) {
-        const slip = db.salary_slips[slipIdx]
-        slip.late_deduction = (slip.late_deduction || 0) + penaltyAmount
-        slip.deductions = (slip.deductions || 0) + penaltyAmount
-        slip.net_salary = Math.max(0, (slip.net_salary || 0) - penaltyAmount)
-      } else {
-        db.salary_slips.push({
-          id: `slip-${period}-${empId}`,
-          employee_id: empId,
-          employee_name: empName,
-          employee_code: emp?.employee_code || 'NV0000',
-          position: emp?.department_name || 'Nhân viên',
-          store_id: newLog.store_id,
-          period,
-          work_days: 1,
-          standard_days: 26,
-          base_salary: emp?.base_salary || 0,
-          allowances: 0,
-          bonus: 0,
-          deductions: penaltyAmount,
-          late_deduction: penaltyAmount,
-          net_salary: Math.max(0, (emp?.base_salary || 0) - penaltyAmount),
-          status: 'draft',
-        })
-      }
     }
 
     await saveServerDb(db)
@@ -633,8 +634,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: isLate
-        ? `Ghi nhận chấm công (Đi trễ ${lateMinutes} phút - đã chuyển vào Sổ lỗi KPI)`
-        : 'Ghi nhận chấm công thành công',
+        ? `Ghi nhận chấm công (Đi trễ ${lateMinutes} phút - đã ghi vào Sổ lỗi KPI)`
+        : offSchedule
+          ? 'Ghi nhận chấm công (ngoài lịch đã chốt - chờ quản lý xác nhận)'
+          : 'Ghi nhận chấm công thành công',
       data: newLog,
     })
   } catch (error: unknown) {

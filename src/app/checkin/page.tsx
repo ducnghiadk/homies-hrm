@@ -196,6 +196,13 @@ function CheckInPageContent() {
   const [qrPurpose, setQrPurpose] = useState<'checkin' | 'checkout'>('checkin')
   const [pinInput, setPinInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // Cách chấm công của chi nhánh (Wi-Fi quán / mã QR) do máy chủ trả về
+  const [presenceInfo, setPresenceInfo] = useState<{
+    checkin_method: 'wifi_or_qr' | 'wifi' | 'qr'
+    require_gps: boolean
+    wifi_configured: boolean
+    on_shop_wifi: boolean
+  } | null>(null)
   const watchIdRef = useRef<number | null>(null)
   const gpsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevOnlineRef = useRef(true)
@@ -253,6 +260,28 @@ function CheckInPageContent() {
     }
   }, [targetStoreId])
 
+  const storeIdForPresence = store?.id
+  const refreshPresence = useCallback(async () => {
+    if (!storeIdForPresence) return null
+    try {
+      const res = await fetch(`/api/attendance/checkin?store_id=${encodeURIComponent(storeIdForPresence)}`, { cache: 'no-store', credentials: 'include' })
+      const json = await res.json().catch(() => null)
+      if (json?.success) {
+        setPresenceInfo(json.data)
+        return json.data as NonNullable<typeof presenceInfo>
+      }
+    } catch {
+      // Không lấy được thông tin: vẫn cho quét mã QR như bình thường
+    }
+    return null
+  }, [storeIdForPresence])
+
+  useEffect(() => {
+    const t = setTimeout(() => void refreshPresence(), 0)
+    return () => clearTimeout(t)
+  }, [refreshPresence])
+
+  const needGps = presenceInfo?.require_gps !== false
   const gpsInRange = userPos !== null && distance !== null && store ? distance <= store.checkin_radius_meters : false
   const canCheckin = !!store
 
@@ -393,7 +422,7 @@ function CheckInPageContent() {
       showError('Cần có mạng để chấm công. Vui lòng bật Wi-Fi hoặc 4G rồi thử lại.')
       return
     }
-    if (!userPos) {
+    if (needGps && !userPos) {
       showError('Chưa lấy được vị trí. Vui lòng bật định vị (GPS) cho trình duyệt rồi thử lại.')
       return
     }
@@ -412,9 +441,9 @@ function CheckInPageContent() {
         body: JSON.stringify({
           employee_id: currentUser.id,
           store_id: store.id,
-          latitude: userPos.lat,
-          longitude: userPos.lng,
-          qr_code: qrCode,
+          latitude: userPos?.lat,
+          longitude: userPos?.lng,
+          qr_code: qrCode || undefined,
           shift_id: shift?.id,
         }),
       })
@@ -473,6 +502,16 @@ function CheckInPageContent() {
       await submitCheckin(scannedQr)
       return
     }
+    // Đang dùng Wi-Fi quán thì chấm công luôn, không cần quét mã
+    const info = (await refreshPresence()) || presenceInfo
+    if (info?.on_shop_wifi) {
+      await submitCheckin('')
+      return
+    }
+    if (info?.checkin_method === 'wifi') {
+      showError('Bạn chưa kết nối Wi-Fi của quán. Vui lòng bắt Wi-Fi quán (tắt 4G) rồi bấm lại.', 5000)
+      return
+    }
     requestQr('checkin')
   }
 
@@ -493,6 +532,15 @@ function CheckInPageContent() {
       await submitCheckout(scannedQr)
       return
     }
+    const info = (await refreshPresence()) || presenceInfo
+    if (info?.on_shop_wifi) {
+      await submitCheckout('')
+      return
+    }
+    if (info?.checkin_method === 'wifi') {
+      showError('Bạn chưa kết nối Wi-Fi của quán. Vui lòng bắt Wi-Fi quán (tắt 4G) rồi bấm lại.', 5000)
+      return
+    }
     requestQr('checkout')
   }
 
@@ -503,7 +551,7 @@ function CheckInPageContent() {
       showError('Cần có mạng để ghi nhận tan ca.')
       return
     }
-    if (!userPos) {
+    if (needGps && !userPos) {
       showError('Chưa lấy được vị trí. Vui lòng bật định vị (GPS) rồi thử lại.')
       return
     }
@@ -522,11 +570,11 @@ function CheckInPageContent() {
           status: 'check_out',
           action: 'check_out',
           check_out_time: new Date().toISOString(),
-          check_out_lat: userPos.lat,
-          check_out_lng: userPos.lng,
-          latitude: userPos.lat,
-          longitude: userPos.lng,
-          qr_code: qrCode,
+          check_out_lat: userPos?.lat,
+          check_out_lng: userPos?.lng,
+          latitude: userPos?.lat,
+          longitude: userPos?.lng,
+          qr_code: qrCode || undefined,
           date: todayStr,
           shift_id: shift?.id,
           shift_end_time: shift?.end_time,
@@ -708,6 +756,34 @@ function CheckInPageContent() {
                   <span className="text-xs text-gray-400">Đang dò GPS...</span>
                 )}
               </div>
+
+              {/* Wi-Fi quán */}
+              {presenceInfo && presenceInfo.checkin_method !== 'qr' && (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${presenceInfo.on_shop_wifi ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {presenceInfo.on_shop_wifi ? <Wifi size={16} /> : <WifiOff size={16} />}
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-gray-800">Wi-Fi của quán</span>
+                      <p className="text-[11px] text-gray-400">
+                        {presenceInfo.on_shop_wifi
+                          ? 'Đang dùng Wi-Fi quán, bấm chấm công là xong'
+                          : presenceInfo.wifi_configured
+                            ? 'Kết nối Wi-Fi quán (tắt 4G) để khỏi quét mã'
+                            : 'Quán chưa cài Wi-Fi chấm công'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void refreshPresence()}
+                    className="text-xs font-bold text-gray-600 bg-white hover:bg-gray-100 border border-gray-200 px-3 py-1 rounded-lg transition-colors cursor-pointer active:scale-95"
+                  >
+                    Kiểm tra lại
+                  </button>
+                </div>
+              )}
 
               {/* QR Kiosk POS status */}
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 border border-gray-100">

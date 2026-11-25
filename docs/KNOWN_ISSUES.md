@@ -1,5 +1,11 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-25 (Chấm công bằng Wi-Fi quán thay cho quét QR):
+  1) Nguyên nhân: nhân viên bắt buộc quét mã QR mỗi lần vào ca/tan ca; trang `/settings/wifi` cũ chỉ lưu tên Wi-Fi trên trình duyệt, không có tác dụng (trình duyệt không đọc được tên Wi-Fi).
+  2) Cách giải quyết: mỗi chi nhánh chọn cách chấm công: "Wi-Fi quán hoặc mã QR" (mặc định), "Chỉ Wi-Fi quán", "Chỉ mã QR", kèm tùy chọn có kiểm tra GPS hay không. Wi-Fi quán được nhận biết bằng địa chỉ mạng công cộng của quán; quản lý đứng tại quán bấm "Dùng mạng hiện tại" để lưu. Máy chủ kiểm tra ở cả `/api/attendance/checkin` và tan ca qua `/api/attendance`. Sửa thêm: lưu thông tin chi nhánh qua `/api/stores` không còn xóa mất cài đặt chấm công; ẩn danh sách mạng của quán với nhân viên.
+  3) Lưu ý vận hành: nhà mạng có thể đổi địa chỉ mạng của quán (thường sau khi khởi động lại modem); khi đó nhân viên sẽ được hỏi quét QR, quản lý bấm lại "Dùng mạng hiện tại". Nhân viên phải tắt 4G và bắt Wi-Fi quán.
+  4) File liên quan: `src/lib/attendance/checkin-method.ts`, `src/lib/server/attendance-schedule.ts`, `src/app/api/stores/checkin-method/route.ts`, `src/app/api/stores/route.ts`, `src/app/api/attendance/checkin/route.ts`, `src/app/api/attendance/route.ts`, `src/app/checkin/page.tsx`, `src/app/settings/wifi/page.tsx`, `src/components/settings/StoreCheckinMethodPanel.tsx`, `src/lib/server/db.ts`.
+
 - Đã fix 2026-11-25 (Audit trước khi triển khai — Đợt 3 bảng lương, thuế TNCN và chấm công):
   1) Nguyên nhân:
      - Mức giảm trừ gia cảnh (11 triệu / 4,4 triệu) và biểu thuế 7 bậc viết cứng trong công thức, không còn đúng từ kỳ tính thuế 2026 và kế toán không tự chỉnh được.
@@ -17,6 +23,20 @@
      - `getActiveUser` chặn tài khoản còn mật khẩu mặc định ở các API nghiệp vụ.
   3) Lưu ý vận hành: kế toán cần kiểm tra lại số liệu thuế trong Cài đặt lương rồi bấm Lưu (nếu đang lưu 11 triệu / 4,4 triệu sẽ có cảnh báo); thuế thưởng BSC là số tạm khấu trừ, quyết toán lại khi bấm Tính lương; phiếu nháp cũ do lỗi đi trễ tạo ra cần kế toán xóa tay.
   4) File liên quan: `src/lib/payroll/pit.ts`, `src/components/payroll/PitSettingsPanel.tsx`, `src/app/settings/payroll/page.tsx`, `src/lib/services/payroll/payroll-policy-service.ts`, `src/lib/payroll/policy-registry.ts`, `src/lib/payroll-engine.ts`, `src/app/api/payroll/route.ts`, `src/app/api/payroll/tax-settings/route.ts`, `src/app/api/bsc/approve/route.ts`, `src/app/api/attendance/checkin/route.ts`, `src/app/checkin/page.tsx`, `src/app/checkin/kiosk/page.tsx`, `src/lib/time/vn-time.ts`, `src/lib/server/auth-helper.ts`, `src/lib/server/db.ts`, `src/lib/server/supabase-store.ts`.
+
+- Đã fix 2026-11-25 (Rà soát logic Chấm công → Đăng ký lịch → Bảng lương):
+  1) Nguyên nhân:
+     - Chấm công đối soát theo lịch rảnh (ca đầu tiên tìm thấy) thay vì lịch đã chốt; tính ngày/giờ theo UTC; ca tan làm không cần QR/GPS; đến sớm/ở muộn đều được tính công.
+     - Đi trễ bị phạt 2 lần (sổ lỗi + tự ghi thẳng vào phiếu lương), và có thể tạo phiếu lương giả khi chưa có phiếu; phạt bậc 3 dùng đơn giá cứng 22.000đ, nhãn bậc ghi số tiền sai.
+     - Hạn chót nộp lịch rảnh (22:00 Thứ 6) chỉ chặn trên giao diện, gọi thẳng API vẫn sửa được; trang cài đặt "hạn chốt" chỉ lưu trên trình duyệt, không có tác dụng.
+     - Chốt lịch tuần không kiểm tra trùng ca, nhân viên đã nghỉ, vượt giờ/ngày, vượt giờ/tuần, nghỉ giữa ca tối - ca sáng.
+  2) Cách giải quyết:
+     - Thêm "Cài đặt vận hành" lưu trên máy chủ (`/api/operation-settings`): hạn chót nộp lịch rảnh, số phút cho phép trễ, có tính công khi đến sớm/ở muộn hay không (mặc định không), làm tròn giờ công, cho/không cho chấm công ngoài lịch.
+     - `/api/attendance`: ưu tiên ca trong lịch đã chốt, bỏ qua ca đã chấm xong, giờ Việt Nam, bắt buộc QR + GPS cả khi vào và tan ca, giờ công tính theo cài đặt; đi trễ chỉ ghi sổ lỗi, tiền phạt tính một lần trong bảng lương.
+     - `/api/shifts/register`: chặn trên máy chủ khi quá hạn chót (mã `AVAILABILITY_DEADLINE_PASSED`), trang đăng ký hiển thị hạn chót từ máy chủ.
+     - `/api/schedules` (`publish_week`): kiểm tra trước khi chốt; lỗi chặn trả 422 `PUBLISH_VALIDATION_FAILED` và không lưu gì, cảnh báo mềm vẫn cho chốt.
+     - Phạt đi trễ có 4 chế độ (cố định, bậc thang, trừ theo phút, không phạt) + số lần đi trễ vẫn giữ thưởng chuyên cần; dùng đơn giá giờ thật của từng người; nhân viên bán thời gian mặc định không bị trừ thêm ở chế độ theo phút.
+  3) File liên quan: `src/lib/attendance/operation-settings.ts`, `src/app/api/operation-settings/route.ts`, `src/lib/server/attendance-schedule.ts`, `src/app/api/attendance/route.ts`, `src/app/api/shifts/register/route.ts`, `src/app/shifts/register/page.tsx`, `src/lib/scheduling/publish-validator.ts`, `src/app/api/schedules/route.ts`, `src/lib/payroll/late-penalty.ts`, `src/lib/payroll-engine.ts`, `src/lib/services/payroll/payroll-policy-service.ts`, `src/app/settings/payroll/page.tsx`, `src/components/settings/OperationSettingsPanel.tsx`, `src/app/settings/schedule-rules/page.tsx`.
 
 - Đã fix 2026-11-25 (Audit bảo mật trước khi triển khai — Đợt 1 nghiêm trọng + Đợt 2 cao):
   1) Nguyên nhân:

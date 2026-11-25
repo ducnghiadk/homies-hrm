@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
 
     const sanitizeStore = (store: ServerStore) => {
       if (canSeePin) return store
-      const { pin_code: _pin, ...safe } = store
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { pin_code: _pin, wifi_public_ips: _ips, ...safe } = store
       return safe
     }
 
@@ -75,6 +76,8 @@ export async function POST(req: NextRequest) {
     const existingIndex = db.stores.findIndex((s) => s.id === storeId)
 
     const updatedStore: ServerStore = {
+      // Giữ các cài đặt khác của chi nhánh (vd. cách chấm công Wi-Fi/QR) không có trong form này
+      ...(existingIndex >= 0 ? db.stores[existingIndex] : {}),
       id: storeId,
       name: name.trim(),
       address: address ? String(address).trim() : (existingIndex >= 0 ? db.stores[existingIndex].address : ''),

@@ -21,6 +21,7 @@ import { AttendanceService, type PayrollAttendanceRecord } from './services/atte
 import { employeeAdapter, type PayrollEmployeeDbRow } from './adapters/employee-adapter'
 import { getEffectiveHourlyRate, calculateHourlyEarnings } from './payroll/payroll-calculator'
 import { careerAllowancesFor, fetchCareerPayPlans } from './career-path/payroll-link'
+import { computeLatePenalties, type LatePenaltySettings } from './payroll/late-penalty'
 
 // ══════════════════════════════════════
 // TYPES
@@ -459,6 +460,25 @@ export function parseTimeToHours(timeStr?: string): number | null {
   return null
 }
 
+/** Đọc cài đặt phạt đi trễ (giữ đúng giá trị mặc định cũ khi chưa cài). */
+function getLatePenaltySettings(policy: ReturnType<typeof getActivePayrollPolicy>): LatePenaltySettings {
+  const lp = policy.latePenaltyPolicy
+  return {
+    mode: lp?.mode ?? 'fixed',
+    graceOccurrences: lp?.graceOccurrences ?? 2,
+    fixedAmount: lp?.fixedAmount ?? policy.rates?.latePenaltyPerOccurrence ?? 50000,
+    tier1MaxMinutes: lp?.tier1MaxMinutes ?? 15,
+    tier1Amount: lp?.tier1Amount ?? 20000,
+    tier2MaxMinutes: lp?.tier2MaxMinutes ?? 30,
+    tier2Amount: lp?.tier2Amount ?? 50000,
+    tier3Amount: lp?.tier3Amount ?? 100000,
+    tier3HalfShiftDeduction: lp?.tier3HalfShiftDeduction,
+    perMinuteMultiplier: lp?.perMinuteMultiplier ?? 1,
+    perMinuteMaxPerOccurrence: lp?.perMinuteMaxPerOccurrence ?? 0,
+    perMinuteApplyToPartTime: lp?.perMinuteApplyToPartTime ?? false,
+  }
+}
+
 function summarizeAttendanceRecords(
   records: PayrollAttendanceRecord[],
   overtimeThresholdHours?: number,
@@ -558,61 +578,14 @@ function summarizeAttendanceRecords(
     .filter(r => r.status === 'late' && !r.soCaChoDuyet && r.trang_thai_db !== 'cho_duyet' && (r.check_out_time || !r.chuaCheckOut))
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
 
-  const mode = policy.latePenaltyPolicy?.mode ?? 'fixed'
-  const graceCount = policy.latePenaltyPolicy?.graceOccurrences ?? 2
-  const fixedRate = policy.latePenaltyPolicy?.fixedAmount ?? policy.rates?.latePenaltyPerOccurrence ?? 50000
-  const t1Max = policy.latePenaltyPolicy?.tier1MaxMinutes ?? 15
-  const t1Amt = policy.latePenaltyPolicy?.tier1Amount ?? 20000
-  const t2Max = policy.latePenaltyPolicy?.tier2MaxMinutes ?? 30
-  const t2Amt = policy.latePenaltyPolicy?.tier2Amount ?? 50000
-  const t3Amt = policy.latePenaltyPolicy?.tier3Amount ?? 100000
-
-  const lateIncidents: LateIncident[] = []
-  let totalLatePenalty = 0
-
-  lateRecords.forEach((rec, idx) => {
-    const occurrenceIndex = idx + 1
-    const minutes = rec.late_minutes || 0
-    if (occurrenceIndex <= graceCount) {
-      lateIncidents.push({
-        date: rec.date,
-        minutes,
-        penalty: 0,
-        isExempt: true,
-        tierLabel: `Miễn phạt (${occurrenceIndex}/${graceCount})`,
-      })
-    } else {
-      let penalty = fixedRate
-      let tierLabel = 'Phạt cố định'
-      if (mode === 'tiered') {
-        if (minutes <= t1Max) {
-          penalty = t1Amt
-          tierLabel = `Bậc 1 (≤${t1Max}p - Nhắc nhở, 0đ)`
-        } else if (minutes <= t2Max) {
-          penalty = t2Amt
-          tierLabel = `Bậc 2 (${t1Max + 1}-${t2Max}p - Trừ 25k)`
-        } else {
-          if (policy.latePenaltyPolicy?.tier3HalfShiftDeduction) {
-            const shiftHours = policy.shiftRules?.partTimeShiftHours ?? 5.5
-            const empRate = 22000
-            penalty = Math.round(shiftHours * empRate * 0.5)
-            tierLabel = `Bậc 3 (>${t2Max}p - Trừ 50% ca)`
-          } else {
-            penalty = t3Amt
-            tierLabel = `Bậc 3 (>${t2Max}p)`
-          }
-        }
-      }
-      totalLatePenalty += penalty
-      lateIncidents.push({
-        date: rec.date,
-        minutes,
-        penalty,
-        isExempt: false,
-        tierLabel,
-      })
-    }
-  })
+  // Tạm tính với đơn giá 0; calculatePayroll tính lại với đơn giá thật của nhân viên
+  const lateCalc = computeLatePenalties(
+    lateRecords.map(r => ({ date: r.date, minutes: r.late_minutes || 0 })),
+    getLatePenaltySettings(policy),
+    { hourlyRate: 0, shiftHours: policy.shiftRules?.partTimeShiftHours ?? 5.5, isPartTime: true },
+  )
+  const lateIncidents: LateIncident[] = lateCalc.items
+  const totalLatePenalty = lateCalc.total
 
   // ── Phân tích Ca gãy & Ca đêm từ dữ liệu chấm công thực tế
   let splitShiftDays = 0
@@ -880,7 +853,8 @@ function getAllowancesForEmployee(
 
     // Thưởng chuyên cần: chỉ hưởng nếu đi làm đủ công chuẩn và không đi muộn / vắng
     if (allowance.name.includes('chuyên cần') || allowance.name.includes('Chuyên cần')) {
-      const isQualifiedAttendance = attendance.workDays >= standardDays && attendance.lateCount === 0 && attendance.absentDays === 0
+      const maxLate = Math.max(0, Math.floor(policy.latePenaltyPolicy?.attendanceBonusMaxLate ?? 0))
+      const isQualifiedAttendance = attendance.workDays >= standardDays && attendance.lateCount <= maxLate && attendance.absentDays === 0
       if (!isQualifiedAttendance) continue
       result.push({ name: allowance.name, amount: allowance.amount })
       continue
@@ -1002,7 +976,22 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   const storeName = input.store?.name ?? (emp ? getStoreRevenueForPeriod(emp.store_id, periodStart).name : '')
 
   // ── Step 2: Attendance
-  const att = input.attendanceSummary ?? getPayrollAttendanceSummary(employeeId, periodStart, periodEnd)
+  const rawAtt = input.attendanceSummary ?? getPayrollAttendanceSummary(employeeId, periodStart, periodEnd)
+  // Tính lại phạt đi trễ với đơn giá giờ thật của nhân viên (không dùng đơn giá cố định)
+  const att: AttendanceSummaryForPayroll = (() => {
+    if (!rawAtt.lateIncidents || rawAtt.lateIncidents.length === 0) return rawAtt
+    const stdHours = (typeof policy.standardHoursPerDay === 'number' && policy.standardHoursPerDay > 0) ? policy.standardHoursPerDay : 8
+    const hourlyRate = isPartTime ? baseSalary : (standardDays > 0 ? baseSalary / standardDays / stdHours : 0)
+    const shiftHours = isPartTime
+      ? (policy.shiftRules?.partTimeShiftHours ?? 5.5)
+      : (policy.shiftRules?.fullTimeShiftHours ?? stdHours)
+    const recalc = computeLatePenalties(
+      rawAtt.lateIncidents.map(i => ({ date: i.date, minutes: i.minutes })),
+      getLatePenaltySettings(policy),
+      { hourlyRate, shiftHours, isPartTime },
+    )
+    return { ...rawAtt, lateIncidents: recalc.items, totalLatePenalty: recalc.total }
+  })()
 
   // ── Step 2.5: Compile anomalies
   const anomalies: PayrollAnomaly[] = att.anomalies ? [...att.anomalies] : []
