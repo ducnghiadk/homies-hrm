@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import PitSettingsPanel from '@/components/payroll/PitSettingsPanel'
-import { DEFAULT_PIT_SETTINGS, calculateProgressivePit } from '@/lib/payroll/pit'
+import { DEFAULT_PIT_SETTINGS, calculateProgressivePit, normalizePitBrackets } from '@/lib/payroll/pit'
 import { useSettingPermissions } from '@/hooks/usePermissions'
 import { settingsPayroll } from '@/lib/mock-data-settings'
 import { mockStores } from '@/lib/mock-data'
@@ -26,6 +26,7 @@ import {
   rollbackPayrollPolicy,
   saveStoredPayrollPolicy,
   savePayrollPolicyToDb,
+  getPitSettingsFromPolicy,
   type PayrollPolicy,
   type PayrollSalaryGrade,
 } from '@/lib/services/payroll-policy-service'
@@ -371,6 +372,10 @@ function SettingsPayrollContent() {
       partTimeOvertimeEnabled: Boolean(nextPolicy.partTimeOvertimeEnabled),
       partTimeOvertimeThresholdHours,
       partTimeOvertimeMultiplier,
+      legal: {
+        ...(nextPolicy.legal || DEFAULT_LEGAL),
+        taxBrackets: normalizePitBrackets(nextPolicy.legal?.taxBrackets ?? DEFAULT_PIT_SETTINGS.brackets),
+      },
     }
 
     const nextHistory = recordPayrollPolicyChange(cleanedPolicy, notice)
@@ -379,7 +384,16 @@ function SettingsPayrollContent() {
       setPolicy(cleanedPolicy)
       setHistory(nextHistory)
       saveStoredPayrollPolicy(cleanedPolicy)
-      setSavedNotice('Đã lưu cấu hình lên hệ thống. Các máy khác sẽ dùng cùng cấu hình này.')
+      // Đồng bộ cài đặt thuế TNCN lên máy chủ để tính thuế thưởng BSC đúng theo Cài đặt.
+      const taxSynced = await fetch('/api/payroll/tax-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ settings: getPitSettingsFromPolicy(cleanedPolicy) }),
+      }).then(res => res.ok).catch(() => false)
+      setSavedNotice(taxSynced
+        ? 'Đã lưu cấu hình lên hệ thống. Các máy khác sẽ dùng cùng cấu hình này.'
+        : 'Đã lưu cấu hình, nhưng chưa đồng bộ được cài đặt thuế lên máy chủ. Vui lòng bấm lưu lại.')
       setTimeout(() => setSavedNotice(null), 5000)
     } else {
       setSavedNotice('Lỗi: Không thể lưu lên hệ thống. Vui lòng thử lại sau.')

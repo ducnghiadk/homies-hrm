@@ -136,3 +136,24 @@ export function calculateOvertimeTaxExemption(overtimeAmount: number, overtimeHo
   const normalEquivalent = overtimeHours * normalHourlyRate
   return Math.max(0, Math.round(overtimeAmount - normalEquivalent))
 }
+
+/**
+ * Thuế TNCN phát sinh thêm khi cộng một khoản thưởng vào lương tháng.
+ * Dùng ở máy chủ (thưởng BSC) khi chưa có đủ dữ liệu bảo hiểm / người phụ thuộc:
+ * bỏ qua bảo hiểm và người phụ thuộc nên số tạm khấu trừ có thể cao hơn một chút,
+ * kế toán quyết toán lại khi bấm Tính lương.
+ */
+export function estimateBonusWithholding(params: {
+  incomeBeforeBonus: number
+  bonus: number
+  isPartTime?: boolean
+  settings?: Partial<PitSettings> | null
+}): number {
+  const bonus = Math.max(0, params.bonus || 0)
+  if (bonus === 0) return 0
+  const before = Math.max(0, params.incomeBeforeBonus || 0)
+  const common = { isPartTime: params.isPartTime, settings: params.settings }
+  const taxBefore = calculatePit({ ...common, taxableIncome: before, grossPaid: before }).tax
+  const taxAfter = calculatePit({ ...common, taxableIncome: before + bonus, grossPaid: before + bonus }).tax
+  return Math.max(0, taxAfter - taxBefore)
+}

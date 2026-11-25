@@ -55,7 +55,10 @@ export default function CheckinKioskPage() {
 
   const qrImageUrl = tokenData?.token
     ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(
-        tokenData.token
+        // Mã QR chứa đường dẫn /checkin?qr=... để nhân viên mở bằng camera điện thoại là vào thẳng trang chấm công
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/checkin?qr=${encodeURIComponent(tokenData.token)}`
+          : tokenData.token
       )}&margin=10`
     : ''
 
