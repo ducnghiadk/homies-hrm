@@ -50,3 +50,6 @@ next-env.d.ts
 build-output.txt
 /.worktrees
 scratch/
+
+# Dữ liệu nhân sự thật sinh từ script seed, không đưa lên repo
+/[[]BOT[]]_HOMIES_HRM_REAL_SEED_PAYLOAD.json

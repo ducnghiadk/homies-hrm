@@ -22,6 +22,12 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `src/lib/server/auth-helper.ts`: module kiem tra va xac thuc phien dang nhap an toan phia server (token/cookie homies_session), ngan chan gia mao vai tro tu client.
   + `src/lib/server/db.ts`: module quan ly doc/ghi CSDL server, seed du lieu chuan cho 2 chi nhanh (HBP & 429), 14 nhan vien that (2 Full-time 6.6tr, 12 Part-time luong gio, 4 nhan su xoay ca 2 quan), 5 khung ca that Homies F&B, 447 ca T8 va 87 ca T9, bang luong quy 43.4 trieu va toa do GPS.
   + `src/app/api/auth/login/route.ts`: POST dang nhap, cap session token cho Bot dong vai (Nhan vien, Quan ly, CEO).
+  + `src/lib/server/auth-cookies.ts`: dat/xoa cookie phien httpOnly va cookie vai tro co chu ky.
+  + `src/lib/server/rate-limit.ts`: gioi han so lan thu (dang nhap, ma PIN chi nhanh) trong bo nho tien trinh.
+  + `src/app/api/auth/logout/route.ts`: POST huy phien tren may chu va xoa cookie.
+  + `src/app/api/auth/change-password/route.ts`: POST doi mat khau (bat buoc khi dang dung mat khau mac dinh).
+  + `src/app/account/change-password/page.tsx`: man hinh doi mat khau lan dau dang nhap.
+  + `src/app/api/stores/verify-pin/route.ts`: POST kiem tra ma PIN chi nhanh tren may chu, cap cookie httpOnly 12 gio cho cong ghi nhan su co cong khai; DELETE thoat phien PIN.
   + `src/app/api/auth/session/route.ts`: GET kiem tra nhanh phien dang nhap con hieu luc hay da het han de canh bao toan ung dung qua AppShell.
   + `src/app/api/stores/route.ts`: GET & POST quan ly danh sach co so, toa do GPS, ban kinh check-in va ma PIN bao mat cua tung quan.
   + `src/app/api/employees/route.ts`: GET & POST/PUT danh sach 14 nhan vien that va cap nhat ho so/muc luong gio.

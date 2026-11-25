@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, ADMIN_ROLES } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, getInitialBscSettingsSeed, type ServerBscSettings } from '@/lib/server/db'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const db = await getServerDb()
     const settings: ServerBscSettings = db.bsc_settings || getInitialBscSettingsSeed()
@@ -19,6 +22,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const gate = await requireAuth(req, ADMIN_ROLES)
+  if (!gate.ok) return gate.response
   try {
     const body = await req.json()
     const db = await getServerDb()

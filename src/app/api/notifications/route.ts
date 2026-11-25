@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, type ServerNotification } from '@/lib/server/db'
 
 export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const { searchParams } = new URL(req.url)
     const limit = parseInt(searchParams.get('limit') || '20', 10)
@@ -24,6 +27,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const body = await req.json()
     const action = body.action || 'mark_all_read'

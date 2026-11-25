@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { MANAGER_ROLES, requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, type ServerBscTarget } from '@/lib/server/db'
 import { isRealDbMode } from '@/lib/adapters/repository-config'
 import { supabase } from '@/lib/supabase'
@@ -9,6 +10,8 @@ function currentPeriod(): string {
 }
 
 export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const { searchParams } = new URL(req.url)
     const storeId = searchParams.get('store_id') || searchParams.get('storeId')
@@ -133,6 +136,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const gate = await requireAuth(req, MANAGER_ROLES)
+  if (!gate.ok) return gate.response
   try {
     const body = await req.json()
     const { store_id, period, ...updates } = body

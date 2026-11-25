@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb, ServerRequest } from '@/lib/server/db'
-import { getAuthenticatedUser } from '@/lib/server/auth-helper'
+import { OPERATOR_ROLES, getAuthenticatedUser, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
 
 const ALLOWED_APPROVER_ROLES = ['ceo', 'hr_admin', 'store_manager', 'area_manager', 'shift_leader']
 
 export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const { searchParams } = new URL(req.url)
     const storeId = searchParams.get('store_id')
-    const employeeId = searchParams.get('employee_id')
+    // Nhân viên thường chỉ xem đơn của chính mình
+    const employeeId = hasRequiredRole(gate.user.role, OPERATOR_ROLES) ? searchParams.get('employee_id') : gate.user.userId
     const status = searchParams.get('status')
     const type = searchParams.get('type')
 
@@ -97,7 +100,13 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 2. Tạo đơn mới
+    // 2. Tạo đơn mới: phải đăng nhập; nhân viên chỉ tạo đơn cho chính mình
+    const creator = await requireAuth(req)
+    if (!creator.ok) return creator.response
+    if (employee_id && employee_id !== creator.user.userId && !hasRequiredRole(creator.user.role, OPERATOR_ROLES)) {
+      return NextResponse.json({ success: false, error: 'Bạn chỉ được tạo đơn cho chính mình' }, { status: 403 })
+    }
+
     if (!employee_id || !type || !reason) {
       return NextResponse.json(
         { success: false, error: 'Thiếu thông tin bắt buộc (employee_id, type, reason)' },

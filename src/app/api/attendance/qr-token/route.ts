@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, OPERATOR_ROLES, canAccessStore } from '@/lib/server/auth-helper'
+import { signQrPayload } from '@/lib/security/token-signer'
 import crypto from 'crypto'
 import { getServerDb } from '@/lib/server/db'
 
-export const QR_SECRET = process.env.QR_SECRET || 'homies_secret_dynamic_qr_2026'
-
 // Sinh mã QR động cho POS / Kiosk quầy bar với thời hạn 60 giây
 export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req, OPERATOR_ROLES)
+  if (!gate.ok) return gate.response
   try {
     const { searchParams } = new URL(req.url)
-    const storeId = searchParams.get('store_id') || 'store-001'
+    const storeId = searchParams.get('store_id') || gate.user.employee?.store_id || 'store-001'
+    if (!canAccessStore(gate.user, storeId)) {
+      return NextResponse.json({ success: false, error: 'Bạn không quản lý chi nhánh này.' }, { status: 403 })
+    }
 
     const db = await getServerDb()
     const store = db.stores.find((s) => s.id === storeId)
@@ -23,7 +28,7 @@ export async function GET(req: NextRequest) {
     const timestamp = Date.now()
     const nonce = crypto.randomBytes(4).toString('hex')
     const rawData = `${storeId}:${timestamp}:${nonce}`
-    const signature = crypto.createHmac('sha256', QR_SECRET).update(rawData).digest('hex').substring(0, 12)
+    const signature = signQrPayload(rawData)
     const token = `HOMIES_DYN_${Buffer.from(rawData).toString('base64url')}_${signature}`
 
     return NextResponse.json({

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { MANAGER_ROLES, OPERATOR_ROLES, canAccessStore, getAuthenticatedUser, getStorePinAccess, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, type ServerBscLog } from '@/lib/server/db'
 import { isRealDbMode } from '@/lib/adapters/repository-config'
 import { supabase } from '@/lib/supabase'
@@ -9,6 +10,8 @@ function currentPeriod(): string {
 }
 
 export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req)
+  if (!gate.ok) return gate.response
   try {
     const { searchParams } = new URL(req.url)
     const storeId = searchParams.get('store_id') || searchParams.get('storeId')
@@ -98,8 +101,21 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    const authUser = await getAuthenticatedUser(req)
+    const pinStoreId = getStorePinAccess(req)
+    const isManager = Boolean(authUser && hasRequiredRole(authUser.role, MANAGER_ROLES))
+    const isOperator = Boolean(authUser && hasRequiredRole(authUser.role, OPERATOR_ROLES))
+    if (!isOperator && !pinStoreId) {
+      return NextResponse.json(
+        { success: false, error: 'Bạn cần đăng nhập hoặc nhập mã PIN chi nhánh để ghi nhận sự cố.' },
+        { status: authUser ? 403 : 401 }
+      )
+    }
 
-    // Hỗ trợ Duyệt 1 chạm trực tiếp từ UI
+    // Hỗ trợ Duyệt 1 chạm trực tiếp từ UI (chỉ quản lý)
+    if ((body.action === 'approve' || body.approval_status === 'confirmed') && (body.id || body.log_id) && !isManager) {
+      return NextResponse.json({ success: false, error: 'Chỉ quản lý mới được duyệt biên bản.' }, { status: 403 })
+    }
     if (body.action === 'approve' || body.approval_status === 'confirmed') {
       const logId = String(body.id || body.log_id || '')
       if (logId) {
@@ -129,6 +145,9 @@ export async function POST(req: NextRequest) {
 
     // Hỗ trợ cập nhật bằng chứng / ảnh đối soát trực tiếp từ modal
     if (body.action === 'update_proof' || (body.id && body.evidence_url !== undefined && !body.group_key)) {
+      if (!isOperator) {
+        return NextResponse.json({ success: false, error: 'Bạn không có quyền sửa bằng chứng.' }, { status: 403 })
+      }
       const logId = String(body.id || body.log_id || '')
       if (logId) {
         const db = await getServerDb()
@@ -191,6 +210,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Cổng PIN chỉ ghi được cho đúng chi nhánh đã mở khóa, và luôn ở trạng thái chờ quản lý duyệt
+    const viaPin = !(isOperator && authUser && canAccessStore(authUser, store_id))
+    if (viaPin && pinStoreId !== store_id) {
+      return NextResponse.json({ success: false, error: 'Bạn không có quyền ghi nhận sự cố cho chi nhánh này.' }, { status: 403 })
+    }
+
     const db = await getServerDb()
     if (!db.bsc_logs) db.bsc_logs = []
 
@@ -221,7 +246,7 @@ export async function POST(req: NextRequest) {
       affects_customer_score: affects_customer_score ?? false,
       affects_personal_multiplier: affects_personal_multiplier ?? false,
       locks_personal_bonus: locks_personal_bonus ?? false,
-      approval_status: approval_status || 'confirmed',
+      approval_status: viaPin ? 'proposed_manager' : approval_status || 'confirmed',
       created_at: new Date().toISOString(),
     }
 
@@ -275,6 +300,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const gate = await requireAuth(req, MANAGER_ROLES)
+  if (!gate.ok) return gate.response
   try {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')

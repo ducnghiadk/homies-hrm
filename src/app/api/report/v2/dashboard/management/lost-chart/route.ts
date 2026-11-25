@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, MANAGER_ROLES } from '@/lib/server/auth-helper'
 
 /**
  * iPOS IVT Inventory & Waste API Endpoint
@@ -6,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
  * Trả về tỷ lệ % hao hụt và chênh lệch kho NVL thực tế từ hệ thống kiểm kê iPOS IVT
  */
 export async function GET(req: NextRequest) {
+  const gate = await requireAuth(req, MANAGER_ROLES)
+  if (!gate.ok) return gate.response
   try {
     const { searchParams } = new URL(req.url)
     const storeId = searchParams.get('store_id') || searchParams.get('storeId') || 'store-001'

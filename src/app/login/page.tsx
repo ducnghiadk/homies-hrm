@@ -82,6 +82,10 @@ export default function LoginPage() {
           redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
             ? redirectParam
             : '/'
+        if (result.mustChangePassword) {
+          window.location.replace(`/account/change-password?redirect=${encodeURIComponent(target)}`)
+          return
+        }
         window.location.replace(target)
       } else {
         setError(result.error || 'Đăng nhập thất bại')

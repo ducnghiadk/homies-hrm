@@ -69,6 +69,7 @@ export type AuthUser = {
 export type LoginResult = {
   success: boolean
   error?: string
+  mustChangePassword?: boolean
 }
 
 import { EmployeeService } from '@/lib/services/employee-service'
@@ -108,21 +109,18 @@ const authStorage: StateStorage = {
   },
 }
 
-export function syncAuthCookie(user: AuthUser | null, serverToken?: string) {
+export function syncAuthCookie(user: AuthUser | null, _serverToken?: string) {
   if (typeof document === 'undefined') return
 
-  const expires = user ? 'Max-Age=2592000' : 'Max-Age=0'
+  // Cookie phiên (homies_session) và chữ ký vai trò (hrm-role-sig) do máy chủ cấp ở chế độ httpOnly,
+  // trình duyệt không ghi đè được. Ở đây chỉ đồng bộ các cookie hiển thị giao diện.
+  const expires = user ? 'Max-Age=604800' : 'Max-Age=0'
   document.cookie = `hrm-auth=${user ? '1' : '0'}; Path=/; SameSite=Lax; ${expires}`
   document.cookie = `hrm-role=${user?.role || ''}; Path=/; SameSite=Lax; ${expires}`
   document.cookie = `hrm-user-id=${user?.id || ''}; Path=/; SameSite=Lax; ${expires}`
-  if (user) {
-    // Chỉ cập nhật homies_session khi có token thật từ server; không ghi đè mất session thật khi F5
-    if (serverToken) {
-      document.cookie = `homies_session=${serverToken}; Path=/; SameSite=Lax; ${expires}`
-    }
-  } else {
-    document.cookie = `homies_session=; Path=/; SameSite=Lax; Max-Age=0`
-    document.cookie = `hrm-role-sig=; Path=/; SameSite=Lax; Max-Age=0`
+  if (!user) {
+    // Hủy phiên phía máy chủ (xóa được cả cookie httpOnly)
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
   }
 }
 
@@ -300,7 +298,7 @@ export const useAuthStore = create<AuthState>()(
               })
               syncAuthCookie(mappedUser, json.token || json.data?.token)
               console.log(`[Auth] User logged in via Server API: ${mappedUser.full_name} (${mappedUser.role})`)
-              return { success: true }
+              return { success: true, mustChangePassword: Boolean(json.must_change_password || json.data?.must_change_password) }
             } else if (json.error) {
               set({ isLoading: false, loginError: json.error })
               return { success: false, error: json.error }
@@ -313,7 +311,12 @@ export const useAuthStore = create<AuthState>()(
             return { success: false, error: errorMsg }
           }
         } catch (e) {
-          console.warn('[AuthStore] API login failed, attempting local fallback:', e)
+          console.warn('[AuthStore] API login failed:', e)
+          // Production: không cho đăng nhập ngoại tuyến bằng dữ liệu trên trình duyệt
+          if (process.env.NODE_ENV === 'production') {
+            set({ isLoading: false, loginError: 'Không kết nối được máy chủ. Vui lòng thử lại.' })
+            return { success: false, error: 'Không kết nối được máy chủ. Vui lòng thử lại.' }
+          }
         }
 
         // 2. Fallback ngoại tuyến: tìm bằng EmployeeService

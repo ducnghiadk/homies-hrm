@@ -1,5 +1,20 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-25 (Audit bảo mật trước khi triển khai — Đợt 1 nghiêm trọng + Đợt 2 cao):
+  1) Nguyên nhân:
+     - API đăng nhập còn cửa hậu cho tài khoản CEO; khóa ký `AUTH_SECRET`/`QR_SECRET` có giá trị mặc định trong mã nguồn nên ai cũng có thể tự ký cookie vai trò và mã QR.
+     - Middleware `src/proxy.ts` bỏ qua `/api`, trong khi nhiều route (`employees`, `payroll`, `attendance`, `contracts`, `requests`, `reports`, `invitations`, `bsc/*`, `kpi/incidents`, `notifications`, `master-data`, `schedule-rules`, `ipos/*`, `hermes/copilot`) không tự kiểm tra đăng nhập hoặc tin vai trò do trình duyệt gửi (`body.role`, header `x-user-role`, `user_role`).
+     - `POST/PUT /api/employees` cho phép bất kỳ ai sửa lương, vai trò, mật khẩu; `GET /api/payroll` trả phiếu lương toàn chuỗi; `GET /api/ipos/cloud-worker` trả mật khẩu/token iPOS kèm CORS `*`; token JWT iPOS thật bị ghi cứng trong `db.ts`; Hermes Copilot có thể gửi khóa AI của máy chủ tới địa chỉ do trình duyệt chỉ định.
+     - Phiên đăng nhập không hết hạn, không có đăng xuất phía máy chủ, cookie phiên không httpOnly, không giới hạn số lần đăng nhập sai, mật khẩu mặc định không bắt đổi; mã PIN chi nhánh ghi cứng trong trang công khai; file `[BOT]_HOMIES_HRM_REAL_SEED_PAYLOAD.json` chứa dữ liệu nhân sự thật nằm trong repo.
+  2) Cách giải quyết:
+     - Gỡ cửa hậu, bắt buộc `AUTH_SECRET`/`QR_SECRET` (>= 32 ký tự) qua `getRequiredSecret`, ký QR bằng `signQrPayload`/`verifyQrPayload`, sửa lỗi tách chữ ký QR base64url.
+     - Thêm `requireAuth`, nhóm vai trò (`ADMIN_ROLES`, `MANAGER_ROLES`, `OPERATOR_ROLES`, `CHAIN_WIDE_ROLES`) và `canAccessStore` trong `auth-helper.ts`; mọi route trên kiểm tra phiên máy chủ, lọc dữ liệu theo vai trò/chi nhánh, che lương/ngân hàng/CCCD với người không có quyền, ghi theo danh sách trường cho phép và không sửa phiếu lương đã khóa.
+     - Phiên hết hạn 12 giờ, `POST /api/auth/logout`, cookie httpOnly (`auth-cookies.ts`), giới hạn đăng nhập sai (`rate-limit.ts`) và thông báo lỗi chung, bắt đổi mật khẩu mặc định (`/api/auth/change-password`, `/account/change-password`), proxy bắt buộc chữ ký vai trò ở production.
+     - `cloud-worker` chỉ cho người đã đăng nhập đọc, chỉ CEO/HR thao tác, che toàn bộ mật khẩu/token, bỏ CORS `*`; token iPOS lấy từ `IPOS_HRM_TOKEN`; `/api/ipos/sync` yêu cầu `IPOS_SYNC_KEY` (tiện ích Chrome có ô "Mã đồng bộ"); Hermes lấy vai trò từ phiên và không gửi khóa máy chủ ra cổng ngoài.
+     - Mã PIN chi nhánh kiểm tra trên máy chủ qua `POST /api/stores/verify-pin` (giới hạn 5 lần/15 phút, cookie httpOnly có chữ ký 12 giờ); gỡ file seed dữ liệu thật khỏi repo và thêm vào `.gitignore`.
+  3) Lưu ý vận hành: phải cài biến môi trường `AUTH_SECRET`, `QR_SECRET`, `IPOS_SYNC_KEY`, `IPOS_HRM_TOKEN`; mọi người cần đăng nhập lại; chi nhánh chưa có mã PIN trong Cài đặt thì cổng ghi nhận sự cố công khai sẽ không mở được; file seed vẫn còn trong lịch sử git nên cần đổi các mật khẩu/token đã lộ.
+  4) File liên quan: `src/lib/security/token-signer.ts`, `src/lib/server/auth-helper.ts`, `src/lib/server/auth-cookies.ts`, `src/lib/server/rate-limit.ts`, `src/app/api/auth/*`, `src/app/api/employees/route.ts`, `src/app/api/payroll/route.ts`, `src/app/api/attendance/**`, `src/app/api/ipos/*`, `src/app/api/hermes/copilot/route.ts`, `src/app/api/stores/verify-pin/route.ts`, `src/app/kpi/violations/public/page.tsx`, `src/proxy.ts`, `extensions/homies-ipos-bridge/*`, `.gitignore`.
+
 - Đã hoàn thiện 2026-11-23 (Đợt 1 vá dứt điểm 3 lỗi đồng bộ & phiên đăng nhập: Cảnh báo hết phiên toàn ứng dụng, Đổi ca nhân viên xem ca đồng nghiệp & iPOS múi giờ Việt Nam):
   1) Nguyên nhân:
      - Ngoài 2 trang xếp lịch quản lý, các màn hình khác (Đổi ca, Chấm công, Lịch cá nhân, Đăng ký lịch rảnh, Bảng công, Hồ sơ, Bảng điều khiển) vẫn im lặng bỏ qua khi phiên cũ hết hạn, dễ báo nhầm chưa chốt lịch hoặc hiện màn hình trống.

@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { getServerDb, saveServerDb } from '@/lib/server/db'
-import { signRole, verifyPassword, hashPassword } from '@/lib/security/token-signer'
+import { verifyPassword, hashPassword, DEFAULT_INITIAL_PASSWORD } from '@/lib/security/token-signer'
+import { isSessionExpired } from '@/lib/server/auth-helper'
+import { setAuthCookies } from '@/lib/server/auth-cookies'
+import { clearAttempts, getClientIp, isRateLimited, recordFailedAttempt } from '@/lib/server/rate-limit'
+
+const LOGIN_WINDOW_MS = 15 * 60 * 1000
+const MAX_FAILS_PER_ACCOUNT = 5
+const MAX_FAILS_PER_IP = 30
+const GENERIC_LOGIN_ERROR = 'Tài khoản hoặc mật khẩu không chính xác'
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,15 +17,27 @@ export async function POST(req: NextRequest) {
     const rawIdentifier = String(body.email || body.phone || body.username || body.identifier || '').trim()
     const password = String(body.password || '').trim()
 
-    if (!rawIdentifier) {
+    if (!rawIdentifier || !password) {
       return NextResponse.json(
-        { success: false, error: 'Vui lòng cung cấp Email hoặc Số điện thoại đăng nhập' },
+        { success: false, error: 'Vui lòng nhập Email/Số điện thoại và mật khẩu' },
         { status: 400 }
       )
     }
 
-    const db = await getServerDb()
     const normalizedIdentifier = rawIdentifier.toLowerCase()
+    const accountKey = `login:acct:${normalizedIdentifier}`
+    const ipKey = `login:ip:${getClientIp(req.headers)}`
+    if (
+      isRateLimited(accountKey, MAX_FAILS_PER_ACCOUNT, LOGIN_WINDOW_MS) ||
+      isRateLimited(ipKey, MAX_FAILS_PER_IP, LOGIN_WINDOW_MS)
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Bạn đã nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.' },
+        { status: 429 }
+      )
+    }
+
+    const db = await getServerDb()
     const cleanPhone = rawIdentifier.replace(/[^\d]/g, '')
 
     // Tìm nhân viên trong CSDL server theo Email, Số điện thoại hoặc Mã NV chính xác
@@ -33,115 +53,64 @@ export async function POST(req: NextRequest) {
       return matchEmail || matchPhone || matchCode
     })
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'Tài khoản không tồn tại trên hệ thống' },
-        { status: 401 }
-      )
+    // Cùng một thông báo cho "không có tài khoản" và "sai mật khẩu" để không dò được tài khoản
+    if (!user || !verifyPassword(password, user.password)) {
+      recordFailedAttempt(accountKey, LOGIN_WINDOW_MS)
+      recordFailedAttempt(ipKey, LOGIN_WINDOW_MS)
+      return NextResponse.json({ success: false, error: GENERIC_LOGIN_ERROR }, { status: 401 })
     }
 
-    // Kiểm tra trạng thái tài khoản
-    if (user.account_status === 'bi_khoa') {
+    if (user.account_status === 'bi_khoa' || user.status === 'resigned') {
       return NextResponse.json(
         { success: false, error: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ HR.' },
         { status: 403 }
       )
     }
 
-    // Kiểm tra mật khẩu (hỗ trợ cả chuỗi mã hóa an toàn và mật khẩu dự phòng cho CEO)
-    const isCorrect =
-      verifyPassword(password, user.password) ||
-      (user.role === 'ceo' && (password === 'Ducnghia@1' || password === '123456'))
-
-    if (!isCorrect) {
-      return NextResponse.json(
-        { success: false, error: 'Mật khẩu không chính xác' },
-        { status: 401 }
-      )
-    }
+    clearAttempts(accountKey)
 
     // Tự động nâng cấp mật khẩu sang chuẩn mã hóa an toàn PBKDF2 nếu tài khoản vẫn đang lưu dạng cũ
     if (user.password && !user.password.startsWith('pbkdf2:')) {
       user.password = hashPassword(password)
     }
 
-    // Tạo session token an toàn bằng crypto ngẫu nhiên
-    const token = `homies_sess_${Date.now()}_${crypto.randomBytes(16).toString('hex')}`
+    const mustChangePassword = password === DEFAULT_INITIAL_PASSWORD
+
+    // Dọn các phiên đã hết hạn để CSDL không phình
+    for (const [key, session] of Object.entries(db.sessions)) {
+      if (isSessionExpired(session.createdAt)) delete db.sessions[key]
+    }
+
+    const token = `homies_sess_${crypto.randomBytes(32).toString('hex')}`
     db.sessions[token] = {
       userId: user.id,
       role: user.role,
       email: user.email,
       createdAt: new Date().toISOString(),
+      mustChangePassword,
     }
     await saveServerDb(db)
 
-    // Trả về user info (bỏ password nếu có)
-    const { password: _p, ...safeUser } = user
+    // Không trả mật khẩu và thông tin ngân hàng/CCCD trong phản hồi đăng nhập
+    const { password: _p, id_card_front_url: _f, id_card_back_url: _b, ...safeUser } = user
 
     const response = NextResponse.json({
       success: true,
       message: 'Đăng nhập thành công',
       token,
+      must_change_password: mustChangePassword,
       user: safeUser,
       data: {
         token,
         user: safeUser,
+        must_change_password: mustChangePassword,
       },
     })
 
-    // Thiết lập session cookie an toàn (30 ngày bền vững)
-    const thirtyDaysSec = 60 * 60 * 24 * 30
-    const isProd = process.env.NODE_ENV === 'production'
-
-    response.cookies.set('homies_session', token, {
-      httpOnly: false,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: thirtyDaysSec,
-      path: '/',
-    })
-
-    // Đồng bộ ngay lập tức hrm-auth và hrm-role từ máy chủ để tránh bị đá văng khi F5
-    response.cookies.set('hrm-auth', '1', {
-      httpOnly: false,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: thirtyDaysSec,
-      path: '/',
-    })
-
-    response.cookies.set('hrm-role', user.role, {
-      httpOnly: false,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: thirtyDaysSec,
-      path: '/',
-    })
-
-    // Thiết lập chữ ký số xác thực vai trò chống can thiệp F12
-    const roleSig = signRole(user.role, user.id)
-    response.cookies.set('hrm-role-sig', roleSig, {
-      httpOnly: false,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: thirtyDaysSec,
-      path: '/',
-    })
-
-    response.cookies.set('hrm-user-id', user.id, {
-      httpOnly: false,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: thirtyDaysSec,
-      path: '/',
-    })
-
+    setAuthCookies(response, token, user)
     return response
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Lỗi máy chủ'
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    )
+    console.error('[auth/login]', error)
+    return NextResponse.json({ success: false, error: 'Lỗi máy chủ khi đăng nhập' }, { status: 500 })
   }
 }

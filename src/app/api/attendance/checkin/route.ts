@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { getServerDb, saveServerDb, ServerAttendanceLog, calculateDistance } from '@/lib/server/db'
-import { QR_SECRET } from '@/app/api/attendance/qr-token/route'
+import { verifyQrPayload } from '@/lib/security/token-signer'
 import { getAuthenticatedUser } from '@/lib/server/auth-helper'
 
 export async function POST(req: NextRequest) {
@@ -71,20 +71,14 @@ export async function POST(req: NextRequest) {
 
     if (qr_code.startsWith('HOMIES_DYN_')) {
       try {
-        const parts = qr_code.split('_')
-        if (parts.length >= 4) {
-          const payloadBase64 = parts[2]
-          const clientSignature = parts[3]
+        // base64url có thể chứa dấu "_" nên tách chữ ký ở dấu "_" cuối cùng
+        const match = /^HOMIES_DYN_(.+)_([0-9a-f]{64})$/.exec(qr_code)
+        if (match) {
+          const payloadBase64 = match[1]
+          const clientSignature = match[2]
           const decoded = Buffer.from(payloadBase64, 'base64url').toString('utf-8')
 
-          // Đối soát chữ ký số bí mật HMAC-SHA256
-          const expectedSignature = crypto
-            .createHmac('sha256', QR_SECRET)
-            .update(decoded)
-            .digest('hex')
-            .substring(0, 12)
-
-          if (clientSignature !== expectedSignature) {
+          if (!verifyQrPayload(decoded, clientSignature)) {
             return NextResponse.json(
               {
                 success: false,
@@ -129,8 +123,8 @@ export async function POST(req: NextRequest) {
         )
       }
     } else {
-      // Hỗ trợ mã QR tĩnh của cơ sở hoặc mã PIN cửa hàng
-      if (qr_code !== store_id && qr_code !== store.id && qr_code !== store.pin_code) {
+      // Mã tĩnh chỉ chấp nhận mã PIN của cửa hàng (mã chi nhánh như "store-001" dễ đoán nên không còn được chấp nhận)
+      if (!store.pin_code || qr_code !== store.pin_code) {
         return NextResponse.json(
           {
             success: false,

@@ -76,11 +76,15 @@
 
     // Đọc URL server cấu hình trong storage
     let serverUrl = 'http://localhost:3535'
+    let syncKey = ''
     try {
       if (chrome.storage && chrome.storage.local) {
-        const stored = await chrome.storage.local.get(['serverUrl'])
+        const stored = await chrome.storage.local.get(['serverUrl', 'syncKey'])
         if (stored.serverUrl) {
           serverUrl = stored.serverUrl.replace(/\/$/, '')
+        }
+        if (stored.syncKey) {
+          syncKey = stored.syncKey
         }
       }
     } catch (e) {}
@@ -98,6 +102,7 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${syncKey}`,
         },
         body: JSON.stringify(payload),
       })

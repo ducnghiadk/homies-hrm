@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { ADMIN_ROLES, MANAGER_ROLES, canAccessStore, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb } from '@/lib/server/db'
 import { isRealDbMode } from '@/lib/adapters/repository-config'
 import { supabase } from '@/lib/supabase'
@@ -13,9 +14,21 @@ import type { BSCEmployeePersonalData, BSCRevenueTarget, BSCPersonalErrorGroup }
  * - Đẩy trực tiếp số tiền thưởng vào phiếu lương tháng (/api/payroll)
  */
 export async function POST(req: NextRequest) {
+  // Quản lý gửi duyệt chi nhánh mình; chỉ CEO/HR được duyệt, từ chối, mở lại
+  const gate = await requireAuth(req, MANAGER_ROLES)
+  if (!gate.ok) return gate.response
   try {
     const body = await req.json()
-    const { store_id, period, action = 'approve', approver_name = 'CEO Nguyễn Đức Nghĩa' } = body
+    const { store_id, period, action = 'approve' } = body
+    // Tên người duyệt lấy từ tài khoản đăng nhập, không tin tên do client gửi
+    const approver_name = gate.user.employee?.full_name || gate.user.email || 'Quản lý'
+    const isSubmit = action === 'submit' || action === 'submit_ceo'
+    if (!isSubmit && !hasRequiredRole(gate.user.role, ADMIN_ROLES)) {
+      return NextResponse.json({ success: false, error: 'Chỉ CEO hoặc HR mới được duyệt quyết toán BSC.' }, { status: 403 })
+    }
+    if (isSubmit && !canAccessStore(gate.user, store_id)) {
+      return NextResponse.json({ success: false, error: 'Bạn không quản lý chi nhánh này.' }, { status: 403 })
+    }
 
     if (!store_id || !period) {
       return NextResponse.json(
@@ -189,7 +202,8 @@ export async function POST(req: NextRequest) {
         s => (s.employee_id === result.employee_id || s.employee_name === result.employee_name) && s.period === period
       )
 
-      if (slipIdx >= 0) {
+      // Không sửa phiếu lương đã khóa sổ
+      if (slipIdx >= 0 && db.salary_slips[slipIdx].status !== 'locked') {
         const currentSlip = db.salary_slips[slipIdx]
         const oldBonus = currentSlip.bonus || 0
         const newBonus = bscBonus
