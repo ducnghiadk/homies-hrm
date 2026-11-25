@@ -3,6 +3,26 @@ import { getServerDb, saveServerDb } from '@/lib/server/db'
 import { ADMIN_ROLES, canAccessStore, hasRequiredRole, isChainWideRole, requireAuth } from '@/lib/server/auth-helper'
 
 
+/**
+ * Kiểm tra số tiền trên phiếu: không âm, không rỗng.
+ * Phiếu máy chủ chưa lưu tăng ca/thuế/bảo hiểm riêng nên không so trần thực nhận được.
+ */
+function validateSlipAmounts(slip: {
+  base_salary: number
+  allowances: number
+  bonus: number
+  deductions: number
+  late_deduction?: number
+  net_salary: number
+  work_days: number
+}): string | null {
+  const amounts = [slip.base_salary, slip.allowances, slip.bonus, slip.deductions, slip.late_deduction || 0, slip.net_salary, slip.work_days]
+  if (amounts.some((n) => !Number.isFinite(n) || n < 0)) {
+    return 'Số tiền trên phiếu lương không được âm hoặc để trống.'
+  }
+  return null
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -80,7 +100,6 @@ export async function POST(req: NextRequest) {
       deductions,
       late_deduction,
       net_salary,
-      status,
     } = body
 
     if (!employee_id || !period) {
@@ -143,7 +162,7 @@ export async function POST(req: NextRequest) {
       ] as const
       const updates: Record<string, unknown> = {}
       for (const f of numericFields) if (body[f] !== undefined) updates[f] = Number(body[f]) || 0
-      for (const f of ['employee_name', 'employee_code', 'position', 'status'] as const) {
+      for (const f of ['employee_name', 'employee_code', 'position'] as const) {
         if (typeof body[f] === 'string') updates[f] = body[f]
       }
       slip = {
@@ -153,7 +172,14 @@ export async function POST(req: NextRequest) {
         id: current.id,
         period: current.period,
         employee_id: current.employee_id,
+        // Khóa sổ chỉ đi qua /api/payroll/lock, không cho đổi trạng thái ở đây.
+        status: current.status,
+        needs_recalculation: false,
+        updated_by: gate.user.userId,
+        updated_at: new Date().toISOString(),
       }
+      const invalid = validateSlipAmounts(slip)
+      if (invalid) return NextResponse.json({ success: false, error: invalid }, { status: 400 })
       db.salary_slips[existingIndex] = slip
     } else {
       const newId = id || `slip-${period}-${employee_id}`
@@ -173,8 +199,12 @@ export async function POST(req: NextRequest) {
         deductions: Number(deductions || 0),
         late_deduction: Number(late_deduction || 0),
         net_salary: Number(net_salary || 0),
-        status: status || 'draft',
+        status: 'draft',
+        updated_by: gate.user.userId,
+        updated_at: new Date().toISOString(),
       }
+      const invalid = validateSlipAmounts(slip)
+      if (invalid) return NextResponse.json({ success: false, error: invalid }, { status: 400 })
       db.salary_slips.push(slip)
     }
 

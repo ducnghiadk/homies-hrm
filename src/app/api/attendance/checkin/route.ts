@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
 import { getServerDb, saveServerDb, ServerAttendanceLog, calculateDistance } from '@/lib/server/db'
 import { verifyQrPayload } from '@/lib/security/token-signer'
 import { getActiveUser } from '@/lib/server/auth-helper'
+import { getVnClock, parseHhmmToMinutes } from '@/lib/time/vn-time'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { employee_id, store_id, latitude, longitude, qr_code, shift_start_time, shift_id } = body
+    const { employee_id, store_id, latitude, longitude, qr_code, shift_id } = body
 
     if (!employee_id || !store_id || latitude === undefined || longitude === undefined) {
       return NextResponse.json(
@@ -19,22 +19,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 0. Xác thực tài khoản người chấm công (chống chấm công hộ)
+    // 0. Bắt buộc đăng nhập để chống chấm công hộ. Chỉ quản lý mới được ghi nhận thay người khác.
     const auth = await getActiveUser(req)
-    let effectiveEmployeeId = employee_id
-    if (auth) {
-      const isManager = ['ceo', 'hr_admin', 'store_manager', 'area_manager'].includes(auth.role)
-      if (!isManager && auth.userId !== employee_id) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Bạn không thể chấm công hộ cho nhân viên khác. Vui lòng đăng nhập đúng tài khoản của mình.',
-          },
-          { status: 403 }
-        )
-      }
-      effectiveEmployeeId = isManager ? (employee_id || auth.userId) : auth.userId
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'Bạn cần đăng nhập để chấm công.' },
+        { status: 401 }
+      )
     }
+    const isManager = ['ceo', 'hr_admin', 'store_manager', 'area_manager'].includes(auth.role)
+    if (!isManager && auth.userId !== employee_id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Bạn không thể chấm công hộ cho nhân viên khác. Vui lòng đăng nhập đúng tài khoản của mình.',
+        },
+        { status: 403 }
+      )
+    }
+    const effectiveEmployeeId: string = isManager ? (employee_id || auth.userId) : auth.userId
 
     const db = await getServerDb()
 
@@ -152,7 +155,9 @@ export async function POST(req: NextRequest) {
     }
 
     const now = new Date()
-    const todayStr = now.toISOString().split('T')[0]
+    // Máy chủ Vercel chạy giờ UTC: ngày và phút trong ngày phải quy về giờ Việt Nam
+    const vnNow = getVnClock(now)
+    const todayStr = vnNow.date
 
     // 4b. CHẶN CHECK-IN ĐÚP (DE-BOUNCE): Trong vòng 15 phút từ chối bấm liên tiếp
     if (db.attendance && Array.isArray(db.attendance)) {
@@ -176,39 +181,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5. BẮT ĐI TRỄ TỰ ĐỘNG: So sánh thời gian check-in với start_time của ca
-    // Nếu trễ > 15 phút ➔ Bắt buộc set is_late: true, status: 'late' và late_minutes: X
+    // 5. BẮT ĐI TRỄ TỰ ĐỘNG theo giờ ca trong LỊCH CHÍNH THỨC ĐÃ CHỐT (không tin giờ ca do điện thoại gửi lên)
+    // Ngưỡng 15 phút giữ nguyên như trước; quy định phạt do Cài đặt lương quyết định.
     let status: 'on_time' | 'late' = 'on_time'
     let isLate = false
     let lateMinutes = 0
 
-    // Xác định ca làm việc tương ứng
-    let targetShiftId = shift_id
-    if (!targetShiftId && db.shifts) {
-      const registeredShift = db.shifts.find(
-        (s) => s.employee_id === effectiveEmployeeId && s.date === todayStr && s.status !== 'REJECTED'
-      )
-      if (registeredShift) {
-        targetShiftId = registeredShift.shift_id
-      }
+    const { getShiftTimeRange, calculateLatePenaltyAmount } = await import('@/lib/server/db')
+
+    // Ca của nhân viên hôm nay: ưu tiên lịch chính thức đã chốt, nếu tuần chưa chốt thì dùng ca đã đăng ký
+    const publishedToday = (db.official_schedules || []).filter(
+      (s) => s.employee_id === effectiveEmployeeId && s.date === todayStr && s.status === 'published'
+    )
+    const registeredToday = (db.shifts || []).filter(
+      (s) => s.employee_id === effectiveEmployeeId && s.date === todayStr && s.status !== 'REJECTED'
+    )
+    const candidateShiftIds = (publishedToday.length > 0 ? publishedToday : registeredToday).map((s) => s.shift_id)
+    const offSchedule = publishedToday.length === 0
+
+    // Nhiều ca trong ngày (ca gãy): chọn ca có giờ bắt đầu gần thời điểm chấm công nhất
+    let targetShiftId: string | undefined
+    if (shift_id && candidateShiftIds.includes(shift_id)) {
+      targetShiftId = shift_id
+    } else if (candidateShiftIds.length > 0) {
+      targetShiftId = candidateShiftIds
+        .map((id) => ({ id, start: parseHhmmToMinutes(getShiftTimeRange(id, db.shift_templates).startStr) }))
+        .sort((a, b) => Math.abs((a.start ?? 0) - vnNow.minutesOfDay) - Math.abs((b.start ?? 0) - vnNow.minutesOfDay))[0].id
     }
 
-    const { getShiftTimeRange, calculateLatePenaltyAmount, parseTimeToMinutes } = await import('@/lib/server/db')
-    let effectiveStartTime = shift_start_time
-    if (!effectiveStartTime && targetShiftId) {
-      const range = getShiftTimeRange(targetShiftId, db.shift_templates)
-      effectiveStartTime = range.startStr
-    }
-
-    if (effectiveStartTime) {
-      const inMinutes = parseTimeToMinutes(now.toISOString())
-      const startMinutes = parseTimeToMinutes(effectiveStartTime)
-      const diff = inMinutes - startMinutes
-      if (diff > 0) {
-        lateMinutes = diff
-        if (lateMinutes > 15) {
-          status = 'late'
-          isLate = true
+    if (targetShiftId) {
+      const startMinutes = parseHhmmToMinutes(getShiftTimeRange(targetShiftId, db.shift_templates).startStr)
+      if (startMinutes !== null) {
+        const diff = vnNow.minutesOfDay - startMinutes
+        if (diff > 0) {
+          lateMinutes = diff
+          if (lateMinutes > 15) {
+            status = 'late'
+            isLate = true
+          }
         }
       }
     }
@@ -230,11 +240,12 @@ export async function POST(req: NextRequest) {
       late_minutes: lateMinutes,
       qr_code: qr_code || 'QR_VALIDATED',
       date: todayStr,
+      off_schedule: offSchedule,
     }
 
     db.attendance.push(newLog)
 
-    // 7. KẾT NỐI SỐ PHÚT TRỄ VÀO SỔ LỖI KPI & BẢNG LƯƠNG
+    // 7. GHI NHẬN ĐI TRỄ VÀO SỔ LỖI KPI
     if (isLate) {
       if (!db.incidents) db.incidents = []
       const penaltyAmount = calculateLatePenaltyAmount(lateMinutes)
@@ -257,41 +268,8 @@ export async function POST(req: NextRequest) {
         created_at: now.toISOString(),
       })
 
-      // b. Đẩy số tiền phạt tương ứng vào cột late_deduction trên bảng lương
-      const period = todayStr.slice(0, 7)
-      if (!db.salary_slips) db.salary_slips = []
-      const slipIdx = db.salary_slips.findIndex(
-        (s) => s.employee_id === effectiveEmployeeId && s.period === period
-      )
-      if (slipIdx >= 0) {
-        const slip = db.salary_slips[slipIdx]
-        // Nếu kỳ lương đã chốt và khóa sổ: giữ nguyên số liệu kế toán đã chốt, không tự ý sửa
-        if (slip.status !== 'locked') {
-          slip.late_deduction = (slip.late_deduction || 0) + penaltyAmount
-          slip.deductions = (slip.deductions || 0) + penaltyAmount
-          slip.net_salary = Math.max(0, (slip.net_salary || 0) - penaltyAmount)
-        }
-      } else {
-        const emp = db.employees.find((e) => e.id === effectiveEmployeeId)
-        db.salary_slips.push({
-          id: `slip-${period}-${effectiveEmployeeId}`,
-          employee_id: effectiveEmployeeId,
-          employee_name: employeeName,
-          employee_code: emp?.employee_code || 'NV0000',
-          position: emp?.department_name || 'Nhân viên',
-          store_id,
-          period,
-          work_days: 1,
-          standard_days: 26,
-          base_salary: emp?.base_salary || 0,
-          allowances: 0,
-          bonus: 0,
-          deductions: penaltyAmount,
-          late_deduction: penaltyAmount,
-          net_salary: Math.max(0, (emp?.base_salary || 0) - penaltyAmount),
-          status: 'draft',
-        })
-      }
+      // Không tự tạo/sửa phiếu lương ở đây: phiếu lương chỉ sinh ra khi bấm "Tính lương",
+      // tiền trừ đi trễ do bộ tính lương áp theo Cài đặt lương.
     }
 
     await saveServerDb(db)
@@ -300,7 +278,9 @@ export async function POST(req: NextRequest) {
       success: true,
       message: isLate
         ? `Chấm công ghi nhận đi trễ ${lateMinutes} phút (đã chuyển vào Sổ lỗi KPI)`
-        : `Chấm công thành công tại ${store.name} (cách ${distanceMeters}m)`,
+        : offSchedule
+          ? `Đã chấm công tại ${store.name}, nhưng hôm nay bạn không có ca trong lịch đã chốt. Quản lý sẽ kiểm tra lại.`
+          : `Chấm công thành công tại ${store.name} (cách ${distanceMeters}m)`,
       data: newLog,
     })
   } catch (error: unknown) {

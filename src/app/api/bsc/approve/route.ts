@@ -4,6 +4,7 @@ import { getServerDb, saveServerDb } from '@/lib/server/db'
 import { isRealDbMode } from '@/lib/adapters/repository-config'
 import { supabase } from '@/lib/supabase'
 import { calculateBSCTeamBonus } from '@/lib/bsc-engine'
+import { estimateBonusWithholding } from '@/lib/payroll/pit'
 import type { BSCEmployeePersonalData, BSCRevenueTarget, BSCPersonalErrorGroup } from '@/lib/bsc-types'
 
 /**
@@ -122,6 +123,23 @@ export async function POST(req: NextRequest) {
     }
 
     // ── HÀNH ĐỘNG PHÊ DUYỆT & BAN HÀNH (APPROVE) ──
+    // Kỳ lương đã khóa sổ (toàn chuỗi hoặc đúng chi nhánh) thì không đẩy thưởng vào được nữa.
+    const isPayrollLocked = (db.payroll_summaries || []).some(
+      (p) =>
+        p.period === period &&
+        p.status === 'locked' &&
+        (!p.store_id || ['all', 'ALL'].includes(p.store_id) || p.store_id === store_id)
+    )
+    if (isPayrollLocked) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Bảng lương kỳ ${period} đã khóa sổ. Cần mở khóa kỳ lương trước khi ban hành thưởng BSC, hoặc đưa thưởng sang kỳ sau.`,
+        },
+        { status: 400 }
+      )
+    }
+
     const nowIso = new Date().toISOString()
     currentTarget.approval_status = 'approved_published'
     currentTarget.approved_by = approver_name
@@ -194,12 +212,17 @@ export async function POST(req: NextRequest) {
     )
 
     // 3. Đẩy số tiền thưởng BSC vào bảng tính lương (db.salary_slips)
-    const distributedBonuses: Array<{ employee_id: string; employee_name: string; bonus_amount: number; net_salary: number }> = []
+    const distributedBonuses: Array<{ employee_id: string; employee_name: string; bonus_amount: number; bonus_tax_withheld: number; net_salary: number }> = []
 
     for (const result of teamSummary.individual_results) {
       const bscBonus = result.bonus_amount || 0
+      // Chỉ ghép theo mã nhân viên, không ghép theo họ tên (dễ trùng tên)
+      const resultEmp = db.employees.find(e => e.id === result.employee_id)
       const slipIdx = db.salary_slips.findIndex(
-        s => (s.employee_id === result.employee_id || s.employee_name === result.employee_name) && s.period === period
+        s =>
+          s.period === period &&
+          (s.employee_id === result.employee_id ||
+            (!!resultEmp?.employee_code && s.employee_code === resultEmp.employee_code))
       )
 
       // Không sửa phiếu lương đã khóa sổ
@@ -208,20 +231,36 @@ export async function POST(req: NextRequest) {
         const oldBonus = currentSlip.bonus || 0
         const newBonus = bscBonus
 
-        // Bảo toàn toàn bộ phần thu nhập thực nhận trước thưởng BSC
-        const netBeforeBonus = (currentSlip.net_salary || 0) - oldBonus
-        const netSalary = Math.round(netBeforeBonus + newBonus)
+        // Bảo toàn phần thực nhận trước thưởng BSC (hoàn lại thuế đã tạm khấu trừ của lần duyệt trước)
+        const oldWithheld = currentSlip.bonus_tax_withheld || 0
+        const netBeforeBonus = (currentSlip.net_salary || 0) - oldBonus + oldWithheld
+
+        // Tạm khấu trừ thuế TNCN trên phần thưởng theo Cài đặt lương
+        const isPartTime = !resultEmp?.base_salary && (resultEmp?.hourly_rate || 0) > 0
+        const incomeBeforeBonus = (currentSlip.base_salary || 0) + (currentSlip.allowances || 0)
+        const bonusTax = estimateBonusWithholding({
+          incomeBeforeBonus,
+          bonus: newBonus,
+          isPartTime,
+          settings: db.payroll_tax_settings,
+        })
+        const netSalary = Math.max(0, Math.round(netBeforeBonus + newBonus - bonusTax))
 
         db.salary_slips[slipIdx] = {
           ...currentSlip,
           bonus: newBonus,
+          bonus_tax_withheld: bonusTax,
           net_salary: netSalary,
+          needs_recalculation: true,
+          updated_by: gate.user.userId,
+          updated_at: nowIso,
         }
 
         distributedBonuses.push({
           employee_id: currentSlip.employee_id,
           employee_name: currentSlip.employee_name,
           bonus_amount: newBonus,
+          bonus_tax_withheld: bonusTax,
           net_salary: netSalary,
         })
       }

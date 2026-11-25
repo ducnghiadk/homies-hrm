@@ -231,6 +231,8 @@ export interface ServerAttendanceLog {
   total_hours?: number
   qr_code?: string
   date: string
+  /** Chấm công khi không có ca nào trong lịch chính thức đã chốt của ngày đó. */
+  off_schedule?: boolean
 }
 
 export interface ServerSalarySlip {
@@ -251,6 +253,12 @@ export interface ServerSalarySlip {
   late_deduction?: number
   net_salary: number
   status: 'draft' | 'locked'
+  /** Thuế TNCN đã khấu trừ thêm khi đẩy thưởng BSC vào phiếu. */
+  bonus_tax_withheld?: number
+  /** Phiếu có thay đổi sau lần tính lương gần nhất, cần bấm Tính lương lại. */
+  needs_recalculation?: boolean
+  updated_by?: string
+  updated_at?: string
 }
 
 export interface ServerViolationIncident {
