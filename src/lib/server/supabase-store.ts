@@ -31,6 +31,7 @@ export const PERSISTED_KEYS = [
   'bsc_targets',
   'bsc_logs',
   'bsc_settings',
+  'payroll_tax_settings',
   'sessions',
   'shift_templates',
   'incidents',

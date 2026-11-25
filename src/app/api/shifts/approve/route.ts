@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb, ServerShiftRegistration } from '@/lib/server/db'
-import { getAuthenticatedUser } from '@/lib/server/auth-helper'
+import { getActiveUser } from '@/lib/server/auth-helper'
 
 const ALLOWED_APPROVER_ROLES = ['ceo', 'hr_admin', 'store_manager', 'area_manager']
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await getAuthenticatedUser(req)
+    const auth = await getActiveUser(req)
     if (!auth) {
       return NextResponse.json(
         { success: false, error: 'Vui lòng đăng nhập để thực hiện phê duyệt ca làm việc' },

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { getServerDb, saveServerDb, ServerAttendanceLog, calculateDistance } from '@/lib/server/db'
 import { verifyQrPayload } from '@/lib/security/token-signer'
-import { getAuthenticatedUser } from '@/lib/server/auth-helper'
+import { getActiveUser } from '@/lib/server/auth-helper'
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 0. Xác thực tài khoản người chấm công (chống chấm công hộ)
-    const auth = await getAuthenticatedUser(req)
+    const auth = await getActiveUser(req)
     let effectiveEmployeeId = employee_id
     if (auth) {
       const isManager = ['ceo', 'hr_admin', 'store_manager', 'area_manager'].includes(auth.role)

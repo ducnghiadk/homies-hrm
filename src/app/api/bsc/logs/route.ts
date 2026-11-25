@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { MANAGER_ROLES, OPERATOR_ROLES, canAccessStore, getAuthenticatedUser, getStorePinAccess, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
+import { MANAGER_ROLES, OPERATOR_ROLES, canAccessStore, getActiveUser, getStorePinAccess, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, type ServerBscLog } from '@/lib/server/db'
 import { isRealDbMode } from '@/lib/adapters/repository-config'
 import { supabase } from '@/lib/supabase'
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const authUser = await getAuthenticatedUser(req)
+    const authUser = await getActiveUser(req)
     const pinStoreId = getStorePinAccess(req)
     const isManager = Boolean(authUser && hasRequiredRole(authUser.role, MANAGER_ROLES))
     const isOperator = Boolean(authUser && hasRequiredRole(authUser.role, OPERATOR_ROLES))

@@ -119,6 +119,16 @@ export async function getAuthenticatedUser(req: NextRequest): Promise<Authentica
   return null
 }
 
+/**
+ * Giống getAuthenticatedUser nhưng coi tài khoản còn phải đổi mật khẩu mặc định là chưa đăng nhập.
+ * Dùng cho các API tự kiểm tra phiên (không qua requireAuth) để không ai dùng mật khẩu mặc định thao tác dữ liệu.
+ */
+export async function getActiveUser(req: NextRequest): Promise<AuthenticatedUser | null> {
+  const user = await getAuthenticatedUser(req)
+  if (user?.mustChangePassword && isPasswordChangeEnforced()) return null
+  return user
+}
+
 export type AuthGate =
   | { ok: true; user: AuthenticatedUser }
   | { ok: false; response: NextResponse }

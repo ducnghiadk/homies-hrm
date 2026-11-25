@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb, ServerRequest } from '@/lib/server/db'
-import { OPERATOR_ROLES, getAuthenticatedUser, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
+import { OPERATOR_ROLES, getActiveUser, hasRequiredRole, requireAuth } from '@/lib/server/auth-helper'
 
 const ALLOWED_APPROVER_ROLES = ['ceo', 'hr_admin', 'store_manager', 'area_manager', 'shift_leader']
 
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
 
     // 1. Phê duyệt hoặc Từ chối đơn có sẵn (nếu có action = 'approve' | 'reject' hoặc có status)
     if (targetId && (action === 'approve' || action === 'reject' || body.status)) {
-      const auth = await getAuthenticatedUser(req)
+      const auth = await getActiveUser(req)
       if (!auth) {
         return NextResponse.json(
           { success: false, error: 'Vui lòng đăng nhập để phê duyệt đơn từ' },

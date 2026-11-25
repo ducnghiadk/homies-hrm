@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb, ServerStore } from '@/lib/server/db'
-import { getAuthenticatedUser } from '@/lib/server/auth-helper'
+import { getActiveUser } from '@/lib/server/auth-helper'
 
 const ALLOWED_STORE_ROLES = ['ceo', 'hr_admin', 'store_manager', 'area_manager']
 
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     const db = await getServerDb()
     let stores = db.stores || []
 
-    const auth = await getAuthenticatedUser(req)
+    const auth = await getActiveUser(req)
     const canSeePin = auth && ALLOWED_STORE_ROLES.includes(auth.role)
 
     const sanitizeStore = (store: ServerStore) => {
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await getAuthenticatedUser(req)
+    const auth = await getActiveUser(req)
     if (!auth || !ALLOWED_STORE_ROLES.includes(auth.role)) {
       return NextResponse.json(
         {

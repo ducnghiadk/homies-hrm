@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedUser, isScheduleManagerRole } from '@/lib/server/auth-helper'
+import { getActiveUser, isScheduleManagerRole } from '@/lib/server/auth-helper'
 import {
   getServerDb,
   saveServerDb,
@@ -18,7 +18,7 @@ import { fetchIposShiftRegistrations } from '@/lib/services/ipos/ipos-cloud-clie
 // 1. GET: Quản lý lấy danh sách ca đăng ký từ Database máy chủ & iPOS Cloud (nhân viên chỉ xem ca của chính mình)
 export async function GET(req: NextRequest) {
   try {
-    const auth = await getAuthenticatedUser(req)
+    const auth = await getActiveUser(req)
     if (!auth) {
       return NextResponse.json(
         { success: false, error: 'Vui lòng đăng nhập để xem lịch rảnh tuần.' },
@@ -162,7 +162,7 @@ export async function GET(req: NextRequest) {
 // 2. POST: Nhân viên gửi ca rảnh từ điện thoại lên Database máy chủ
 export async function POST(req: NextRequest) {
   try {
-    const auth = await getAuthenticatedUser(req)
+    const auth = await getActiveUser(req)
     if (!auth) {
       return NextResponse.json(
         { success: false, error: 'Vui lòng đăng nhập để gửi lịch rảnh tuần.' },

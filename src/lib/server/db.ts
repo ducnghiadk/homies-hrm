@@ -1,3 +1,4 @@
+import type { PitSettings } from '@/lib/payroll/pit'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
@@ -620,6 +621,8 @@ export interface ServerDatabaseSchema {
   bsc_targets?: ServerBscTarget[]
   bsc_logs?: ServerBscLog[]
   bsc_settings?: ServerBscSettings
+  /** Cài đặt thuế TNCN (giảm trừ, biểu thuế) đồng bộ từ Cài đặt lương để máy chủ tính thuế thưởng. */
+  payroll_tax_settings?: PitSettings
   ipos_integration?: ServerIposIntegrationConfig
   notifications?: ServerNotification[]
   sessions: Record<string, { userId: string; role: string; email: string; createdAt: string; mustChangePassword?: boolean }>

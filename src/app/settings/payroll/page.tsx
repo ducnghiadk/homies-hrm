@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
+import PitSettingsPanel from '@/components/payroll/PitSettingsPanel'
+import { DEFAULT_PIT_SETTINGS, calculateProgressivePit } from '@/lib/payroll/pit'
 import { useSettingPermissions } from '@/hooks/usePermissions'
 import { settingsPayroll } from '@/lib/mock-data-settings'
 import { mockStores } from '@/lib/mock-data'
@@ -146,6 +148,13 @@ const ALLOWANCE_CATALOG: AllowanceCatalogItem[] = [
 ]
 
 // Component nhập tiền tệ có định dạng phân tách hàng ngàn trực quan
+const DEFAULT_LEGAL: PayrollPolicy['legal'] = {
+  personalDeduction: DEFAULT_PIT_SETTINGS.personalDeduction,
+  dependentDeduction: DEFAULT_PIT_SETTINGS.dependentDeduction,
+  minRegionSalary: 4680000,
+  maxInsuranceSalary: 29800000,
+}
+
 function MoneyNumberInput({
   value,
   onChange,
@@ -492,7 +501,16 @@ function SettingsPayrollContent() {
     setPolicy(current => ({
       ...current,
       status: current.status === 'active' ? 'draft' : current.status,
-      legal: { ...(current.legal || { personalDeduction: 11000000, dependentDeduction: 4400000, minRegionSalary: 4680000, maxInsuranceSalary: 29800000 }), [field]: value },
+      legal: { ...(current.legal || DEFAULT_LEGAL), [field]: value },
+    }))
+  }
+
+  const updateLegalPatch = (patch: Partial<PayrollPolicy['legal']>) => {
+    if (!canEdit) return
+    setPolicy(current => ({
+      ...current,
+      status: current.status === 'active' ? 'draft' : current.status,
+      legal: { ...(current.legal || DEFAULT_LEGAL), ...patch },
     }))
   }
 
@@ -623,8 +641,8 @@ function SettingsPayrollContent() {
       const insBase = Math.min(baseSal, 29800000)
       const insRate = policy.rates.bhxhEmployee + policy.rates.bhytEmployee + policy.rates.bhtnEmployee
       const insurance = Math.round(insBase * insRate)
-      const taxable = Math.max(0, gross - insurance - 11000000)
-      const pit = taxable > 0 ? Math.round(taxable * policy.rates.taxBracket1) : 0
+      const taxable = Math.max(0, gross - insurance - (policy.legal?.personalDeduction ?? DEFAULT_PIT_SETTINGS.personalDeduction))
+      const pit = calculateProgressivePit(taxable, policy.legal?.taxBrackets ?? DEFAULT_PIT_SETTINGS.brackets)
       const netTotal = gross - insurance - pit
 
       return {
@@ -2057,31 +2075,11 @@ function SettingsPayrollContent() {
                   <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs mt-4">
                     <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
                       <Shield size={16} className="text-purple-700" />
-                      <span>Thông Số Pháp Lý (Lương Vùng & Thuế)</span>
+                      <span>Thông Số Pháp Lý (Lương Vùng & Bảo Hiểm)</span>
                     </h3>
-                    <p className="text-xs text-gray-500 mb-4">Các chỉ số được áp dụng để tính thuế TNCN và giới hạn bảo hiểm</p>
+                    <p className="text-xs text-gray-500 mb-4">Lương tối thiểu vùng và trần lương đóng bảo hiểm</p>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
-                        <label className="text-[11px] font-bold text-gray-700 block mb-1">Giảm trừ gia cảnh (Bản thân)</label>
-                        <MoneyNumberInput
-                          value={policy.legal?.personalDeduction || 11000000}
-                          step={100000}
-                          disabled={!canEdit}
-                          onChange={val => updateLegal('personalDeduction', val)}
-                        />
-                      </div>
-                      
-                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
-                        <label className="text-[11px] font-bold text-gray-700 block mb-1">Giảm trừ người phụ thuộc</label>
-                        <MoneyNumberInput
-                          value={policy.legal?.dependentDeduction || 4400000}
-                          step={100000}
-                          disabled={!canEdit}
-                          onChange={val => updateLegal('dependentDeduction', val)}
-                        />
-                      </div>
-                      
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
                         <label className="text-[11px] font-bold text-gray-700 block mb-1">Lương tối thiểu vùng</label>
                         <MoneyNumberInput
@@ -2103,6 +2101,12 @@ function SettingsPayrollContent() {
                       </div>
                     </div>
                   </div>
+
+                  <PitSettingsPanel
+                    legal={policy.legal || DEFAULT_LEGAL}
+                    canEdit={canEdit}
+                    onChange={updateLegalPatch}
+                  />
                 </div>
               )}
 

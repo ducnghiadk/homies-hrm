@@ -68,8 +68,8 @@ export const POLICY_REGISTRY: PolicyFieldDef[] = [
     step: 100000,
     affectsMoney: true,
     requiresApproval: true,
-    legalRefVi: 'Nghị quyết 954/2020/UBTVQH14',
-    defaultValue: 11000000,
+    legalRefVi: 'Nghị quyết 110/2025/UBTVQH15',
+    defaultValue: 15500000,
   },
   {
     path: 'legal.dependentDeduction',
@@ -82,8 +82,8 @@ export const POLICY_REGISTRY: PolicyFieldDef[] = [
     step: 100000,
     affectsMoney: true,
     requiresApproval: true,
-    legalRefVi: 'Nghị quyết 954/2020/UBTVQH14',
-    defaultValue: 4400000,
+    legalRefVi: 'Nghị quyết 110/2025/UBTVQH15',
+    defaultValue: 6200000,
   },
   {
     path: 'legal.minRegionSalary',

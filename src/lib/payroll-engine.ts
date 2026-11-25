@@ -15,7 +15,8 @@ import {
   mockBonuses, mockDeductions, mockAdvances,
   type SalarySlipData,
 } from './mock-data-payroll'
-import { getActivePayrollPolicy, INSURANCE_MAX_BASE } from './services/payroll-policy-service'
+import { getActivePayrollPolicy, getPitSettingsFromPolicy, INSURANCE_MAX_BASE } from './services/payroll-policy-service'
+import { calculatePit, calculateOvertimeTaxExemption } from './payroll/pit'
 import { AttendanceService, type PayrollAttendanceRecord } from './services/attendance/attendance-service'
 import { employeeAdapter, type PayrollEmployeeDbRow } from './adapters/employee-adapter'
 import { getEffectiveHourlyRate, calculateHourlyEarnings } from './payroll/payroll-calculator'
@@ -393,7 +394,8 @@ export function getEmployeeBaseSalary(employeeId: string): number {
   const pos = mockPositions.find(p => p.id === emp.position_id)
   // Part-time: đơn giá giờ (ưu tiên hourly_rate riêng, nếu không có thì quy đổi lương tháng chức vụ ra giờ)
   if (emp.contract_type === 'ban_thoi_gian') {
-    return getEffectiveHourlyRate(emp, pos, 22000)
+    // Không tự lấy đơn giá mặc định: thiếu đơn giá phải hiện cảnh báo để quản lý cài đặt
+    return getEffectiveHourlyRate(emp, pos, 0)
   }
   const policyGrade = getActivePayrollPolicy().grades.find(grade => grade.id === emp.position_id)
   return policyGrade?.base_salary ?? pos?.base_salary ?? 0
@@ -784,24 +786,23 @@ export function calculateInsurance(baseSalary: number): {
 // 5. CALCULATE TAX (Progressive)
 // ══════════════════════════════════════
 
+/**
+ * Thuế TNCN tháng. Mức giảm trừ, biểu thuế và tỷ lệ khấu trừ part-time
+ * đều lấy từ Cài đặt lương (policy.legal), không viết cứng ở đây.
+ */
 export function calculateTax(
   taxableIncome: number,
   dependents: number = 0,
+  options: { isPartTime?: boolean; grossPaid?: number } = {},
 ): number {
   const policy = getActivePayrollPolicy()
-  const personalDeduction = policy.legal?.personalDeduction ?? 11000000
-  const dependentDeduction = policy.legal?.dependentDeduction ?? 4400000
-  const deduction = personalDeduction + dependents * dependentDeduction
-  const income = Math.max(0, taxableIncome - deduction)
-
-  if (income <= 0) return 0
-  if (income <= 5000000) return Math.round(income * 0.05)
-  if (income <= 10000000) return Math.round(250000 + (income - 5000000) * 0.1)
-  if (income <= 18000000) return Math.round(750000 + (income - 10000000) * 0.15)
-  if (income <= 32000000) return Math.round(1950000 + (income - 18000000) * 0.2)
-  if (income <= 52000000) return Math.round(4750000 + (income - 32000000) * 0.25)
-  if (income <= 80000000) return Math.round(9750000 + (income - 52000000) * 0.3)
-  return Math.round(18150000 + (income - 80000000) * 0.35)
+  return calculatePit({
+    taxableIncome,
+    dependents,
+    isPartTime: options.isPartTime,
+    grossPaid: options.grossPaid,
+    settings: getPitSettingsFromPolicy(policy),
+  }).tax
 }
 
 // ══════════════════════════════════════
@@ -990,10 +991,8 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   const isPartTime = input.contractType === 'ban_thoi_gian' || emp?.contract_type === 'ban_thoi_gian'
   let baseSalary = 0
   if (isPartTime) {
-    const fallbackRate = (policy.legal?.minRegionSalary && policy.legal.minRegionSalary < 100000)
-      ? policy.legal.minRegionSalary
-      : 22000
-    baseSalary = getEffectiveHourlyRate(emp, pos, fallbackRate, standardDays, policy.standardHoursPerDay || 8)
+    // Thiếu đơn giá giờ thì để 0 và báo bất thường, không tự đoán mức lương
+    baseSalary = getEffectiveHourlyRate(emp, pos, 0, standardDays, policy.standardHoursPerDay || 8)
   } else {
     baseSalary = policyGrade?.base_salary ?? pos?.base_salary ?? 0
   }
@@ -1021,6 +1020,8 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   let overtimeHoursToReport = att.overtimeHours
   let dailyRate = 0
   let absentDeduction = 0
+  // Phần chênh lệch tiền tăng ca so với giờ thường được miễn thuế TNCN
+  let overtimeTaxExempt = 0
 
   if (isPartTime) {
     const hourlyRate = baseSalary > 0 ? baseSalary : 0
@@ -1036,6 +1037,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     })
     baseEarned = hourlyCalc.baseEarned
     overtimeAmount = hourlyCalc.overtimeAmount
+    overtimeTaxExempt = calculateOvertimeTaxExemption(overtimeAmount, ptOt, hourlyRate)
     overtimeHoursToReport = ptOt
     dailyRate = 0
     absentDeduction = 0
@@ -1052,6 +1054,11 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     const otHolidayAmt = calculateOvertimeAmount(baseSalary, otHoliday, 'holiday')
     overtimeAmount = otWeekdayAmt + otWeekendAmt + otHolidayAmt
     overtimeHoursToReport = att.overtimeHours
+    const standardHoursPerDay = (typeof policy.standardHoursPerDay === 'number' && policy.standardHoursPerDay > 0)
+      ? policy.standardHoursPerDay
+      : 8
+    const normalHourlyRate = baseSalary / standardDays / standardHoursPerDay
+    overtimeTaxExempt = calculateOvertimeTaxExemption(overtimeAmount, otWeekday + otWeekend + otHoliday, normalHourlyRate)
 
     dailyRate = Math.round(baseSalary / standardDays)
     absentDeduction = att.absentDays * dailyRate
@@ -1106,12 +1113,20 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     .filter(a => a.name.includes('Cơm ca') || a.name.includes('cơm ca'))
     .reduce((sum, a) => sum + a.amount, 0)
   const grossSalary = totalEarnings
-  const taxableIncome = Math.max(0, grossSalary - insurance.total - nonTaxableAllowances)
-  const tax = calculateTax(taxableIncome, input.dependents ?? 0)
+  const taxableIncome = Math.max(0, grossSalary - insurance.total - nonTaxableAllowances - overtimeTaxExempt)
+  const tax = calculateTax(taxableIncome, input.dependents ?? 0, { isPartTime, grossPaid: grossSalary })
 
   // ── Step 11: Net Salary
   // Advance payment is deducted from net payout, NOT from taxable income
-  const netSalary = grossSalary - insurance.total - tax - lateDeduction - totalOtherDeductions - advanceDeduction
+  const rawNetSalary = grossSalary - insurance.total - tax - lateDeduction - totalOtherDeductions - advanceDeduction
+  // Không trả lương âm: phần khấu trừ vượt thu nhập được báo để quản lý xử lý (chuyển kỳ sau / thu lại)
+  const netSalary = Math.max(0, rawNetSalary)
+  if (rawNetSalary < 0) {
+    anomalies.push({
+      type: 'luong_am',
+      message: `Khấu trừ (tạm ứng, phạt, thuế, bảo hiểm) vượt thu nhập ${Math.abs(Math.round(rawNetSalary)).toLocaleString('vi-VN')}đ. Thực nhận để 0đ, phần thiếu cần chuyển sang kỳ sau hoặc thu lại.`,
+    })
+  }
 
   return {
     employee_id: employeeId,
