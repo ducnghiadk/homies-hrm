@@ -1,4 +1,6 @@
 import type { PitSettings } from '@/lib/payroll/pit'
+import type { CareerPathSettings } from '@/lib/career-path/settings'
+import type { CareerPlacement, CareerGradeHistoryEntry } from '@/lib/career-path/placement'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
@@ -633,6 +635,10 @@ export interface ServerDatabaseSchema {
   payroll_tax_settings?: PitSettings
   ipos_integration?: ServerIposIntegrationConfig
   notifications?: ServerNotification[]
+  /** Lộ trình thăng tiến (Playbook V7): cài đặt, bậc hiện tại và lịch sử đổi bậc của nhân viên. */
+  career_settings?: CareerPathSettings
+  career_placements?: CareerPlacement[]
+  career_grade_history?: CareerGradeHistoryEntry[]
   sessions: Record<string, { userId: string; role: string; email: string; createdAt: string; mustChangePassword?: boolean }>
 }
 
@@ -2457,6 +2463,8 @@ function normalizeServerDb(db: ServerDatabaseSchema): { db: ServerDatabaseSchema
   if (!db.bsc_targets || db.bsc_targets.length === 0) db.bsc_targets = getInitialBscTargetsSeed()
   if (!db.bsc_logs || db.bsc_logs.length === 0) db.bsc_logs = getInitialBscLogsSeed()
   if (!db.bsc_settings) db.bsc_settings = getInitialBscSettingsSeed()
+  if (!Array.isArray(db.career_placements)) db.career_placements = []
+  if (!Array.isArray(db.career_grade_history)) db.career_grade_history = []
   if (!db.shifts) db.shifts = []
   if (!Array.isArray(db.official_schedules)) db.official_schedules = []
   if (!Array.isArray(db.schedule_weeks)) db.schedule_weeks = []
