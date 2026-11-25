@@ -77,6 +77,8 @@ export interface CareerPathSettings {
   positions: CareerPositionConfig[]
   grades: CareerGradeConfig[]
   ft_pay_method: FullTimePayMethod
+  /** Bật thì bảng lương (kỳ chưa khóa) tự cộng thêm tiền theo bậc. Mặc định tắt để HR kiểm tra trước. */
+  payroll_link_enabled: boolean
   skills: CareerSkillConfig[]
   /** Mức (1-3) coi là "đạt" với tiêu chuẩn chung bắt buộc (ATTP, SOP...). */
   common_pass_level: number
@@ -118,6 +120,7 @@ export function getDefaultCareerPathSettings(): CareerPathSettings {
       { code: 'G4', label: 'Chủ chốt', description: 'Thành thạo cả hai vị trí, phòng ngừa lỗi và hướng dẫn.', min_months: 4, min_hours: 720, hourly_step_vnd: 1500, ft_monthly_vs_g1_vnd: 1050000, requirement: req({ main_min_level: 3, second_min_level: 3, advanced_min_level: 2, common_required: true }) },
     ],
     ft_pay_method: 'fixed_monthly',
+    payroll_link_enabled: false,
     skills: [
       skill('CS01', 'Menu, tư vấn', 'cashier', 'core', 'Giải thích đúng món, tùy chọn, ưu đãi'),
       skill('CS02', 'POS', 'cashier', 'core', 'Nhập đúng món, số lượng, yêu cầu'),
@@ -260,5 +263,6 @@ export function normalizeCareerPathSettings(raw: Partial<CareerPathSettings> | n
     skills: Array.isArray(raw.skills) && raw.skills.length > 0 ? raw.skills : d.skills,
     approval: { ...d.approval, ...(raw.approval || {}) },
     m1: { ...d.m1, ...(raw.m1 || {}) },
+    payroll_link_enabled: raw.payroll_link_enabled === true,
   }
 }

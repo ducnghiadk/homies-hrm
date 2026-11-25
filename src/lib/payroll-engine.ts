@@ -20,6 +20,7 @@ import { calculatePit, calculateOvertimeTaxExemption } from './payroll/pit'
 import { AttendanceService, type PayrollAttendanceRecord } from './services/attendance/attendance-service'
 import { employeeAdapter, type PayrollEmployeeDbRow } from './adapters/employee-adapter'
 import { getEffectiveHourlyRate, calculateHourlyEarnings } from './payroll/payroll-calculator'
+import { computeCareerPay, type CareerPayPlan } from './career-path/pay'
 
 // ══════════════════════════════════════
 // TYPES
@@ -36,6 +37,8 @@ export interface PayrollInput {
   employee?: Employee
   position?: Position
   store?: Store
+  /** Khoản cộng thêm tính sẵn bên ngoài (vd: cộng lương theo bậc lộ trình), chịu thuế như phụ cấp thường. */
+  extraAllowances?: { name: string; amount: number }[]
 }
 
 export interface FnbAllocationBreakdown {
@@ -1065,7 +1068,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   }
 
   // ── Step 5: Allowances
-  const allowances = getAllowancesForEmployee(employeeId, baseSalary, att, emp, isPartTime)
+  const allowances = [...getAllowancesForEmployee(employeeId, baseSalary, att, emp, isPartTime), ...(input.extraAllowances || [])]
   const totalAllowances = allowances.reduce((sum, a) => sum + a.amount, 0)
 
   // ── Step 6: Bonuses
@@ -1220,10 +1223,43 @@ export function calculatePayrollBatch(
   )
 }
 
+/** Kế hoạch cộng lương theo bậc (lộ trình V7) của kỳ. null khi tắt liên kết hoặc không tải được (bảng lương giữ nguyên). */
+async function fetchCareerPayPlans(periodStart: string): Promise<Map<string, CareerPayPlan> | null> {
+  if (typeof window === 'undefined') return null
+  try {
+    const res = await fetch(`/api/career-path/pay?period=${periodStart.slice(0, 7)}`, { cache: 'no-store' })
+    const json = await res.json()
+    if (!res.ok || !json?.success || !json.enabled) return null
+    return new Map(((json.plans || []) as CareerPayPlan[]).map(plan => [plan.employee_id, plan]))
+  } catch (error) {
+    console.warn('[Payroll] Không tải được cộng lương theo bậc, bỏ qua:', error)
+    return null
+  }
+}
+
+function careerAllowancesFor(
+  plans: Map<string, CareerPayPlan> | null,
+  employeeId: string,
+  isPartTime: boolean,
+  periodStart: string,
+  periodEnd: string,
+  records: PayrollAttendanceRecord[],
+) {
+  const plan = plans?.get(employeeId)
+  if (!plan) return undefined
+  // Chỉ tính giờ của ca đã đóng và đã duyệt, giống cách tính giờ công.
+  const workedHours = records
+    .filter(r => r.employee_id === employeeId && !r.soCaChoDuyet && r.trang_thai_db !== 'cho_duyet' && !r.chuaCheckOut && Boolean(r.check_out_time)
+      && (r.status === 'on_time' || r.status === 'late' || r.status === 'early'))
+    .map(r => ({ date: r.date, hours: r.total_hours || 0 }))
+  return computeCareerPay(plan, { isPartTime, periodStart, periodEnd, workedHours })
+}
+
 export async function calculatePayrollBatchAsync(
   periodStart: string,
   periodEnd: string,
 ): Promise<PayrollResult[]> {
+  const careerPlans = await fetchCareerPayPlans(periodStart)
   const payrollEmployeesResult = await employeeAdapter.getPayrollEmployees()
   if (payrollEmployeesResult.coLoi || payrollEmployeesResult.employees.length === 0) {
     const activeEmployees = mockEmployees.filter(e => {
@@ -1248,6 +1284,7 @@ export async function calculatePayrollBatchAsync(
         periodEnd,
         fnbAllocations,
         contractType: emp.contract_type,
+        extraAllowances: careerAllowancesFor(careerPlans, emp.id, emp.contract_type === 'ban_thoi_gian', periodStart, periodEnd, attendanceRecords),
         attendanceSummary: summarizeAttendanceRecords(
           attendanceRecords.filter(record => record.employee_id === emp.id),
           otThreshold,
@@ -1367,6 +1404,7 @@ export async function calculatePayrollBatchAsync(
         employee: emp,
         position: empPos,
         store: empStore,
+        extraAllowances: careerAllowancesFor(careerPlans, emp.id, payrollEmp?.loai_hop_dong === 'ban_thoi_gian', periodStart, periodEnd, attendanceRecords),
         attendanceSummary: summarizeAttendanceRecords(
           attendanceRecords.filter(record => record.employee_id === emp.id),
           otThreshold,

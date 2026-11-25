@@ -36,8 +36,8 @@ export default function CareerGradesPanel({ settings, readOnly, onChange }: Prop
       <section className={cardClass}>
         <h2 className="text-base font-bold text-[#001D3D]">Bậc, mốc tối thiểu và mức cộng lương</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Số tháng và số giờ tính từ ngày vào làm, áp dụng như nhau cho Part-time và Full-time. Mức cộng lương chỉ là cài đặt,
-          chưa tự động đưa vào bảng lương ở bước này.
+          Số tháng và số giờ tính từ ngày vào làm, áp dụng như nhau cho Part-time và Full-time. Mức cộng lương giờ là phần cộng thêm
+          so với bậc liền trước (cộng dồn). Bảng lương chỉ dùng các mức này khi bật “Đưa vào bảng lương” bên dưới.
         </p>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
@@ -100,6 +100,22 @@ export default function CareerGradesPanel({ settings, readOnly, onChange }: Prop
           Ví dụ G4 so với G1: cộng {formatVnd(settings.grades.find((g) => g.code === 'G4')?.ft_monthly_vs_g1_vnd || 0)}/tháng theo cách cố định.
           Hệ thống không bao giờ tự hạ lương hay hạ bậc.
         </p>
+        <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={settings.payroll_link_enabled}
+            disabled={readOnly}
+            onChange={(e) => onChange({ ...settings, payroll_link_enabled: e.target.checked })}
+          />
+          <span>
+            <span className="block text-sm font-semibold text-[#001D3D]">Đưa tiền cộng theo bậc vào bảng lương</span>
+            <span className="block text-xs text-gray-500">
+              Khi bật, bảng lương của kỳ chưa khóa sẽ có thêm dòng “Cộng lương bậc …” cho nhân viên đã được xếp bậc, tính từ ngày hiệu lực của bậc.
+              Kỳ đã khóa không bị thay đổi. Nên kiểm tra lại mức cộng ở bảng trên trước khi bật.
+            </span>
+          </span>
+        </label>
       </section>
 
       <section className={cardClass}>
