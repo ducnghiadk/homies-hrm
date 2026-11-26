@@ -36,6 +36,27 @@ export function isNotificationForUser(n: ServerNotification, userId: string, rol
   return n.target_user_id === userId || n.target_role === role
 }
 
+/**
+ * Người này đã đọc thông báo chưa.
+ * Thông báo gửi riêng 1 người dùng `is_read`; thông báo chung/theo vai trò dùng `read_by`
+ * để một người đọc không làm mất thông báo của người khác.
+ */
+export function isNotificationReadBy(n: ServerNotification, userId: string) {
+  if (n.target_user_id) return n.is_read
+  if (Array.isArray(n.read_by)) return n.read_by.includes(userId)
+  return n.is_read
+}
+
+/** Đánh dấu đã đọc cho đúng người đang xem. */
+export function markNotificationReadBy(n: ServerNotification, userId: string) {
+  if (n.target_user_id) {
+    n.is_read = true
+    return
+  }
+  const readBy = Array.isArray(n.read_by) ? n.read_by : []
+  if (!readBy.includes(userId)) n.read_by = [...readBy, userId]
+}
+
 /** Những người có quyền duyệt đề xuất lên bậc này (theo Cài đặt), trừ người đề xuất. */
 export function careerApproverIds(
   db: ServerDatabaseSchema,

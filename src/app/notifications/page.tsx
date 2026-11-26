@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import { useAuthStore } from '@/store/auth-store'
 import { useNotifications } from '@/hooks/useNotifications'
 import { getNotificationActionUrl, type Notification } from '@/lib/notifications/notification-center'
+import { fetchServerNotifications, mergeNotifications, markServerNotificationRead, markAllServerNotificationsRead } from '@/lib/notifications/server-notifications'
 import { Bell, CheckCircle, AlertTriangle, Info, Megaphone, X, ArrowRight } from 'lucide-react'
 
 const iconMap: Record<string, { icon: typeof Bell; bg: string; color: string }> = {
@@ -20,6 +21,7 @@ const iconMap: Record<string, { icon: typeof Bell; bg: string; color: string }> 
   open_shift_claim_submitted: { icon: Bell, bg: '#0EA5E9', color: 'white' },
   open_shift_claim_approved: { icon: CheckCircle, bg: '#10B981', color: 'white' },
   open_shift_claim_rejected: { icon: X, bg: '#EF4444', color: 'white' },
+  career_path: { icon: Megaphone, bg: '#2F6FA8', color: 'white' },
   system: { icon: Info, bg: '#6B7280', color: 'white' },
 }
 
@@ -106,12 +108,48 @@ export default function NotificationsPage() {
   const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
   const {
-    notifications,
-    unreadCount,
-    markAsRead,
-    markAllAsRead,
-    deleteNotification,
+    notifications: localNotifications,
+    markAsRead: markLocalAsRead,
+    markAllAsRead: markAllLocalAsRead,
+    deleteNotification: deleteLocalNotification,
   } = useNotifications(user?.id)
+  // Thông báo trên máy chủ (lộ trình thăng tiến, đồng bộ iPOS...) — trước đây trang này chỉ đọc thông báo trên máy.
+  const [serverNotifications, setServerNotifications] = useState<Notification[]>([])
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
+
+  const userId = user?.id
+  useEffect(() => {
+    if (!userId) return
+    let alive = true
+    fetchServerNotifications(userId, 100).then((list) => {
+      if (alive && list) setServerNotifications(list)
+    })
+    return () => { alive = false }
+  }, [userId])
+
+  const notifications = useMemo(
+    () => mergeNotifications(serverNotifications, localNotifications).filter((n) => !hiddenIds.has(n.id)),
+    [serverNotifications, localNotifications, hiddenIds]
+  )
+  const unreadCount = notifications.filter((n) => n.status === 'unread').length
+
+  const markAsRead = (id: string) => {
+    markLocalAsRead(id)
+    if (serverNotifications.some((n) => n.id === id)) {
+      setServerNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, status: 'read' } : n)))
+      markServerNotificationRead(id)
+    }
+  }
+  const markAllAsRead = () => {
+    markAllLocalAsRead()
+    setServerNotifications((prev) => prev.map((n) => ({ ...n, status: 'read' })))
+    markAllServerNotificationsRead()
+  }
+  const deleteNotification = (id: string) => {
+    deleteLocalNotification(id)
+    // Thông báo máy chủ chỉ ẩn khỏi danh sách đang xem.
+    setHiddenIds((prev) => new Set(prev).add(id))
+  }
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/notifications')
@@ -135,7 +173,7 @@ export default function NotificationsPage() {
         <div className="flex items-end justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-gray-800">Thông báo</h1>
-            <p className="mt-0.5 text-xs text-gray-400">Lịch mới, thay đổi ca, đổi ca và ca trống sẽ xuất hiện ở đây.</p>
+            <p className="mt-0.5 text-xs text-gray-400">Lịch mới, thay đổi ca, đổi ca, ca trống và lộ trình thăng tiến sẽ xuất hiện ở đây.</p>
           </div>
           {unreadCount > 0 && (
             <button

@@ -24,10 +24,12 @@ interface Props {
   today: string
   respondWithin: number
   onAction: (action: 'approve' | 'reject' | 'cancel', note: string, effectiveDate: string) => Promise<string | null>
+  /** Đề xuất được mở từ thông báo: tô viền để dễ thấy. */
+  highlight?: boolean
 }
 
 /** Một đề xuất nâng bậc: thông tin, lý do, ảnh chụp điều kiện lúc đề xuất và nút duyệt/từ chối/hủy. */
-export default function PromotionProposalCard({ row, today, respondWithin, onAction }: Props) {
+export default function PromotionProposalCard({ row, today, respondWithin, onAction, highlight }: Props) {
   const [note, setNote] = useState('')
   const [effectiveDate, setEffectiveDate] = useState(today)
   const [busy, setBusy] = useState(false)
@@ -43,7 +45,7 @@ export default function PromotionProposalCard({ row, today, respondWithin, onAct
   }
 
   return (
-    <li className="rounded-xl border border-gray-200 bg-white p-4">
+    <li id={`proposal-${row.id}`} className={`rounded-xl border bg-white p-4 ${highlight ? 'border-[#2F6FA8] ring-2 ring-[#2F6FA8]/30' : 'border-gray-200'}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="text-sm font-bold text-[#001D3D]">{row.employee_name}</div>

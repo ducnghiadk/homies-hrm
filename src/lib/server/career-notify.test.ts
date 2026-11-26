@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { careerApproverIds, isNotificationForUser, pushCareerNotices } from './career-notify.ts'
+import { careerApproverIds, isNotificationForUser, isNotificationReadBy, markNotificationReadBy, pushCareerNotices } from './career-notify.ts'
 
 const db = {
   employees: [
@@ -26,4 +26,15 @@ test('thông báo có người nhận chỉ hiện cho người đó; thông bá
   assert.ok(!isNotificationForUser(n, 'sm2', 'store_manager'))
   assert.ok(isNotificationForUser({ ...n, target_user_id: undefined }, 'sm2', 'employee'))
   assert.ok(isNotificationForUser({ ...n, target_user_id: undefined, target_role: 'ceo' }, 'x', 'ceo'))
+})
+
+test('thông báo theo vai trò: mỗi người đọc riêng, không làm mất thông báo của người khác', () => {
+  const n = { id: 'n1', title: 't', message: 'm', type: 'career_path', created_at: '', is_read: false, target_role: 'store_manager' }
+  markNotificationReadBy(n, 'sm1')
+  assert.ok(isNotificationReadBy(n, 'sm1'))
+  assert.ok(!isNotificationReadBy(n, 'sm2'))
+  assert.equal(n.is_read, false)
+  const personal = { ...n, id: 'n2', target_role: undefined, target_user_id: 'sm1' }
+  markNotificationReadBy(personal, 'sm1')
+  assert.ok(personal.is_read)
 })

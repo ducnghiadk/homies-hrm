@@ -66,7 +66,17 @@ export default function CareerReviewPage() {
   const [tab, setTab] = useState<Tab>('pending')
   const [showNotReady, setShowNotReady] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Mở từ thông báo: /career-path/review?proposal=<id> → chuyển đúng tab và tô viền đề xuất đó.
+  const [focusId, setFocusId] = useState<string | null>(null)
   const today = todayVn()
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const id = new URLSearchParams(window.location.search).get('proposal')
+      if (id) setFocusId(id)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (!hasHydrated) return
@@ -95,6 +105,17 @@ export default function CareerReviewPage() {
       .filter(({ p, s }) => s?.eligibility.next && !hasPending.has(p.employee_id) && p.employee_id !== user?.id && (showNotReady || s.eligibility.ready))
       .sort((a, b) => Number(Boolean(b.s?.eligibility.ready)) - Number(Boolean(a.s?.eligibility.ready)) || a.name.localeCompare(b.name, 'vi'))
   }, [data, pending, showNotReady, user?.id])
+
+  useEffect(() => {
+    if (!focusId || !data) return
+    const row = data.proposals.find((p) => p.id === focusId)
+    if (!row) return
+    const timer = window.setTimeout(() => {
+      setTab(row.status === 'pending' ? 'pending' : 'done')
+      window.setTimeout(() => document.getElementById(`proposal-${focusId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [focusId, data])
 
   const act = (row: ProposalRow) => async (action: 'approve' | 'reject' | 'cancel', note: string, effectiveDate: string) => {
     const err = await post({ action, proposal_id: row.id, note, effective_date: effectiveDate })
@@ -150,7 +171,7 @@ export default function CareerReviewPage() {
           {tab !== 'propose' && (
             <ul className="space-y-3">
               {(tab === 'pending' ? pending : done).map((row) => (
-                <PromotionProposalCard key={row.id} row={row} today={today} respondWithin={data?.respondWithin || 0} onAction={act(row)} />
+                <PromotionProposalCard key={row.id} row={row} today={today} respondWithin={data?.respondWithin || 0} onAction={act(row)} highlight={row.id === focusId} />
               ))}
               {data && (tab === 'pending' ? pending : done).length === 0 && (
                 <li className={`${cardClass} text-center text-sm text-gray-500`}>{tab === 'pending' ? 'Không có đề xuất nào đang chờ.' : 'Chưa có đề xuất nào được xử lý.'}</li>

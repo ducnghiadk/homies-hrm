@@ -315,6 +315,8 @@ export interface ServerNotification {
   target_role?: string
   target_user_id?: string
   metadata?: Record<string, unknown>
+  /** Thông báo chung / theo vai trò: danh sách người đã đọc (mỗi người đọc riêng). */
+  read_by?: string[]
 }
 
 export interface ServerRequest {
