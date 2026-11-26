@@ -97,7 +97,7 @@ export const POLICY_REGISTRY: PolicyFieldDef[] = [
     affectsMoney: true,
     requiresApproval: true,
     legalRefVi: 'Nghị định 293/2025/NĐ-CP',
-    defaultValue: 20000,
+    defaultValue: 5310000,
   },
   {
     path: 'legal.maxInsuranceSalary',
@@ -110,7 +110,7 @@ export const POLICY_REGISTRY: PolicyFieldDef[] = [
     step: 100000,
     affectsMoney: true,
     requiresApproval: true,
-    defaultValue: 29800000,
+    defaultValue: 46800000,
   },
   {
     path: 'rates.bhxhEmployee',
@@ -591,6 +591,11 @@ export function migratePolicy(raw: unknown): PayrollPolicy {
       lp.perMinuteMultiplier = 1
     }
     result.latePenaltyPolicy = lp
+  }
+
+  // Cài đặt cũ chưa có ngày nghỉ tuần: giữ cách tính trước đây (Thứ Bảy, Chủ nhật) cho đến khi CEO/HR chọn lại.
+  if (!Array.isArray(result.weeklyRestDays)) {
+    result.weeklyRestDays = [0, 6]
   }
 
   // Đảm bảo đồng bộ 2 chiều giữa root standardDaysPerMonth và work.standardDaysPerMonth
