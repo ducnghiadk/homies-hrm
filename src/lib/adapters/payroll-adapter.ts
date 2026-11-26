@@ -538,9 +538,11 @@ export const payrollAdapter = {
             standard_days: slip.standardDays || 26,
             base_salary: slip.baseSalary || slip.base_salary,
             allowances: slip.allowances || slip.tong_phu_cap,
-            bonus: slip.bonusTickets || slip.bonus,
-            deductions: slip.deductionTickets || slip.totalPenalties || slip.deductions,
-            net_salary: slip.netSalary || slip.luong_thuc_nhan,
+            // Dùng ?? để số 0 (đã xóa thưởng/phạt) vẫn được lưu, không bị lấy nhầm giá trị khác
+            bonus: slip.bonusTickets ?? slip.bonus,
+            deductions: slip.deductionTickets ?? slip.deductions,
+            late_deduction: slip.totalPenalties ?? slip.late_deduction,
+            net_salary: slip.netSalary ?? slip.luong_thuc_nhan,
             status: slip.status,
           }),
         }).catch(err => console.warn('[PayrollAdapter] API sync error:', err))

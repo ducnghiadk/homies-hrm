@@ -2170,6 +2170,26 @@ function SettingsPayrollContent() {
                       </div>
                       
                       <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
+                        <label className="text-[11px] font-bold text-gray-700 block mb-1">Lương tối thiểu theo giờ (bán thời gian)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={100}
+                          inputMode="numeric"
+                          placeholder="Để trống = không kiểm tra"
+                          disabled={!canEdit}
+                          value={policy.legal?.minHourlyWage ?? ''}
+                          onChange={e => {
+                            const raw = e.target.value.trim()
+                            const num = Number(raw)
+                            updateLegalPatch({ minHourlyWage: raw === '' || !Number.isFinite(num) || num <= 0 ? undefined : Math.round(num) })
+                          }}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono text-[#001D3D] disabled:bg-gray-100"
+                        />
+                        <p className="text-[11px] text-gray-500">Bảng lương sẽ cảnh báo khi đơn giá giờ của nhân viên bán thời gian thấp hơn mức này (đồng/giờ).</p>
+                      </div>
+
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
                         <label className="text-[11px] font-bold text-gray-700 block mb-1">Trần lương đóng BH</label>
                         <MoneyNumberInput
                           value={policy.legal?.maxInsuranceSalary || 29800000}

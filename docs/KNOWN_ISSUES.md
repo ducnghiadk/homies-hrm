@@ -1,5 +1,23 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-26 (Rà soát bảng lương — Đợt A các lỗi sai tiền):
+  1) Nguyên nhân:
+     - Tiền tip F&B chia theo doanh thu mẫu cố định (78 triệu / 74 triệu) nên ai cũng có tip giả.
+     - Lưu phiếu lương ghi đè mất thưởng BSC đã duyệt (thưởng BSC và thưởng nhập tay dùng chung một ô `bonus`).
+     - Thưởng nhập tay / lương KPI không tính lại thuế TNCN; thực nhận có thể âm trên bảng.
+     - Cài đặt lương chỉ lưu trên trình duyệt (và Supabase khi bật), mỗi máy một cấu hình.
+     - Đơn giá giờ part-time thấp hơn lương tối thiểu không có cảnh báo.
+     - Kỳ chưa khóa sổ mà có phiếu trên máy chủ thì bảng lương lấy phiếu nháp làm số chốt (thuế, bảo hiểm = 0).
+  2) Cách giải quyết:
+     - `payroll-engine`: bỏ doanh thu mẫu, chỉ chia tip khi có doanh thu thật truyền vào (hiện chưa có nên tip = 0).
+     - Thưởng BSC lưu ô riêng `bsc_bonus` (`/api/bsc/approve`), bảng lương cộng vào cột Lương KPI và tính thuế; lưu phiếu không còn đè mất.
+     - Bảng lương tính lại thuế khi có thưởng nhập tay / KPI, chặn thực nhận âm và gắn cảnh báo `luong_am`.
+     - Cài đặt lương lưu trên máy chủ qua `/api/payroll/policy` (`payroll_policy`), máy nào cũng đọc cùng một bản.
+     - Thêm ô "Lương tối thiểu theo giờ (bán thời gian)" trong Cài đặt lương (để trống = không kiểm tra), bảng lương cảnh báo `duoi_luong_toi_thieu`.
+     - Chỉ dùng phiếu trên máy chủ làm số chốt khi kỳ đã khóa sổ; còn lại tính lại từ chấm công + Cài đặt.
+  3) Lưu ý vận hành: CEO/HR cần mở Cài đặt lương và bấm Lưu một lần để cấu hình lên máy chủ; tip F&B tạm bằng 0 đến khi nhập doanh thu thật.
+  4) File liên quan: `src/lib/payroll-engine.ts`, `src/app/payroll/page.tsx`, `src/app/api/payroll/policy/route.ts`, `src/lib/services/payroll/payroll-policy-service.ts`, `src/app/api/bsc/approve/route.ts`, `src/lib/adapters/payroll-adapter.ts`, `src/app/settings/payroll/page.tsx`, `src/lib/server/db.ts`, `src/lib/server/supabase-store.ts`.
+
 - Đã fix 2026-11-26 (Lộ trình thăng tiến: thêm điều kiện KPI vận hành và nhắc việc):
   1) Nguyên nhân: xét lên bậc chỉ dựa vào số tháng, số giờ và kỹ năng; giờ làm cộng mọi lượt chấm công kể cả ca ngoài lịch chưa duyệt; đề xuất quá hạn phản hồi không ai được nhắc.
   2) Cách giải quyết: Cài đặt chọn giờ nào được tính (lịch đã chốt, ca ngoài lịch được duyệt, giờ iPOS cũ); thêm ngưỡng KPI theo từng bậc (đi trễ, phút trễ, vắng ca không phép, quên tan ca, điểm lỗi cá nhân BSC đã duyệt, lỗi nghiêm trọng), chưa đạt thì cho đề xuất ngoại lệ hoặc chặn theo Cài đặt; nhắc người duyệt qua chuông khi quá hạn và báo lên cấp trên sau X ngày. Mọi con số để trống, nút "Điền gợi ý" điền số mẫu.

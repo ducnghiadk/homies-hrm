@@ -270,6 +270,8 @@ export interface ServerSalarySlip {
   status: 'draft' | 'locked'
   /** Thuế TNCN đã khấu trừ thêm khi đẩy thưởng BSC vào phiếu. */
   bonus_tax_withheld?: number
+  /** Thưởng BSC do CEO duyệt (tách riêng khỏi phiếu cộng tiền nhập tay để lưu phiếu không làm mất). */
+  bsc_bonus?: number
   /** Phiếu có thay đổi sau lần tính lương gần nhất, cần bấm Tính lương lại. */
   needs_recalculation?: boolean
   updated_by?: string
@@ -648,6 +650,8 @@ export interface ServerDatabaseSchema {
   bsc_settings?: ServerBscSettings
   /** Cài đặt thuế TNCN (giảm trừ, biểu thuế) đồng bộ từ Cài đặt lương để máy chủ tính thuế thưởng. */
   payroll_tax_settings?: PitSettings
+  /** Chính sách lương (Cài đặt lương) dùng chung cho mọi máy; lưu nguyên dạng JSON do màn Cài đặt gửi lên. */
+  payroll_policy?: { policy: Record<string, unknown>; updated_at: string; updated_by: string }
   /** Cài đặt vận hành: hạn chót nộp lịch rảnh, cách tính giờ công, ngưỡng đi trễ. */
   operation_settings?: OperationSettings
   ipos_integration?: ServerIposIntegrationConfig
