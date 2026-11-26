@@ -10,13 +10,15 @@ import CareerGradesPanel from '@/components/career-path-v7/CareerGradesPanel'
 import CareerApprovalPanel from '@/components/career-path-v7/CareerApprovalPanel'
 import CareerSkillCatalogPanel from '@/components/career-path-v7/CareerSkillCatalogPanel'
 import CareerRulesPanel from '@/components/career-path-v7/CareerRulesPanel'
+import CareerKpiPanel from '@/components/career-path-v7/CareerKpiPanel'
 import { applyPlaybookV7Suggestion } from '@/lib/career-path/settings-suggestion'
 
-type Tab = 'grades' | 'approval' | 'skills' | 'rules'
+type Tab = 'grades' | 'approval' | 'skills' | 'kpi' | 'rules'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'grades', label: 'Bậc & lương' },
   { id: 'approval', label: 'Đánh giá & duyệt' },
   { id: 'skills', label: 'Kỹ năng' },
+  { id: 'kpi', label: 'KPI & vận hành' },
   { id: 'rules', label: 'Quy tắc tính' },
 ]
 const ADMIN = ['ceo', 'hr_admin']
@@ -161,6 +163,7 @@ export default function CareerPathSettingsPage() {
           {draft && tab === 'grades' && <CareerGradesPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
           {draft && tab === 'approval' && <CareerApprovalPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
           {draft && tab === 'skills' && <CareerSkillCatalogPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
+          {draft && tab === 'kpi' && <CareerKpiPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
           {draft && tab === 'rules' && <CareerRulesPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
 
           {canEdit && saved?.configured && draft && (

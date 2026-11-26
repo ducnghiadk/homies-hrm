@@ -2,6 +2,8 @@
 // Notification Center — Mock data store
 // =============================================
 
+import { resolveMetadataActionUrl } from './notification-links'
+
 export type NotificationType =
   | 'swap_request'        // Ai đó gửi request đổi ca đến bạn
   | 'swap_accepted'       // Người được hỏi đồng ý đổi ca
@@ -17,6 +19,7 @@ export type NotificationType =
   | 'schedule_changed_after_publish' // Ca bị chỉnh sau publish
   | 'preference_reminder' // Nhắc đăng ký ca mong muốn
   | 'ipos_sync'           // Đồng bộ iPOS Cloud
+  | 'career_path'         // Lộ trình thăng tiến (đề xuất, duyệt, nhắc việc)
   | 'system'
 
 export type NotificationStatus = 'unread' | 'read'
@@ -235,9 +238,8 @@ export function clearAllForUser(userId: string): number {
 }
 
 export function getNotificationActionUrl(notification: Notification): string | null {
-  if (notification.metadata?.action_url) {
-    return notification.metadata.action_url
-  }
+  const fromMetadata = resolveMetadataActionUrl(notification.type, notification.metadata)
+  if (fromMetadata) return fromMetadata
 
   switch (notification.type) {
     case 'swap_request':

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, type ServerNotification } from '@/lib/server/db'
-import { isNotificationForUser } from '@/lib/server/career-notify'
+import { runCareerReminders } from '@/lib/server/career-reminders'
+import { isNotificationForUser, isNotificationReadBy, markNotificationReadBy } from '@/lib/server/career-notify'
 
 export async function GET(req: NextRequest) {
   const gate = await requireAuth(req)
@@ -11,8 +12,21 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20', 10)
 
     const db = await getServerDb()
+    // Nhắc việc lộ trình quá hạn: chạy bù khi có người mở thông báo (mỗi đề xuất tối đa 1 lần/ngày).
+    try {
+      if (runCareerReminders(db) > 0) await saveServerDb(db)
+    } catch (err) {
+      console.error('[API /api/notifications] career reminders:', err)
+    }
     // Chỉ trả thông báo chung và thông báo gửi đúng người / đúng vai trò.
-    const list: ServerNotification[] = (db.notifications || []).filter((n) => isNotificationForUser(n, gate.user.userId, gate.user.role))
+    const uid = gate.user.userId
+    const list: ServerNotification[] = (db.notifications || [])
+      .filter((n) => isNotificationForUser(n, uid, gate.user.role))
+      .map((n) => {
+        const { read_by: _readBy, ...rest } = n
+        void _readBy
+        return { ...rest, is_read: isNotificationReadBy(n, uid) }
+      })
 
     return NextResponse.json({
       success: true,
@@ -40,19 +54,19 @@ export async function POST(req: NextRequest) {
     if (action === 'mark_read' && body.id) {
       const idx = db.notifications.findIndex(n => n.id === body.id && isNotificationForUser(n, gate.user.userId, gate.user.role))
       if (idx >= 0) {
-        db.notifications[idx].is_read = true
+        markNotificationReadBy(db.notifications[idx], gate.user.userId)
         await saveServerDb(db)
       }
     } else if (action === 'mark_all_read') {
       db.notifications.forEach(n => {
-        if (isNotificationForUser(n, gate.user.userId, gate.user.role)) n.is_read = true
+        if (isNotificationForUser(n, gate.user.userId, gate.user.role)) markNotificationReadBy(n, gate.user.userId)
       })
       await saveServerDb(db)
     }
 
     return NextResponse.json({
       success: true,
-      unread_count: db.notifications.filter(n => !n.is_read && isNotificationForUser(n, gate.user.userId, gate.user.role)).length,
+      unread_count: db.notifications.filter(n => isNotificationForUser(n, gate.user.userId, gate.user.role) && !isNotificationReadBy(n, gate.user.userId)).length,
     })
   } catch (error) {
     return NextResponse.json(

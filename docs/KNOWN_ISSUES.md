@@ -1,5 +1,11 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-26 (Lộ trình thăng tiến: thêm điều kiện KPI vận hành và nhắc việc):
+  1) Nguyên nhân: xét lên bậc chỉ dựa vào số tháng, số giờ và kỹ năng; giờ làm cộng mọi lượt chấm công kể cả ca ngoài lịch chưa duyệt; đề xuất quá hạn phản hồi không ai được nhắc.
+  2) Cách giải quyết: Cài đặt chọn giờ nào được tính (lịch đã chốt, ca ngoài lịch được duyệt, giờ iPOS cũ); thêm ngưỡng KPI theo từng bậc (đi trễ, phút trễ, vắng ca không phép, quên tan ca, điểm lỗi cá nhân BSC đã duyệt, lỗi nghiêm trọng), chưa đạt thì cho đề xuất ngoại lệ hoặc chặn theo Cài đặt; nhắc người duyệt qua chuông khi quá hạn và báo lên cấp trên sau X ngày. Mọi con số để trống, nút "Điền gợi ý" điền số mẫu.
+  3) Lưu ý vận hành: cần biến môi trường `CRON_SECRET` (>= 16 ký tự) trên Vercel để nhắc hằng ngày; nếu thiếu, nhắc vẫn chạy bù khi có người mở chuông thông báo. Đánh giá KPI tháng / đồng nghiệp ẩn danh vẫn lưu trên trình duyệt, chưa dùng để xét bậc.
+  4) File liên quan: `src/lib/career-path/{hours,kpi,reminders,eligibility,promotion,settings,settings-suggestion}.ts`, `src/lib/server/{career-progress,career-reminders}.ts`, `src/app/api/career-path/reminders/route.ts`, `src/app/api/notifications/route.ts`, `src/components/career-path-v7/{CareerKpiPanel,CareerRulesPanel,EligibilityPanel}.tsx`, `src/app/settings/career-path/page.tsx`, `vercel.json`.
+
 - Đã fix 2026-11-25 (Làm nốt rà soát Chấm công → Lịch → Lương, đợt 2):
   1) Nguyên nhân:
      - Quản lý cửa hàng sửa được thông tin, mã PIN, Wi-Fi của chi nhánh khác và xem được mã PIN mọi chi nhánh qua `/api/stores`.

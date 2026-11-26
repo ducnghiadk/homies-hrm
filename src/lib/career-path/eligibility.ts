@@ -1,15 +1,21 @@
 // Xem nhân viên đã đủ điều kiện xét lên bậc kế tiếp chưa (chỉ để hiển thị).
 // Không tự nâng bậc, không đổi lương: nâng bậc phải qua đề xuất và duyệt.
 
-import { CAREER_GRADE_CODES, gradeOrder, type CareerGradeCode, type CareerPathSettings, type CareerPositionCode } from './settings.ts'
+import { CAREER_GRADE_CODES, gradeOrder, type CareerGradeCode, type CareerPathSettings, type CareerPositionCode, type HoursSource } from './settings.ts'
+import type { CareerHoursBreakdown } from './hours.ts'
+import type { CareerKpiStats } from './kpi.ts'
 import { applicableSkills, type ApplicableBucket, type CurrentSkillLevel } from './assessment.ts'
 
 export interface EligibilityCheck {
-  key: 'setup' | 'months' | 'hours' | ApplicableBucket
+  key: 'setup' | 'months' | 'hours' | ApplicableBucket | KpiCheckKey
   label: string
   ok: boolean
   detail: string
 }
+
+export type KpiCheckKey = 'kpi_late' | 'kpi_late_minutes' | 'kpi_no_show' | 'kpi_missing_checkout' | 'kpi_error_points' | 'kpi_serious'
+
+export const isKpiCheck = (c: Pick<EligibilityCheck, 'key'>) => String(c.key).startsWith('kpi_')
 
 export interface EligibilityResult {
   current: CareerGradeCode
@@ -24,6 +30,8 @@ export interface EligibilityInput {
   levels: Record<string, CurrentSkillLevel>
   months: number
   hours: number
+  /** Chỉ số vận hành trong N tháng gần nhất. Không truyền thì không xét KPI. */
+  kpi?: CareerKpiStats
 }
 
 const BUCKET_LABEL: Record<ApplicableBucket, string> = {
@@ -105,7 +113,35 @@ export function evaluateNextGrade(settings: CareerPathSettings, input: Eligibili
       detail: list.length === 0 ? 'Chưa có kỹ năng nào trong nhóm này' : `${passed}/${list.length} kỹ năng đạt mức ${min} trở lên`,
     })
   }
+  checks.push(...kpiChecks(settings, target.kpi, input.kpi))
   return { current: input.grade, next, checks, ready: checks.every((c) => c.ok) }
+}
+
+function kpiChecks(settings: CareerPathSettings, limit: CareerPathSettings['grades'][number]['kpi'] | undefined, stats: CareerKpiStats | undefined): EligibilityCheck[] {
+  const months = settings.kpi?.lookback_months || 0
+  if (!limit || !stats || months < 1) return []
+  const span = `trong ${months} tháng gần nhất`
+  const rows: [KpiCheckKey, string, number | null, number, string][] = [
+    ['kpi_late', 'Số lần đi trễ', limit.max_late_count, stats.late_count, 'lần'],
+    ['kpi_late_minutes', 'Tổng số phút đi trễ', limit.max_late_minutes, stats.late_minutes, 'phút'],
+    ['kpi_no_show', 'Số ngày vắng ca không phép', limit.max_no_show, stats.no_show_count, 'ngày'],
+    ['kpi_missing_checkout', 'Số lần quên chấm công tan ca', limit.max_missing_checkout, stats.missing_checkout_count, 'lần'],
+    ['kpi_error_points', 'Điểm lỗi cá nhân đã duyệt', limit.max_error_points, stats.error_points, 'điểm'],
+  ]
+  const out: EligibilityCheck[] = []
+  for (const [key, label, max, value, unit] of rows) {
+    if (max === null || max === undefined) continue
+    out.push({ key, label, ok: value <= max, detail: `${value} ${unit} ${span} (tối đa ${max})` })
+  }
+  if (limit.block_serious_error) {
+    out.push({
+      key: 'kpi_serious',
+      label: 'Không có lỗi nghiêm trọng',
+      ok: stats.serious_error_count === 0,
+      detail: stats.serious_error_count === 0 ? `Không có lỗi nghiêm trọng ${span}` : `${stats.serious_error_count} lỗi nghiêm trọng đã duyệt ${span}`,
+    })
+  }
+  return out
 }
 
 /** Tóm tắt tiến độ 1 nhân viên do API /api/career-path/assessments trả về. */
@@ -116,5 +152,11 @@ export interface CareerProgressSummary {
   last_assessed_at: string
   months: number
   hours: number
+  /** Giờ được tính / bị loại theo Cài đặt (để nhân viên và quản lý thấy rõ vì sao ra con số này). */
+  hours_breakdown?: CareerHoursBreakdown & { carried: number; source: HoursSource }
+  /** Chỉ số vận hành dùng để xét KPI (chỉ có khi đã cài số tháng xét KPI). */
+  kpi?: CareerKpiStats
+  /** BSC cửa hàng kỳ đã công bố gần nhất: chỉ để tham khảo, không dùng để xét bậc. */
+  store_bsc?: { store_name: string; period: string; coefficient: number | null; unlocked: boolean }
   eligibility: EligibilityResult
 }

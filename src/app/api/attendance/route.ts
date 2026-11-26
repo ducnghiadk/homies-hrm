@@ -603,6 +603,8 @@ export async function POST(req: NextRequest) {
       date: targetDate,
       schedule_source: scheduleSource,
       off_schedule: offSchedule,
+      // Quản lý chấm công thay cho nhân viên ngoài lịch = ca ngoài lịch đã được quản lý duyệt.
+      off_schedule_approved_by: offSchedule && canOverride ? gate.user.userId : undefined,
     }
 
     db.attendance.unshift(newLog)

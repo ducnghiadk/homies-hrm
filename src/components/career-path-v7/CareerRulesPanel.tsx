@@ -1,6 +1,6 @@
 'use client'
 
-import type { CareerPathSettings, CareerRulesConfig, FtMidMonth, HoursFrom, MonthsFrom } from '@/lib/career-path/settings'
+import type { CareerPathSettings, CareerRulesConfig, FtMidMonth, HoursFrom, HoursSource, LegacyHoursRule, MonthsFrom } from '@/lib/career-path/settings'
 import { cardClass, inputClass } from './career-ui'
 
 interface Props {
@@ -18,6 +18,15 @@ const MONTHS_FROM: [MonthsFrom, string][] = [
 const HOURS_FROM: [HoursFrom, string][] = [
   ['all_attendance', 'Toàn bộ giờ chấm công đã có'],
   ['since_first_placement', 'Chỉ giờ chấm công từ ngày xếp bậc lần đầu'],
+]
+const HOURS_SOURCE: [HoursSource, string][] = [
+  ['all_attendance', 'Mọi lượt chấm công đã tan ca'],
+  ['confirmed_schedule', 'Chỉ ca nằm trong lịch đã chốt'],
+  ['confirmed_plus_approved', 'Ca trong lịch đã chốt + ca ngoài lịch được quản lý duyệt'],
+]
+const LEGACY: [LegacyHoursRule, string][] = [
+  ['count', 'Tính hết'],
+  ['skip', 'Bỏ qua'],
 ]
 const FT_MID: [FtMidMonth, string][] = [
   ['prorate_days', 'Chia theo số ngày ở mỗi bậc'],
@@ -88,6 +97,23 @@ export default function CareerRulesPanel({ settings, readOnly, onChange }: Props
               {HOURS_FROM.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
             <span className="mt-1 block text-xs text-gray-500">Luôn cộng thêm số giờ HR nhập lúc xếp bậc.</span>
+          </label>
+          <label className="block">
+            <span className="text-sm text-gray-600">Giờ nào được tính</span>
+            <select className={`${inputClass} mt-1`} disabled={readOnly} value={r.hours_source} onChange={(e) => set({ hours_source: e.target.value as HoursSource })}>
+              {HOURS_SOURCE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <span className="mt-1 block text-xs text-gray-500">
+              Ca ngoài lịch được tính là duyệt khi quản lý chấm công thay, hoặc nhân viên có đơn bổ sung chấm công đã duyệt cho ngày đó.
+              Giờ mỗi ca đã tính đến sớm / ở muộn giống bảng lương.
+            </span>
+          </label>
+          <label className="block">
+            <span className="text-sm text-gray-600">Giờ chấm công cũ (iPOS) chưa đánh dấu có trong lịch</span>
+            <select className={`${inputClass} mt-1`} disabled={readOnly || r.hours_source === 'all_attendance'} value={r.legacy_hours} onChange={(e) => set({ legacy_hours: e.target.value as LegacyHoursRule })}>
+              {LEGACY.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <span className="mt-1 block text-xs text-gray-500">Chỉ áp dụng khi không chọn &quot;Mọi lượt chấm công&quot;.</span>
           </label>
         </div>
       </section>
