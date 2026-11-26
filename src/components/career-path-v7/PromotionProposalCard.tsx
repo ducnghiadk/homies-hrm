@@ -87,26 +87,28 @@ export default function PromotionProposalCard({ row, today, respondWithin, onAct
 
       {row.status === 'pending' && (row.can_decide || row.can_cancel) && (
         <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
-          <textarea className={inputClass} rows={2} placeholder="Ghi chú (bắt buộc khi từ chối)" value={note} onChange={(e) => setNote(e.target.value)} />
-          <div className="flex flex-wrap items-center gap-2">
-            {row.can_decide && (
-              <>
-                <label className="flex items-center gap-1.5 text-xs text-gray-600">
-                  Hiệu lực từ
-                  <input type="date" className={`${inputClass} w-auto`} value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
-                </label>
-                <button type="button" disabled={busy} onClick={() => run('approve')} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
-                  Duyệt nâng bậc
-                </button>
-                <button type="button" disabled={busy} onClick={() => run('reject')} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50">
-                  Từ chối
-                </button>
-              </>
-            )}
-            {row.can_cancel && (
-              <button type="button" disabled={busy} onClick={() => run('cancel')} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 disabled:opacity-50">
+          <textarea className={inputClass} rows={1} placeholder="Ghi chú (bắt buộc khi từ chối)" value={note} onChange={(e) => setNote(e.target.value)} />
+          {row.can_decide && (
+            <label className="flex items-center justify-between gap-2 text-sm text-gray-600">
+              Hiệu lực từ ngày
+              <input type="date" className={`${inputClass} w-auto`} value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
+            </label>
+          )}
+          <div className="flex items-center justify-between gap-2">
+            {row.can_cancel ? (
+              <button type="button" disabled={busy} onClick={() => run('cancel')} className="text-xs font-semibold text-gray-500 underline disabled:opacity-50">
                 Hủy đề xuất
               </button>
+            ) : <span />}
+            {row.can_decide && (
+              <div className="flex gap-2">
+                <button type="button" disabled={busy} onClick={() => run('reject')} className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">
+                  Từ chối
+                </button>
+                <button type="button" disabled={busy} onClick={() => run('approve')} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                  Duyệt nâng bậc
+                </button>
+              </div>
             )}
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}

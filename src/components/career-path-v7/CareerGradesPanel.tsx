@@ -1,7 +1,7 @@
 'use client'
 
 import type { CareerGradeConfig, CareerPathSettings, FullTimePayMethod } from '@/lib/career-path/settings'
-import { GRADE_BADGE, cardClass, formatVnd, inputClass } from './career-ui'
+import { GRADE_BADGE, cardClass, inputClass } from './career-ui'
 
 interface Props {
   settings: CareerPathSettings
@@ -31,59 +31,88 @@ export default function CareerGradesPanel({ settings, readOnly, onChange }: Prop
 
   const setPayMethod = (m: FullTimePayMethod) => onChange({ ...settings, ft_pay_method: m })
 
+  const field = (g: CareerGradeConfig, key: NumField, label: string, unit: string) => (
+    <label className="block">
+      <span className="text-xs text-gray-500">{label}</span>
+      <div className="relative mt-1">
+        <input
+          type="number"
+          min={0}
+          inputMode="numeric"
+          className={`${inputClass} pr-12`}
+          placeholder="Nhập số"
+          value={g[key] || ''}
+          disabled={readOnly}
+          onChange={(e) => setNum(g.code, key, e.target.value)}
+        />
+        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-gray-400">{unit}</span>
+      </div>
+    </label>
+  )
+
   return (
     <div className="space-y-4">
       <section className={cardClass}>
-        <h2 className="text-base font-bold text-[#001D3D]">Bậc, mốc tối thiểu và mức cộng lương</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Số tháng và số giờ tính từ ngày vào làm, áp dụng như nhau cho Part-time và Full-time. Mức cộng lương giờ là phần cộng thêm
-          so với bậc liền trước (cộng dồn). Bảng lương chỉ dùng các mức này khi bật “Đưa vào bảng lương” bên dưới.
-        </p>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="py-2 pr-3">Bậc</th>
-                <th className="py-2 pr-3">Tháng tối thiểu</th>
-                <th className="py-2 pr-3">Giờ tối thiểu</th>
-                <th className="py-2 pr-3">Cộng lương giờ (đ/giờ)</th>
-                <th className="py-2 pr-3">Full-time cộng/tháng so với G1 (đ)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {settings.grades.map((g) => (
-                <tr key={g.code} className="border-b border-gray-50 align-top">
-                  <td className="py-2.5 pr-3">
-                    <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-bold ${GRADE_BADGE[g.code]}`}>{g.code}</span>
-                    <div className="mt-1 font-semibold text-[#001D3D]">{g.label}</div>
-                    <div className="max-w-[220px] text-xs text-gray-500">{g.description}</div>
-                  </td>
-                  {(['min_months', 'min_hours', 'hourly_step_vnd', 'ft_monthly_vs_g1_vnd'] as NumField[]).map((key) => (
-                    <td key={key} className="py-2.5 pr-3">
+        <h2 className="text-base font-bold text-[#001D3D]">Điều kiện và mức cộng lương từng bậc</h2>
+        <p className="mt-1 text-sm text-gray-500">Tháng và giờ tính từ ngày vào làm. Mức cộng lương giờ là phần cộng thêm so với bậc trước.</p>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {settings.grades.map((g) => (
+            <div key={g.code} className="rounded-xl border border-gray-100 p-3">
+              <div className="flex items-center gap-2">
+                <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${GRADE_BADGE[g.code]}`}>{g.code}</span>
+                <span className="text-sm font-semibold text-[#001D3D]">{g.label}</span>
+              </div>
+              {g.code === 'T0' ? (
+                <p className="mt-2 text-xs text-gray-500">Bậc khởi đầu, không cần điều kiện và không cộng lương.</p>
+              ) : (
+                <>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {field(g, 'min_months', 'Làm tối thiểu', 'tháng')}
+                    {field(g, 'min_hours', 'Tổng giờ tối thiểu', 'giờ')}
+                    {field(g, 'hourly_step_vnd', 'Cộng lương giờ', 'đ/giờ')}
+                    {field(g, 'ft_monthly_vs_g1_vnd', 'Full-time cộng so với G1', 'đ/tháng')}
+                  </div>
+                  <details className="group mt-3">
+                    <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-[#2F6FA8]">
+                      <span className="transition group-open:rotate-90">›</span> Mức kỹ năng cần đạt
+                    </summary>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {LEVEL_COLUMNS.map((c) => (
+                        <label key={c.key} className="block">
+                          <span className="text-xs text-gray-500">{c.label}</span>
+                          <select className={`${inputClass} mt-1`} disabled={readOnly} value={g.requirement[c.key] ?? ''} onChange={(e) => setLevel(g.code, c.key, e.target.value)}>
+                            <option value="">Không xét</option>
+                            {[0, 1, 2, 3].map((lv) => <option key={lv} value={lv}>Mức {lv}</option>)}
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                    <label className="mt-2 flex items-center gap-2 text-sm text-[#001D3D]">
                       <input
-                        type="number"
-                        min={0}
-                        className={inputClass}
-                        placeholder={g.code === 'T0' ? '' : 'Nhập số'}
-                        value={g[key] || ''}
-                        disabled={readOnly || g.code === 'T0'}
-                        onChange={(e) => setNum(g.code, key, e.target.value)}
+                        type="checkbox"
+                        disabled={readOnly}
+                        checked={g.requirement.common_required}
+                        onChange={(e) => updateGrade(g.code, (x) => ({ ...x, requirement: { ...x.requirement, common_required: e.target.checked } }))}
                       />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      Bắt buộc đạt SOP / ATTP
+                    </label>
+                  </details>
+                </>
+              )}
+            </div>
+          ))}
         </div>
+        <p className="mt-3 text-xs text-gray-500">Mức kỹ năng: 0 chưa biết · 1 làm được khi có người kèm · 2 tự làm được · 3 thành thạo, kèm được người khác.</p>
       </section>
 
       <section className={cardClass}>
-        <h2 className="text-base font-bold text-[#001D3D]">Cách cộng lương cho nhân viên Full-time</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <h2 className="text-base font-bold text-[#001D3D]">Cách tính tiền cộng</h2>
+        <p className="mt-1 text-sm text-gray-500">Nhân viên Full-time được cộng theo cách nào?</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {([
-            ['fixed_monthly', 'Cộng cố định mỗi tháng', 'Dùng cột “Full-time cộng/tháng so với G1”. Lương không đổi theo số giờ làm trong tháng.'],
-            ['hourly_x_hours', 'Cộng theo giờ × số giờ làm', 'Dùng cột “Cộng lương giờ” nhân với số giờ thực tế trong tháng, giống Part-time.'],
+            ['fixed_monthly', 'Cố định mỗi tháng', 'Dùng ô “Full-time cộng so với G1”.'],
+            ['hourly_x_hours', 'Theo giờ làm thực tế', 'Cộng lương giờ × số giờ làm, giống Part-time.'],
           ] as [FullTimePayMethod, string, string][]).map(([value, title, hint]) => (
             <label
               key={value}
@@ -97,11 +126,8 @@ export default function CareerGradesPanel({ settings, readOnly, onChange }: Prop
             </label>
           ))}
         </div>
-        <p className="mt-3 text-xs text-gray-500">
-          Ví dụ G4 so với G1: cộng {formatVnd(settings.grades.find((g) => g.code === 'G4')?.ft_monthly_vs_g1_vnd || 0)}/tháng theo cách cố định.
-          Hệ thống không bao giờ tự hạ lương hay hạ bậc.
-        </p>
-        <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3">
+
+        <label className={`mt-3 flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${settings.payroll_link_enabled ? 'border-emerald-300 bg-emerald-50/60' : 'border-gray-200'}`}>
           <input
             type="checkbox"
             className="mt-1"
@@ -111,51 +137,9 @@ export default function CareerGradesPanel({ settings, readOnly, onChange }: Prop
           />
           <span>
             <span className="block text-sm font-semibold text-[#001D3D]">Đưa tiền cộng theo bậc vào bảng lương</span>
-            <span className="block text-xs text-gray-500">
-              Khi bật, bảng lương của kỳ chưa khóa sẽ có thêm dòng “Cộng lương bậc …” cho nhân viên đã được xếp bậc, tính từ ngày hiệu lực của bậc.
-              Kỳ đã khóa không bị thay đổi. Nên kiểm tra lại mức cộng ở bảng trên trước khi bật.
-            </span>
+            <span className="block text-xs text-gray-500">Chỉ áp dụng cho kỳ lương chưa khóa. Hệ thống không bao giờ tự hạ lương hay hạ bậc.</span>
           </span>
         </label>
-      </section>
-
-      <section className={cardClass}>
-        <h2 className="text-base font-bold text-[#001D3D]">Mức kỹ năng tối thiểu để lên bậc</h2>
-        <p className="mt-1 text-sm text-gray-500">Mức 0 = chưa biết, 1 = làm được khi có người kèm, 2 = tự làm được, 3 = thành thạo / kèm người khác. Để trống = không xét.</p>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="py-2 pr-3">Bậc</th>
-                {LEVEL_COLUMNS.map((c) => <th key={c.key} className="py-2 pr-3">{c.label}</th>)}
-                <th className="py-2 pr-3">Đạt SOP / ATTP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {settings.grades.filter((g) => g.code !== 'T0').map((g) => (
-                <tr key={g.code} className="border-b border-gray-50">
-                  <td className="py-2 pr-3 font-bold text-[#001D3D]">{g.code}</td>
-                  {LEVEL_COLUMNS.map((c) => (
-                    <td key={c.key} className="py-2 pr-3">
-                      <select className={inputClass} disabled={readOnly} value={g.requirement[c.key] ?? ''} onChange={(e) => setLevel(g.code, c.key, e.target.value)}>
-                        <option value="">Không xét</option>
-                        {[0, 1, 2, 3].map((lv) => <option key={lv} value={lv}>Mức {lv}</option>)}
-                      </select>
-                    </td>
-                  ))}
-                  <td className="py-2 pr-3">
-                    <input
-                      type="checkbox"
-                      disabled={readOnly}
-                      checked={g.requirement.common_required}
-                      onChange={(e) => updateGrade(g.code, (x) => ({ ...x, requirement: { ...x.requirement, common_required: e.target.checked } }))}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </section>
     </div>
   )
