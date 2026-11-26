@@ -116,6 +116,11 @@ export type PayrollPolicy = {
    * Để trống = không có ngày lễ nào được tính.
    */
   holidays?: PayrollHoliday[]
+  /**
+   * Ngày nghỉ hằng tuần (0 = Chủ nhật ... 6 = Thứ Bảy). Làm thêm vào ngày này tính hệ số ngày nghỉ (rates.otWeekend).
+   * Để trống = không có ngày nghỉ tuần cố định (tăng ca tính hệ số ngày thường).
+   */
+  weeklyRestDays?: number[]
   shiftRules?: {
     partTimeShiftHours?: number
     fullTimeShiftHours?: number
@@ -139,6 +144,12 @@ export type PayrollPolicy = {
      * Để trống = không tự tính bảo hiểm cho bán thời gian (chỉ theo ô "Tham gia bảo hiểm" của từng người).
      */
     partTimeInsuranceMinMonthlySalary?: number
+    /** Giới hạn giờ tăng ca mỗi tháng để cảnh báo. Để trống = không kiểm tra. */
+    maxMonthlyOvertimeHours?: number
+    /** Tỷ lệ tối đa (%) phiếu trừ bồi thường so với lương tháng để cảnh báo. Để trống = không kiểm tra. */
+    maxCompensationDeductionPercent?: number
+    /** Trần miễn thuế TNCN của tiền cơm ca mỗi tháng. Để trống = miễn thuế toàn bộ. */
+    mealAllowanceTaxExemptCap?: number
   }
 }
 
@@ -168,8 +179,10 @@ export type PayrollPolicyDiff = {
 export const PAYROLL_POLICY_STORAGE_KEY = 'homies-payroll-policy-v1'
 export const PAYROLL_POLICY_HISTORY_KEY = 'homies-payroll-policy-history-v1'
 export const PAYROLL_POLICY_CACHE_KEY_PREFIX = 'homies-payroll-policy-cache-v2'
-export const MIN_REGION_1_SALARY = 4680000
-export const INSURANCE_MAX_BASE = 29800000
+// Mức pháp lý tham khảo, kế toán cần đối chiếu văn bản hiện hành:
+// lương tối thiểu vùng I từ 01/01/2026 (Nghị định 293/2025/NĐ-CP); trần BHXH = 20 lần lương cơ sở 2.340.000đ.
+export const MIN_REGION_1_SALARY = 5310000
+export const INSURANCE_MAX_BASE = 46800000
 
 export function getPayrollPolicyCacheKey(organizationId: string = 'a0000000-0000-0000-0000-000000000001'): string {
   return `${PAYROLL_POLICY_CACHE_KEY_PREFIX}::${organizationId}`
@@ -241,8 +254,8 @@ export function buildDefaultPayrollPolicy(): PayrollPolicy {
       partTimeFlatTaxEnabled: DEFAULT_PIT_SETTINGS.partTimeFlatTaxEnabled,
       partTimeFlatTaxRate: DEFAULT_PIT_SETTINGS.partTimeFlatTaxRate,
       partTimeFlatTaxThreshold: DEFAULT_PIT_SETTINGS.partTimeFlatTaxThreshold,
-      maxInsuranceSalary: 29800000,
-      minRegionSalary: 20000,
+      maxInsuranceSalary: INSURANCE_MAX_BASE,
+      minRegionSalary: MIN_REGION_1_SALARY,
     },
     fnb: {
       ...defaultFnbPolicy,
@@ -273,6 +286,7 @@ export function buildDefaultPayrollPolicy(): PayrollPolicy {
       tier3HalfShiftDeduction: true,
     },
     netRoundingMethod: 'round_1000',
+    weeklyRestDays: [],
     shiftRules: {
       partTimeShiftHours: 5.5,
       fullTimeShiftHours: 8,

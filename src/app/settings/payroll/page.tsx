@@ -23,6 +23,7 @@ import {
   fetchRemotePayrollPolicy,
   syncRemotePayrollPolicy,
   MIN_REGION_1_SALARY,
+  INSURANCE_MAX_BASE,
   recordPayrollPolicyChange,
   rollbackPayrollPolicy,
   saveStoredPayrollPolicy,
@@ -153,8 +154,8 @@ const ALLOWANCE_CATALOG: AllowanceCatalogItem[] = [
 const DEFAULT_LEGAL: PayrollPolicy['legal'] = {
   personalDeduction: DEFAULT_PIT_SETTINGS.personalDeduction,
   dependentDeduction: DEFAULT_PIT_SETTINGS.dependentDeduction,
-  minRegionSalary: 4680000,
-  maxInsuranceSalary: 29800000,
+  minRegionSalary: MIN_REGION_1_SALARY,
+  maxInsuranceSalary: INSURANCE_MAX_BASE,
 }
 
 function MoneyNumberInput({
@@ -1451,7 +1452,7 @@ function SettingsPayrollContent() {
 
                         {/* OT Cuối tuần */}
                         <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
-                          <span className="text-xs font-bold text-gray-800 block">OT Ngày Nghỉ Cuối Tuần</span>
+                          <span className="text-xs font-bold text-gray-800 block">OT Ngày Nghỉ Hằng Tuần</span>
                           <div className="flex items-center gap-2">
                             <input
                               type="number"
@@ -1472,7 +1473,7 @@ function SettingsPayrollContent() {
                             />
                             <span className="text-xs font-bold text-gray-600">x Lương cơ bản ({Math.round((policy.rates.otWeekend ?? 2.0) * 100)}%)</span>
                           </div>
-                          <p className="text-[11px] text-gray-500">Mặc định: 200% (2.0x) cho ca làm ngày thứ 7 / Chủ nhật.</p>
+                          <p className="text-[11px] text-gray-500">Áp dụng cho ngày chọn ở mục &quot;Ngày nghỉ hằng tuần&quot; (luật: ít nhất 200%).</p>
                         </div>
 
                         {/* OT Ngày Lễ / Tết */}
@@ -1499,6 +1500,60 @@ function SettingsPayrollContent() {
                             <span className="text-xs font-bold text-gray-600">x Lương cơ bản ({Math.round((policy.rates.otHoliday ?? 3.0) * 100)}%)</span>
                           </div>
                           <p className="text-[11px] text-gray-500">Theo luật: ít nhất 300% (3.0x), chưa kể lương ngày lễ. Nhân viên toàn thời gian làm ngày lễ được thêm lương ngày lễ nên nhận tổng ít nhất 400%; bán thời gian nhận 300%. Ngày lễ lấy từ &quot;Danh sách ngày lễ, Tết&quot; ở tab Pháp lý.</p>
+                        </div>
+
+                        {/* Làm việc ban đêm */}
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+                          <span className="text-xs font-bold text-gray-800 block">Làm việc ban đêm (22h - 6h)</span>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min={1}
+                              max={3}
+                              step={0.05}
+                              disabled={!canEdit}
+                              value={policy.rates.otNight ?? ''}
+                              onChange={(e) => {
+                                if (!canEdit) return
+                                const val = parseFloat(e.target.value)
+                                setPolicy(c => ({
+                                  ...c,
+                                  rates: { ...c.rates, otNight: Number.isFinite(val) && val >= 1 ? val : 1 },
+                                }))
+                              }}
+                              className="w-24 px-2.5 py-1 text-center font-mono font-bold text-indigo-700 border border-indigo-200 rounded-lg bg-indigo-50/40 text-sm focus:ring-1 focus:ring-indigo-600"
+                            />
+                            <span className="text-xs font-bold text-gray-600">x Lương giờ ({Math.round((policy.rates.otNight ?? 1) * 100)}%)</span>
+                          </div>
+                          <p className="text-[11px] text-gray-500">Mỗi giờ làm trong khung 22h - 6h được trả thêm phần chênh so với 100% (luật: ít nhất 130%, tức thêm 30%). Nhập 1 = không trả thêm. Phần trả thêm được miễn thuế TNCN.</p>
+                        </div>
+
+                        {/* Ngày nghỉ hằng tuần */}
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+                          <span className="text-xs font-bold text-gray-800 block">Ngày nghỉ hằng tuần</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              { d: 1, label: 'T2' }, { d: 2, label: 'T3' }, { d: 3, label: 'T4' }, { d: 4, label: 'T5' },
+                              { d: 5, label: 'T6' }, { d: 6, label: 'T7' }, { d: 0, label: 'CN' },
+                            ].map(({ d, label }) => {
+                              const selected = (policy.weeklyRestDays ?? []).includes(d)
+                              return (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  disabled={!canEdit}
+                                  onClick={() => setPolicy(c => {
+                                    const cur = c.weeklyRestDays ?? []
+                                    return { ...c, weeklyRestDays: cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d].sort() }
+                                  })}
+                                  className={`rounded-lg border px-2.5 py-1 text-xs font-bold disabled:opacity-60 ${selected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-200 bg-white text-gray-600'}`}
+                                >
+                                  {label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          <p className="text-[11px] text-gray-500">Làm thêm giờ vào ngày được chọn tính theo hệ số &quot;OT Ngày Nghỉ&quot;. Không chọn ngày nào = tăng ca mọi ngày tính hệ số ngày thường. Quán làm xoay ca thì thường để trống.</p>
                         </div>
                       </div>
                     </div>
@@ -2064,7 +2119,7 @@ function SettingsPayrollContent() {
                       <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
                         <label className="text-[11px] font-bold text-gray-700 block mb-1">Lương tối thiểu vùng</label>
                         <MoneyNumberInput
-                          value={policy.legal?.minRegionSalary || 4680000}
+                          value={policy.legal?.minRegionSalary || MIN_REGION_1_SALARY}
                           step={100000}
                           disabled={!canEdit}
                           onChange={val => updateLegal('minRegionSalary', val)}
@@ -2112,9 +2167,69 @@ function SettingsPayrollContent() {
                       </div>
 
                       <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
+                        <label className="text-[11px] font-bold text-gray-700 block mb-1">Giới hạn giờ tăng ca / tháng</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          inputMode="numeric"
+                          placeholder="Để trống = không kiểm tra"
+                          disabled={!canEdit}
+                          value={policy.legal?.maxMonthlyOvertimeHours ?? ''}
+                          onChange={e => {
+                            const raw = e.target.value.trim()
+                            const num = Number(raw)
+                            updateLegalPatch({ maxMonthlyOvertimeHours: raw === '' || !Number.isFinite(num) || num <= 0 ? undefined : Math.round(num) })
+                          }}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono text-[#001D3D] disabled:bg-gray-100"
+                        />
+                        <p className="text-[11px] text-gray-500">Bảng lương cảnh báo khi một người tăng ca quá số giờ này trong tháng (luật hiện hành: 40 giờ/tháng).</p>
+                      </div>
+
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
+                        <label className="text-[11px] font-bold text-gray-700 block mb-1">Tỷ lệ tối đa phiếu trừ bồi thường (%)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          inputMode="numeric"
+                          placeholder="Để trống = không kiểm tra"
+                          disabled={!canEdit}
+                          value={policy.legal?.maxCompensationDeductionPercent ?? ''}
+                          onChange={e => {
+                            const raw = e.target.value.trim()
+                            const num = Number(raw)
+                            updateLegalPatch({ maxCompensationDeductionPercent: raw === '' || !Number.isFinite(num) || num <= 0 ? undefined : Math.round(num) })
+                          }}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono text-[#001D3D] disabled:bg-gray-100"
+                        />
+                        <p className="text-[11px] text-gray-500">Bảng lương cảnh báo khi tổng phiếu trừ trong tháng vượt tỷ lệ này so với lương sau bảo hiểm và thuế (luật: tối đa 30%, Điều 129 BLLĐ).</p>
+                      </div>
+
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
+                        <label className="text-[11px] font-bold text-gray-700 block mb-1">Trần miễn thuế tiền cơm ca / tháng</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={10000}
+                          inputMode="numeric"
+                          placeholder="Để trống = miễn thuế toàn bộ"
+                          disabled={!canEdit}
+                          value={policy.legal?.mealAllowanceTaxExemptCap ?? ''}
+                          onChange={e => {
+                            const raw = e.target.value.trim()
+                            const num = Number(raw)
+                            updateLegalPatch({ mealAllowanceTaxExemptCap: raw === '' || !Number.isFinite(num) || num <= 0 ? undefined : Math.round(num) })
+                          }}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono text-[#001D3D] disabled:bg-gray-100"
+                        />
+                        <p className="text-[11px] text-gray-500">Nếu trả cơm ca bằng tiền, phần vượt mức này bị tính thuế TNCN (kiểm tra mức theo quy định hiện hành). Để trống nếu quán nấu ăn cho nhân viên.</p>
+                      </div>
+
+                      <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-2">
                         <label className="text-[11px] font-bold text-gray-700 block mb-1">Trần lương đóng BH</label>
                         <MoneyNumberInput
-                          value={policy.legal?.maxInsuranceSalary || 29800000}
+                          value={policy.legal?.maxInsuranceSalary || INSURANCE_MAX_BASE}
                           step={100000}
                           disabled={!canEdit}
                           onChange={val => updateLegal('maxInsuranceSalary', val)}

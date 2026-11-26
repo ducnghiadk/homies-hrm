@@ -1,5 +1,20 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-26 (Rà soát bảng lương — Đợt C các điểm còn lại):
+  1) Nguyên nhân:
+     - Ngày nghỉ hằng tuần cứng là Thứ 7 và Chủ nhật, trong khi quán F&B thường làm cả cuối tuần.
+     - Làm đêm (22h - 6h) không được trả thêm 30%; vẫn có khoản "Hỗ trợ ca đêm" đoán tự động.
+     - Không cảnh báo khi bán thời gian làm quá giờ mà không được trả tăng ca, khi tăng ca vượt giới hạn tháng, hoặc phiếu trừ bồi thường vượt tỷ lệ cho phép (Điều 129).
+     - Tiền cơm ca được miễn thuế toàn bộ, không có trần.
+     - Lương tối thiểu vùng và trần đóng bảo hiểm còn theo số cũ; làm tròn thực nhận có thể làm tròn xuống.
+  2) Cách giải quyết:
+     - Cài đặt lương có "Ngày nghỉ hằng tuần" (chọn T2 - CN); cài đặt cũ giữ Thứ 7, Chủ nhật.
+     - Bảng lương tính giờ làm đêm và trả thêm theo ô "Làm việc ban đêm", phần này miễn thuế; bỏ khoản hỗ trợ ca đêm đoán tự động.
+     - Thêm 3 ô để trống: giới hạn giờ tăng ca/tháng, tỷ lệ tối đa phiếu trừ bồi thường, trần miễn thuế tiền cơm ca; bảng lương gắn cảnh báo `tang_ca_chua_tra`, `vuot_gio_tang_ca`, `vuot_khau_tru_boi_thuong`.
+     - Mặc định lương tối thiểu vùng I 5.310.000đ, trần BH 46.800.000đ; làm tròn thực nhận luôn làm tròn lên.
+  3) Lưu ý vận hành: cài đặt đã lưu vẫn giữ trần BH cũ, CEO/HR cần sửa trong Cài đặt lương rồi Lưu. Chưa làm: bảo hiểm toàn thời gian tính cả phụ cấp ghi trong hợp đồng; ngày nghỉ tuần riêng từng người.
+  4) File liên quan: `src/lib/payroll-engine.ts`, `src/lib/services/payroll/payroll-policy-service.ts`, `src/lib/payroll/policy-registry.ts`, `src/app/settings/payroll/page.tsx`, `src/app/payroll/page.tsx`.
+
 - Đã fix 2026-11-26 (Rà soát bảng lương — Đợt B các điểm chưa đúng luật):
   1) Nguyên nhân:
      - Đi trễ có chế độ phạt tiền cố định / bậc thang, trái Điều 127 Bộ luật Lao động (cấm phạt tiền, cắt lương thay kỷ luật); chế độ trừ theo phút còn cho nhân hệ số tới 5 lần.

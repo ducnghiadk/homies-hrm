@@ -105,6 +105,7 @@ export interface PayrollResult {
   total_hours: number
   split_shift_days?: number
   night_shift_shifts?: number
+  night_hours?: number
 
   // Earnings
   base_salary: number
@@ -167,6 +168,39 @@ const OT_RATES = {
   weekday: 1.5,
   weekend: 2.0,
   holiday: 3.0,
+}
+
+/**
+ * Ngày nghỉ hằng tuần lấy từ Cài đặt lương (0 = Chủ nhật ... 6 = Thứ Bảy).
+ * Để trống = không có ngày nào được coi là ngày nghỉ tuần (tăng ca tính hệ số ngày thường).
+ */
+export function getPolicyWeeklyRestDays(policy?: ReturnType<typeof getActivePayrollPolicy>): Set<number> {
+  const p = policy ?? getActivePayrollPolicy()
+  const days = Array.isArray(p.weeklyRestDays) ? p.weeklyRestDays : []
+  return new Set(days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6))
+}
+
+export function isRestDay(dateStr: string | undefined, restDays: Set<number>): boolean {
+  if (!dateStr || restDays.size === 0) return false
+  const d = new Date(dateStr + 'T00:00:00')
+  return restDays.has(d.getDay())
+}
+
+/** Số giờ làm rơi vào khung ban đêm (mặc định 22:00 - 06:00, Điều 106 BLLĐ). */
+export function computeNightHours(checkIn?: string, checkOut?: string, nightStartHour: number = 22, nightEndHour: number = 6): number {
+  const inH = parseTimeToHours(checkIn)
+  let outH = parseTimeToHours(checkOut)
+  if (inH === null || outH === null) return 0
+  if (outH <= inH) outH += 24
+  const windows: Array<[number, number]> = [
+    [nightStartHour - 24, nightEndHour],
+    [nightStartHour, 24 + nightEndHour],
+  ]
+  let total = 0
+  for (const [ws, we] of windows) {
+    total += Math.max(0, Math.min(outH, we) - Math.max(inH, ws))
+  }
+  return Math.round(total * 100) / 100
 }
 
 export function isWeekendDay(dateStr?: string): boolean {
@@ -437,6 +471,10 @@ export interface AttendanceSummaryForPayroll {
   overtimeHoursHoliday?: number
   /** Giờ làm trong giờ chuẩn vào ngày lễ (full-time được trả thêm cho đủ mức ngày lễ). */
   holidayRegularHours?: number
+  /** Tổng số giờ làm vượt giờ chuẩn/ngày (dù có được trả tăng ca hay không). */
+  hoursOverStandard?: number
+  /** Tổng số giờ làm trong khung ban đêm (22h - 6h). */
+  nightHours?: number
   /** Các ngày có đi làm (dùng để biết ngày lễ nào nhân viên nghỉ). */
   workedDateList?: string[]
   /** Các ngày nghỉ phép (có hoặc không lương). */
@@ -517,6 +555,7 @@ function summarizeAttendanceRecords(
   const dailyRecordedOtMap = new Map<string, number>()
   const anomalies: PayrollAnomaly[] = []
   const holidayDates = getPolicyHolidayDates()
+  const restDays = getPolicyWeeklyRestDays()
   const leaveDates = new Set<string>()
 
   for (const r of records) {
@@ -572,7 +611,7 @@ function summarizeAttendanceRecords(
     if (otH > 0) {
       if (isHolidayDay(r.date, holidayDates)) {
         overtimeHoursHoliday += otH
-      } else if (isWeekendDay(r.date)) {
+      } else if (isRestDay(r.date, restDays)) {
         overtimeHoursWeekend += otH
       } else {
         overtimeHoursWeekday += otH
@@ -592,8 +631,10 @@ function summarizeAttendanceRecords(
     return typeof p.standardHoursPerDay === 'number' && p.standardHoursPerDay > 0 ? p.standardHoursPerDay : 8
   })()
   let holidayRegularHours = 0
+  let hoursOverStandard = 0
   for (const [date, dayHours] of dailyHoursMap) {
     const recordedOt = dailyRecordedOtMap.get(date) ?? 0
+    if (dayHours > stdHoursPerDay) hoursOverStandard += dayHours - stdHoursPerDay
     if (isHolidayDay(date, holidayDates)) {
       holidayRegularHours += Math.min(Math.max(dayHours - recordedOt, 0), stdHoursPerDay)
     }
@@ -601,10 +642,11 @@ function summarizeAttendanceRecords(
     const extra = Math.round((dayHours - stdHoursPerDay) * 100) / 100
     overtimeHours += extra
     if (isHolidayDay(date, holidayDates)) overtimeHoursHoliday += extra
-    else if (isWeekendDay(date)) overtimeHoursWeekend += extra
+    else if (isRestDay(date, restDays)) overtimeHoursWeekend += extra
     else overtimeHoursWeekday += extra
   }
   holidayRegularHours = Math.round(holidayRegularHours * 100) / 100
+  hoursOverStandard = Math.round(hoursOverStandard * 100) / 100
 
   const workDays = workedDates.size > 0 ? workedDates.size : totalShifts
 
@@ -648,7 +690,9 @@ function summarizeAttendanceRecords(
 
   // 1. Nhận diện ca đêm (Night Shift) theo cài đặt nightShiftStartHour
   const nightStartHour = policy.fnb?.nightShiftStartHour ?? 22
+  let nightHours = 0
   validWorkRecords.forEach(r => {
+    nightHours += computeNightHours(r.check_in_time, r.check_out_time, nightStartHour, 6)
     const outH = parseTimeToHours(r.check_out_time)
     const inH = parseTimeToHours(r.check_in_time)
     let isNight = false
@@ -720,6 +764,8 @@ function summarizeAttendanceRecords(
     overtimeHoursWeekend,
     overtimeHoursHoliday,
     holidayRegularHours,
+    hoursOverStandard,
+    nightHours: Math.round(nightHours * 100) / 100,
     workedDateList: Array.from(workedDates),
     leaveDateList: Array.from(leaveDates),
     totalHours,
@@ -881,8 +927,6 @@ function getAllowancesForEmployee(
     const nightShifts = attendance.nightShiftShifts || 0
     if (nightShiftRate > 0 && nightShifts > 0) {
       ptResult.push({ name: `F&B: Phụ cấp ca đêm (${nightShifts} ca)`, amount: nightShifts * nightShiftRate })
-    } else if (attendance.overtimeHours > 0 && nightShiftRate > 0) {
-      ptResult.push({ name: 'F&B: Hỗ trợ ca đêm/chốt muộn', amount: nightShiftRate })
     }
     return ptResult
   }
@@ -945,8 +989,6 @@ function getAllowancesForEmployee(
   const nightShifts = attendance.nightShiftShifts || 0
   if (nightShiftRate > 0 && nightShifts > 0) {
     result.push({ name: `F&B: Phụ cấp ca đêm (${nightShifts} ca)`, amount: nightShifts * nightShiftRate })
-  } else if (attendance.overtimeHours > 0 && nightShiftRate > 0) {
-    result.push({ name: 'F&B: Hỗ trợ ca đêm/chốt muộn', amount: nightShiftRate })
   }
 
   // Manager-level get responsibility allowance, others don't
@@ -1174,8 +1216,22 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     absentDeduction = att.absentDays * dailyRate
   }
 
+  // ── Step 4b: Làm việc ban đêm (Điều 98 BLLĐ): trả thêm theo giờ, hệ số trong Cài đặt (rates.otNight, 130% = thêm 30%).
+  // Phần trả thêm được miễn thuế TNCN.
+  const nightHours = att.nightHours ?? 0
+  const nightRate = typeof policy.rates?.otNight === 'number' ? policy.rates.otNight : 0
+  const nightHourlyRate = isPartTime
+    ? (baseSalary > 0 ? baseSalary : 0)
+    : baseSalary / standardDays / ((typeof policy.standardHoursPerDay === 'number' && policy.standardHoursPerDay > 0) ? policy.standardHoursPerDay : 8)
+  const nightPremium = nightHours > 0 && nightRate > 1
+    ? Math.round(nightHours * nightHourlyRate * (nightRate - 1))
+    : 0
+  const nightAllowances = nightPremium > 0
+    ? [{ name: `Trả thêm làm ban đêm (${nightHours} giờ × ${Math.round((nightRate - 1) * 100)}%)`, amount: nightPremium, tax_exempt: true }]
+    : []
+
   // ── Step 5: Allowances
-  const allowances = [...getAllowancesForEmployee(employeeId, baseSalary, att, emp, isPartTime), ...(input.extraAllowances || [])]
+  const allowances = [...getAllowancesForEmployee(employeeId, baseSalary, att, emp, isPartTime), ...nightAllowances, ...(input.extraAllowances || [])]
   const totalAllowances = allowances.reduce((sum, a) => sum + a.amount, 0)
 
   // ── Step 6: Bonuses
@@ -1219,8 +1275,13 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   // ── Step 10: Tax & Gross definition
   // Standard Gross Salary = Total earnings before any statutory or disciplinary deductions
   // BUG-L FIX: Khấu trừ phụ cấp cơm ca không chịu thuế theo luật Thuế TNCN
-  const nonTaxableAllowances = allowances
-    .filter(a => a.name.includes('Cơm ca') || a.name.includes('cơm ca') || ('tax_exempt' in a && a.tax_exempt === true))
+  // Cơm ca: nếu Cài đặt có trần miễn thuế (vd trả tiền mặt), phần vượt trần chịu thuế; để trống = miễn toàn bộ.
+  const isMealAllowance = (a: { name: string }) => a.name.includes('Cơm ca') || a.name.includes('cơm ca')
+  const mealTotal = allowances.filter(isMealAllowance).reduce((sum, a) => sum + a.amount, 0)
+  const mealCap = policy.legal?.mealAllowanceTaxExemptCap
+  const mealExempt = typeof mealCap === 'number' && mealCap > 0 ? Math.min(mealTotal, mealCap) : mealTotal
+  const nonTaxableAllowances = mealExempt + allowances
+    .filter(a => !isMealAllowance(a) && 'tax_exempt' in a && (a as { tax_exempt?: boolean }).tax_exempt === true)
     .reduce((sum, a) => sum + a.amount, 0)
   const grossSalary = totalEarnings
   const taxableIncome = Math.max(0, grossSalary - insurance.total - nonTaxableAllowances - overtimeTaxExempt)
@@ -1239,11 +1300,39 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     })
   }
 
+  // Bán thời gian làm quá giờ chuẩn/ngày nhưng Cài đặt đang tắt tăng ca: báo để quản lý kiểm tra
+  const hoursOverStandard = att.hoursOverStandard ?? 0
+  if (isPartTime && policy.partTimeOvertimeEnabled !== true && hoursOverStandard > 0) {
+    anomalies.push({
+      type: 'tang_ca_chua_tra',
+      message: `Có ${hoursOverStandard} giờ làm vượt giờ chuẩn/ngày nhưng Cài đặt đang tắt tăng ca bán thời gian, nên chỉ trả 100%. Luật yêu cầu trả từ 150%.`,
+    })
+  }
+  // Vượt giới hạn giờ tăng ca/tháng trong Cài đặt (để trống = không kiểm tra; luật hiện hành 40 giờ/tháng)
+  const maxOtHours = policy.legal?.maxMonthlyOvertimeHours
+  const monthOtHours = Math.max(overtimeHoursToReport || 0, hoursOverStandard)
+  if (typeof maxOtHours === 'number' && maxOtHours > 0 && monthOtHours > maxOtHours) {
+    anomalies.push({
+      type: 'vuot_gio_tang_ca',
+      message: `Tăng ca ${monthOtHours} giờ trong tháng, vượt giới hạn ${maxOtHours} giờ trong Cài đặt.`,
+    })
+  }
+
   // ── Step 11: Net Salary
   // Advance payment is deducted from net payout, NOT from taxable income
   const rawNetSalary = grossSalary - insurance.total - tax - lateDeduction - totalOtherDeductions - advanceDeduction
   // Không trả lương âm: phần khấu trừ vượt thu nhập được báo để quản lý xử lý (chuyển kỳ sau / thu lại)
   const netSalary = Math.max(0, rawNetSalary)
+  // Khấu trừ bồi thường (phiếu trừ đã duyệt) vượt tỷ lệ trong Cài đặt (để trống = không kiểm tra; luật tối đa 30%, Điều 129 BLLĐ)
+  const maxCompRate = policy.legal?.maxCompensationDeductionPercent
+  const salaryAfterStatutory = Math.max(0, grossSalary - insurance.total - tax)
+  if (typeof maxCompRate === 'number' && maxCompRate > 0 && totalOtherDeductions > 0
+    && totalOtherDeductions > Math.round(salaryAfterStatutory * maxCompRate / 100)) {
+    anomalies.push({
+      type: 'vuot_khau_tru_boi_thuong',
+      message: `Phiếu trừ ${totalOtherDeductions.toLocaleString('vi-VN')}đ vượt ${maxCompRate}% lương tháng (tối đa ${Math.round(salaryAfterStatutory * maxCompRate / 100).toLocaleString('vi-VN')}đ). Phần vượt cần chuyển sang tháng sau.`,
+    })
+  }
   if (rawNetSalary < 0) {
     anomalies.push({
       type: 'luong_am',
@@ -1272,6 +1361,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     total_hours: att.totalHours,
     split_shift_days: att.splitShiftDays || 0,
     night_shift_shifts: att.nightShiftShifts || 0,
+    night_hours: nightHours,
     base_salary: baseSalary,
     base_earned: baseEarned,
     overtime_hours: overtimeHoursToReport,
