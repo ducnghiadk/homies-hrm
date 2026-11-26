@@ -411,7 +411,7 @@ export default function PayrollPage() {
               const slipStoreId = s.store_id || emp?.store_id || 'store-001'
               const store = sourceStores.find(st => st.id === slipStoreId)
               const isPartTime = (s.base_salary === 0 && ((s.total_hours || 0) > 0 || (s.net_salary || 0) > 0)) || emp?.contract_type === 'ban_thoi_gian' || s.position?.includes('pha chế') || s.position?.includes('phục vụ') || false
-              const hourlyRate = (emp as PayrollEmployee)?.hourly_rate || (isPartTime && (s.total_hours || 0) > 0 ? Math.round(((s.net_salary || 0) - (s.bonus || 0)) / (s.total_hours || 1)) : (isPartTime ? 20000 : 0))
+              const hourlyRate = (emp as PayrollEmployee)?.hourly_rate || (isPartTime && (s.total_hours || 0) > 0 ? Math.round(((s.net_salary || 0) - (s.bonus || 0)) / (s.total_hours || 1)) : 0)
 
               return {
                 employee_id: s.employee_id,

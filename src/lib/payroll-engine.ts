@@ -1351,7 +1351,7 @@ export async function calculatePayrollBatchAsync(
       }
       return employee.chuc_vu_luong_co_ban > 0
         ? Math.round(employee.chuc_vu_luong_co_ban / 26 / 8)
-        : 22500
+        : 0 // Không đoán đơn giá: để 0 để bảng lương báo "Thiếu đơn giá giờ"
     }
     return employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : employee.chuc_vu_luong_co_ban
   }

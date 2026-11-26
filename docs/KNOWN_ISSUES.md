@@ -15,6 +15,7 @@
      - Cài đặt lương lưu trên máy chủ qua `/api/payroll/policy` (`payroll_policy`), máy nào cũng đọc cùng một bản.
      - Thêm ô "Lương tối thiểu theo giờ (bán thời gian)" trong Cài đặt lương (để trống = không kiểm tra), bảng lương cảnh báo `duoi_luong_toi_thieu`.
      - Chỉ dùng phiếu trên máy chủ làm số chốt khi kỳ đã khóa sổ; còn lại tính lại từ chấm công + Cài đặt.
+     - Bỏ đơn giá đoán 22.500đ/giờ khi đọc nhân viên part-time thiếu đơn giá từ cơ sở dữ liệu thật: để 0đ và báo "Thiếu đơn giá giờ".
   3) Lưu ý vận hành: CEO/HR cần mở Cài đặt lương và bấm Lưu một lần để cấu hình lên máy chủ; tip F&B tạm bằng 0 đến khi nhập doanh thu thật.
   4) File liên quan: `src/lib/payroll-engine.ts`, `src/app/payroll/page.tsx`, `src/app/api/payroll/policy/route.ts`, `src/lib/services/payroll/payroll-policy-service.ts`, `src/app/api/bsc/approve/route.ts`, `src/lib/adapters/payroll-adapter.ts`, `src/app/settings/payroll/page.tsx`, `src/lib/server/db.ts`, `src/lib/server/supabase-store.ts`.
 
