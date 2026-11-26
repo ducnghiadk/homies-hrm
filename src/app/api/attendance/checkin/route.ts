@@ -101,10 +101,11 @@ export async function POST(req: NextRequest) {
     const vnNow = getVnClock(now)
     const todayStr = vnNow.date
 
-    // 4b. CHẶN CHECK-IN ĐÚP (DE-BOUNCE): Trong vòng 15 phút từ chối bấm liên tiếp
+    // 4b. CHẶN CHECK-IN ĐÚP: chỉ chặn khi còn một lượt vào ca CHƯA tan ca trong 15 phút gần đây.
+    // Ca ngắn đã tan ca rồi thì được vào ca tiếp ngay.
     if (db.attendance && Array.isArray(db.attendance)) {
       const recentCheckin = db.attendance.find((a) => {
-        if (a.employee_id !== effectiveEmployeeId || a.date !== todayStr) return false
+        if (a.employee_id !== effectiveEmployeeId || a.date !== todayStr || a.check_out_time) return false
         const prevTime = new Date(a.check_in_time).getTime()
         const diffMs = Math.abs(now.getTime() - prevTime)
         return diffMs < 15 * 60 * 1000 // dưới 15 phút

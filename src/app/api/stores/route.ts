@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb, ServerStore } from '@/lib/server/db'
-import { getActiveUser } from '@/lib/server/auth-helper'
+import { getActiveUser, canAccessStore, isChainWideRole } from '@/lib/server/auth-helper'
 
 const ALLOWED_STORE_ROLES = ['ceo', 'hr_admin', 'store_manager', 'area_manager']
 
@@ -16,10 +16,11 @@ export async function GET(req: NextRequest) {
     let stores = db.stores || []
 
     const auth = await getActiveUser(req)
-    const canSeePin = auth && ALLOWED_STORE_ROLES.includes(auth.role)
+    const isStoreAdmin = !!auth && ALLOWED_STORE_ROLES.includes(auth.role)
 
+    // Quản lý chỉ xem được mã PIN / mạng Wi-Fi của chi nhánh mình phụ trách
     const sanitizeStore = (store: ServerStore) => {
-      if (canSeePin) return store
+      if (isStoreAdmin && auth && canAccessStore(auth, store.id)) return store
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { pin_code: _pin, wifi_public_ips: _ips, ...safe } = store
       return safe
@@ -74,6 +75,20 @@ export async function POST(req: NextRequest) {
 
     const storeId = id || `store-${String(db.stores.length + 1).padStart(3, '0')}`
     const existingIndex = db.stores.findIndex((s) => s.id === storeId)
+
+    // Quản lý cửa hàng chỉ sửa được chi nhánh mình phụ trách, không tạo chi nhánh mới
+    if (existingIndex < 0 && !isChainWideRole(auth.role)) {
+      return NextResponse.json(
+        { success: false, error: 'Chỉ Ban Giám đốc mới được tạo chi nhánh mới.' },
+        { status: 403 }
+      )
+    }
+    if (existingIndex >= 0 && !canAccessStore(auth, storeId)) {
+      return NextResponse.json(
+        { success: false, error: 'Bạn chỉ được sửa thông tin chi nhánh mình phụ trách.' },
+        { status: 403 }
+      )
+    }
 
     const updatedStore: ServerStore = {
       // Giữ các cài đặt khác của chi nhánh (vd. cách chấm công Wi-Fi/QR) không có trong form này

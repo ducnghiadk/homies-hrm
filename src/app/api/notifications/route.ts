@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, type ServerNotification } from '@/lib/server/db'
+import type { AuthenticatedUser } from '@/lib/server/auth-helper'
+
+/** Thông báo có người nhận cụ thể chỉ hiện cho đúng người/vai trò đó; thông báo chung hiện cho mọi người. */
+function isVisibleTo(n: ServerNotification, user: AuthenticatedUser): boolean {
+  if (n.target_user_id) return n.target_user_id === user.userId
+  if (n.target_role) return n.target_role === user.role
+  return true
+}
 
 export async function GET(req: NextRequest) {
   const gate = await requireAuth(req)
@@ -10,7 +18,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20', 10)
 
     const db = await getServerDb()
-    const list: ServerNotification[] = db.notifications || []
+    const list: ServerNotification[] = (db.notifications || []).filter((n) => isVisibleTo(n, gate.user))
 
     return NextResponse.json({
       success: true,
@@ -36,21 +44,21 @@ export async function POST(req: NextRequest) {
     if (!db.notifications) db.notifications = []
 
     if (action === 'mark_read' && body.id) {
-      const idx = db.notifications.findIndex(n => n.id === body.id)
+      const idx = db.notifications.findIndex(n => n.id === body.id && isVisibleTo(n, gate.user))
       if (idx >= 0) {
         db.notifications[idx].is_read = true
         await saveServerDb(db)
       }
     } else if (action === 'mark_all_read') {
       db.notifications.forEach(n => {
-        n.is_read = true
+        if (isVisibleTo(n, gate.user)) n.is_read = true
       })
       await saveServerDb(db)
     }
 
     return NextResponse.json({
       success: true,
-      unread_count: db.notifications.filter(n => !n.is_read).length,
+      unread_count: db.notifications.filter(n => !n.is_read && isVisibleTo(n, gate.user)).length,
     })
   } catch (error) {
     return NextResponse.json(

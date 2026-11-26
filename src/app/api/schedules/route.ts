@@ -20,6 +20,7 @@ import {
   type ServerScheduleChangeLog,
 } from '@/lib/server/db'
 import { validateWeekForPublish, type PublishItem, type PublishRule } from '@/lib/scheduling/publish-validator'
+import { pickFromAvailability, slotKey as availabilitySlotKey } from '@/lib/scheduling/availability-fill'
 
 function ensureOfficialDbArrays(db: ServerDatabaseSchema) {
   if (!Array.isArray(db.official_schedules)) db.official_schedules = []
@@ -167,7 +168,37 @@ function appendChangeLog(
   if (db.schedule_change_logs!.length > 2000) {
     db.schedule_change_logs = db.schedule_change_logs!.slice(0, 2000)
   }
+  // Sửa lịch đã chốt: báo cho đúng nhân viên bị đổi ca
+  if (['create', 'update', 'cancel'].includes(String(entry.action)) && entry.employee_id) {
+    const ddmm = `${(entry.date || '').slice(8, 10)}/${(entry.date || '').slice(5, 7)}`
+    const shiftName = resolveShiftDisplayName(db, entry.shift_id || '', undefined)
+    const verb = entry.action === 'cancel' ? 'gỡ' : entry.action === 'create' ? 'thêm' : 'đổi'
+    pushScheduleNotification(db, entry.employee_id, {
+      title: 'Lịch làm của bạn vừa thay đổi',
+      message: `Quản lý đã ${verb} ca ${shiftName} ngày ${ddmm}.${entry.reason ? ` Lý do: ${entry.reason}` : ''}`,
+      metadata: { store_id: log.store_id, week_start: log.week_start, date: entry.date, link: '/my-schedule' },
+    })
+  }
   return log
+}
+
+function pushScheduleNotification(
+  db: ServerDatabaseSchema,
+  employeeId: string,
+  payload: { title: string; message: string; metadata?: Record<string, unknown> }
+) {
+  if (!db.notifications) db.notifications = []
+  db.notifications.unshift({
+    id: `notif-sch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: payload.title,
+    message: payload.message,
+    type: 'schedule',
+    created_at: new Date().toISOString(),
+    is_read: false,
+    target_user_id: employeeId,
+    metadata: payload.metadata,
+  })
+  if (db.notifications.length > 1000) db.notifications = db.notifications.slice(0, 1000)
 }
 
 function sortOfficialSchedules(
@@ -481,6 +512,20 @@ export async function POST(req: NextRequest) {
         changed_by_name: actorName,
       })
 
+      // Báo cho từng nhân viên có ca trong tuần vừa chốt
+      const weekLabel = `${normWeekStart.slice(8, 10)}/${normWeekStart.slice(5, 7)}`
+      const shiftCountByEmp = new Map<string, number>()
+      for (const item of publishedItems) {
+        shiftCountByEmp.set(item.employee_id, (shiftCountByEmp.get(item.employee_id) || 0) + 1)
+      }
+      for (const [empId, count] of shiftCountByEmp) {
+        pushScheduleNotification(db, empId, {
+          title: 'Đã có lịch làm tuần mới',
+          message: `Lịch tuần từ ${weekLabel} đã được chốt. Bạn có ${count} ca, vào "Lịch của tôi" để xem.`,
+          metadata: { store_id: storeId, week_start: normWeekStart, link: '/my-schedule' },
+        })
+      }
+
       const persisted = await persistScheduleDb(db)
       if (persisted.errorResponse) return persisted.errorResponse
 
@@ -599,6 +644,7 @@ export async function POST(req: NextRequest) {
       })
 
       let addedCount = 0
+      const candidates: (ServerOfficialSchedule & { key: string; hours: number })[] = []
       for (const reg of sourceAvailability) {
         const matchedEmp = db.employees.find(
           (e) =>
@@ -635,9 +681,50 @@ export async function POST(req: NextRequest) {
         const slotKey = getOfficialScheduleSlotKey(candidate)
         if (existingKeys.has(slotKey)) continue
         existingKeys.add(slotKey)
-        db.official_schedules!.push(candidate)
+        candidates.push({
+          ...candidate,
+          key: slotKey,
+          hours: getShiftTimeRange(candidate.shift_id, db.shift_templates).hours || 0,
+        })
+      }
+
+      // Mỗi ca chỉ lấy đủ số người cần (số người tối đa của mẫu ca), ưu tiên người ít giờ trong tuần.
+      const weekExisting = db.official_schedules!.filter((s) =>
+        isScheduleInStoreWeek(s, storeId, normWeekStart, normWeekEnd)
+      )
+      const existingCountBySlot: Record<string, number> = {}
+      const existingHoursByEmployee: Record<string, number> = {}
+      for (const s of weekExisting) {
+        const k = availabilitySlotKey(s.date, s.shift_id)
+        existingCountBySlot[k] = (existingCountBySlot[k] || 0) + 1
+        existingHoursByEmployee[s.employee_id] =
+          (existingHoursByEmployee[s.employee_id] || 0) +
+          (getShiftTimeRange(s.shift_id, db.shift_templates).hours || 0)
+      }
+      const capacityByShift: Record<string, number | undefined> = {}
+      for (const c of candidates) {
+        const tpl = (db.shift_templates || []).find((t) => t.id === c.shift_id || t.code === c.shift_id)
+        capacityByShift[c.shift_id] = tpl?.max_headcount
+      }
+      const { selected, reserve } = pickFromAvailability({
+        candidates,
+        capacityByShift,
+        existingCountBySlot,
+        existingHoursByEmployee,
+      })
+      for (const pick of selected) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { key: _key, hours: _hours, ...row } = pick
+        db.official_schedules!.push(row)
         addedCount++
       }
+      const reserveList = reserve.map((r) => ({
+        employee_id: r.employee_id,
+        employee_name: r.employee_name,
+        date: r.date,
+        shift_id: r.shift_id,
+        shift_name: r.shift_name,
+      }))
 
       const weekMeta = upsertWeekMeta(db, {
         store_id: storeId,
@@ -679,9 +766,10 @@ export async function POST(req: NextRequest) {
         ...(persisted.cloudWarning ? { cloud_warning: persisted.cloudWarning } : {}),
         message:
           addedCount > 0
-            ? `Đã nạp ${addedCount} ca từ lịch rảnh vào Bản Nháp.`
+            ? `Đã nạp ${addedCount} ca từ lịch rảnh vào Bản Nháp.${reserveList.length > 0 ? ` ${reserveList.length} lượt rảnh còn lại để dự bị vì ca đã đủ người.` : ''}`
             : 'Không có thêm ca rảnh mới cần điền vào Bản Nháp.',
         added_count: addedCount,
+        reserve: reserveList,
         total_week_count: weekSchedules.length,
         week_meta: weekMeta,
         data: weekSchedules,
