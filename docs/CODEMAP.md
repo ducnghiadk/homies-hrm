@@ -62,6 +62,7 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `src/app/api/payroll/policy/route.ts`: GET doc / POST (CEO, HR) luu toan bo Cai dat luong tren may chu (`payroll_policy`) de moi may dung chung mot cau hinh.
   + `src/app/api/payroll/tax-settings/route.ts`: GET doc / POST (CEO, HR) luu cai dat thue TNCN tren may chu (`payroll_tax_settings`), dung cho tam khau tru thue thuong BSC.
   + `src/lib/payroll/pit.ts`: ham thue TNCN thuan dung chung (giam tru, bieu luy tien, khau tru 10% part-time, mien thue phan chenh tang ca, tam khau tru thue thuong).
+  + `src/components/payroll/HolidaySettingsPanel.tsx`: khoi danh sach ngay le, Tet trong `/settings/payroll` (luu `holidays` trong Cai dat luong, nut dien goi y 2026).
   + `src/components/payroll/PitSettingsPanel.tsx`: khoi cai dat thue TNCN trong `/settings/payroll` (muc giam tru, bieu thue, khau tru part-time).
   + `src/lib/time/vn-time.ts`: lay ngay/gio theo gio Viet Nam (UTC+7) cho may chu chay UTC.
   + `src/app/api/payroll/route.ts`: GET xuat bang tinh luong chi tiet doi soat tung dong voi iPOS, quan ly cot late_deduction.

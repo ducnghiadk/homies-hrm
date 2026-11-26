@@ -57,6 +57,10 @@ export type AuthUser = {
   hourly_rate?: number
   has_insurance?: boolean
   dependents_count?: number
+  /** Thời hạn hợp đồng để xét thuế TNCN (không HĐ / dưới 3 tháng → khấu trừ 10%). */
+  pit_contract_term?: 'khong_hop_dong' | 'duoi_3_thang' | 'tu_3_thang'
+  /** Đã nộp cam kết mẫu 08/CK-TNCN → không khấu trừ 10%. */
+  pit_commitment_08?: boolean
   marital_status?: string
   ethnicity?: string
   religion?: string
