@@ -38,6 +38,7 @@ type EmployeeProfileExtras = {
   dependents_count?: number
   pit_contract_term?: '' | 'khong_hop_dong' | 'duoi_3_thang' | 'tu_3_thang'
   pit_commitment_08?: boolean
+  insurance_salary?: number
   marital_status?: string
 }
 
@@ -75,6 +76,7 @@ type EditFormData = {
   dependents_count: string
   pit_contract_term: '' | 'khong_hop_dong' | 'duoi_3_thang' | 'tu_3_thang'
   pit_commitment_08: boolean
+  insurance_salary: string
 }
 
 type EditFormErrors = Partial<Record<keyof EditFormData, string>>
@@ -264,6 +266,7 @@ const buildEditForm = (employee: AuthUser, profile?: EmployeeProfileExtras): Edi
   dependents_count: profile?.dependents_count !== undefined ? String(profile.dependents_count) : '0',
   pit_contract_term: profile?.pit_contract_term || '',
   pit_commitment_08: profile?.pit_commitment_08 === true,
+  insurance_salary: typeof profile?.insurance_salary === 'number' && profile.insurance_salary > 0 ? String(profile.insurance_salary) : '',
 })
 
 export default function EmployeeDetailPage() {
@@ -363,6 +366,7 @@ export default function EmployeeDetailPage() {
     dependents_count: '0',
     pit_contract_term: '',
     pit_commitment_08: false,
+    insurance_salary: '',
   })
 
   const employeeId = params.id as string
@@ -599,6 +603,7 @@ export default function EmployeeDetailPage() {
         dependents_count: editForm.dependents_count ? Number(editForm.dependents_count) : 0,
         pit_contract_term: editForm.pit_contract_term || undefined,
         pit_commitment_08: editForm.pit_commitment_08,
+        insurance_salary: Number(editForm.insurance_salary) > 0 ? Number(editForm.insurance_salary) : undefined,
       }
       if (salaryToSave !== undefined) {
         profileUpdates.official_salary = salaryToSave
@@ -1353,6 +1358,20 @@ export default function EmployeeDetailPage() {
                         />
                         Đã nộp bản cam kết (không khấu trừ 10%)
                       </label>
+                    </FormField>
+
+                    <FormField label="Mức lương đóng bảo hiểm (để trống = tự tính)">
+                      <input
+                        type="number"
+                        min={0}
+                        value={editForm.insurance_salary}
+                        onChange={e => setEditForm({ ...editForm, insurance_salary: e.target.value })}
+                        className={getInputClassName(false)}
+                        placeholder="Để trống: theo lương hợp đồng"
+                      />
+                      <span className="mt-1 block text-[11px] text-gray-500">
+                        Không được thấp hơn lương ghi trong hợp đồng và lương tối thiểu vùng; nếu thấp hơn, bảng lương sẽ cảnh báo.
+                      </span>
                     </FormField>
                   </>
                 )}
