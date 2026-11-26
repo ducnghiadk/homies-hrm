@@ -246,6 +246,8 @@ export interface ServerAttendanceLog {
   schedule_source?: 'official' | 'availability' | 'none'
   /** Chấm công khi không có ca nào trong lịch chính thức đã chốt của ngày đó. */
   off_schedule?: boolean
+  /** Ca ngoài lịch do quản lý ghi nhận thay: lưu mã người ghi nhận (coi như đã duyệt khi xét bậc). */
+  off_schedule_approved_by?: string
 }
 
 export interface ServerSalarySlip {

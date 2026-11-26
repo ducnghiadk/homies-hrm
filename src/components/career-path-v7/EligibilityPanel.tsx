@@ -49,7 +49,26 @@ export default function EligibilityPanel({ summary, hint, bare }: Props) {
           </li>
         ))}
       </ul>
+      {summary.hours_breakdown && summary.hours_breakdown.source !== 'all_attendance' && (
+        <HoursBreakdownNote b={summary.hours_breakdown} />
+      )}
       <p className="mt-3 text-xs text-gray-500">{hint || 'Chỉ để tham khảo. Nâng bậc vẫn phải qua đề xuất và duyệt.'}</p>
     </section>
+  )
+}
+
+function HoursBreakdownNote({ b }: { b: NonNullable<CareerProgressSummary['hours_breakdown']> }) {
+  const parts: string[] = [`${b.official} giờ trong lịch đã chốt`]
+  if (b.approved_off_schedule > 0) parts.push(`${b.approved_off_schedule} giờ ngoài lịch đã được duyệt`)
+  if (b.legacy_counted > 0) parts.push(`${b.legacy_counted} giờ chấm công cũ`)
+  if (b.carried > 0) parts.push(`${b.carried} giờ HR nhập lúc xếp bậc`)
+  const removed: string[] = []
+  if (b.off_schedule_excluded > 0) removed.push(`${b.off_schedule_excluded} giờ ngoài lịch chưa được duyệt`)
+  if (b.legacy_excluded > 0) removed.push(`${b.legacy_excluded} giờ chấm công cũ`)
+  return (
+    <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+      <span className="font-semibold text-[#001D3D]">Giờ được tính:</span> {parts.join(' + ')}.
+      {removed.length > 0 && <span className="block text-amber-700">Không tính: {removed.join(', ')}.</span>}
+    </div>
   )
 }

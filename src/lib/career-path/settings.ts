@@ -77,6 +77,15 @@ export interface CareerM1Config {
 export type MonthsFrom = 'hire_date' | 'first_placement'
 export type HoursFrom = 'all_attendance' | 'since_first_placement'
 export type FtMidMonth = 'prorate_days' | 'grade_at_period_end'
+/**
+ * Giờ nào được tính khi xét bậc:
+ * - all_attendance: mọi lượt chấm công đã tan ca (cách tính cũ).
+ * - confirmed_schedule: chỉ ca nằm trong lịch đã chốt.
+ * - confirmed_plus_approved: ca trong lịch đã chốt + ca ngoài lịch được quản lý duyệt.
+ */
+export type HoursSource = 'all_attendance' | 'confirmed_schedule' | 'confirmed_plus_approved'
+/** Dữ liệu chấm công cũ (iPOS) không đánh dấu có trong lịch hay không: tính hết hoặc bỏ qua. */
+export type LegacyHoursRule = 'count' | 'skip'
 
 /** Các quy tắc tính nhỏ, đều do CEO/HR chọn. */
 export interface CareerRulesConfig {
@@ -92,6 +101,10 @@ export interface CareerRulesConfig {
   months_from: MonthsFrom
   /** Giờ làm tính từ đâu (luôn cộng thêm số giờ HR nhập lúc xếp bậc). */
   hours_from: HoursFrom
+  /** Giờ nào được tính: mọi chấm công, chỉ lịch đã chốt, hay lịch đã chốt + ca ngoài lịch được duyệt. */
+  hours_source: HoursSource
+  /** Dữ liệu chấm công cũ không có dấu lịch: tính hết hay bỏ qua. */
+  legacy_hours: LegacyHoursRule
   /** Tiền cộng theo bậc có tính thuế TNCN không. */
   pay_taxable: boolean
   /** Full-time cộng cố định mà đổi bậc giữa tháng: chia theo ngày hay tính trọn tháng theo bậc cuối kỳ. */
@@ -164,6 +177,8 @@ export function getDefaultCareerPathSettings(): CareerPathSettings {
       non_working_weekdays: [],
       months_from: 'hire_date',
       hours_from: 'all_attendance',
+      hours_source: 'all_attendance',
+      legacy_hours: 'count',
       pay_taxable: true,
       ft_mid_month: 'prorate_days',
     },
@@ -245,6 +260,8 @@ export function validateCareerPathSettings(s: CareerPathSettings): string[] {
   }
   if (r?.months_from !== 'hire_date' && r?.months_from !== 'first_placement') errors.push('Cách tính số tháng không hợp lệ.')
   if (r?.hours_from !== 'all_attendance' && r?.hours_from !== 'since_first_placement') errors.push('Cách tính số giờ không hợp lệ.')
+  if (!['all_attendance', 'confirmed_schedule', 'confirmed_plus_approved'].includes(r?.hours_source)) errors.push('Cách chọn giờ được tính không hợp lệ.')
+  if (r?.legacy_hours !== 'count' && r?.legacy_hours !== 'skip') errors.push('Cách xử lý giờ chấm công cũ không hợp lệ.')
   if (r?.ft_mid_month !== 'prorate_days' && r?.ft_mid_month !== 'grade_at_period_end') errors.push('Cách tính Full-time đổi bậc giữa tháng không hợp lệ.')
   const a = s.approval
   if (!a.approver_roles?.length) errors.push('Phải chọn ít nhất một vai trò được duyệt nâng bậc.')

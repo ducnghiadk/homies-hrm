@@ -5,7 +5,8 @@ import { canAccessStore, isChainWideRole, hasRequiredRole, MANAGER_ROLES } from 
 import type { CareerPathSettings } from '@/lib/career-path/settings'
 import type { CareerPlacement } from '@/lib/career-path/placement'
 import { currentSkillLevels } from '@/lib/career-path/assessment'
-import { evaluateNextGrade, fullMonthsBetween, sumWorkedHours, type CareerProgressSummary } from '@/lib/career-path/eligibility'
+import { evaluateNextGrade, fullMonthsBetween, type CareerProgressSummary } from '@/lib/career-path/eligibility'
+import { computeCareerHours } from '@/lib/career-path/hours'
 
 export function buildCareerSummary(db: ServerDatabaseSchema, settings: CareerPathSettings, placement: CareerPlacement, today: string): CareerProgressSummary {
   const entries = db.career_skill_assessments || []
@@ -20,8 +21,19 @@ export function buildCareerSummary(db: ServerDatabaseSchema, settings: CareerPat
   const monthsStart = rules.months_from === 'first_placement' ? firstPlacement : employee?.hire_date || firstPlacement
   const months = fullMonthsBetween(monthsStart, today)
   const hoursFrom = rules.hours_from === 'since_first_placement' ? firstPlacement : undefined
-  const worked = sumWorkedHours(db.attendance || [], placement.employee_id, hoursFrom)
-  const hours = Math.round((placement.carried_hours + worked) * 100) / 100
+  // Ngày có đơn bổ sung / giải trình chấm công đã duyệt: coi như ca ngoài lịch đã được quản lý duyệt.
+  const approvedDates = new Set(
+    (db.requests || [])
+      .filter((r) => r.employee_id === placement.employee_id && r.type === 'missed_checkin' && r.status === 'APPROVED' && r.date)
+      .map((r) => String(r.date).slice(0, 10))
+  )
+  const breakdown = computeCareerHours(db.attendance || [], placement.employee_id, {
+    source: rules.hours_source,
+    legacy: rules.legacy_hours,
+    fromDate: hoursFrom,
+    approvedDates,
+  })
+  const hours = Math.round((placement.carried_hours + breakdown.counted) * 100) / 100
   return {
     employee_id: placement.employee_id,
     levels,
@@ -29,6 +41,7 @@ export function buildCareerSummary(db: ServerDatabaseSchema, settings: CareerPat
     last_assessed_at: mine.reduce((max, e) => (e.assessed_at > max ? e.assessed_at : max), ''),
     months,
     hours,
+    hours_breakdown: { ...breakdown, carried: placement.carried_hours, source: rules.hours_source },
     eligibility: evaluateNextGrade(settings, { grade: placement.grade_code, position: placement.primary_position, levels, months, hours }),
   }
 }

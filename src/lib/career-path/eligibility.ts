@@ -1,7 +1,8 @@
 // Xem nhân viên đã đủ điều kiện xét lên bậc kế tiếp chưa (chỉ để hiển thị).
 // Không tự nâng bậc, không đổi lương: nâng bậc phải qua đề xuất và duyệt.
 
-import { CAREER_GRADE_CODES, gradeOrder, type CareerGradeCode, type CareerPathSettings, type CareerPositionCode } from './settings.ts'
+import { CAREER_GRADE_CODES, gradeOrder, type CareerGradeCode, type CareerPathSettings, type CareerPositionCode, type HoursSource } from './settings.ts'
+import type { CareerHoursBreakdown } from './hours.ts'
 import { applicableSkills, type ApplicableBucket, type CurrentSkillLevel } from './assessment.ts'
 
 export interface EligibilityCheck {
@@ -116,5 +117,7 @@ export interface CareerProgressSummary {
   last_assessed_at: string
   months: number
   hours: number
+  /** Giờ được tính / bị loại theo Cài đặt (để nhân viên và quản lý thấy rõ vì sao ra con số này). */
+  hours_breakdown?: CareerHoursBreakdown & { carried: number; source: HoursSource }
   eligibility: EligibilityResult
 }
