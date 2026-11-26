@@ -235,6 +235,7 @@ const ANOMALY_CONFIG: Record<string, { label: string; severity: 'error' | 'warni
   tang_ca_chua_tra: { label: 'Làm quá giờ chuẩn nhưng chưa trả tăng ca', severity: 'warning' },
   vuot_gio_tang_ca: { label: 'Vượt giới hạn giờ tăng ca trong tháng', severity: 'warning' },
   vuot_khau_tru_boi_thuong: { label: 'Phiếu trừ vượt tỷ lệ cho phép', severity: 'warning' },
+  muc_dong_bh_thap: { label: 'Mức lương đóng BH thấp hơn quy định', severity: 'warning' },
 }
 
 export default function PayrollPage() {

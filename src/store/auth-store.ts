@@ -61,6 +61,8 @@ export type AuthUser = {
   pit_contract_term?: 'khong_hop_dong' | 'duoi_3_thang' | 'tu_3_thang'
   /** Đã nộp cam kết mẫu 08/CK-TNCN → không khấu trừ 10%. */
   pit_commitment_08?: boolean
+  /** Mức lương đóng bảo hiểm do HR nhập (để trống = tính theo lương cơ bản / lương thực nhận). */
+  insurance_salary?: number
   marital_status?: string
   ethnicity?: string
   religion?: string

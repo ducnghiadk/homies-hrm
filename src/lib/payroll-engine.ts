@@ -44,6 +44,8 @@ export interface PayrollInput {
   contractTerm?: 'khong_hop_dong' | 'duoi_3_thang' | 'tu_3_thang'
   /** Đã nộp bản cam kết mẫu 08/CK-TNCN (thu nhập cả năm chưa tới mức chịu thuế) → không khấu trừ 10%. */
   pitCommitment08?: boolean
+  /** Mức lương đóng bảo hiểm do HR nhập trong hồ sơ (để trống = tính tự động). */
+  insuranceSalary?: number
 }
 
 export interface FnbAllocationBreakdown {
@@ -1067,7 +1069,7 @@ export function countPaidHolidayOffDays(
 }
 
 /** Thông tin thuế khai trong hồ sơ nhân viên (thời hạn hợp đồng, cam kết 08, người phụ thuộc). */
-export function getEmployeeTaxProfile(employeeId: string): Pick<PayrollInput, 'contractTerm' | 'pitCommitment08' | 'dependents'> {
+export function getEmployeeTaxProfile(employeeId: string): Pick<PayrollInput, 'contractTerm' | 'pitCommitment08' | 'dependents' | 'insuranceSalary'> {
   try {
     const profile = EmployeeService.getEmployeeById(employeeId)
     if (!profile) return {}
@@ -1076,6 +1078,7 @@ export function getEmployeeTaxProfile(employeeId: string): Pick<PayrollInput, 'c
       contractTerm: term === 'khong_hop_dong' || term === 'duoi_3_thang' || term === 'tu_3_thang' ? term : undefined,
       pitCommitment08: profile.pit_commitment_08 === true,
       dependents: typeof profile.dependents_count === 'number' ? profile.dependents_count : undefined,
+      insuranceSalary: typeof profile.insurance_salary === 'number' && profile.insurance_salary > 0 ? profile.insurance_salary : undefined,
     }
   } catch {
     return {}
@@ -1258,7 +1261,10 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
 
   // ── Step 9: Insurance
   // BUG-F FIX: Under VN law, statutory insurance base excludes OT. Part-time base uses baseEarned only.
-  const insuranceBase = isPartTime ? baseEarned : baseSalary
+  // Mức đóng BH nhập tay trong hồ sơ (nếu có) được ưu tiên; để trống thì tính tự động như trên.
+  const autoInsuranceBase = isPartTime ? baseEarned : baseSalary
+  const customInsuranceSalary = typeof input.insuranceSalary === 'number' && input.insuranceSalary > 0 ? input.insuranceSalary : undefined
+  const insuranceBase = customInsuranceSalary ?? autoInsuranceBase
   // Theo Khoản 3 Điều 85 Luật BHXH: Người lao động không làm việc và không hưởng tiền lương từ 14 ngày làm việc trở lên trong tháng
   // (hoặc không đi làm ngày nào trong tháng: effectiveDays === 0), tháng đó không đóng BHXH.
   const effectiveDaysForInsurance = isPartTime ? att.workDays : (att.workDays + att.leavePaid)
@@ -1271,6 +1277,23 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   const insurance = shouldCalculateInsurance
     ? calculateInsurance(insuranceBase)
     : { bhxh: 0, bhyt: 0, bhtn: 0, total: 0 }
+
+  // Mức đóng BH nhập tay thấp hơn lương hợp đồng hoặc lương tối thiểu vùng: chỉ cảnh báo, không chặn
+  if (customInsuranceSalary !== undefined && shouldCalculateInsurance) {
+    const contractSalary = isPartTime ? 0 : baseSalary
+    const minRegion = policy.legal?.minRegionSalary
+    if (contractSalary > 0 && customInsuranceSalary < contractSalary) {
+      anomalies.push({
+        type: 'muc_dong_bh_thap',
+        message: `Mức lương đóng bảo hiểm ${customInsuranceSalary.toLocaleString('vi-VN')}đ thấp hơn lương trong hợp đồng ${contractSalary.toLocaleString('vi-VN')}đ. Luật yêu cầu đóng theo lương và phụ cấp ghi trong hợp đồng, có thể bị truy thu khi thanh tra.`,
+      })
+    } else if (typeof minRegion === 'number' && minRegion > 0 && customInsuranceSalary < minRegion) {
+      anomalies.push({
+        type: 'muc_dong_bh_thap',
+        message: `Mức lương đóng bảo hiểm ${customInsuranceSalary.toLocaleString('vi-VN')}đ thấp hơn lương tối thiểu vùng ${minRegion.toLocaleString('vi-VN')}đ.`,
+      })
+    }
+  }
 
   // ── Step 10: Tax & Gross definition
   // Standard Gross Salary = Total earnings before any statutory or disciplinary deductions
@@ -1583,6 +1606,7 @@ export async function calculatePayrollBatchAsync(
         contractType: payrollEmp?.loai_hop_dong,
         contractTerm: getEmployeeTaxProfile(emp.id).contractTerm,
         pitCommitment08: getEmployeeTaxProfile(emp.id).pitCommitment08,
+        insuranceSalary: getEmployeeTaxProfile(emp.id).insuranceSalary,
         hasInsurance: payrollEmp?.tham_gia_bao_hiem ?? undefined,
         dependents: payrollEmp?.so_nguoi_phu_thuoc ?? undefined,
         employee: emp,

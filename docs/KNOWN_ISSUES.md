@@ -1,5 +1,10 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-26 (Mức lương đóng bảo hiểm riêng từng nhân viên):
+  1) Nguyên nhân: mức đóng bảo hiểm luôn tự tính (toàn thời gian = lương hợp đồng, bán thời gian = lương thực nhận trong tháng), HR không chọn được mức đóng cho từng người.
+  2) Cách giải quyết: hồ sơ nhân viên có ô "Mức lương đóng bảo hiểm" (`insurance_salary`), để trống = tự tính như cũ. Khi có nhập, bảng lương dùng mức này (vẫn áp trần BH) và gắn cảnh báo `muc_dong_bh_thap` nếu thấp hơn lương hợp đồng hoặc lương tối thiểu vùng trong Cài đặt lương; không chặn tính lương.
+  3) File liên quan: `src/lib/payroll-engine.ts`, `src/store/auth-store.ts`, `src/app/employees/[id]/page.tsx`, `src/app/payroll/page.tsx`.
+
 - Đã fix 2026-11-26 (Rà soát bảng lương — Đợt C các điểm còn lại):
   1) Nguyên nhân:
      - Ngày nghỉ hằng tuần cứng là Thứ 7 và Chủ nhật, trong khi quán F&B thường làm cả cuối tuần.
