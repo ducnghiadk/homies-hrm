@@ -230,6 +230,7 @@ const ANOMALY_CONFIG: Record<string, { label: string; severity: 'error' | 'warni
   quen_checkout:       { label: 'Quên check-out',                        severity: 'warning' },
   duoi_luong_toi_thieu: { label: 'Đơn giá giờ thấp hơn lương tối thiểu', severity: 'warning' },
   luong_am:            { label: 'Khấu trừ vượt thu nhập (thực nhận để 0đ)', severity: 'error' },
+  thieu_thoi_han_hop_dong: { label: 'Thiếu thời hạn hợp đồng (đang khấu trừ thuế 10%)', severity: 'warning' },
 }
 
 export default function PayrollPage() {

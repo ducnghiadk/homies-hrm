@@ -1,5 +1,21 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-26 (Rà soát bảng lương — Đợt B các điểm chưa đúng luật):
+  1) Nguyên nhân:
+     - Đi trễ có chế độ phạt tiền cố định / bậc thang, trái Điều 127 Bộ luật Lao động (cấm phạt tiền, cắt lương thay kỷ luật); chế độ trừ theo phút còn cho nhân hệ số tới 5 lần.
+     - Danh sách ngày lễ viết cứng trong bộ tính lương, không sửa được theo năm (Tết Âm lịch đổi ngày).
+     - Làm ngày lễ: toàn thời gian chỉ được tổng 300% (luật là 300% chưa kể lương ngày lễ, tổng ít nhất 400%); toàn thời gian nghỉ đúng ngày lễ không được trả lương ngày đó; bán thời gian làm ngày lễ chỉ được 100%.
+     - Thuế TNCN 10% áp cho mọi nhân viên bán thời gian, trong khi luật chỉ áp cho người không ký hợp đồng hoặc hợp đồng dưới 3 tháng; chưa có ô cam kết mẫu 08/CK-TNCN.
+     - Nhân viên bán thời gian không bao giờ bị tính bảo hiểm, kể cả khi lương tháng đủ ngưỡng phải đóng.
+  2) Cách giải quyết:
+     - Đi trễ chỉ còn 2 lựa chọn: "Không trả lương phút đến trễ" (trừ đúng 1 lần) hoặc "Không trừ tiền" (mặc định). Cài đặt cũ dạng phạt tiền tự chuyển sang trừ theo phút và hiện thông báo (`legacyMode`).
+     - Ngày lễ lấy từ Cài đặt lương (`holidays`, khối `HolidaySettingsPanel`), để trống = không có ngày lễ; nút "Điền gợi ý 2026" phải đối chiếu thông báo của Chính phủ.
+     - Toàn thời gian làm ngày lễ: cộng thêm hệ số ngày lễ (tổng 400%); nghỉ đúng ngày lễ vẫn được tính ngày công. Bán thời gian làm ngày lễ: tổng 300%. Phần chênh lệch được miễn thuế.
+     - Hồ sơ nhân viên có "Thời hạn hợp đồng (để tính thuế TNCN)" và "Cam kết thu nhập (mẫu 08)"; chỉ khấu trừ 10% khi không hợp đồng / dưới 3 tháng và chưa cam kết. Bán thời gian chưa chọn thời hạn vẫn khấu trừ 10% và có cảnh báo `thieu_thoi_han_hop_dong`.
+     - Thêm ô "Ngưỡng bắt buộc đóng BH (bán thời gian)" (để trống = theo hồ sơ từng người).
+  3) Lưu ý vận hành: CEO/HR cần nhập danh sách ngày lễ, kiểm tra cách xử lý đi trễ và bấm Lưu Cài đặt lương; HR cần chọn thời hạn hợp đồng trong hồ sơ nhân viên bán thời gian. Còn một danh sách ngày lễ viết cứng khác trong `src/lib/mock-data-labor-cost.ts` (màn dự báo chi phí nhân sự), chưa sửa.
+  4) File liên quan: `src/lib/payroll-engine.ts`, `src/lib/payroll/policy-registry.ts`, `src/lib/services/payroll/payroll-policy-service.ts`, `src/app/settings/payroll/page.tsx`, `src/components/payroll/HolidaySettingsPanel.tsx`, `src/app/payroll/page.tsx`, `src/app/employees/[id]/page.tsx`, `src/store/auth-store.ts`.
+
 - Đã fix 2026-11-26 (Rà soát bảng lương — Đợt A các lỗi sai tiền):
   1) Nguyên nhân:
      - Tiền tip F&B chia theo doanh thu mẫu cố định (78 triệu / 74 triệu) nên ai cũng có tip giả.

@@ -21,6 +21,7 @@ import { employeeAdapter, type PayrollEmployeeDbRow } from './adapters/employee-
 import { getEffectiveHourlyRate, calculateHourlyEarnings } from './payroll/payroll-calculator'
 import { careerAllowancesFor, fetchCareerPayPlans } from './career-path/payroll-link'
 import { computeLatePenalties, type LatePenaltySettings } from './payroll/late-penalty'
+import { EmployeeService } from './services/employee-service'
 
 // ══════════════════════════════════════
 // TYPES
@@ -39,6 +40,10 @@ export interface PayrollInput {
   store?: Store
   /** Khoản cộng thêm tính sẵn bên ngoài (vd: cộng lương theo bậc lộ trình), chịu thuế như phụ cấp thường. */
   extraAllowances?: { name: string; amount: number; tax_exempt?: boolean }[]
+  /** Thời hạn hợp đồng để xét thuế TNCN: không HĐ / dưới 3 tháng thì khấu trừ 10%, từ 3 tháng thì tính lũy tiến. */
+  contractTerm?: 'khong_hop_dong' | 'duoi_3_thang' | 'tu_3_thang'
+  /** Đã nộp bản cam kết mẫu 08/CK-TNCN (thu nhập cả năm chưa tới mức chịu thuế) → không khấu trừ 10%. */
+  pitCommitment08?: boolean
 }
 
 export interface FnbAllocationBreakdown {
@@ -136,6 +141,8 @@ export interface PayrollResult {
   tax: number
   /** Số người phụ thuộc đã dùng khi tính thuế (để tính lại thuế khi thưởng/phạt thay đổi trên bảng lương). */
   pit_dependents?: number
+  /** Số ngày lễ, Tết nghỉ được trả lương (toàn thời gian). */
+  holiday_paid_days?: number
 
   // Final
   gross_salary: number
@@ -155,22 +162,12 @@ export interface PayrollResult {
 // ══════════════════════════════════════
 
 const STANDARD_WORK_DAYS = 26
-const LATE_PENALTY = 50000 // 50k per late
 
 const OT_RATES = {
   weekday: 1.5,
   weekend: 2.0,
   holiday: 3.0,
 }
-
-// Vietnamese Public Holidays
-const VN_HOLIDAYS = [
-  '2026-01-01', // Tết Dương lịch
-  '2026-01-28', '2026-01-29', '2026-01-30', '2026-01-31', '2026-02-01', // Tết Nguyên đán
-  '2026-04-30', // Giải phóng
-  '2026-05-01', // Quốc tế Lao động
-  '2026-09-02', // Quốc khánh
-]
 
 export function isWeekendDay(dateStr?: string): boolean {
   if (!dateStr) return false
@@ -179,9 +176,16 @@ export function isWeekendDay(dateStr?: string): boolean {
   return day === 0 || day === 6
 }
 
-export function isHolidayDay(dateStr?: string): boolean {
+/** Ngày nghỉ lễ, Tết lấy từ Cài đặt lương (CEO/HR nhập theo thông báo Nhà nước). Để trống = không có ngày lễ. */
+export function getPolicyHolidayDates(policy?: ReturnType<typeof getActivePayrollPolicy>): Set<string> {
+  const p = policy ?? getActivePayrollPolicy()
+  const list = Array.isArray(p.holidays) ? p.holidays : []
+  return new Set(list.map(h => (h && typeof h.date === 'string' ? h.date.trim() : '')).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)))
+}
+
+export function isHolidayDay(dateStr?: string, holidayDates?: Set<string>): boolean {
   if (!dateStr) return false
-  return VN_HOLIDAYS.includes(dateStr)
+  return (holidayDates ?? getPolicyHolidayDates()).has(dateStr)
 }
 
 // Leave types considered "paid"
@@ -433,6 +437,10 @@ export interface AttendanceSummaryForPayroll {
   overtimeHoursHoliday?: number
   /** Giờ làm trong giờ chuẩn vào ngày lễ (full-time được trả thêm cho đủ mức ngày lễ). */
   holidayRegularHours?: number
+  /** Các ngày có đi làm (dùng để biết ngày lễ nào nhân viên nghỉ). */
+  workedDateList?: string[]
+  /** Các ngày nghỉ phép (có hoặc không lương). */
+  leaveDateList?: string[]
   totalHours: number
   soCaChoDuyet: number
   soCaChuaCheckOut: number
@@ -468,9 +476,13 @@ export function parseTimeToHours(timeStr?: string): number | null {
 /** Đọc cài đặt phạt đi trễ (giữ đúng giá trị mặc định cũ khi chưa cài). */
 function getLatePenaltySettings(policy: ReturnType<typeof getActivePayrollPolicy>): LatePenaltySettings {
   const lp = policy.latePenaltyPolicy
+  // Chỉ giữ cách đúng luật (Điều 127 BLLĐ cấm phạt tiền): không trả lương phút trễ, hoặc không trừ tiền.
+  const rawMode = lp?.mode ?? 'none'
+  const mode = rawMode === 'fixed' || rawMode === 'tiered' ? 'per_minute' : rawMode
+  const rawMult = Number(lp?.perMinuteMultiplier)
   return {
-    mode: lp?.mode ?? 'fixed',
-    graceOccurrences: lp?.graceOccurrences ?? 2,
+    mode,
+    graceOccurrences: lp?.graceOccurrences ?? 0,
     fixedAmount: lp?.fixedAmount ?? policy.rates?.latePenaltyPerOccurrence ?? 50000,
     tier1MaxMinutes: lp?.tier1MaxMinutes ?? 15,
     tier1Amount: lp?.tier1Amount ?? 20000,
@@ -478,7 +490,7 @@ function getLatePenaltySettings(policy: ReturnType<typeof getActivePayrollPolicy
     tier2Amount: lp?.tier2Amount ?? 50000,
     tier3Amount: lp?.tier3Amount ?? 100000,
     tier3HalfShiftDeduction: lp?.tier3HalfShiftDeduction,
-    perMinuteMultiplier: lp?.perMinuteMultiplier ?? 1,
+    perMinuteMultiplier: rawMult > 0 && rawMult < 1 ? rawMult : 1,
     perMinuteMaxPerOccurrence: lp?.perMinuteMaxPerOccurrence ?? 0,
     perMinuteApplyToPartTime: lp?.perMinuteApplyToPartTime ?? false,
   }
@@ -504,6 +516,8 @@ function summarizeAttendanceRecords(
   const dailyHoursMap = new Map<string, number>()
   const dailyRecordedOtMap = new Map<string, number>()
   const anomalies: PayrollAnomaly[] = []
+  const holidayDates = getPolicyHolidayDates()
+  const leaveDates = new Set<string>()
 
   for (const r of records) {
     const isPendingApproval = r.soCaChoDuyet || r.trang_thai_db === 'cho_duyet'
@@ -542,6 +556,7 @@ function summarizeAttendanceRecords(
         lateCount++
         break
       case 'leave':
+        if (r.date) leaveDates.add(r.date)
         if (r.leave_type && PAID_LEAVE_TYPES.includes(r.leave_type)) {
           leavePaid++
         } else {
@@ -555,7 +570,7 @@ function summarizeAttendanceRecords(
     const otH = r.overtime_hours || 0
     overtimeHours += otH
     if (otH > 0) {
-      if (isHolidayDay(r.date)) {
+      if (isHolidayDay(r.date, holidayDates)) {
         overtimeHoursHoliday += otH
       } else if (isWeekendDay(r.date)) {
         overtimeHoursWeekend += otH
@@ -579,13 +594,13 @@ function summarizeAttendanceRecords(
   let holidayRegularHours = 0
   for (const [date, dayHours] of dailyHoursMap) {
     const recordedOt = dailyRecordedOtMap.get(date) ?? 0
-    if (isHolidayDay(date)) {
+    if (isHolidayDay(date, holidayDates)) {
       holidayRegularHours += Math.min(Math.max(dayHours - recordedOt, 0), stdHoursPerDay)
     }
     if (recordedOt > 0 || dayHours <= stdHoursPerDay) continue
     const extra = Math.round((dayHours - stdHoursPerDay) * 100) / 100
     overtimeHours += extra
-    if (isHolidayDay(date)) overtimeHoursHoliday += extra
+    if (isHolidayDay(date, holidayDates)) overtimeHoursHoliday += extra
     else if (isWeekendDay(date)) overtimeHoursWeekend += extra
     else overtimeHoursWeekday += extra
   }
@@ -705,6 +720,8 @@ function summarizeAttendanceRecords(
     overtimeHoursWeekend,
     overtimeHoursHoliday,
     holidayRegularHours,
+    workedDateList: Array.from(workedDates),
+    leaveDateList: Array.from(leaveDates),
     totalHours,
     soCaChoDuyet,
     soCaChuaCheckOut,
@@ -985,6 +1002,44 @@ function getOtherDeductions(
 // 6. MAIN: CALCULATE PAYROLL
 // ══════════════════════════════════════
 
+/** Đếm ngày lễ trong kỳ mà nhân viên toàn thời gian nghỉ (không đi làm, không ghi nghỉ phép) để trả lương ngày lễ. */
+export function countPaidHolidayOffDays(
+  att: Pick<AttendanceSummaryForPayroll, 'workedDateList' | 'leaveDateList'>,
+  periodStart: string,
+  periodEnd: string,
+  hireDate?: string,
+  resignDate?: string,
+  holidayDates?: Set<string>,
+): number {
+  const worked = new Set(att.workedDateList ?? [])
+  const leave = new Set(att.leaveDateList ?? [])
+  let count = 0
+  for (const date of holidayDates ?? getPolicyHolidayDates()) {
+    if (date < periodStart || date > periodEnd) continue
+    if (hireDate && date < hireDate.slice(0, 10)) continue
+    if (resignDate && date > resignDate.slice(0, 10)) continue
+    if (worked.has(date) || leave.has(date)) continue
+    count++
+  }
+  return count
+}
+
+/** Thông tin thuế khai trong hồ sơ nhân viên (thời hạn hợp đồng, cam kết 08, người phụ thuộc). */
+export function getEmployeeTaxProfile(employeeId: string): Pick<PayrollInput, 'contractTerm' | 'pitCommitment08' | 'dependents'> {
+  try {
+    const profile = EmployeeService.getEmployeeById(employeeId)
+    if (!profile) return {}
+    const term = profile.pit_contract_term
+    return {
+      contractTerm: term === 'khong_hop_dong' || term === 'duoi_3_thang' || term === 'tu_3_thang' ? term : undefined,
+      pitCommitment08: profile.pit_commitment_08 === true,
+      dependents: typeof profile.dependents_count === 'number' ? profile.dependents_count : undefined,
+    }
+  } catch {
+    return {}
+  }
+}
+
 export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   const { employeeId, periodStart, periodEnd } = input
   const policy = getActivePayrollPolicy()
@@ -1053,6 +1108,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   let absentDeduction = 0
   // Phần chênh lệch tiền tăng ca so với giờ thường được miễn thuế TNCN
   let overtimeTaxExempt = 0
+  let holidayOffDays = 0
 
   if (isPartTime) {
     const hourlyRate = baseSalary > 0 ? baseSalary : 0
@@ -1067,16 +1123,21 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
       overtimeMultiplier: ptMultiplier,
     })
     baseEarned = hourlyCalc.baseEarned
-    overtimeAmount = hourlyCalc.overtimeAmount
-    overtimeTaxExempt = calculateOvertimeTaxExemption(overtimeAmount, ptOt, hourlyRate)
+    // Làm vào ngày lễ: giờ đã trả 100%, trả thêm phần chênh cho đủ hệ số ngày lễ trong Cài đặt (mặc định 300%)
+    const ptHolidayRate = policy.rates?.otHoliday || 3.0
+    const ptHolidayPremium = Math.round((att.holidayRegularHours || 0) * hourlyRate * Math.max(0, ptHolidayRate - 1))
+    overtimeAmount = hourlyCalc.overtimeAmount + ptHolidayPremium
+    overtimeTaxExempt = calculateOvertimeTaxExemption(hourlyCalc.overtimeAmount, ptOt, hourlyRate) + ptHolidayPremium
     overtimeHoursToReport = ptOt
     dailyRate = 0
     absentDeduction = 0
   } else {
-    const effectiveDays = att.workDays + att.leavePaid
+    // Ngày lễ, Tết trong kỳ mà nhân viên nghỉ (không đi làm, không ghi nghỉ phép) vẫn được trả lương (Điều 112 BLLĐ)
+    holidayOffDays = countPaidHolidayOffDays(att, periodStart, periodEnd, emp?.hire_date, emp?.resign_date)
+    const effectiveDays = att.workDays + att.leavePaid + holidayOffDays
     // Lương cơ bản tối đa đủ số ngày công chuẩn; ngày làm vượt chuẩn trả theo hệ số ngày nghỉ (mặc định 200%)
     const paidDays = Math.min(effectiveDays, standardDays)
-    const extraDays = Math.max(0, att.workDays - Math.max(0, standardDays - att.leavePaid))
+    const extraDays = Math.max(0, att.workDays - Math.max(0, standardDays - att.leavePaid - holidayOffDays))
     baseEarned = Math.round(baseSalary * (paidDays / standardDays))
     const restDayRate = policy.rates?.otWeekend || 2.0
     const extraDaysAmount = Math.round((baseSalary / standardDays) * extraDays * restDayRate)
@@ -1092,9 +1153,12 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
       ? policy.standardHoursPerDay
       : 8
     const normalHourlyRate = baseSalary / standardDays / standardHoursPerDay
-    // Làm trong giờ chuẩn vào ngày lễ: lương ngày đã có 100%, trả thêm phần chênh cho đủ hệ số ngày lễ (mặc định 300%)
+    // Làm trong giờ chuẩn vào ngày lễ (Điều 98 BLLĐ): ngày đó đã tính 100% (lương ngày lễ),
+    // trả thêm đủ hệ số ngày lễ trong Cài đặt (mặc định 300%) → tổng 400%.
     const holidayRate = policy.rates?.otHoliday || 3.0
-    const holidayPremium = Math.round((att.holidayRegularHours || 0) * normalHourlyRate * Math.max(0, holidayRate - 1))
+    const holidayPremium = Math.round((att.holidayRegularHours || 0) * normalHourlyRate * holidayRate)
+    // Phần 100% tương ứng giờ làm bình thường vẫn chịu thuế; phần cao hơn được miễn thuế
+    const holidayPremiumTaxExempt = Math.round((att.holidayRegularHours || 0) * normalHourlyRate * Math.max(0, holidayRate - 1))
     overtimeAmount = otWeekdayAmt + otWeekendAmt + otHolidayAmt + extraDaysAmount + holidayPremium
     overtimeHoursToReport = att.overtimeHours
     const extraDaysHours = extraDays * standardHoursPerDay
@@ -1104,8 +1168,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
       normalHourlyRate,
     )
       + calculateOvertimeTaxExemption(extraDaysAmount, extraDaysHours, normalHourlyRate)
-      // Phần trả thêm ngày lễ đều là phần chênh so với lương thường nên được miễn thuế toàn bộ
-      + holidayPremium
+      + holidayPremiumTaxExempt
 
     dailyRate = Math.round(baseSalary / standardDays)
     absentDeduction = att.absentDays * dailyRate
@@ -1125,12 +1188,8 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   const fnbShare = fnbAllocation?.share ?? 0
 
   // ── Step 7: Deductions
-  const latePenaltyRate = (typeof policy.rates?.latePenaltyPerOccurrence === 'number' && policy.rates.latePenaltyPerOccurrence >= 0)
-    ? policy.rates.latePenaltyPerOccurrence
-    : LATE_PENALTY
-  const lateDeduction = att.totalLatePenalty !== undefined
-    ? att.totalLatePenalty
-    : att.lateCount * latePenaltyRate
+  // Không còn phạt tiền cố định mỗi lần đi trễ (trái Điều 127 BLLĐ); chỉ trừ theo cài đặt đúng luật.
+  const lateDeduction = att.totalLatePenalty ?? 0
   const advanceDeduction = getAdvanceDeduction(employeeId, periodStart)
   const otherDeductions = getOtherDeductions(employeeId, periodStart)
   const totalOtherDeductions = otherDeductions.reduce((sum, d) => sum + d.amount, 0)
@@ -1148,7 +1207,11 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   // (hoặc không đi làm ngày nào trong tháng: effectiveDays === 0), tháng đó không đóng BHXH.
   const effectiveDaysForInsurance = isPartTime ? att.workDays : (att.workDays + att.leavePaid)
   const isUnpaidExempt = !isPartTime && (effectiveDaysForInsurance === 0 || effectiveDaysForInsurance <= standardDays - 14)
-  const shouldCalculateInsurance = (input.hasInsurance ?? (!isPartTime)) && !isUnpaidExempt
+  // Bán thời gian (Luật BHXH 2024, từ 01/07/2025): lương tháng từ mức trong Cài đặt trở lên thì bắt buộc đóng.
+  // Để trống mức này thì chỉ đóng khi hồ sơ nhân viên bật "Tham gia bảo hiểm".
+  const ptInsuranceMin = policy.legal?.partTimeInsuranceMinMonthlySalary
+  const ptMustInsure = isPartTime && typeof ptInsuranceMin === 'number' && ptInsuranceMin > 0 && baseEarned >= ptInsuranceMin
+  const shouldCalculateInsurance = (ptMustInsure || (input.hasInsurance ?? (!isPartTime))) && !isUnpaidExempt
   const insurance = shouldCalculateInsurance
     ? calculateInsurance(insuranceBase)
     : { bhxh: 0, bhyt: 0, bhtn: 0, total: 0 }
@@ -1161,7 +1224,20 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     .reduce((sum, a) => sum + a.amount, 0)
   const grossSalary = totalEarnings
   const taxableIncome = Math.max(0, grossSalary - insurance.total - nonTaxableAllowances - overtimeTaxExempt)
-  const tax = calculateTax(taxableIncome, input.dependents ?? 0, { isPartTime, grossPaid: grossSalary })
+  // Khấu trừ 10% chỉ áp cho người không có hợp đồng hoặc hợp đồng dưới 3 tháng (Thông tư 111/2013).
+  // Hồ sơ chưa ghi thời hạn hợp đồng: bán thời gian vẫn khấu trừ 10% như trước, toàn thời gian tính lũy tiến.
+  const contractTerm = input.contractTerm
+  const flatWithholding = contractTerm === 'khong_hop_dong' || contractTerm === 'duoi_3_thang'
+    || (contractTerm === undefined && isPartTime)
+  const tax = flatWithholding && input.pitCommitment08 === true
+    ? 0
+    : calculateTax(taxableIncome, input.dependents ?? 0, { isPartTime: flatWithholding, grossPaid: grossSalary })
+  if (isPartTime && contractTerm === undefined) {
+    anomalies.push({
+      type: 'thieu_thoi_han_hop_dong',
+      message: 'Hồ sơ chưa ghi thời hạn hợp đồng: đang tạm khấu trừ thuế 10%. Nếu hợp đồng từ 3 tháng trở lên, cập nhật hồ sơ để tính thuế lũy tiến.',
+    })
+  }
 
   // ── Step 11: Net Salary
   // Advance payment is deducted from net payout, NOT from taxable income
@@ -1227,6 +1303,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     taxable_income: taxableIncome,
     tax,
     pit_dependents: input.dependents ?? 0,
+    holiday_paid_days: holidayOffDays,
 
     gross_salary: grossSalary,
     net_salary: netSalary,
@@ -1264,6 +1341,7 @@ export function calculatePayrollBatch(
       periodEnd,
       fnbAllocations,
       contractType: emp.contract_type,
+      ...getEmployeeTaxProfile(emp.id),
     }),
   )
 }
@@ -1297,6 +1375,7 @@ export async function calculatePayrollBatchAsync(
         periodEnd,
         fnbAllocations,
         contractType: emp.contract_type,
+        ...getEmployeeTaxProfile(emp.id),
         extraAllowances: careerAllowancesFor(careerPlans, emp.id, emp.contract_type === 'ban_thoi_gian', periodStart, periodEnd, attendanceRecords),
         attendanceSummary: summarizeAttendanceRecords(
           attendanceRecords.filter(record => record.employee_id === emp.id),
@@ -1412,6 +1491,8 @@ export async function calculatePayrollBatchAsync(
         periodEnd,
         fnbAllocations,
         contractType: payrollEmp?.loai_hop_dong,
+        contractTerm: getEmployeeTaxProfile(emp.id).contractTerm,
+        pitCommitment08: getEmployeeTaxProfile(emp.id).pitCommitment08,
         hasInsurance: payrollEmp?.tham_gia_bao_hiem ?? undefined,
         dependents: payrollEmp?.so_nguoi_phu_thuoc ?? undefined,
         employee: emp,

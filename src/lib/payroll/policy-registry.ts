@@ -276,18 +276,17 @@ export const POLICY_REGISTRY: PolicyFieldDef[] = [
   },
   {
     path: 'latePenaltyPolicy.mode',
-    labelVi: 'Chế độ tính phạt đi muộn',
-    helpVi: 'Lựa chọn phương thức phạt: cố định mỗi lần, bậc thang số phút, trừ theo phút hoặc không phạt tiền',
+    labelVi: 'Cách xử lý đi muộn',
+    helpVi: 'Luật không cho phạt tiền (Điều 127 Bộ luật Lao động): chỉ được không trả lương cho những phút không làm, hoặc không xét thưởng chuyên cần',
     type: 'enum',
     options: [
-      { value: 'fixed', labelVi: 'Phạt cố định mỗi lần' },
-      { value: 'tiered', labelVi: 'Phạt theo bậc thang số phút' },
-      { value: 'per_minute', labelVi: 'Trừ theo số phút trễ × đơn giá' },
-      { value: 'none', labelVi: 'Không phạt tiền (chỉ ghi nhận)' },
+      { value: 'per_minute', labelVi: 'Không trả lương những phút đến trễ' },
+      { value: 'none', labelVi: 'Không trừ tiền (chỉ ghi nhận)' },
     ],
     affectsMoney: true,
     requiresApproval: false,
-    defaultValue: 'fixed',
+    legalRefVi: 'Điều 127 Bộ luật Lao động',
+    defaultValue: 'none',
   },
   {
     path: 'latePenaltyPolicy.graceOccurrences',
@@ -578,6 +577,20 @@ export function migratePolicy(raw: unknown): PayrollPolicy {
     if (currentVal === undefined || currentVal === null || (typeof currentVal === 'number' && isNaN(currentVal))) {
       setPolicyValueByPath(result, field.path, field.defaultValue)
     }
+  }
+
+  // Luật không cho phạt tiền khi đi trễ (Điều 127 BLLĐ): cài đặt cũ "phạt cố định" / "bậc thang"
+  // được chuyển sang "không trả lương những phút đến trễ"; hệ số > 1 (trừ nhiều hơn số phút) đưa về 1.
+  if (result.latePenaltyPolicy && typeof result.latePenaltyPolicy === 'object') {
+    const lp = { ...result.latePenaltyPolicy }
+    if (lp.mode === 'fixed' || lp.mode === 'tiered') {
+      lp.legacyMode = lp.mode
+      lp.mode = 'per_minute'
+    }
+    if (typeof lp.perMinuteMultiplier !== 'number' || !(lp.perMinuteMultiplier > 0) || lp.perMinuteMultiplier > 1) {
+      lp.perMinuteMultiplier = 1
+    }
+    result.latePenaltyPolicy = lp
   }
 
   // Đảm bảo đồng bộ 2 chiều giữa root standardDaysPerMonth và work.standardDaysPerMonth

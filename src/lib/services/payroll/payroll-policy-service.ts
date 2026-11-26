@@ -107,8 +107,15 @@ export type PayrollPolicy = {
     perMinuteApplyToPartTime?: boolean
     /** Số lần đi trễ tối đa trong tháng mà vẫn giữ thưởng chuyên cần (mặc định 0). */
     attendanceBonusMaxLate?: number
+    /** Cách phạt cũ (cố định / bậc thang) trước khi chuyển sang cách đúng luật, để báo cho người dùng. */
+    legacyMode?: 'fixed' | 'tiered'
   }
   netRoundingMethod?: 'none' | 'round_1000' | 'round_5000' | 'round_10000'
+  /**
+   * Danh sách ngày nghỉ lễ, Tết (YYYY-MM-DD) do CEO/HR nhập theo thông báo của Nhà nước mỗi năm.
+   * Để trống = không có ngày lễ nào được tính.
+   */
+  holidays?: PayrollHoliday[]
   shiftRules?: {
     partTimeShiftHours?: number
     fullTimeShiftHours?: number
@@ -127,7 +134,17 @@ export type PayrollPolicy = {
     partTimeFlatTaxEnabled?: boolean
     partTimeFlatTaxRate?: number
     partTimeFlatTaxThreshold?: number
+    /**
+     * Mức lương tháng tối thiểu để nhân viên bán thời gian bắt buộc đóng bảo hiểm.
+     * Để trống = không tự tính bảo hiểm cho bán thời gian (chỉ theo ô "Tham gia bảo hiểm" của từng người).
+     */
+    partTimeInsuranceMinMonthlySalary?: number
   }
+}
+
+export type PayrollHoliday = {
+  date: string
+  name: string
 }
 
 export type PayrollPolicyHistoryEntry = {
@@ -245,7 +262,7 @@ export function buildDefaultPayrollPolicy(): PayrollPolicy {
       latePenaltyPerOccurrence: 25000,
     },
     latePenaltyPolicy: {
-      mode: 'tiered',
+      mode: 'none',
       graceOccurrences: 0,
       fixedAmount: 25000,
       tier1MaxMinutes: 15,

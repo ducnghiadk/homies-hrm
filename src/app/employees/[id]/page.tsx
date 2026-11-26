@@ -36,6 +36,8 @@ type EmployeeProfileExtras = {
   kpi_salary?: number
   has_insurance?: boolean
   dependents_count?: number
+  pit_contract_term?: '' | 'khong_hop_dong' | 'duoi_3_thang' | 'tu_3_thang'
+  pit_commitment_08?: boolean
   marital_status?: string
 }
 
@@ -71,6 +73,8 @@ type EditFormData = {
   kpi_salary: string
   has_insurance: boolean
   dependents_count: string
+  pit_contract_term: '' | 'khong_hop_dong' | 'duoi_3_thang' | 'tu_3_thang'
+  pit_commitment_08: boolean
 }
 
 type EditFormErrors = Partial<Record<keyof EditFormData, string>>
@@ -258,6 +262,8 @@ const buildEditForm = (employee: AuthUser, profile?: EmployeeProfileExtras): Edi
   kpi_salary: profile?.kpi_salary ? String(profile.kpi_salary) : '',
   has_insurance: Boolean(profile?.has_insurance),
   dependents_count: profile?.dependents_count !== undefined ? String(profile.dependents_count) : '0',
+  pit_contract_term: profile?.pit_contract_term || '',
+  pit_commitment_08: profile?.pit_commitment_08 === true,
 })
 
 export default function EmployeeDetailPage() {
@@ -355,6 +361,8 @@ export default function EmployeeDetailPage() {
     kpi_salary: '',
     has_insurance: false,
     dependents_count: '0',
+    pit_contract_term: '',
+    pit_commitment_08: false,
   })
 
   const employeeId = params.id as string
@@ -589,6 +597,8 @@ export default function EmployeeDetailPage() {
         kpi_salary: editForm.kpi_salary ? Number(editForm.kpi_salary) : undefined,
         has_insurance: editForm.has_insurance,
         dependents_count: editForm.dependents_count ? Number(editForm.dependents_count) : 0,
+        pit_contract_term: editForm.pit_contract_term || undefined,
+        pit_commitment_08: editForm.pit_commitment_08,
       }
       if (salaryToSave !== undefined) {
         profileUpdates.official_salary = salaryToSave
@@ -1316,6 +1326,33 @@ export default function EmployeeDetailPage() {
                         className={getInputClassName(false)}
                         placeholder="0"
                       />
+                    </FormField>
+
+                    <FormField label="Thời hạn hợp đồng (để tính thuế TNCN)">
+                      <select
+                        value={editForm.pit_contract_term}
+                        onChange={e => setEditForm({ ...editForm, pit_contract_term: e.target.value as EditFormData['pit_contract_term'] })}
+                        className={getInputClassName(false)}
+                      >
+                        <option value="">Chưa ghi</option>
+                        <option value="khong_hop_dong">Không ký hợp đồng lao động</option>
+                        <option value="duoi_3_thang">Hợp đồng dưới 3 tháng</option>
+                        <option value="tu_3_thang">Hợp đồng từ 3 tháng trở lên</option>
+                      </select>
+                      <span className="mt-1 block text-[11px] text-gray-500">
+                        Không hợp đồng hoặc dưới 3 tháng: khấu trừ 10%. Từ 3 tháng trở lên: tính thuế lũy tiến có giảm trừ gia cảnh.
+                      </span>
+                    </FormField>
+
+                    <FormField label="Cam kết thu nhập (mẫu 08/CK-TNCN)">
+                      <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={editForm.pit_commitment_08}
+                          onChange={e => setEditForm({ ...editForm, pit_commitment_08: e.target.checked })}
+                        />
+                        Đã nộp bản cam kết (không khấu trừ 10%)
+                      </label>
                     </FormField>
                   </>
                 )}
