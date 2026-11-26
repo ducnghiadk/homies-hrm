@@ -3,7 +3,7 @@
 
 import { CAREER_GRADE_CODES, gradeOrder, type CareerGradeCode, type CareerPathSettings, type CareerPositionCode } from './settings.ts'
 import type { CareerGradeHistoryEntry, CareerPlacement } from './placement.ts'
-import type { EligibilityResult } from './eligibility.ts'
+import { isKpiCheck, type EligibilityResult } from './eligibility.ts'
 
 export type PromotionStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
@@ -28,6 +28,14 @@ export interface PromotionProposal {
   decision_note: string
   /** Ngày bậc mới có hiệu lực (YYYY-MM-DD), chỉ có khi đã duyệt. */
   effective_date: string
+  /** Dấu vết nhắc việc khi quá hạn phản hồi. */
+  reminder?: ProposalReminderState
+}
+
+export interface ProposalReminderState {
+  count: number
+  last_on: string
+  escalated_on: string
 }
 
 export interface Actor {
@@ -67,6 +75,9 @@ export function createProposal(
   const exception = !eligibility.ready
   if (exception && !rules.allow_exception) {
     return { ok: false, errors: ['Nhân viên chưa đủ điều kiện và Cài đặt đang không cho đề xuất ngoại lệ.'] }
+  }
+  if (settings.kpi?.when_not_met === 'block' && eligibility.checks.some((c) => isKpiCheck(c) && !c.ok)) {
+    return { ok: false, errors: ['Nhân viên chưa đạt KPI vận hành. Cài đặt đang chặn đề xuất khi chưa đạt KPI.'] }
   }
   const minLen = exception ? rules.exception_reason_min_chars : rules.reason_min_chars
   if (reason.length < minLen) {

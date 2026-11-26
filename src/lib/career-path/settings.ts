@@ -33,6 +33,28 @@ export interface CareerGradeRequirement {
   common_required: boolean
 }
 
+/** Giới hạn KPI vận hành để lên bậc này, tính trong N tháng gần nhất. null = không xét. */
+export interface CareerGradeKpi {
+  max_late_count: number | null
+  max_late_minutes: number | null
+  max_no_show: number | null
+  max_missing_checkout: number | null
+  /** Tổng điểm lỗi cá nhân đã duyệt (sổ lỗi BSC) tối đa. */
+  max_error_points: number | null
+  /** Có lỗi nghiêm trọng (khóa thưởng) đã duyệt thì chưa đủ điều kiện. */
+  block_serious_error: boolean
+}
+
+export type KpiWhenNotMet = 'block' | 'exception'
+
+/** Cách xét KPI chung cho mọi bậc. */
+export interface CareerKpiConfig {
+  /** Xét KPI trong bao nhiêu tháng gần nhất (0 = chưa cài, không xét KPI). */
+  lookback_months: number
+  /** Chưa đạt KPI: chặn đề xuất, hay vẫn cho đề xuất ngoại lệ kèm lý do. */
+  when_not_met: KpiWhenNotMet
+}
+
 export interface CareerGradeConfig {
   code: CareerGradeCode
   label: string
@@ -44,6 +66,7 @@ export interface CareerGradeConfig {
   /** Số tiền cộng thêm mỗi tháng so với G1, dùng cho Full-time khi chọn cách "cố định". */
   ft_monthly_vs_g1_vnd: number
   requirement: CareerGradeRequirement
+  kpi: CareerGradeKpi
 }
 
 export interface CareerSkillConfig {
@@ -111,6 +134,21 @@ export interface CareerRulesConfig {
   ft_mid_month: FtMidMonth
 }
 
+/** Nhắc người duyệt khi đề xuất nâng bậc quá hạn phản hồi (chuông thông báo trong ứng dụng). */
+export interface CareerReminderConfig {
+  enabled: boolean
+  /** Nhắc lại sau mỗi bao nhiêu ngày (0 = chỉ nhắc một lần). */
+  repeat_every_days: number
+  /** Nhắc tối đa bao nhiêu lần cho mỗi đề xuất (0 = không giới hạn). */
+  max_times: number
+  /** Chỉ gửi nhắc từ giờ này trở đi trong ngày, giờ Việt Nam (null = giờ nào cũng được). */
+  send_hour: number | null
+  /** Quá hạn thêm bao nhiêu ngày làm việc thì báo lên cấp trên (0 = không báo lên). */
+  escalate_after_days: number
+  /** Báo lên những vai trò nào. */
+  escalate_roles: string[]
+}
+
 export interface CareerPathSettings {
   version: number
   updated_at: string
@@ -127,6 +165,8 @@ export interface CareerPathSettings {
   common_pass_level: number
   approval: CareerApprovalConfig
   rules: CareerRulesConfig
+  kpi: CareerKpiConfig
+  reminders: CareerReminderConfig
   m1: CareerM1Config
 }
 
@@ -137,6 +177,15 @@ const req = (r: Partial<CareerGradeRequirement>): CareerGradeRequirement => ({
   advanced_min_level: null,
   common_required: false,
   ...r,
+})
+
+export const emptyGradeKpi = (): CareerGradeKpi => ({
+  max_late_count: null,
+  max_late_minutes: null,
+  max_no_show: null,
+  max_missing_checkout: null,
+  max_error_points: null,
+  block_serious_error: false,
 })
 
 export function getDefaultCareerPathSettings(): CareerPathSettings {
@@ -150,11 +199,11 @@ export function getDefaultCareerPathSettings(): CareerPathSettings {
       { code: 'barista', label: 'Pha chế' },
     ],
     grades: [
-      { code: 'T0', label: 'Hội nhập', description: 'Tháng đầu: học luồng đơn, nội quy, ATTP.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
-      { code: 'G1', label: 'Nền tảng', description: 'Làm các nghiệp vụ cơ bản đã học của vị trí chính.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
-      { code: 'G2', label: 'Chuyên môn', description: 'Thành thạo vị trí chính, hỗ trợ được vị trí còn lại.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
-      { code: 'G3', label: 'Đa nhiệm', description: 'Thành thạo vị trí chính, độc lập toàn bộ vị trí thứ hai.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
-      { code: 'G4', label: 'Chủ chốt', description: 'Thành thạo cả hai vị trí, phòng ngừa lỗi và hướng dẫn.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
+      { code: 'T0', label: 'Hội nhập', description: 'Tháng đầu: học luồng đơn, nội quy, ATTP.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}), kpi: emptyGradeKpi() },
+      { code: 'G1', label: 'Nền tảng', description: 'Làm các nghiệp vụ cơ bản đã học của vị trí chính.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}), kpi: emptyGradeKpi() },
+      { code: 'G2', label: 'Chuyên môn', description: 'Thành thạo vị trí chính, hỗ trợ được vị trí còn lại.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}), kpi: emptyGradeKpi() },
+      { code: 'G3', label: 'Đa nhiệm', description: 'Thành thạo vị trí chính, độc lập toàn bộ vị trí thứ hai.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}), kpi: emptyGradeKpi() },
+      { code: 'G4', label: 'Chủ chốt', description: 'Thành thạo cả hai vị trí, phòng ngừa lỗi và hướng dẫn.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}), kpi: emptyGradeKpi() },
     ],
     ft_pay_method: 'fixed_monthly',
     payroll_link_enabled: false,
@@ -182,6 +231,8 @@ export function getDefaultCareerPathSettings(): CareerPathSettings {
       pay_taxable: true,
       ft_mid_month: 'prorate_days',
     },
+    kpi: { lookback_months: 0, when_not_met: 'exception' },
+    reminders: { enabled: false, repeat_every_days: 0, max_times: 0, send_hour: null, escalate_after_days: 0, escalate_roles: ['ceo'] },
     m1: { enabled: true, full_time_only: true, min_grade: 'G4' },
   }
 }
@@ -218,6 +269,10 @@ export function validateCareerPathSettings(s: CareerPathSettings): string[] {
     const r = g.requirement
     if (![r.main_min_level, r.support_min_level, r.second_min_level, r.advanced_min_level].every(isLevelOrNull)) {
       errors.push(`${name}: mức kỹ năng yêu cầu phải từ 0 đến 3.`)
+    }
+    const k = g.kpi
+    if (k && ![k.max_late_count, k.max_late_minutes, k.max_no_show, k.max_missing_checkout, k.max_error_points].every((v) => v === null || isWholeNonNegative(v))) {
+      errors.push(`${name}: giới hạn KPI phải là số nguyên không âm (để trống = không xét).`)
     }
     const prev = s.grades[i - 1]
     if (prev) {
@@ -263,6 +318,22 @@ export function validateCareerPathSettings(s: CareerPathSettings): string[] {
   if (!['all_attendance', 'confirmed_schedule', 'confirmed_plus_approved'].includes(r?.hours_source)) errors.push('Cách chọn giờ được tính không hợp lệ.')
   if (r?.legacy_hours !== 'count' && r?.legacy_hours !== 'skip') errors.push('Cách xử lý giờ chấm công cũ không hợp lệ.')
   if (r?.ft_mid_month !== 'prorate_days' && r?.ft_mid_month !== 'grade_at_period_end') errors.push('Cách tính Full-time đổi bậc giữa tháng không hợp lệ.')
+  const kc = s.kpi
+  if (!isWholeNonNegative(kc?.lookback_months)) errors.push('Số tháng xét KPI phải là số nguyên không âm.')
+  if (kc?.when_not_met !== 'block' && kc?.when_not_met !== 'exception') errors.push('Cách xử lý khi chưa đạt KPI không hợp lệ.')
+  const usesKpi = s.grades.some((g) => g.kpi && (g.kpi.block_serious_error || [g.kpi.max_late_count, g.kpi.max_late_minutes, g.kpi.max_no_show, g.kpi.max_missing_checkout, g.kpi.max_error_points].some((v) => v !== null)))
+  if (usesKpi && isWholeNonNegative(kc?.lookback_months) && kc.lookback_months < 1) {
+    errors.push('Có bậc đặt giới hạn KPI: hãy nhập số tháng xét KPI (từ 1 trở lên) ở tab KPI & vận hành.')
+  }
+  const rm = s.reminders
+  if (!isWholeNonNegative(rm?.repeat_every_days) || !isWholeNonNegative(rm?.max_times) || !isWholeNonNegative(rm?.escalate_after_days)) {
+    errors.push('Các con số nhắc việc phải là số nguyên không âm.')
+  }
+  if (rm && rm.send_hour !== null && !(isWholeNonNegative(rm.send_hour) && rm.send_hour <= 23)) errors.push('Giờ gửi nhắc phải từ 0 đến 23.')
+  if (rm?.enabled && !(s.approval.respond_within_working_days > 0)) {
+    errors.push('Bật nhắc việc thì cần nhập hạn phản hồi đề xuất (số ngày làm việc) ở tab Đánh giá & duyệt.')
+  }
+  if (rm?.enabled && rm.escalate_after_days > 0 && !rm.escalate_roles?.length) errors.push('Chọn ít nhất một vai trò nhận báo lên khi quá hạn.')
   const a = s.approval
   if (!a.approver_roles?.length) errors.push('Phải chọn ít nhất một vai trò được duyệt nâng bậc.')
   if (!a.assessor_roles?.length) errors.push('Phải chọn ít nhất một vai trò được đánh giá.')
@@ -283,7 +354,7 @@ export function normalizeCareerPathSettings(raw: Partial<CareerPathSettings> | n
   const grades = CAREER_GRADE_CODES.map((code) => {
     const base = d.grades.find((g) => g.code === code)!
     const saved = Array.isArray(raw.grades) ? raw.grades.find((g) => g?.code === code) : undefined
-    return saved ? { ...base, ...saved, code, requirement: { ...base.requirement, ...(saved.requirement || {}) } } : base
+    return saved ? { ...base, ...saved, code, requirement: { ...base.requirement, ...(saved.requirement || {}) }, kpi: { ...base.kpi, ...(saved.kpi || {}) } } : base
   })
   return {
     ...d,
@@ -293,6 +364,8 @@ export function normalizeCareerPathSettings(raw: Partial<CareerPathSettings> | n
     skills: Array.isArray(raw.skills) && raw.skills.length > 0 ? raw.skills : d.skills,
     approval: { ...d.approval, ...(raw.approval || {}) },
     rules: { ...d.rules, ...(raw.rules || {}) },
+    kpi: { ...d.kpi, ...(raw.kpi || {}) },
+    reminders: { ...d.reminders, ...(raw.reminders || {}) },
     m1: { ...d.m1, ...(raw.m1 || {}) },
     payroll_link_enabled: raw.payroll_link_enabled === true,
     // Bản đã lưu trước khi có cờ này (có updated_at) coi như đã cài đặt.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, type ServerNotification } from '@/lib/server/db'
+import { runCareerReminders } from '@/lib/server/career-reminders'
 import { isNotificationForUser, isNotificationReadBy, markNotificationReadBy } from '@/lib/server/career-notify'
 
 export async function GET(req: NextRequest) {
@@ -11,6 +12,12 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20', 10)
 
     const db = await getServerDb()
+    // Nhắc việc lộ trình quá hạn: chạy bù khi có người mở thông báo (mỗi đề xuất tối đa 1 lần/ngày).
+    try {
+      if (runCareerReminders(db) > 0) await saveServerDb(db)
+    } catch (err) {
+      console.error('[API /api/notifications] career reminders:', err)
+    }
     // Chỉ trả thông báo chung và thông báo gửi đúng người / đúng vai trò.
     const uid = gate.user.userId
     const list: ServerNotification[] = (db.notifications || [])

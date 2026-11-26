@@ -1,6 +1,6 @@
 'use client'
 
-import type { CareerProgressSummary } from '@/lib/career-path/eligibility'
+import { isKpiCheck, type CareerProgressSummary } from '@/lib/career-path/eligibility'
 import { GRADE_BADGE, cardClass } from './career-ui'
 
 interface Props {
@@ -39,8 +39,8 @@ export default function EligibilityPanel({ summary, hint, bare }: Props) {
         <div className={`h-full rounded-full ${eligibility.ready ? 'bg-emerald-500' : 'bg-[#2F6FA8]'}`} style={{ width: `${(done / total) * 100}%` }} />
       </div>
       <ul className="mt-3 space-y-2">
-        {eligibility.checks.map((c) => (
-          <li key={c.key} className="flex items-start gap-2 text-sm">
+        {eligibility.checks.map((c, i) => (
+          <li key={c.key} className={`flex items-start gap-2 text-sm ${isKpiCheck(c) && !isKpiCheck(eligibility.checks[i - 1] ?? { key: 'setup' }) ? 'border-t border-gray-100 pt-2' : ''}`}>
             <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] ${c.ok ? 'bg-emerald-500 text-white' : 'border border-gray-300 text-transparent'}`}>✓</span>
             <span className="min-w-0">
               <span className={c.ok ? 'text-[#001D3D]' : 'font-medium text-[#001D3D]'}>{c.label}</span>
@@ -49,6 +49,7 @@ export default function EligibilityPanel({ summary, hint, bare }: Props) {
           </li>
         ))}
       </ul>
+      {summary.store_bsc && <StoreBscNote b={summary.store_bsc} />}
       {summary.hours_breakdown && summary.hours_breakdown.source !== 'all_attendance' && (
         <HoursBreakdownNote b={summary.hours_breakdown} />
       )}
@@ -69,6 +70,17 @@ function HoursBreakdownNote({ b }: { b: NonNullable<CareerProgressSummary['hours
     <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
       <span className="font-semibold text-[#001D3D]">Giờ được tính:</span> {parts.join(' + ')}.
       {removed.length > 0 && <span className="block text-amber-700">Không tính: {removed.join(', ')}.</span>}
+    </div>
+  )
+}
+
+function StoreBscNote({ b }: { b: NonNullable<CareerProgressSummary['store_bsc']> }) {
+  const [y, m] = b.period.split('-')
+  return (
+    <div className="mt-3 rounded-lg border border-gray-100 px-3 py-2 text-xs text-gray-600">
+      <span className="font-semibold text-[#001D3D]">BSC cửa hàng tháng {m}/{y}{b.store_name ? ` (${b.store_name})` : ''}:</span>{' '}
+      {b.unlocked ? `đã mở quỹ thưởng${b.coefficient !== null ? `, hệ số ${b.coefficient}` : ''}` : 'chưa mở quỹ thưởng'}.
+      <span className="block text-gray-500">Chỉ để tham khảo, không dùng để xét bậc.</span>
     </div>
   )
 }

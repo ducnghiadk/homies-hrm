@@ -5,6 +5,7 @@
  */
 import type {
   CareerGradeCode,
+  CareerGradeKpi,
   CareerGradeRequirement,
   CareerPathSettings,
   CareerPositionCode,
@@ -66,6 +67,24 @@ const req = (r: Partial<CareerGradeRequirement>): CareerGradeRequirement => ({
   ...r,
 })
 
+const kpi = (k: Partial<CareerGradeKpi>): CareerGradeKpi => ({
+  max_late_count: null,
+  max_late_minutes: null,
+  max_no_show: null,
+  max_missing_checkout: null,
+  max_error_points: null,
+  block_serious_error: false,
+  ...k,
+})
+
+/** Gợi ý KPI vận hành theo bậc (trong 3 tháng gần nhất). Bậc càng cao càng chặt. */
+const KPI_SUGGESTION: Partial<Record<CareerGradeCode, CareerGradeKpi>> = {
+  G1: kpi({ max_late_count: 4, max_no_show: 1, max_missing_checkout: 3, max_error_points: 6, block_serious_error: true }),
+  G2: kpi({ max_late_count: 3, max_no_show: 0, max_missing_checkout: 2, max_error_points: 4, block_serious_error: true }),
+  G3: kpi({ max_late_count: 2, max_no_show: 0, max_missing_checkout: 1, max_error_points: 3, block_serious_error: true }),
+  G4: kpi({ max_late_count: 1, max_no_show: 0, max_missing_checkout: 1, max_error_points: 2, block_serious_error: true }),
+}
+
 const GRADE_SUGGESTION: Record<CareerGradeCode, { min_months: number; min_hours: number; hourly_step_vnd: number; ft_monthly_vs_g1_vnd: number; requirement: CareerGradeRequirement }> = {
   T0: { min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
   G1: { min_months: 1, min_hours: 120, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({ main_min_level: 1, common_required: true }) },
@@ -80,7 +99,8 @@ export function applyPlaybookV7Suggestion(s: CareerPathSettings): CareerPathSett
     ...s,
     grades: s.grades.map((g) => {
       const sug = GRADE_SUGGESTION[g.code]
-      return sug ? { ...g, ...sug, requirement: { ...sug.requirement } } : g
+      const k = KPI_SUGGESTION[g.code]
+      return sug ? { ...g, ...sug, requirement: { ...sug.requirement }, kpi: k ? { ...k } : g.kpi } : g
     }),
     common_pass_level: 2,
     approval: {
@@ -95,6 +115,17 @@ export function applyPlaybookV7Suggestion(s: CareerPathSettings): CareerPathSett
       reason_min_chars: 5,
       exception_reason_min_chars: 20,
       non_working_weekdays: [0],
+      hours_source: 'confirmed_plus_approved',
+      legacy_hours: 'count',
+    },
+    kpi: { lookback_months: 3, when_not_met: 'exception' },
+    reminders: {
+      enabled: true,
+      repeat_every_days: 1,
+      max_times: 3,
+      send_hour: 8,
+      escalate_after_days: 2,
+      escalate_roles: ['ceo'],
     },
   }
 }
