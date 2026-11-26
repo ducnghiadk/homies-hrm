@@ -10,7 +10,6 @@ import {
   type Position,
   type Store,
 } from './mock-data'
-import { mockRevenueByMonth, mockRevenueByStore } from './mock-data-p4'
 import {
   mockBonuses, mockDeductions, mockAdvances,
   type SalarySlipData,
@@ -135,6 +134,8 @@ export interface PayrollResult {
   // Tax
   taxable_income: number
   tax: number
+  /** Số người phụ thuộc đã dùng khi tính thuế (để tính lại thuế khi thưởng/phạt thay đổi trên bảng lương). */
+  pit_dependents?: number
 
   // Final
   gross_salary: number
@@ -200,10 +201,6 @@ const FNB_POSITION_WEIGHTS: Record<string, number> = {
   'pos-005': 1.18,
 }
 
-function getPayrollMonth(periodStart: string): string {
-  return periodStart.slice(0, 7)
-}
-
 export const DEFAULT_PAYROLL_PERIOD = '2026-02'
 
 export function normalizePayrollPeriod(value: string | null): string {
@@ -228,15 +225,18 @@ export function getPayrollPeriodBounds(period: string): {
   }
 }
 
-function getStoreRevenueForPeriod(storeId: string, periodStart: string): { name: string; revenue: number } {
-  const base = mockRevenueByStore.find((store) => store.store_id === storeId)
+/**
+ * Doanh thu thật của từng cửa hàng trong kỳ (VNĐ). Chỉ dùng khi bên gọi truyền vào;
+ * không bao giờ đoán từ dữ liệu mẫu. Thiếu doanh thu thật thì quỹ tip = 0.
+ */
+export type StoreRevenueByStore = Record<string, number>
+
+function getStoreRevenueForPeriod(storeId: string, storeRevenues?: StoreRevenueByStore): { name: string; revenue: number } {
   const store = mockStores.find((item) => item.id === storeId)
-  const baseRevenue = mockRevenueByStore.reduce((sum, store) => sum + store.revenue, 0)
-  const monthRevenue = mockRevenueByMonth.find((item) => item.month === getPayrollMonth(periodStart))?.revenue
-  const scale = baseRevenue > 0 && monthRevenue ? monthRevenue / baseRevenue : 1
+  const raw = storeRevenues ? Number(storeRevenues[storeId]) : 0
   return {
-    name: store?.name ?? base?.name ?? storeId,
-    revenue: Math.round((base?.revenue ?? 0) * scale),
+    name: store?.name ?? storeId,
+    revenue: Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 0,
   }
 }
 
@@ -276,10 +276,13 @@ function buildFnbPayrollAllocations(
   periodStart: string,
   periodEnd: string,
   employees: Employee[],
-  attendanceRecords?: PayrollAttendanceRecord[]
+  attendanceRecords?: PayrollAttendanceRecord[],
+  storeRevenues?: StoreRevenueByStore,
 ): Record<string, FnbPayrollAllocation> {
   const policy = getActivePayrollPolicy()
   if (policy.fnb.serviceChargePoolRate <= 0 || policy.fnb.tipPoolRate <= 0) return {}
+  // Không có doanh thu thật thì không chia tip (trước đây đoán từ doanh thu mẫu → tip giả).
+  if (!storeRevenues || !Object.values(storeRevenues).some((value) => Number(value) > 0)) return {}
 
   const activeEmployees = employees.filter((e) => e.status !== 'inactive' && e.role !== 'ceo')
   const employeeMap = new Map(activeEmployees.map((employee) => [employee.id, employee]))
@@ -301,11 +304,11 @@ function buildFnbPayrollAllocations(
     if (!employee) continue
 
     const storeId = attendance.store_id || employee.store_id
-    const storeRevenueInfo = getStoreRevenueForPeriod(storeId, periodStart)
+    const storeRevenueInfo = getStoreRevenueForPeriod(storeId, storeRevenues)
     const shiftId = inferShiftId(employee, attendance)
     const shiftName = getShiftName(shiftId)
     const points = getFnbContributionPoints(employee, attendance)
-    if (points <= 0) continue
+    if (points <= 0 || storeRevenueInfo.revenue <= 0) continue
 
     const bucketKey = `${storeId}:${shiftId}`
     const bucket = shiftBuckets.get(bucketKey) ?? {
@@ -1001,7 +1004,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   } else {
     baseSalary = policyGrade?.base_salary ?? pos?.base_salary ?? 0
   }
-  const storeName = input.store?.name ?? (emp ? getStoreRevenueForPeriod(emp.store_id, periodStart).name : '')
+  const storeName = input.store?.name ?? (emp ? getStoreRevenueForPeriod(emp.store_id).name : '')
 
   // ── Step 2: Attendance
   const rawAtt = input.attendanceSummary ?? getPayrollAttendanceSummary(employeeId, periodStart, periodEnd)
@@ -1029,6 +1032,14 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
     } else {
       anomalies.push({ type: 'thieu_luong_co_ban', message: 'Nhân viên chưa được cài đặt mức lương cơ bản (đang lấy giá trị 0đ).' })
     }
+  }
+  // Cảnh báo đơn giá giờ thấp hơn lương tối thiểu theo giờ trong Cài đặt (để trống = không kiểm tra)
+  const minHourlyWage = policy.legal?.minHourlyWage
+  if (isPartTime && baseSalary > 0 && typeof minHourlyWage === 'number' && minHourlyWage > 0 && baseSalary < minHourlyWage) {
+    anomalies.push({
+      type: 'duoi_luong_toi_thieu',
+      message: `Đơn giá ${baseSalary.toLocaleString('vi-VN')}đ/giờ thấp hơn lương tối thiểu theo giờ trong Cài đặt (${minHourlyWage.toLocaleString('vi-VN')}đ/giờ).`,
+    })
   }
   if (!input.contractType) {
     anomalies.push({ type: 'thieu_loai_hop_dong', message: 'Nhân viên chưa được gắn loại hợp đồng (Toàn thời gian/Bán thời gian).' })
@@ -1215,6 +1226,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
 
     taxable_income: taxableIncome,
     tax,
+    pit_dependents: input.dependents ?? 0,
 
     gross_salary: grossSalary,
     net_salary: netSalary,
@@ -1339,7 +1351,7 @@ export async function calculatePayrollBatchAsync(
       }
       return employee.chuc_vu_luong_co_ban > 0
         ? Math.round(employee.chuc_vu_luong_co_ban / 26 / 8)
-        : 22500
+        : 0 // Không đoán đơn giá: để 0 để bảng lương báo "Thiếu đơn giá giờ"
     }
     return employee.muc_luong_co_ban > 0 ? employee.muc_luong_co_ban : employee.chuc_vu_luong_co_ban
   }

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 import { mockStores, mockEmployees, mockPositions, type Employee } from '@/lib/mock-data'
 import { mockPayrollPeriods, formatVND } from '@/lib/mock-data-p4'
-import { calculatePayrollBatchAsync, getPayrollPeriodBounds, parseTimeToHours, type LateIncident } from '@/lib/payroll-engine'
+import { calculatePayrollBatchAsync, calculateTax, getPayrollPeriodBounds, parseTimeToHours, type LateIncident } from '@/lib/payroll-engine'
 import { AttendanceService, type PayrollAttendanceRecord } from '@/lib/services/attendance/attendance-service'
 import { getInitials } from '@/lib/utils'
 import { payrollAdapter, storeAdapter, employeeAdapter, MasterDataAdapter } from '@/lib/adapters'
@@ -182,6 +182,7 @@ type ApiSalarySlip = {
   bonus?: number
   deductions?: number
   late_deduction?: number
+  bsc_bonus?: number
   net_salary?: number
   total_hours?: number
   status?: string
@@ -227,6 +228,8 @@ const ANOMALY_CONFIG: Record<string, { label: string; severity: 'error' | 'warni
   thieu_loai_hop_dong: { label: 'Thiếu loại hợp đồng',                   severity: 'warning' },
   ca_chua_duyet:       { label: 'Ca chưa được duyệt',                   severity: 'warning' },
   quen_checkout:       { label: 'Quên check-out',                        severity: 'warning' },
+  duoi_luong_toi_thieu: { label: 'Đơn giá giờ thấp hơn lương tối thiểu', severity: 'warning' },
+  luong_am:            { label: 'Khấu trừ vượt thu nhập (thực nhận để 0đ)', severity: 'error' },
 }
 
 export default function PayrollPage() {
@@ -285,6 +288,8 @@ export default function PayrollPage() {
   const [employees, setEmployees] = useState<PayrollEmployee[]>(mockEmployees)
   const [positions, setPositions] = useState(mockPositions)
   const [payrollResults, setPayrollResults] = useState<Awaited<ReturnType<typeof calculatePayrollBatchAsync>>>([])
+  // Thưởng BSC đã duyệt (lưu riêng trên máy chủ) để cộng vào lương KPI khi tính lại bảng lương
+  const [bscBonusByEmployee, setBscBonusByEmployee] = useState<Record<string, number>>({})
   const [isPayrollLoading, setIsPayrollLoading] = useState(true)
   const [payrollError, setPayrollError] = useState<string | null>(null)
   const [policyUnavailable, setPolicyUnavailable] = useState(false)
@@ -376,6 +381,7 @@ export default function PayrollPage() {
     setIsPayrollLoading(true)
     setPayrollError(null)
     setPayrollResults([])
+    setBscBonusByEmployee({})
 
     const loadPayrollData = async () => {
       try {
@@ -383,19 +389,29 @@ export default function PayrollPage() {
         const apiRes = await fetch(`/api/payroll?period=${selectedPeriod}`)
         if (apiRes.ok) {
           const apiData = await apiRes.json()
-          if (apiData?.success && Array.isArray(apiData.salary_slips) && apiData.salary_slips.length > 0) {
+          const serverSlips: ApiSalarySlip[] = apiData?.success && Array.isArray(apiData.salary_slips) ? apiData.salary_slips : []
+          const bscMap: Record<string, number> = {}
+          serverSlips.forEach(s => {
+            if ((s.bsc_bonus || 0) > 0) bscMap[s.employee_id] = (bscMap[s.employee_id] || 0) + (s.bsc_bonus || 0)
+          })
+          if (isMounted) setBscBonusByEmployee(bscMap)
+          // Chỉ dùng phiếu đã lưu làm số chốt khi kỳ lương đã khóa sổ.
+          // Kỳ chưa khóa luôn tính lại theo chấm công + Cài đặt (phiếu nháp chưa có thuế/bảo hiểm).
+          const periodLocked = (Array.isArray(apiData?.summaries) && apiData.summaries.some((sm: { status?: string }) => sm.status === 'locked'))
+            || (serverSlips.length > 0 && serverSlips.every(s => s.status === 'locked'))
+          if (periodLocked && serverSlips.length > 0) {
             if (!isMounted) return
             const sourceEmployees: PayrollEmployee[] = employees.length > 0 ? employees : (mockEmployees as PayrollEmployee[])
             const sourcePositions = positions.length > 0 ? positions : mockPositions
             const sourceStores = stores.length > 0 ? stores : mockStores
 
-            const mappedResults = apiData.salary_slips.map((s: ApiSalarySlip) => {
+            const mappedResults = serverSlips.map((s: ApiSalarySlip) => {
               const emp = sourceEmployees.find(e => e.id === s.employee_id) || (mockEmployees.find(e => e.id === s.employee_id) as PayrollEmployee | undefined)
               const pos = sourcePositions.find(p => p.id === emp?.position_id)
               const slipStoreId = s.store_id || emp?.store_id || 'store-001'
               const store = sourceStores.find(st => st.id === slipStoreId)
               const isPartTime = (s.base_salary === 0 && ((s.total_hours || 0) > 0 || (s.net_salary || 0) > 0)) || emp?.contract_type === 'ban_thoi_gian' || s.position?.includes('pha chế') || s.position?.includes('phục vụ') || false
-              const hourlyRate = (emp as PayrollEmployee)?.hourly_rate || (isPartTime && (s.total_hours || 0) > 0 ? Math.round(((s.net_salary || 0) - (s.bonus || 0)) / (s.total_hours || 1)) : (isPartTime ? 20000 : 0))
+              const hourlyRate = (emp as PayrollEmployee)?.hourly_rate || (isPartTime && (s.total_hours || 0) > 0 ? Math.round(((s.net_salary || 0) - (s.bonus || 0)) / (s.total_hours || 1)) : 0)
 
               return {
                 employee_id: s.employee_id,
@@ -444,6 +460,7 @@ export default function PayrollPage() {
                 tax: 0,
                 gross_salary: s.net_salary || 0,
                 net_salary: s.net_salary || 0,
+                locked_net: s.net_salary || 0,
                 kpi_salary: 0,
                 union_fee: 0,
                 hold_salary: 0,
@@ -644,7 +661,8 @@ export default function PayrollPage() {
       const totalPenalties = res.late_deduction
       const deductionTickets = deductionOverrides[emp.id] !== undefined ? deductionOverrides[emp.id] : res.total_other_deductions
 
-      const kpiSalary = res.kpi_salary || 0
+      const lockedNet = (res as { locked_net?: number }).locked_net
+      const kpiSalary = (res.kpi_salary || 0) + (lockedNet === undefined ? (bscBonusByEmployee[emp.id] || 0) : 0)
       const unionFee = res.union_fee || 0
       const fnbShare = res.fnb_fnb_share || 0
       // Standard Gross Salary = Total earnings before statutory & disciplinary deductions
@@ -653,8 +671,25 @@ export default function PayrollPage() {
       const holdSalary = res.hold_salary || 0
       const advanceSalary = res.advance_deduction
 
+      // Thưởng nhập tay / thưởng KPI làm đổi thu nhập chịu thuế → tính lại thuế theo Cài đặt thuế.
+      // Phiếu trừ tiền không được trừ khỏi thu nhập chịu thuế nên không làm đổi thuế.
+      const extraTaxable = (bonusTickets - (res.total_bonuses || 0)) + kpiSalary
+      const tax = extraTaxable !== 0
+        ? calculateTax(Math.max(0, res.taxable_income + extraTaxable), res.pit_dependents ?? 0, { isPartTime: res.is_part_time, grossPaid: grossSalary })
+        : res.tax
+
       // Net Salary = Gross - Insurance - Tax - Penalties - Deduction Tickets - Advance - Hold + ReturnHold - UnionFee
-      const netSalary = grossSalary - res.total_insurance - res.tax - totalPenalties - deductionTickets - advanceSalary - holdSalary + returnHoldSalary - unionFee
+      const rawNetSalary = grossSalary - res.total_insurance - tax - totalPenalties - deductionTickets - advanceSalary - holdSalary + returnHoldSalary - unionFee
+      // Không trả lương âm: phần khấu trừ vượt thu nhập được gắn cảnh báo để quản lý xử lý.
+      // Kỳ đã khóa sổ: giữ đúng số thực nhận đã chốt trên máy chủ.
+      const netSalary = lockedNet !== undefined ? lockedNet : Math.max(0, rawNetSalary)
+      const rowAnomalies = [...(res.anomalies || []).filter(a => a.type !== 'luong_am')]
+      if (lockedNet === undefined && rawNetSalary < 0) {
+        rowAnomalies.push({
+          type: 'luong_am',
+          message: `Khấu trừ vượt thu nhập ${Math.abs(Math.round(rawNetSalary)).toLocaleString('vi-VN')}đ. Thực nhận để 0đ, phần thiếu cần chuyển sang kỳ sau hoặc thu lại.`,
+        })
+      }
       const netRoundingRule = getActivePayrollPolicy().netRoundingMethod ?? 'round_1000'
       const roundedNet = applyNetRounding(netSalary, netRoundingRule)
 
@@ -720,19 +755,19 @@ export default function PayrollPage() {
         holdSalary,
         advanceSalary,
         insurance: res.total_insurance,
-        tax: res.tax,
+        tax,
          netSalary,
          roundedNet,
          status,
          bankAccount,
          isResigned: res.is_resigned_employee,
          pendingShifts: res.soCaChoDuyet,
-         anomalies: res.anomalies || [],
+         anomalies: rowAnomalies,
          lateCount: res.late_count,
          lateIncidents: res.late_incidents || [],
        }
     }).filter((row): row is PayrollTableRow => row !== null)
-  }, [selectedPeriod, payrollResults, employees, positions, stores, bonusOverrides, deductionOverrides, statusOverrides, statusPeriod, user])
+  }, [selectedPeriod, payrollResults, employees, positions, stores, bonusOverrides, deductionOverrides, statusOverrides, statusPeriod, user, bscBonusByEmployee])
 
   const pendingSummary = useMemo(() => {
     const pendingRows = tableData.filter(r => r.pendingShifts > 0)

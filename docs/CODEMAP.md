@@ -59,6 +59,7 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `src/app/api/contracts/[id]/route.ts`: GET & PUT chi tiet, cap nhat ky duyet (e-signature canvas), gia han va thanh ly hop dong.
   + `src/components/contracts/SignaturePadModal.tsx`: bang ve cam ung ngon tay ky dien tu tren dien thoai va may tinh.
   + `src/components/contracts/ContractPrintA4Modal.tsx`: xem truoc va in an hop dong A4 chuan phap ly luu tru thanh tra lao dong.
+  + `src/app/api/payroll/policy/route.ts`: GET doc / POST (CEO, HR) luu toan bo Cai dat luong tren may chu (`payroll_policy`) de moi may dung chung mot cau hinh.
   + `src/app/api/payroll/tax-settings/route.ts`: GET doc / POST (CEO, HR) luu cai dat thue TNCN tren may chu (`payroll_tax_settings`), dung cho tam khau tru thue thuong BSC.
   + `src/lib/payroll/pit.ts`: ham thue TNCN thuan dung chung (giam tru, bieu luy tien, khau tru 10% part-time, mien thue phan chenh tang ca, tam khau tru thue thuong).
   + `src/components/payroll/PitSettingsPanel.tsx`: khoi cai dat thue TNCN trong `/settings/payroll` (muc giam tru, bieu thue, khau tru part-time).

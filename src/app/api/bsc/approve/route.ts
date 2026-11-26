@@ -228,7 +228,10 @@ export async function POST(req: NextRequest) {
       // Không sửa phiếu lương đã khóa sổ
       if (slipIdx >= 0 && db.salary_slips[slipIdx].status !== 'locked') {
         const currentSlip = db.salary_slips[slipIdx]
-        const oldBonus = currentSlip.bonus || 0
+        // Thưởng BSC lưu riêng ở bsc_bonus để lưu phiếu lương (phiếu cộng tiền tay) không ghi đè mất.
+        // Phiếu cũ (trước khi tách) đã ghi thưởng BSC vào `bonus` kèm bonus_tax_withheld.
+        const isLegacyBsc = currentSlip.bsc_bonus === undefined && currentSlip.bonus_tax_withheld !== undefined
+        const oldBonus = isLegacyBsc ? (currentSlip.bonus || 0) : (currentSlip.bsc_bonus || 0)
         const newBonus = bscBonus
 
         // Bảo toàn phần thực nhận trước thưởng BSC (hoàn lại thuế đã tạm khấu trừ của lần duyệt trước)
@@ -248,7 +251,8 @@ export async function POST(req: NextRequest) {
 
         db.salary_slips[slipIdx] = {
           ...currentSlip,
-          bonus: newBonus,
+          ...(isLegacyBsc ? { bonus: 0 } : {}),
+          bsc_bonus: newBonus,
           bonus_tax_withheld: bonusTax,
           net_salary: netSalary,
           needs_recalculation: true,
@@ -263,6 +267,37 @@ export async function POST(req: NextRequest) {
           bonus_tax_withheld: bonusTax,
           net_salary: netSalary,
         })
+      } else if (slipIdx < 0 && bscBonus > 0 && resultEmp) {
+        // Chưa có phiếu lương kỳ này: tạo phiếu nháp chỉ giữ thưởng BSC để không mất thưởng.
+        // Lương, thuế, bảo hiểm sẽ được tính đầy đủ khi kế toán bấm Tính lương.
+        db.salary_slips.push({
+          id: `slip-${period}-${resultEmp.id}`,
+          employee_id: resultEmp.id,
+          employee_name: resultEmp.full_name,
+          employee_code: resultEmp.employee_code || '',
+          position: '',
+          store_id: resultEmp.store_id || store_id,
+          period,
+          work_days: 0,
+          standard_days: 0,
+          base_salary: 0,
+          allowances: 0,
+          bonus: 0,
+          bsc_bonus: bscBonus,
+          deductions: 0,
+          net_salary: 0,
+          status: 'draft',
+          needs_recalculation: true,
+          updated_by: gate.user.userId,
+          updated_at: nowIso,
+        })
+        distributedBonuses.push({
+          employee_id: resultEmp.id,
+          employee_name: resultEmp.full_name,
+          bonus_amount: bscBonus,
+          bonus_tax_withheld: 0,
+          net_salary: 0,
+        })
       }
     }
 
@@ -275,7 +310,7 @@ export async function POST(req: NextRequest) {
         s => s.store_id === store_id && s.period === period
       )
       const totalNet = storeSlips.reduce((sum, s) => sum + s.net_salary, 0)
-      const totalBonus = storeSlips.reduce((sum, s) => sum + (s.bonus || 0), 0)
+      const totalBonus = storeSlips.reduce((sum, s) => sum + (s.bonus || 0) + (s.bsc_bonus || 0), 0)
 
       if (summaryIdx >= 0) {
         db.payroll_summaries[summaryIdx].total_net = totalNet

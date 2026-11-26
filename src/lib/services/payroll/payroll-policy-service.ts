@@ -119,6 +119,8 @@ export type PayrollPolicy = {
     dependentDeduction: number
     minRegionSalary: number
     maxInsuranceSalary: number
+    /** Lương tối thiểu theo giờ cho nhân viên bán thời gian. Để trống = không kiểm tra. */
+    minHourlyWage?: number
     /** Biểu thuế TNCN lũy tiến theo tháng; thiếu thì dùng mặc định trong `@/lib/payroll/pit`. */
     taxBrackets?: PitBracket[]
     /** Khấu trừ cố định cho lao động bán thời gian / HĐ dưới 3 tháng. */
@@ -318,10 +320,50 @@ export function saveStoredPayrollPolicy(policy: PayrollPolicy, organizationId: s
   }
 }
 
+/** Đọc cài đặt lương đã lưu trên máy chủ (/api/payroll/policy). Trả null nếu chưa lưu hoặc lỗi mạng. */
+async function fetchServerPayrollPolicy(organizationId: string): Promise<PayrollPolicy | null> {
+  if (typeof window === 'undefined') return null
+  try {
+    const res = await fetch('/api/payroll/policy', { credentials: 'include', cache: 'no-store' })
+    if (!res.ok) return null
+    const json = await res.json()
+    if (!json?.success || !json.data) return null
+    const policy = migratePolicy(json.data)
+    saveStoredPayrollPolicy(policy, organizationId)
+    return policy
+  } catch (err) {
+    console.warn('[PayrollPolicy] Không đọc được cài đặt lương từ máy chủ:', err)
+    return null
+  }
+}
+
+/** Lưu cài đặt lương lên máy chủ để mọi máy dùng chung. */
+async function saveServerPayrollPolicy(policy: PayrollPolicy): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  try {
+    const res = await fetch('/api/payroll/policy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ policy }),
+    })
+    return res.ok
+  } catch (err) {
+    console.warn('[PayrollPolicy] Không lưu được cài đặt lương lên máy chủ:', err)
+    return false
+  }
+}
+
 export async function fetchRemotePayrollPolicy(
   organizationId: string = 'a0000000-0000-0000-0000-000000000001'
 ): Promise<PayrollPolicy | null> {
   clearLegacyLocalStoragePolicy()
+  // Ưu tiên cài đặt lưu trên máy chủ (dùng chung mọi máy)
+  const serverPolicy = await fetchServerPayrollPolicy(organizationId)
+  if (serverPolicy) {
+    inMemoryActivePolicy = serverPolicy
+    return serverPolicy
+  }
   if (!isSupabaseConfigured || !isRealDbMode()) return null
   try {
     // 1. Đọc key homies-payroll-policy-v1
@@ -392,9 +434,13 @@ export async function syncRemotePayrollPolicy(
   organizationId: string = 'a0000000-0000-0000-0000-000000000001'
 ): Promise<boolean> {
   clearLegacyLocalStoragePolicy()
+  const migrated = migratePolicy(policy)
+  // Lưu lên máy chủ là bắt buộc: thiếu bước này thì máy khác sẽ tính lương theo cài đặt cũ.
+  const serverSaved = await saveServerPayrollPolicy(migrated)
+  if (!serverSaved) return false
+  saveStoredPayrollPolicy(migrated, organizationId)
   if (!isSupabaseConfigured || !isRealDbMode()) return true
   try {
-    const migrated = migratePolicy(policy)
     const { error } = await supabase.from('cau_hinh_to_chuc').upsert({
       to_chuc_id: organizationId,
       khoa: PAYROLL_POLICY_STORAGE_KEY,
@@ -405,14 +451,13 @@ export async function syncRemotePayrollPolicy(
     })
     
     if (error) {
-      console.error('[PayrollPolicy] Sync remote policy failed:', error.message)
-      return false
+      // Đã lưu trên máy chủ, bản sao Supabase chỉ là phụ nên không chặn.
+      console.warn('[PayrollPolicy] Sync remote policy (Supabase) failed:', error.message)
     }
-    saveStoredPayrollPolicy(migrated, organizationId)
     return true
   } catch (err) {
-    console.error('[PayrollPolicy] Sync remote policy exception:', err)
-    return false
+    console.warn('[PayrollPolicy] Sync remote policy (Supabase) exception:', err)
+    return true
   }
 }
 
