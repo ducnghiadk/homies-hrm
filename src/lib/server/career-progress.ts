@@ -12,8 +12,16 @@ export function buildCareerSummary(db: ServerDatabaseSchema, settings: CareerPat
   const employee = db.employees.find((e) => e.id === placement.employee_id)
   const levels = currentSkillLevels(entries, placement.employee_id)
   const mine = entries.filter((e) => e.employee_id === placement.employee_id)
-  const months = fullMonthsBetween(employee?.hire_date || placement.effective_date, today)
-  const hours = Math.round((placement.carried_hours + sumWorkedHours(db.attendance || [], placement.employee_id)) * 100) / 100
+  // Ngày xếp bậc đầu tiên: bản ghi lịch sử sớm nhất, nếu không có thì ngày hiệu lực hiện tại.
+  const firstPlacement = (db.career_grade_history || [])
+    .filter((h) => h.employee_id === placement.employee_id && h.effective_date)
+    .reduce((min, h) => (h.effective_date < min ? h.effective_date : min), placement.effective_date)
+  const rules = settings.rules
+  const monthsStart = rules.months_from === 'first_placement' ? firstPlacement : employee?.hire_date || firstPlacement
+  const months = fullMonthsBetween(monthsStart, today)
+  const hoursFrom = rules.hours_from === 'since_first_placement' ? firstPlacement : undefined
+  const worked = sumWorkedHours(db.attendance || [], placement.employee_id, hoursFrom)
+  const hours = Math.round((placement.carried_hours + worked) * 100) / 100
   return {
     employee_id: placement.employee_id,
     levels,

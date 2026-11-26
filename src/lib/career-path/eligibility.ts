@@ -5,7 +5,7 @@ import { CAREER_GRADE_CODES, gradeOrder, type CareerGradeCode, type CareerPathSe
 import { applicableSkills, type ApplicableBucket, type CurrentSkillLevel } from './assessment.ts'
 
 export interface EligibilityCheck {
-  key: 'months' | 'hours' | ApplicableBucket
+  key: 'setup' | 'months' | 'hours' | ApplicableBucket
   label: string
   ok: boolean
   detail: string
@@ -45,11 +45,16 @@ export function fullMonthsBetween(start: string, today: string): number {
   return Math.max(0, months)
 }
 
-/** Tổng giờ công đã ghi nhận trong hệ thống của 1 nhân viên. */
-export function sumWorkedHours(logs: { employee_id: string; total_hours?: number }[], employeeId: string): number {
+/** Tổng giờ công đã ghi nhận trong hệ thống của 1 nhân viên (tùy chọn: chỉ tính từ ngày fromDate trở đi). */
+export function sumWorkedHours(
+  logs: { employee_id: string; total_hours?: number; date?: string }[],
+  employeeId: string,
+  fromDate?: string,
+): number {
   let total = 0
   for (const log of logs) {
     if (log.employee_id !== employeeId) continue
+    if (fromDate && String(log.date || '') < fromDate) continue
     const h = Number(log.total_hours)
     if (Number.isFinite(h) && h > 0) total += h
   }
@@ -62,11 +67,23 @@ export function evaluateNextGrade(settings: CareerPathSettings, input: Eligibili
   if (!next) return { current: input.grade, next: null, checks: [], ready: false }
   const target = settings.grades.find((g) => g.code === next)
   if (!target) return { current: input.grade, next: null, checks: [], ready: false }
+  if (!settings.configured) {
+    return {
+      current: input.grade,
+      next,
+      checks: [{ key: 'setup', label: 'Chưa cài đặt lộ trình', ok: false, detail: 'CEO/HR cần nhập và lưu cài đặt lộ trình trước khi hệ thống xét bậc' }],
+      ready: false,
+    }
+  }
 
-  const checks: EligibilityCheck[] = [
-    { key: 'months', label: 'Thời gian làm việc', ok: input.months >= target.min_months, detail: `${input.months}/${target.min_months} tháng` },
-    { key: 'hours', label: 'Số giờ đã làm', ok: input.hours >= target.min_hours, detail: `${input.hours}/${target.min_hours} giờ` },
-  ]
+  // Mốc bằng 0 nghĩa là CEO/HR không xét tiêu chí đó.
+  const checks: EligibilityCheck[] = []
+  if (target.min_months > 0) {
+    checks.push({ key: 'months', label: 'Thời gian làm việc', ok: input.months >= target.min_months, detail: `${input.months}/${target.min_months} tháng` })
+  }
+  if (target.min_hours > 0) {
+    checks.push({ key: 'hours', label: 'Số giờ đã làm', ok: input.hours >= target.min_hours, detail: `${input.hours}/${target.min_hours} giờ` })
+  }
 
   const skills = applicableSkills(settings, input.position)
   const r = target.requirement

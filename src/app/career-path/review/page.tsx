@@ -18,6 +18,10 @@ interface Loaded {
   proposals: ProposalRow[]
   canPropose: boolean
   respondWithin: number
+  configured: boolean
+  reasonMin: number
+  allowException: boolean
+  exceptionMin: number
   placements: CareerPlacement[]
   summaries: Map<string, CareerProgressSummary>
   names: Map<string, string>
@@ -36,6 +40,10 @@ async function fetchAll(): Promise<Loaded> {
     proposals: prRes.proposals || [],
     canPropose: Boolean(prRes.can_propose),
     respondWithin: prRes.respond_within_working_days || 0,
+    configured: prRes.configured !== false,
+    reasonMin: Number(prRes.reason_min_chars) || 0,
+    allowException: prRes.allow_exception !== false,
+    exceptionMin: Number(prRes.exception_reason_min_chars) || 0,
     placements: plRes.placements || [],
     summaries: new Map(((asRes.summaries || []) as CareerProgressSummary[]).map((s) => [s.employee_id, s])),
     names: new Map(emps.map((e) => [e.id, e.full_name])),
@@ -115,6 +123,11 @@ export default function CareerReviewPage() {
             <Link href="/career-path/assessment" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-[#001D3D]">Đánh giá kỹ năng</Link>
           </div>
 
+          {data && !data.configured && (
+            <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+              Chưa cài đặt lộ trình. CEO/HR cần nhập và lưu Cài đặt lộ trình thì mới đề xuất nâng bậc được.
+            </div>
+          )}
           {overdue > 0 && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               Có {overdue} đề xuất đã quá {data?.respondWithin} ngày làm việc chưa được phản hồi.
@@ -174,7 +187,7 @@ export default function CareerReviewPage() {
               </section>
               <div>
                 {selected?.s ? (
-                  <ProposePromotionPanel key={selected.p.employee_id} employeeName={selected.name} summary={selected.s} onSubmit={propose(selected.p.employee_id)} onClose={() => setSelectedId(null)} />
+                  <ProposePromotionPanel key={selected.p.employee_id} employeeName={selected.name} summary={selected.s} reasonMin={data?.reasonMin || 0} exceptionMin={data?.exceptionMin || 0} allowException={data?.allowException !== false} onSubmit={propose(selected.p.employee_id)} onClose={() => setSelectedId(null)} />
                 ) : (
                   <section className={`${cardClass} text-sm text-gray-500`}>Chọn một nhân viên để đề xuất nâng bậc.</section>
                 )}

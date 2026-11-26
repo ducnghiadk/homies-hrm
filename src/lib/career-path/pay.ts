@@ -3,7 +3,7 @@
 // Part-time: cộng theo giờ làm thực tế x mức cộng/giờ của bậc tại ngày làm.
 // Full-time: theo Cài đặt "cách cộng lương Full-time" (cố định theo tháng, chia theo số ngày ở mỗi bậc; hoặc theo giờ như Part-time).
 
-import { CAREER_GRADE_CODES, gradeOrder, type CareerGradeCode, type CareerPathSettings, type FullTimePayMethod } from './settings.ts'
+import { CAREER_GRADE_CODES, gradeOrder, type CareerGradeCode, type CareerPathSettings, type FtMidMonth, type FullTimePayMethod } from './settings.ts'
 import type { CareerGradeHistoryEntry, CareerPlacement } from './placement.ts'
 
 /** Một đoạn thời gian nhân viên giữ 1 bậc trong kỳ (từ `from` tới `to`, cả hai đầu, YYYY-MM-DD). */
@@ -20,6 +20,10 @@ export interface CareerPaySegment {
 export interface CareerPayPlan {
   employee_id: string
   ft_pay_method: FullTimePayMethod
+  /** Full-time cộng cố định đổi bậc giữa kỳ: chia theo ngày, hay tính trọn kỳ theo bậc cuối kỳ (theo Cài đặt). */
+  ft_mid_month?: FtMidMonth
+  /** Tiền cộng theo bậc có tính thuế TNCN không (theo Cài đặt). Mặc định có. */
+  taxable?: boolean
   segments: CareerPaySegment[]
 }
 
@@ -78,6 +82,8 @@ export function buildPaySegments(
 export interface CareerPayLine {
   name: string
   amount: number
+  /** true khi Cài đặt chọn tiền cộng theo bậc không tính thuế TNCN. */
+  tax_exempt?: boolean
 }
 
 /**
@@ -90,6 +96,16 @@ export function computeCareerPay(
 ): CareerPayLine[] {
   const byHours = opts.isPartTime || plan.ft_pay_method === 'hourly_x_hours'
   const lines: CareerPayLine[] = []
+  const taxExempt = plan.taxable === false
+  const push = (line: CareerPayLine) => lines.push(taxExempt ? { ...line, tax_exempt: true } : line)
+  if (!byHours && plan.ft_mid_month === 'grade_at_period_end' && plan.segments.length > 0) {
+    const lastSeg = plan.segments[plan.segments.length - 1]
+    // Chỉ tính trọn kỳ khi bậc cuối kỳ còn hiệu lực tới ngày cuối kỳ.
+    if (lastSeg.to === opts.periodEnd && lastSeg.ft_monthly_vnd > 0) {
+      push({ name: `Cộng lương bậc ${lastSeg.grade} (trọn kỳ theo bậc cuối kỳ)`, amount: Math.round(lastSeg.ft_monthly_vnd) })
+    }
+    return lines
+  }
   for (const seg of plan.segments) {
     let amount = 0
     let detail = ''
@@ -105,7 +121,7 @@ export function computeCareerPay(
       amount = Math.round((seg.ft_monthly_vnd * days) / total)
       detail = days === total ? 'cả kỳ' : `${days}/${total} ngày`
     }
-    if (amount > 0) lines.push({ name: `Cộng lương bậc ${seg.grade} (${detail})`, amount })
+    if (amount > 0) push({ name: `Cộng lương bậc ${seg.grade} (${detail})`, amount })
   }
   return lines
 }

@@ -1,10 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getDefaultCareerPathSettings, normalizeCareerPathSettings } from './settings.ts'
+import { applyPlaybookV7Suggestion } from './settings-suggestion.ts'
 import type { CareerGradeHistoryEntry, CareerPlacement } from './placement.ts'
 import { buildPaySegments, computeCareerPay, cumulativeHourlyBonus } from './pay.ts'
 
-const settings = getDefaultCareerPathSettings()
+const settings = { ...applyPlaybookV7Suggestion(getDefaultCareerPathSettings()), configured: true }
 const placement: CareerPlacement = {
   employee_id: 'e1', primary_position: 'cashier', grade_code: 'G3', effective_date: '2026-11-16',
   carried_hours: 0, entry_assessment: 'confirmed', note: '', updated_at: '', updated_by: '',
@@ -38,4 +39,13 @@ test('chưa được xếp bậc trước kỳ thì không cộng; G1 không c�
   const g1 = buildPaySegments(settings, { ...placement, grade_code: 'G1', effective_date: '2026-10-01' }, [], '2026-11-01', '2026-11-30')
   const lines = computeCareerPay({ employee_id: 'e1', ft_pay_method: 'hourly_x_hours', segments: g1 }, { isPartTime: false, periodStart: '2026-11-01', periodEnd: '2026-11-30', workedHours: [{ date: '2026-11-02', hours: 8 }] })
   assert.equal(lines.length, 0)
+})
+
+test('Full-time tính trọn kỳ theo bậc cuối kỳ và tiền cộng không tính thuế theo Cài đặt', () => {
+  const history = [h('G2', '2026-09-01', '1'), h('G3', '2026-11-16', '2')]
+  const segs = buildPaySegments(settings, placement, history, '2026-11-01', '2026-11-30')
+  const plan = { employee_id: 'e1', ft_pay_method: 'fixed_monthly' as const, ft_mid_month: 'grade_at_period_end' as const, taxable: false, segments: segs }
+  const ft = computeCareerPay(plan, { isPartTime: false, periodStart: '2026-11-01', periodEnd: '2026-11-30', workedHours: [] })
+  assert.deepEqual(ft.map((l) => l.amount), [735000])
+  assert.equal(ft[0].tax_exempt, true)
 })

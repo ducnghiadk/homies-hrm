@@ -1,17 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getDefaultCareerPathSettings, normalizeCareerPathSettings, validateCareerPathSettings } from './settings.ts'
+import { applyPlaybookV7Suggestion } from './settings-suggestion.ts'
 import { applicableSkills, applyAssessment, currentSkillLevels } from './assessment.ts'
 import { evaluateNextGrade, fullMonthsBetween, sumWorkedHours } from './eligibility.ts'
 
-const settings = getDefaultCareerPathSettings()
+const settings = { ...applyPlaybookV7Suggestion(getDefaultCareerPathSettings()), configured: true }
 const actor = { id: 'emp-sm', name: 'Quản lý' }
 let n = 0
 const makeId = () => `a-${++n}`
 
-test('mức đạt tiêu chuẩn chung có mặc định và được kiểm tra', () => {
-  assert.equal(normalizeCareerPathSettings({ version: 3 } as never).common_pass_level, 2)
-  assert.ok(validateCareerPathSettings({ ...settings, common_pass_level: 0 }).some((e) => e.includes('tiêu chuẩn chung')))
+test('mức đạt tiêu chuẩn chung để trống mặc định và bắt buộc chọn khi có bậc yêu cầu', () => {
+  assert.equal(normalizeCareerPathSettings({ version: 3 } as never).common_pass_level, 0)
+  assert.ok(validateCareerPathSettings({ ...settings, common_pass_level: 0 }).some((e) => e.includes('SOP / ATTP')))
+  assert.deepEqual(validateCareerPathSettings(getDefaultCareerPathSettings()), [])
 })
 
 test('kỹ năng áp dụng theo vị trí chính Thu ngân', () => {
@@ -69,4 +71,20 @@ test('xét lên G2: đủ tháng/giờ nhưng thiếu kỹ năng thì chưa sẵ
   assert.ok(!missing.ready)
   assert.deepEqual(missing.checks.filter((c) => !c.ok).map((c) => c.key).sort(), ['hours', 'support'])
   assert.equal(evaluateNextGrade(settings, { grade: 'G4', position: 'cashier', levels, months: 9, hours: 999 }).next, null)
+})
+
+test('chưa cài đặt lộ trình thì không xét bậc; mốc bằng 0 là không xét tiêu chí đó', () => {
+  const blank = getDefaultCareerPathSettings()
+  const r = evaluateNextGrade(blank, { grade: 'G1', position: 'cashier', levels: {}, months: 9, hours: 999 })
+  assert.ok(!r.ready)
+  assert.deepEqual(r.checks.map((c) => c.key), ['setup'])
+  const noHours = { ...settings, grades: settings.grades.map((g) => (g.code === 'G2' ? { ...g, min_hours: 0 } : g)) }
+  const r2 = evaluateNextGrade(noHours, { grade: 'G1', position: 'cashier', levels: {}, months: 2, hours: 0 })
+  assert.ok(!r2.checks.some((c) => c.key === 'hours'))
+})
+
+test('đếm giờ chỉ từ ngày xếp bậc đầu khi chọn', () => {
+  const logs = [{ employee_id: 'e1', total_hours: 5, date: '2026-10-01' }, { employee_id: 'e1', total_hours: 3, date: '2026-11-02' }]
+  assert.equal(sumWorkedHours(logs, 'e1'), 8)
+  assert.equal(sumWorkedHours(logs, 'e1', '2026-11-01'), 3)
 })

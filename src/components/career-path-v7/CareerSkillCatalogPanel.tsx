@@ -56,6 +56,7 @@ export default function CareerSkillCatalogPanel({ settings, readOnly, onChange }
           value={settings.common_pass_level}
           onChange={(e) => onChange({ ...settings, common_pass_level: Number(e.target.value) })}
         >
+          <option value={0}>Chưa chọn</option>
           {[1, 2, 3].map((l) => <option key={l} value={l}>Mức {l} trở lên</option>)}
         </select>
       </label>

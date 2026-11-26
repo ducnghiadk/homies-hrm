@@ -5,15 +5,29 @@ import {
   normalizeCareerPathSettings,
   validateCareerPathSettings,
 } from './settings.ts'
+import { applyPlaybookV7Suggestion } from './settings-suggestion.ts'
 import { applyPlacement, type CareerGradeHistoryEntry, type CareerPlacement } from './placement.ts'
 
+const suggested = () => ({ ...applyPlaybookV7Suggestion(getDefaultCareerPathSettings()), configured: true })
 const actor = { id: 'emp-hr', name: 'HR' }
 const now = new Date('2026-11-25T03:00:00.000Z')
 let n = 0
 const makeId = () => `h-${++n}`
 
-test('cấu hình mặc định hợp lệ và đúng Playbook V7', () => {
+test('mặc định để trống mọi con số và chưa cài đặt', () => {
   const s = getDefaultCareerPathSettings()
+  assert.deepEqual(validateCareerPathSettings(s), [])
+  assert.equal(s.configured, false)
+  assert.deepEqual(s.grades.map((g) => g.min_hours), [0, 0, 0, 0, 0])
+  assert.deepEqual(s.grades.map((g) => g.hourly_step_vnd), [0, 0, 0, 0, 0])
+  assert.equal(s.common_pass_level, 0)
+  assert.equal(s.approval.respond_within_working_days, 0)
+  assert.equal(s.rules.reason_min_chars, 0)
+  assert.ok(s.skills.length > 0, 'danh mục kỹ năng (chữ) vẫn có sẵn')
+})
+
+test('nút gợi ý điền đúng số Playbook V7 và hợp lệ', () => {
+  const s = suggested()
   assert.deepEqual(validateCareerPathSettings(s), [])
   assert.deepEqual(s.grades.map((g) => g.code), ['T0', 'G1', 'G2', 'G3', 'G4'])
   assert.deepEqual(s.grades.map((g) => g.min_hours), [0, 120, 240, 480, 720])
@@ -23,7 +37,7 @@ test('cấu hình mặc định hợp lệ và đúng Playbook V7', () => {
 })
 
 test('chặn số giờ bậc sau thấp hơn bậc trước và mức kỹ năng ngoài 0-3', () => {
-  const s = getDefaultCareerPathSettings()
+  const s = suggested()
   s.grades[3].min_hours = 100
   s.grades[2].requirement.main_min_level = 5
   const errors = validateCareerPathSettings(s)
@@ -41,8 +55,11 @@ test('dữ liệu cũ thiếu trường vẫn đọc được', () => {
   const s = normalizeCareerPathSettings({ version: 3, grades: [{ code: 'G2', min_hours: 300 } as never] })
   assert.equal(s.version, 3)
   assert.equal(s.grades.find((g) => g.code === 'G2')!.min_hours, 300)
-  assert.equal(s.grades.find((g) => g.code === 'G2')!.hourly_step_vnd, 1500)
+  assert.equal(s.grades.find((g) => g.code === 'G2')!.hourly_step_vnd, 0)
   assert.equal(s.grades.length, 5)
+  assert.equal(s.configured, false)
+  assert.equal(normalizeCareerPathSettings({ updated_at: '2026-11-25T00:00:00Z' }).configured, true, 'cài đặt đã lưu trước đây coi như đã cài đặt')
+  assert.equal(s.rules.months_from, 'hire_date')
 })
 
 test('xếp bậc lần đầu ghi lịch sử "initial" không cần lý do', () => {

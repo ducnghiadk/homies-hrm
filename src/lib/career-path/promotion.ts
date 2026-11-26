@@ -36,9 +36,6 @@ export interface Actor {
   role: string
 }
 
-export const MIN_PROPOSAL_REASON = 5
-export const MIN_EXCEPTION_REASON = 20
-
 type Fail = { ok: false; errors: string[] }
 
 const isYmd = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`))
@@ -53,12 +50,14 @@ export function canApproveGrade(settings: CareerPathSettings, role: string, toGr
 
 export function createProposal(
   proposals: PromotionProposal[],
-  input: { placement: CareerPlacement; store_id: string; eligibility: EligibilityResult; months: number; hours: number; reason: unknown },
+  input: { settings: CareerPathSettings; placement: CareerPlacement; store_id: string; eligibility: EligibilityResult; months: number; hours: number; reason: unknown },
   actor: Actor,
   now: Date = new Date(),
   makeId: () => string = () => `cpp-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`
 ): { ok: true; proposals: PromotionProposal[]; proposal: PromotionProposal } | Fail {
-  const { placement, eligibility } = input
+  const { placement, eligibility, settings } = input
+  const rules = settings.rules
+  if (!settings.configured) return { ok: false, errors: ['Chưa cài đặt lộ trình. CEO/HR cần lưu Cài đặt lộ trình trước khi đề xuất nâng bậc.'] }
   const reason = typeof input.reason === 'string' ? input.reason.trim() : ''
   if (placement.employee_id === actor.id) return { ok: false, errors: ['Không được tự đề xuất nâng bậc cho chính mình.'] }
   if (!eligibility.next) return { ok: false, errors: ['Nhân viên đã ở bậc cao nhất của lộ trình.'] }
@@ -66,13 +65,16 @@ export function createProposal(
     return { ok: false, errors: ['Nhân viên này đang có đề xuất chờ duyệt.'] }
   }
   const exception = !eligibility.ready
-  const minLen = exception ? MIN_EXCEPTION_REASON : MIN_PROPOSAL_REASON
+  if (exception && !rules.allow_exception) {
+    return { ok: false, errors: ['Nhân viên chưa đủ điều kiện và Cài đặt đang không cho đề xuất ngoại lệ.'] }
+  }
+  const minLen = exception ? rules.exception_reason_min_chars : rules.reason_min_chars
   if (reason.length < minLen) {
     return {
       ok: false,
       errors: [exception
-        ? `Nhân viên chưa đủ điều kiện. Muốn đề xuất ngoại lệ cần ghi lý do ít nhất ${MIN_EXCEPTION_REASON} ký tự.`
-        : `Cần ghi lý do đề xuất (ít nhất ${MIN_PROPOSAL_REASON} ký tự).`],
+        ? `Nhân viên chưa đủ điều kiện. Muốn đề xuất ngoại lệ cần ghi lý do ít nhất ${minLen} ký tự.`
+        : `Cần ghi lý do đề xuất (ít nhất ${minLen} ký tự).`],
     }
   }
   const proposal: PromotionProposal = {
@@ -150,7 +152,8 @@ export function decideProposal(
   }
 
   if (input.decision === 'reject') {
-    if (note.length < MIN_PROPOSAL_REASON) return { ok: false, errors: [`Từ chối cần ghi lý do (ít nhất ${MIN_PROPOSAL_REASON} ký tự).`] }
+    const minNote = settings.rules.reason_min_chars
+    if (note.length < minNote) return { ok: false, errors: [`Từ chối cần ghi lý do (ít nhất ${minNote} ký tự).`] }
     const next = done('rejected')
     return { ok: true, proposals: replace(next), placements: state.placements, history: state.history, proposal: next }
   }
@@ -189,14 +192,14 @@ export function decideProposal(
   }
 }
 
-/** Số ngày làm việc (trừ Chủ nhật) từ lúc đề xuất tới hôm nay, để nhắc hạn phản hồi. */
-export function workingDaysSince(isoStart: string, today: string): number {
+/** Số ngày làm việc (trừ các thứ nghỉ trong Cài đặt) từ lúc đề xuất tới hôm nay, để nhắc hạn phản hồi. */
+export function workingDaysSince(isoStart: string, today: string, nonWorkingWeekdays: number[] = []): number {
   const start = new Date(`${isoStart.slice(0, 10)}T00:00:00Z`)
   const end = new Date(`${today}T00:00:00Z`)
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0
   let days = 0
   for (const d = new Date(start); d < end; d.setUTCDate(d.getUTCDate() + 1)) {
-    if (d.getUTCDay() !== 0) days += 1
+    if (!nonWorkingWeekdays.includes(d.getUTCDay())) days += 1
   }
   return days
 }

@@ -39,7 +39,7 @@ export interface PayrollInput {
   position?: Position
   store?: Store
   /** Khoản cộng thêm tính sẵn bên ngoài (vd: cộng lương theo bậc lộ trình), chịu thuế như phụ cấp thường. */
-  extraAllowances?: { name: string; amount: number }[]
+  extraAllowances?: { name: string; amount: number; tax_exempt?: boolean }[]
 }
 
 export interface FnbAllocationBreakdown {
@@ -1102,7 +1102,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   // Standard Gross Salary = Total earnings before any statutory or disciplinary deductions
   // BUG-L FIX: Khấu trừ phụ cấp cơm ca không chịu thuế theo luật Thuế TNCN
   const nonTaxableAllowances = allowances
-    .filter(a => a.name.includes('Cơm ca') || a.name.includes('cơm ca'))
+    .filter(a => a.name.includes('Cơm ca') || a.name.includes('cơm ca') || ('tax_exempt' in a && a.tax_exempt === true))
     .reduce((sum, a) => sum + a.amount, 0)
   const grossSalary = totalEarnings
   const taxableIncome = Math.max(0, grossSalary - insurance.total - nonTaxableAllowances - overtimeTaxExempt)

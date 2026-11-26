@@ -39,20 +39,24 @@ export async function GET(req: NextRequest) {
       .filter((p) => canSee(p.employee_id))
       .sort((a, b) => b.proposed_at.localeCompare(a.proposed_at))
       .map((p) => {
-        const waiting = p.status === 'pending' ? workingDaysSince(p.proposed_at, today) : 0
+        const waiting = p.status === 'pending' ? workingDaysSince(p.proposed_at, today, settings.rules.non_working_weekdays) : 0
         return {
           ...p,
           employee_name: db.employees.find((e) => e.id === p.employee_id)?.full_name || p.employee_id,
           waiting_working_days: waiting,
-          overdue: p.status === 'pending' && waiting > limit,
+          overdue: p.status === 'pending' && limit > 0 && waiting > limit,
           can_decide: canDecide(db, settings, user, p),
           can_cancel: p.status === 'pending' && (p.proposed_by === user.userId || hasRequiredRole(user.role, settings.approval.approver_roles)),
         }
       })
     return NextResponse.json({
       success: true,
-      can_propose: hasRequiredRole(user.role, settings.approval.assessor_roles),
+      can_propose: settings.configured && hasRequiredRole(user.role, settings.approval.assessor_roles),
+      configured: settings.configured,
       respond_within_working_days: limit,
+      reason_min_chars: settings.rules.reason_min_chars,
+      allow_exception: settings.rules.allow_exception,
+      exception_reason_min_chars: settings.rules.exception_reason_min_chars,
       proposals,
     })
   } catch (error) {
@@ -86,7 +90,7 @@ export async function POST(req: NextRequest) {
       const summary = buildCareerSummary(db, settings, placement, today)
       const result = createProposal(
         db.career_promotions || [],
-        { placement, store_id: employee.store_id, eligibility: summary.eligibility, months: summary.months, hours: summary.hours, reason: body.reason },
+        { settings, placement, store_id: employee.store_id, eligibility: summary.eligibility, months: summary.months, hours: summary.hours, reason: body.reason },
         actor
       )
       if (!result.ok) return bad(result.errors[0])

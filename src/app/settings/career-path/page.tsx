@@ -9,12 +9,15 @@ import { normalizeCareerPathSettings, validateCareerPathSettings, type CareerPat
 import CareerGradesPanel from '@/components/career-path-v7/CareerGradesPanel'
 import CareerApprovalPanel from '@/components/career-path-v7/CareerApprovalPanel'
 import CareerSkillCatalogPanel from '@/components/career-path-v7/CareerSkillCatalogPanel'
+import CareerRulesPanel from '@/components/career-path-v7/CareerRulesPanel'
+import { applyPlaybookV7Suggestion } from '@/lib/career-path/settings-suggestion'
 
-type Tab = 'grades' | 'approval' | 'skills'
+type Tab = 'grades' | 'approval' | 'skills' | 'rules'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'grades', label: 'Bậc & lương' },
   { id: 'approval', label: 'Đánh giá & duyệt' },
   { id: 'skills', label: 'Kỹ năng' },
+  { id: 'rules', label: 'Quy tắc tính' },
 ]
 const ADMIN = ['ceo', 'hr_admin']
 
@@ -63,7 +66,13 @@ export default function CareerPathSettingsPage() {
     return () => { alive = false }
   }, [hasHydrated, isAuthenticated])
 
-  const dirty = Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved))
+  // Chưa cài đặt lần nào thì vẫn cho lưu (kể cả chưa sửa gì) để bật lộ trình.
+  const dirty = Boolean(draft && saved && (JSON.stringify(draft) !== JSON.stringify(saved) || !saved.configured))
+  const fillSuggestion = () => {
+    if (!draft) return
+    setDraft(applyPlaybookV7Suggestion(draft))
+    setMessage({ kind: 'ok', text: 'Đã điền số gợi ý theo Playbook V7 vào bản nháp. Kiểm tra, sửa nếu cần rồi bấm “Lưu cài đặt”.' })
+  }
   const errors = draft ? validateCareerPathSettings(draft) : []
 
   const save = async () => {
@@ -98,13 +107,13 @@ export default function CareerPathSettingsPage() {
               <Link href="/settings" className="text-xs font-semibold text-[#2F6FA8]">← Trung tâm cài đặt</Link>
               <h1 className="mt-1 text-xl font-bold text-[#001D3D]">Lộ trình thăng tiến</h1>
               <p className="text-sm text-gray-500">
-                Bậc T0 → G1 → G2 → G3 → G4 theo vị trí chính (Thu ngân / Pha chế). Mọi mốc và mức tiền đều chỉnh được ở đây.
+                Bậc T0 → G1 → G2 → G3 → G4 theo vị trí chính (Thu ngân / Pha chế). Mọi mốc, mức tiền và quy tắc tính đều do CEO/HR nhập ở đây.
               </p>
               {saved && (
                 <p className="mt-1 text-xs text-gray-400">
                   Phiên bản {saved.version}
                   {saved.updated_by ? ` · cập nhật bởi ${saved.updated_by}` : ''}
-                  {saved.updated_at ? ` lúc ${new Date(saved.updated_at).toLocaleString('vi-VN')}` : ' · đang dùng cài đặt mặc định theo Playbook V7'}
+                  {saved.updated_at ? ` lúc ${new Date(saved.updated_at).toLocaleString('vi-VN')}` : ' · chưa lưu lần nào'}
                 </p>
               )}
             </div>
@@ -112,6 +121,15 @@ export default function CareerPathSettingsPage() {
               <Link href="/career-path/placement" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-[#001D3D]">
                 Xếp bậc nhân viên
               </Link>
+              {canEdit && draft && (
+                <button
+                  type="button"
+                  onClick={fillSuggestion}
+                  className="rounded-lg border border-[#2F6FA8] bg-white px-3 py-2 text-sm font-semibold text-[#2F6FA8]"
+                >
+                  Điền gợi ý theo Playbook V7
+                </button>
+              )}
               {canEdit && (
                 <button
                   type="button"
@@ -125,6 +143,13 @@ export default function CareerPathSettingsPage() {
             </div>
           </div>
 
+          {saved && !saved.configured && (
+            <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+              <div className="font-semibold">Chưa cài đặt lộ trình</div>
+              Các con số (tháng, giờ, mức cộng lương, mức kỹ năng, hạn xử lý) đang để trống. Hãy tự nhập hoặc bấm “Điền gợi ý theo Playbook V7”, rồi bấm “Lưu cài đặt”.
+              Trước khi lưu, hệ thống chưa xét bậc, chưa cho đề xuất nâng bậc và chưa cộng lương theo bậc.
+            </div>
+          )}
           {message && (
             <div className={`rounded-xl border px-4 py-2.5 text-sm ${message.kind === 'ok' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
               {message.text}
@@ -161,6 +186,7 @@ export default function CareerPathSettingsPage() {
           {draft && tab === 'grades' && <CareerGradesPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
           {draft && tab === 'approval' && <CareerApprovalPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
           {draft && tab === 'skills' && <CareerSkillCatalogPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
+          {draft && tab === 'rules' && <CareerRulesPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
         </div>
       </div>
     </AppShell>

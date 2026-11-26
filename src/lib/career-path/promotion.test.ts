@@ -1,11 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getDefaultCareerPathSettings } from './settings.ts'
+import { applyPlaybookV7Suggestion } from './settings-suggestion.ts'
 import type { CareerPlacement } from './placement.ts'
 import type { EligibilityResult } from './eligibility.ts'
 import { canApproveGrade, createProposal, decideProposal, workingDaysSince } from './promotion.ts'
 
-const settings = getDefaultCareerPathSettings()
+const settings = { ...applyPlaybookV7Suggestion(getDefaultCareerPathSettings()), configured: true }
 const placement: CareerPlacement = {
   employee_id: 'emp-1', primary_position: 'cashier', grade_code: 'G1', effective_date: '2026-09-01',
   carried_hours: 0, entry_assessment: 'confirmed', note: '', updated_at: '', updated_by: '',
@@ -19,7 +20,7 @@ let n = 0
 const id = () => `x-${++n}`
 
 const propose = (elig = ready, reason = 'Đạt đủ kỹ năng') =>
-  createProposal([], { placement, store_id: 'store-001', eligibility: elig, months: 3, hours: 300, reason }, sm, now, id)
+  createProposal([], { settings, placement, store_id: 'store-001', eligibility: elig, months: 3, hours: 300, reason }, sm, now, id)
 
 test('đề xuất khi đủ điều kiện, chặn trùng và chặn tự đề xuất', () => {
   const r = propose()
@@ -27,9 +28,9 @@ test('đề xuất khi đủ điều kiện, chặn trùng và chặn tự đề
   if (!r.ok) return
   assert.equal(r.proposal.to_grade, 'G2')
   assert.equal(r.proposal.exception, false)
-  const dup = createProposal(r.proposals, { placement, store_id: 's', eligibility: ready, months: 3, hours: 300, reason: 'Đạt đủ kỹ năng' }, hr, now, id)
+  const dup = createProposal(r.proposals, { settings, placement, store_id: 's', eligibility: ready, months: 3, hours: 300, reason: 'Đạt đủ kỹ năng' }, hr, now, id)
   assert.ok(!dup.ok && dup.errors[0].includes('chờ duyệt'))
-  const self = createProposal([], { placement, store_id: 's', eligibility: ready, months: 3, hours: 300, reason: 'Đạt đủ kỹ năng' }, { ...sm, id: 'emp-1' }, now, id)
+  const self = createProposal([], { settings, placement, store_id: 's', eligibility: ready, months: 3, hours: 300, reason: 'Đạt đủ kỹ năng' }, { ...sm, id: 'emp-1' }, now, id)
   assert.ok(!self.ok)
 })
 
@@ -57,7 +58,7 @@ test('duyệt: đổi bậc và ghi lịch sử nâng bậc', () => {
 })
 
 test('từ chối cần lý do; người duyệt phải khác người đề xuất', () => {
-  const r = createProposal([], { placement, store_id: 's', eligibility: ready, months: 3, hours: 300, reason: 'Đạt đủ kỹ năng' }, hr, now, id)
+  const r = createProposal([], { settings, placement, store_id: 's', eligibility: ready, months: 3, hours: 300, reason: 'Đạt đủ kỹ năng' }, hr, now, id)
   if (!r.ok) return assert.fail()
   const state = { proposals: r.proposals, placements: [placement], history: [] }
   assert.ok(!decideProposal(state, { proposal_id: r.proposal.id, decision: 'approve' }, settings, hr, '2026-11-25').ok)
@@ -75,5 +76,19 @@ test('quyền duyệt theo bậc và đếm ngày làm việc', () => {
   assert.ok(!canApproveGrade(s, 'store_manager', 'G3'))
   assert.ok(canApproveGrade(s, 'ceo', 'G4'))
   // 2026-11-23 là Thứ Hai; tới Chủ nhật 29 có 6 ngày làm việc.
-  assert.equal(workingDaysSince('2026-11-23T08:00:00Z', '2026-11-29'), 6)
+  assert.equal(workingDaysSince('2026-11-23T08:00:00Z', '2026-11-29', settings.rules.non_working_weekdays), 6)
+  assert.equal(workingDaysSince('2026-11-23T08:00:00Z', '2026-11-29', []), 6)
+  assert.equal(workingDaysSince('2026-11-23T08:00:00Z', '2026-11-30', [0, 6]), 5)
+})
+
+test('chưa cài đặt lộ trình thì không đề xuất; tắt ngoại lệ thì chặn đề xuất chưa đủ điều kiện', () => {
+  const blank = getDefaultCareerPathSettings()
+  const r1 = createProposal([], { settings: blank, placement, store_id: 's', eligibility: ready, months: 3, hours: 300, reason: 'Đạt đủ kỹ năng' }, sm, now, id)
+  assert.ok(!r1.ok && r1.errors[0].includes('Chưa cài đặt'))
+  const noEx = { ...settings, rules: { ...settings.rules, allow_exception: false } }
+  const r2 = createProposal([], { settings: noEx, placement, store_id: 's', eligibility: notReady, months: 3, hours: 300, reason: 'Thiếu giờ do nghỉ ốm nhưng kỹ năng đã vững' }, sm, now, id)
+  assert.ok(!r2.ok)
+  const noMin = { ...settings, rules: { ...settings.rules, reason_min_chars: 0 } }
+  const r3 = createProposal([], { settings: noMin, placement, store_id: 's', eligibility: ready, months: 3, hours: 300, reason: '' }, sm, now, id)
+  assert.ok(r3.ok, 'lý do không bắt buộc khi Cài đặt để 0')
 })

@@ -64,7 +64,8 @@ export default function CareerGradesPanel({ settings, readOnly, onChange }: Prop
                         type="number"
                         min={0}
                         className={inputClass}
-                        value={g[key]}
+                        placeholder={g.code === 'T0' ? '' : 'Nhập số'}
+                        value={g[key] || ''}
                         disabled={readOnly || g.code === 'T0'}
                         onChange={(e) => setNum(g.code, key, e.target.value)}
                       />
