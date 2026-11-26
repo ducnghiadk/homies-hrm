@@ -442,7 +442,16 @@ export class ScheduleService {
         ok: true,
         addedCount: Number(json.added_count || 0),
         totalCount: Number(json.total_week_count || 0),
-        message: String(json.message || 'Đã điền nhanh lịch rảnh vào Bản Nháp.'),
+        message: (() => {
+          const base = String(json.message || 'Đã điền nhanh lịch rảnh vào Bản Nháp.')
+          const reserve: { employee_name?: string; date?: string; shift_name?: string }[] = Array.isArray(json.reserve) ? json.reserve : []
+          if (reserve.length === 0) return base
+          const list = reserve
+            .slice(0, 6)
+            .map((r) => `${r.employee_name || 'Nhân viên'} (${(r.date || '').slice(8, 10)}/${(r.date || '').slice(5, 7)} ${r.shift_name || ''})`.trim())
+            .join(', ')
+          return `${base} Dự bị: ${list}${reserve.length > 6 ? '…' : ''}.`
+        })(),
       }
     } catch {
       return {

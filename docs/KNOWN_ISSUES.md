@@ -1,5 +1,22 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-25 (Làm nốt rà soát Chấm công → Lịch → Lương, đợt 2):
+  1) Nguyên nhân:
+     - Quản lý cửa hàng sửa được thông tin, mã PIN, Wi-Fi của chi nhánh khác và xem được mã PIN mọi chi nhánh qua `/api/stores`.
+     - Trang chấm công QR/Kiosk chặn vào ca mới trong 15 phút kể cả khi ca trước đã tan (ca ngắn bị chặn).
+     - Phụ cấp ca gãy vẫn trả khi thiếu giờ ra/vào; ca 0 giờ vẫn được tính là ca và ngày công.
+     - "Điền nhanh từ lịch rảnh" đổ hết mọi người rảnh vào ca, vượt số người cần.
+     - Nhân viên không được báo khi chốt lịch hoặc khi quản lý sửa ca đã chốt; thông báo máy chủ hiện cho mọi người.
+     - Full-time: làm quá 26 ngày chỉ được trả 100%, không có tăng ca từ giờ chấm công thực tế, làm ngày lễ chỉ được 100%.
+  2) Cách giải quyết:
+     - `/api/stores`: chỉ Ban Giám đốc tạo chi nhánh mới; quản lý chỉ sửa và chỉ xem PIN/Wi-Fi của chi nhánh mình (`canAccessStore`).
+     - `/api/attendance/checkin`: chỉ chặn khi còn lượt vào ca chưa tan ca trong 15 phút.
+     - `payroll-engine`: ca gãy cần đủ giờ ra ca trước và giờ vào ca sau; ca 0 giờ không tính ca/ngày công; ngày vượt công chuẩn trả theo hệ số ngày nghỉ (mặc định 200%); giờ làm quá giờ chuẩn/ngày tính tăng ca theo loại ngày; làm trong giờ chuẩn ngày lễ được trả thêm cho đủ hệ số ngày lễ (mặc định 300%). Các hệ số lấy từ Cài đặt lương.
+     - `src/lib/scheduling/availability-fill.ts` (có test): mỗi ca chỉ lấy đủ số người tối đa của mẫu ca, ưu tiên người ít giờ trong tuần, còn lại vào danh sách dự bị hiện trong thông báo.
+     - `/api/schedules`: gửi thông báo cho từng nhân viên khi chốt lịch tuần và khi sửa/gỡ ca đã chốt; `/api/notifications` chỉ trả thông báo của đúng người nhận.
+  3) Bảng lương (khi chưa bật Supabase thật) nay đọc chấm công từ máy chủ qua `/api/attendance` (`AttendanceService.getAttendanceRecordsForPeriod`), ghi đè các ca quản lý đã sửa trên bảng công; ca chưa tan ca không tính giờ; chỉ quay về dữ liệu trên trình duyệt khi máy chủ không trả được dữ liệu.
+  4) File liên quan: `src/app/api/stores/route.ts`, `src/app/api/attendance/checkin/route.ts`, `src/lib/payroll-engine.ts`, `src/lib/scheduling/availability-fill.ts`, `src/app/api/schedules/route.ts`, `src/lib/services/scheduling/schedule-service.ts`, `src/app/api/notifications/route.ts`, `src/lib/services/attendance/attendance-service.ts`.
+
 - Đã fix 2026-11-25 (Chấm công bằng Wi-Fi quán thay cho quét QR):
   1) Nguyên nhân: nhân viên bắt buộc quét mã QR mỗi lần vào ca/tan ca; trang `/settings/wifi` cũ chỉ lưu tên Wi-Fi trên trình duyệt, không có tác dụng (trình duyệt không đọc được tên Wi-Fi).
   2) Cách giải quyết: mỗi chi nhánh chọn cách chấm công: "Wi-Fi quán hoặc mã QR" (mặc định), "Chỉ Wi-Fi quán", "Chỉ mã QR", kèm tùy chọn có kiểm tra GPS hay không. Wi-Fi quán được nhận biết bằng địa chỉ mạng công cộng của quán; quản lý đứng tại quán bấm "Dùng mạng hiện tại" để lưu. Máy chủ kiểm tra ở cả `/api/attendance/checkin` và tan ca qua `/api/attendance`. Sửa thêm: lưu thông tin chi nhánh qua `/api/stores` không còn xóa mất cài đặt chấm công; ẩn danh sách mạng của quán với nhân viên.
