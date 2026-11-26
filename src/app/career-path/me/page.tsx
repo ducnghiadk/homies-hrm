@@ -17,6 +17,8 @@ import { BUCKET_LABEL, GRADE_BADGE, POSITION_LABEL, SKILL_LEVEL_BADGE, SKILL_LEV
  * điều kiện lên bậc kế tiếp và lịch sử đổi bậc. Chỉ xem, không tự sửa.
  */
 
+const formatDay = (iso: string) => (iso ? iso.split('-').reverse().join('/') : '')
+
 const BUCKET_ORDER: ApplicableBucket[] = ['common', 'main', 'support', 'second', 'advanced']
 const KIND_LABEL: Record<CareerGradeHistoryEntry['kind'], string> = {
   initial: 'Xếp bậc ban đầu',
@@ -97,7 +99,7 @@ export default function MyCareerPathPage() {
                 <span className={`rounded-lg px-3 py-1 text-lg font-bold ${GRADE_BADGE[placement.grade_code]}`}>{placement.grade_code}</span>
                 <div>
                   <p className="font-semibold text-[#001D3D]">{gradeCfg?.label || placement.grade_code} · {POSITION_LABEL[placement.primary_position]}</p>
-                  <p className="text-xs text-gray-500">Hiệu lực từ {placement.effective_date}</p>
+                  <p className="text-xs text-gray-500">Hiệu lực từ {formatDay(placement.effective_date)}</p>
                 </div>
               </div>
               {gradeCfg?.description && <p className="mt-2 text-sm text-gray-600">{gradeCfg.description}</p>}
@@ -148,7 +150,7 @@ export default function MyCareerPathPage() {
               {[...data.history].sort((a, b) => b.created_at.localeCompare(a.created_at)).map((h) => (
                 <li key={h.id} className="border-l-2 border-gray-200 pl-3 text-sm">
                   <p className="font-semibold text-[#001D3D]">{KIND_LABEL[h.kind]}: {h.from_grade ? `${h.from_grade} → ` : ''}{h.to_grade}</p>
-                  <p className="text-xs text-gray-500">Hiệu lực {h.effective_date}{h.decided_by_name ? ` · ${h.decided_by_name}` : ''}</p>
+                  <p className="text-xs text-gray-500">Hiệu lực {formatDay(h.effective_date)}{h.decided_by_name ? ` · ${h.decided_by_name}` : ''}</p>
                   {h.reason && <p className="mt-0.5 text-xs text-gray-600">{h.reason}</p>}
                 </li>
               ))}

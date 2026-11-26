@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, canAccessStore, isChainWideRole, hasRequiredRole, type AuthenticatedUser } from '@/lib/server/auth-helper'
 import { getServerDb, saveServerDb, type ServerDatabaseSchema } from '@/lib/server/db'
+import { careerApproverIds, pushCareerNotices } from '@/lib/server/career-notify'
 import { normalizeCareerPathSettings, type CareerPathSettings } from '@/lib/career-path/settings'
 import { canApproveGrade, createProposal, decideProposal, workingDaysSince, type PromotionProposal } from '@/lib/career-path/promotion'
 import { buildCareerSummary, careerViewScope } from '@/lib/server/career-progress'
@@ -95,6 +96,14 @@ export async function POST(req: NextRequest) {
       )
       if (!result.ok) return bad(result.errors[0])
       db.career_promotions = result.proposals
+      const p = result.proposal
+      const kind = p.exception ? 'đề xuất ngoại lệ' : 'đề xuất'
+      pushCareerNotices(db, careerApproverIds(db, (role) => canApproveGrade(settings, role, p.to_grade), employee.store_id, user.userId).map((id) => ({
+        title: 'Có đề xuất nâng bậc chờ duyệt',
+        message: `${actor.name} ${kind} ${employee.full_name} lên ${p.to_grade}. Vào "Đề xuất & duyệt nâng bậc" để xử lý.`,
+        target_user_id: id,
+        metadata: { proposal_id: p.id, link: '/career-path/review' },
+      })))
       await saveServerDb(db)
       return NextResponse.json({ success: true, proposal: result.proposal })
     }
@@ -114,6 +123,16 @@ export async function POST(req: NextRequest) {
       db.career_promotions = result.proposals
       db.career_placements = result.placements
       db.career_grade_history = result.history
+      const p = result.proposal
+      const name = db.employees.find((e) => e.id === p.employee_id)?.full_name || 'Nhân viên'
+      if (body.action === 'approve') {
+        pushCareerNotices(db, [
+          { title: `Chúc mừng! Bạn đã lên ${p.to_grade}`, message: `Bậc mới có hiệu lực từ ngày ${p.effective_date}. Xem chi tiết ở "Lộ trình của tôi".`, target_user_id: p.employee_id, metadata: { proposal_id: p.id, link: '/career-path/me' } },
+          ...(p.proposed_by !== user.userId ? [{ title: 'Đề xuất nâng bậc đã được duyệt', message: `${name} đã lên ${p.to_grade} (hiệu lực ${p.effective_date}).`, target_user_id: p.proposed_by, metadata: { proposal_id: p.id, link: '/career-path/review' } }] : []),
+        ])
+      } else if (body.action === 'reject' && p.proposed_by !== user.userId) {
+        pushCareerNotices(db, [{ title: 'Đề xuất nâng bậc bị từ chối', message: `Đề xuất cho ${name} lên ${p.to_grade} bị từ chối${p.decision_note ? `: ${p.decision_note}` : '.'}`, target_user_id: p.proposed_by, metadata: { proposal_id: p.id, link: '/career-path/review' } }])
+      }
       await saveServerDb(db)
       return NextResponse.json({ success: true, proposal: result.proposal })
     }
