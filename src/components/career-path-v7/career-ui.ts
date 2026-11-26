@@ -35,3 +35,28 @@ export const inputClass =
   'w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-[#001D3D] focus:border-[#2F6FA8] focus:outline-none focus:ring-2 focus:ring-[#2F6FA8]/20 disabled:bg-gray-50 disabled:text-gray-500'
 
 export const cardClass = 'rounded-2xl border border-gray-200/80 bg-white p-4 shadow-xs sm:p-5'
+
+/** Thang mức kỹ năng 0-3 dùng khi đánh giá. */
+export const SKILL_LEVEL_LABEL: Record<number, string> = {
+  0: '0 · Chưa làm được',
+  1: '1 · Làm được khi có kèm',
+  2: '2 · Tự làm đúng',
+  3: '3 · Thành thạo, hướng dẫn được',
+}
+
+export const SKILL_LEVEL_BADGE: Record<number, string> = {
+  0: 'bg-gray-100 text-gray-600',
+  1: 'bg-amber-50 text-amber-800',
+  2: 'bg-sky-50 text-sky-700',
+  3: 'bg-emerald-50 text-emerald-700',
+}
+
+export const BUCKET_LABEL: Record<string, string> = {
+  main: 'Kỹ năng chính của vị trí chính',
+  support: 'Kỹ năng hỗ trợ vị trí còn lại',
+  second: 'Kỹ năng chính của vị trí thứ hai',
+  common: 'Tiêu chuẩn chung',
+  advanced: 'Năng lực nâng cao',
+}
+
+export const formatDateTime = (iso: string) => (iso ? new Date(iso).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '')

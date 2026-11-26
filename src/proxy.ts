@@ -110,6 +110,8 @@ const ROUTE_PERMISSIONS: RoutePermission[] = [
       '/settings/schedule-rules/preferences',
       '/tasks/templates',
       '/settings/wifi',
+      '/career-path/assessment',
+      '/career-path/review',
     ],
     requiredRoles: ['store_manager', 'area_manager', 'hr_admin', 'ceo'],
   },

@@ -29,12 +29,12 @@ export function getActionItems(_userId: string, role: string): DashboardActionIt
     return [
       { id: 'a1', icon: '🔴', title: 'Ca trực cần theo dõi quân số', description: 'Đảm bảo định biên nhân sự theo ca', href: '/schedule', priority: 'urgent' },
       { id: 'a2', icon: '📋', title: 'Đơn chờ quản lý phê duyệt', description: 'Xem xét các yêu cầu đổi ca, nghỉ phép', href: '/leave/approval', priority: 'high' },
-      { id: 'a3', icon: '⭐', title: 'Lộ trình thăng tiến nhân sự', description: 'Xem xét đề xuất thăng cấp nhân viên', href: '/career-path', priority: 'medium' },
+      { id: 'a3', icon: '⭐', title: 'Lộ trình thăng tiến nhân sự', description: 'Xem xét đề xuất thăng cấp nhân viên', href: '/career-path/review', priority: 'medium' },
     ];
   }
   // admin
   return [
-    { id: 'a1', icon: '👔', title: 'Đề xuất thăng tiến nhân sự', description: 'Xem xét các hồ sơ thăng cấp toàn chuỗi', href: '/career-path', priority: 'high' },
+    { id: 'a1', icon: '👔', title: 'Đề xuất thăng tiến nhân sự', description: 'Xem xét các hồ sơ thăng cấp toàn chuỗi', href: '/career-path/review', priority: 'high' },
     { id: 'a2', icon: '💰', title: 'Bảng lương chuỗi chờ đối soát', description: 'Kiểm tra chi phí & tổng lương các cửa hàng', href: '/payroll', priority: 'high' },
     { id: 'a3', icon: '📋', title: 'Theo dõi hợp đồng lao động', description: 'Quản lý thời hạn hợp đồng nhân sự', href: '/employees/contracts', priority: 'medium' },
   ];

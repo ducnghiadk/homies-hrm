@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, ADMIN_ROLES, canAccessStore, isChainWideRole, hasRequiredRole, MANAGER_ROLES } from '@/lib/server/auth-helper'
+import { pushCareerNotices } from '@/lib/server/career-notify'
 import { getServerDb, saveServerDb } from '@/lib/server/db'
 import { applyPlacement, type PlacementInput } from '@/lib/career-path/placement'
 
@@ -72,6 +73,12 @@ export async function POST(req: NextRequest) {
     }
     db.career_placements = result.placements
     db.career_grade_history = result.history
+    pushCareerNotices(db, [{
+      title: 'Bậc của bạn đã được cập nhật',
+      message: `HR đã xếp bạn ở bậc ${result.placement.grade_code} (hiệu lực ${result.placement.effective_date}). Xem chi tiết ở "Lộ trình của tôi".`,
+      target_user_id: employee.id,
+      metadata: { link: '/career-path/me' },
+    }])
     await saveServerDb(db)
     return NextResponse.json({ success: true, placement: result.placement, entry: result.entry })
   } catch (error) {

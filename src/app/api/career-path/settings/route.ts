@@ -37,6 +37,7 @@ async function save(req: NextRequest) {
       ...body.settings,
       version: current.version + 1,
       updated_at: new Date().toISOString(),
+      configured: true,
       updated_by: gate.user.employee?.full_name || gate.user.email || gate.user.userId,
     })
     const errors = validateCareerPathSettings(next)

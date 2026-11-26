@@ -7,6 +7,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import AppShell from '@/components/layout/AppShell'
 import ProfileOverviewTab from '@/components/employee-profile/ProfileOverviewTab'
+import CareerGradeProfileCard from '@/components/career-path-v7/CareerGradeProfileCard'
 import { getPositionById, getStoreById, mockAttendances, mockPositions, mockStores } from '@/lib/mock-data'
 import { ContractService, CONTRACT_STATUS_META, type EmployeeContract } from '@/lib/services/contract-service'
 import { EmployeeService, getDepartmentName } from '@/lib/services/employee-service'
@@ -770,6 +771,8 @@ export default function EmployeeDetailPage() {
                 ))}
               </div>
             </div>
+
+            <CareerGradeProfileCard employeeId={employee.id} viewerRole={user.role} />
 
             <ProfileOverviewTab
               employee={employee}

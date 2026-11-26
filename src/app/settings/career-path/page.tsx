@@ -9,12 +9,15 @@ import { normalizeCareerPathSettings, validateCareerPathSettings, type CareerPat
 import CareerGradesPanel from '@/components/career-path-v7/CareerGradesPanel'
 import CareerApprovalPanel from '@/components/career-path-v7/CareerApprovalPanel'
 import CareerSkillCatalogPanel from '@/components/career-path-v7/CareerSkillCatalogPanel'
+import CareerRulesPanel from '@/components/career-path-v7/CareerRulesPanel'
+import { applyPlaybookV7Suggestion } from '@/lib/career-path/settings-suggestion'
 
-type Tab = 'grades' | 'approval' | 'skills'
+type Tab = 'grades' | 'approval' | 'skills' | 'rules'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'grades', label: 'Bậc & lương' },
   { id: 'approval', label: 'Đánh giá & duyệt' },
   { id: 'skills', label: 'Kỹ năng' },
+  { id: 'rules', label: 'Quy tắc tính' },
 ]
 const ADMIN = ['ceo', 'hr_admin']
 
@@ -63,7 +66,13 @@ export default function CareerPathSettingsPage() {
     return () => { alive = false }
   }, [hasHydrated, isAuthenticated])
 
-  const dirty = Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved))
+  // Chưa cài đặt lần nào thì vẫn cho lưu (kể cả chưa sửa gì) để bật lộ trình.
+  const dirty = Boolean(draft && saved && (JSON.stringify(draft) !== JSON.stringify(saved) || !saved.configured))
+  const fillSuggestion = () => {
+    if (!draft) return
+    setDraft(applyPlaybookV7Suggestion(draft))
+    setMessage({ kind: 'ok', text: 'Đã điền số gợi ý theo Playbook V7 vào bản nháp. Kiểm tra, sửa nếu cần rồi bấm “Lưu cài đặt”.' })
+  }
   const errors = draft ? validateCareerPathSettings(draft) : []
 
   const save = async () => {
@@ -89,61 +98,52 @@ export default function CareerPathSettingsPage() {
     }
   }
 
+  const changed = Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved))
+
   return (
     <AppShell title="Cài đặt lộ trình thăng tiến">
-      <div className="min-h-screen bg-[#FFF8E8] px-4 py-5 sm:px-6">
-        <div className="mx-auto max-w-6xl space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-h-screen bg-[#FFF8E8] px-4 py-5 pb-28 sm:px-6">
+        <div className="mx-auto max-w-5xl space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <Link href="/settings" className="text-xs font-semibold text-[#2F6FA8]">← Trung tâm cài đặt</Link>
               <h1 className="mt-1 text-xl font-bold text-[#001D3D]">Lộ trình thăng tiến</h1>
-              <p className="text-sm text-gray-500">
-                Bậc T0 → G1 → G2 → G3 → G4 theo vị trí chính (Thu ngân / Pha chế). Mọi mốc và mức tiền đều chỉnh được ở đây.
-              </p>
-              {saved && (
-                <p className="mt-1 text-xs text-gray-400">
-                  Phiên bản {saved.version}
-                  {saved.updated_by ? ` · cập nhật bởi ${saved.updated_by}` : ''}
-                  {saved.updated_at ? ` lúc ${new Date(saved.updated_at).toLocaleString('vi-VN')}` : ' · đang dùng cài đặt mặc định theo Playbook V7'}
-                </p>
-              )}
+              <p className="text-sm text-gray-500">T0 → G1 → G2 → G3 → G4. Mọi con số do CEO/HR nhập ở đây.</p>
             </div>
-            <div className="flex gap-2">
-              <Link href="/career-path/placement" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-[#001D3D]">
-                Xếp bậc nhân viên
-              </Link>
-              {canEdit && (
-                <button
-                  type="button"
-                  disabled={!dirty || saving || errors.length > 0}
-                  onClick={save}
-                  className="rounded-lg bg-[#2F6FA8] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                >
-                  {saving ? 'Đang lưu...' : 'Lưu cài đặt'}
+            {saved?.configured && (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                Đang áp dụng · phiên bản {saved.version}
+                {saved.updated_at ? ` · ${new Date(saved.updated_at).toLocaleDateString('vi-VN')}` : ''}
+              </span>
+            )}
+          </div>
+
+          {saved && !saved.configured && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3">
+              <div className="text-sm text-orange-800">
+                <div className="font-semibold">Lộ trình chưa hoạt động</div>
+                Nhập các con số rồi bấm Lưu. Trước khi lưu, hệ thống chưa xét bậc, chưa đề xuất và chưa cộng lương.
+              </div>
+              {canEdit && draft && (
+                <button type="button" onClick={fillSuggestion} className="rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm font-semibold text-orange-800">
+                  Điền gợi ý theo Playbook V7
                 </button>
               )}
             </div>
-          </div>
-
+          )}
           {message && (
             <div className={`rounded-xl border px-4 py-2.5 text-sm ${message.kind === 'ok' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
               {message.text}
             </div>
           )}
-          {errors.length > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
-              <div className="font-semibold">Cần sửa trước khi lưu:</div>
-              <ul className="mt-1 list-disc pl-5">{errors.slice(0, 6).map((e) => <li key={e}>{e}</li>)}</ul>
-            </div>
-          )}
 
-          <div className="flex gap-1.5 overflow-x-auto">
+          <div className="flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white p-1">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
-                className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold ${tab === t.id ? 'bg-[#001D3D] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+                className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === t.id ? 'bg-[#001D3D] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
               >
                 {t.label}
               </button>
@@ -161,8 +161,42 @@ export default function CareerPathSettingsPage() {
           {draft && tab === 'grades' && <CareerGradesPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
           {draft && tab === 'approval' && <CareerApprovalPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
           {draft && tab === 'skills' && <CareerSkillCatalogPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
+          {draft && tab === 'rules' && <CareerRulesPanel settings={draft} readOnly={!canEdit} onChange={setDraft} />}
+
+          {canEdit && saved?.configured && draft && (
+            <p className="text-center text-xs text-gray-400">
+              Muốn bắt đầu lại từ số mẫu?{' '}
+              <button type="button" onClick={fillSuggestion} className="font-semibold text-[#2F6FA8] underline">Điền gợi ý theo Playbook V7</button>
+            </p>
+          )}
         </div>
       </div>
+
+      {canEdit && dirty && draft && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur lg:bottom-0">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
+            <div className="text-sm">
+              {errors.length > 0 ? (
+                <span className="text-amber-700">
+                  Cần sửa {errors.length} chỗ trước khi lưu: {errors[0]}{errors.length > 1 ? '…' : ''}
+                </span>
+              ) : (
+                <span className="text-[#001D3D]">{changed ? 'Có thay đổi chưa lưu' : 'Bấm Lưu để bật lộ trình'}</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {changed && saved && (
+                <button type="button" onClick={() => { setDraft(saved); setMessage(null) }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-600">
+                  Bỏ thay đổi
+                </button>
+              )}
+              <button type="button" disabled={saving || errors.length > 0} onClick={save} className="rounded-lg bg-[#2F6FA8] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                {saving ? 'Đang lưu...' : 'Lưu cài đặt'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   )
 }

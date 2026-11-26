@@ -48,6 +48,19 @@ export default function CareerSkillCatalogPanel({ settings, readOnly, onChange }
         </div>
       </div>
 
+      <label className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+        Mức coi là “đạt” với tiêu chuẩn chung (ATTP, SOP)
+        <select
+          className={`${inputClass} w-auto`}
+          disabled={readOnly}
+          value={settings.common_pass_level}
+          onChange={(e) => onChange({ ...settings, common_pass_level: Number(e.target.value) })}
+        >
+          <option value={0}>Chưa chọn</option>
+          {[1, 2, 3].map((l) => <option key={l} value={l}>Mức {l} trở lên</option>)}
+        </select>
+      </label>
+
       <div className="mt-4 space-y-2">
         {visible.map(({ sk, index }) => (
           <div key={index} className={`grid gap-2 rounded-xl border p-3 sm:grid-cols-[90px_1fr_150px_150px_auto] ${sk.active ? 'border-gray-200' : 'border-dashed border-gray-200 opacity-60'}`}>

@@ -1,0 +1,55 @@
+'use client'
+
+import type { CareerProgressSummary } from '@/lib/career-path/eligibility'
+import { GRADE_BADGE, cardClass } from './career-ui'
+
+interface Props {
+  summary: CareerProgressSummary
+  /** Câu nhắc thêm dưới tiêu đề (vd: dành cho nhân viên tự xem). */
+  hint?: string
+  /** Bỏ khung thẻ khi đặt bên trong một thẻ khác. */
+  bare?: boolean
+}
+
+/** Hiển thị điều kiện lên bậc kế tiếp. Chỉ để tham khảo, không tự nâng bậc. */
+export default function EligibilityPanel({ summary, hint, bare }: Props) {
+  const { eligibility, months, hours } = summary
+  const wrap = bare ? '' : cardClass
+  if (!eligibility.next) {
+    return (
+      <section className={wrap}>
+        <h3 className="text-sm font-bold text-[#001D3D]">Điều kiện lên bậc</h3>
+        <p className="mt-1 text-sm text-gray-500">Đang ở bậc cao nhất của lộ trình ({eligibility.current}). Tổng {months} tháng, {hours} giờ.</p>
+      </section>
+    )
+  }
+  const done = eligibility.checks.filter((c) => c.ok).length
+  const total = eligibility.checks.length || 1
+  return (
+    <section className={wrap}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-bold text-[#001D3D]">
+          Điều kiện lên <span className={`rounded-md px-2 py-0.5 ${GRADE_BADGE[eligibility.next]}`}>{eligibility.next}</span>
+        </h3>
+        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${eligibility.ready ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
+          {eligibility.ready ? 'Đủ điều kiện để đề xuất' : `Đạt ${done}/${eligibility.checks.length} điều kiện`}
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
+        <div className={`h-full rounded-full ${eligibility.ready ? 'bg-emerald-500' : 'bg-[#2F6FA8]'}`} style={{ width: `${(done / total) * 100}%` }} />
+      </div>
+      <ul className="mt-3 space-y-2">
+        {eligibility.checks.map((c) => (
+          <li key={c.key} className="flex items-start gap-2 text-sm">
+            <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] ${c.ok ? 'bg-emerald-500 text-white' : 'border border-gray-300 text-transparent'}`}>✓</span>
+            <span className="min-w-0">
+              <span className={c.ok ? 'text-[#001D3D]' : 'font-medium text-[#001D3D]'}>{c.label}</span>
+              <span className={`block text-xs ${c.ok ? 'text-gray-500' : 'text-amber-700'}`}>{c.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-gray-500">{hint || 'Chỉ để tham khảo. Nâng bậc vẫn phải qua đề xuất và duyệt.'}</p>
+    </section>
+  )
+}

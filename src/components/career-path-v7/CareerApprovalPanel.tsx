@@ -95,7 +95,8 @@ export default function CareerApprovalPanel({ settings, readOnly, onChange }: Pr
                 min={0}
                 className={`${inputClass} mt-1`}
                 disabled={readOnly}
-                value={a[f.key]}
+                placeholder="Để trống = không áp dụng"
+                value={a[f.key] || ''}
                 onChange={(e) => setApproval({ [f.key]: Math.max(0, Math.round(Number(e.target.value) || 0)) } as Partial<CareerApprovalConfig>)}
               />
             </label>

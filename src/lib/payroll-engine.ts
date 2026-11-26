@@ -20,6 +20,7 @@ import { calculatePit, calculateOvertimeTaxExemption } from './payroll/pit'
 import { AttendanceService, type PayrollAttendanceRecord } from './services/attendance/attendance-service'
 import { employeeAdapter, type PayrollEmployeeDbRow } from './adapters/employee-adapter'
 import { getEffectiveHourlyRate, calculateHourlyEarnings } from './payroll/payroll-calculator'
+import { careerAllowancesFor, fetchCareerPayPlans } from './career-path/payroll-link'
 import { computeLatePenalties, type LatePenaltySettings } from './payroll/late-penalty'
 
 // ══════════════════════════════════════
@@ -37,6 +38,8 @@ export interface PayrollInput {
   employee?: Employee
   position?: Position
   store?: Store
+  /** Khoản cộng thêm tính sẵn bên ngoài (vd: cộng lương theo bậc lộ trình), chịu thuế như phụ cấp thường. */
+  extraAllowances?: { name: string; amount: number; tax_exempt?: boolean }[]
 }
 
 export interface FnbAllocationBreakdown {
@@ -1098,7 +1101,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   }
 
   // ── Step 5: Allowances
-  const allowances = getAllowancesForEmployee(employeeId, baseSalary, att, emp, isPartTime)
+  const allowances = [...getAllowancesForEmployee(employeeId, baseSalary, att, emp, isPartTime), ...(input.extraAllowances || [])]
   const totalAllowances = allowances.reduce((sum, a) => sum + a.amount, 0)
 
   // ── Step 6: Bonuses
@@ -1143,7 +1146,7 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   // Standard Gross Salary = Total earnings before any statutory or disciplinary deductions
   // BUG-L FIX: Khấu trừ phụ cấp cơm ca không chịu thuế theo luật Thuế TNCN
   const nonTaxableAllowances = allowances
-    .filter(a => a.name.includes('Cơm ca') || a.name.includes('cơm ca'))
+    .filter(a => a.name.includes('Cơm ca') || a.name.includes('cơm ca') || ('tax_exempt' in a && a.tax_exempt === true))
     .reduce((sum, a) => sum + a.amount, 0)
   const grossSalary = totalEarnings
   const taxableIncome = Math.max(0, grossSalary - insurance.total - nonTaxableAllowances - overtimeTaxExempt)
@@ -1257,6 +1260,7 @@ export async function calculatePayrollBatchAsync(
   periodStart: string,
   periodEnd: string,
 ): Promise<PayrollResult[]> {
+  const careerPlans = await fetchCareerPayPlans(periodStart)
   const payrollEmployeesResult = await employeeAdapter.getPayrollEmployees()
   if (payrollEmployeesResult.coLoi || payrollEmployeesResult.employees.length === 0) {
     const activeEmployees = mockEmployees.filter(e => {
@@ -1281,6 +1285,7 @@ export async function calculatePayrollBatchAsync(
         periodEnd,
         fnbAllocations,
         contractType: emp.contract_type,
+        extraAllowances: careerAllowancesFor(careerPlans, emp.id, emp.contract_type === 'ban_thoi_gian', periodStart, periodEnd, attendanceRecords),
         attendanceSummary: summarizeAttendanceRecords(
           attendanceRecords.filter(record => record.employee_id === emp.id),
           otThreshold,
@@ -1400,6 +1405,7 @@ export async function calculatePayrollBatchAsync(
         employee: emp,
         position: empPos,
         store: empStore,
+        extraAllowances: careerAllowancesFor(careerPlans, emp.id, payrollEmp?.loai_hop_dong === 'ban_thoi_gian', periodStart, periodEnd, attendanceRecords),
         attendanceSummary: summarizeAttendanceRecords(
           attendanceRecords.filter(record => record.employee_id === emp.id),
           otThreshold,

@@ -1,6 +1,10 @@
 // Lộ trình thăng tiến Homies theo Playbook V7.
 // Cấu hình nghiệp vụ (bậc, mốc tháng/giờ, mức cộng lương, kỹ năng, người duyệt)
 // đều nằm trong Cài đặt để HR/CEO chỉnh được, không ghi cứng trong logic.
+// Mặc định mọi con số để trống (0 / không xét): lộ trình chỉ chạy sau khi CEO/HR điền và lưu lần đầu.
+// Số tham khảo theo Playbook V7 nằm ở settings-suggestion.ts, chỉ áp dụng khi người dùng bấm "Điền gợi ý".
+
+import { PLAYBOOK_V7_SKILLS } from './settings-suggestion.ts'
 
 export const CAREER_GRADE_CODES = ['T0', 'G1', 'G2', 'G3', 'G4'] as const
 export type CareerGradeCode = (typeof CAREER_GRADE_CODES)[number]
@@ -70,15 +74,46 @@ export interface CareerM1Config {
   min_grade: CareerGradeCode
 }
 
+export type MonthsFrom = 'hire_date' | 'first_placement'
+export type HoursFrom = 'all_attendance' | 'since_first_placement'
+export type FtMidMonth = 'prorate_days' | 'grade_at_period_end'
+
+/** Các quy tắc tính nhỏ, đều do CEO/HR chọn. */
+export interface CareerRulesConfig {
+  /** Số ký tự tối thiểu của lý do khi đề xuất hoặc từ chối (0 = không bắt buộc). */
+  reason_min_chars: number
+  /** Cho phép đề xuất khi nhân viên chưa đủ điều kiện (ngoại lệ). */
+  allow_exception: boolean
+  /** Số ký tự tối thiểu của lý do khi đề xuất ngoại lệ. */
+  exception_reason_min_chars: number
+  /** Thứ trong tuần không tính là ngày làm việc khi đếm hạn (0 = Chủ nhật ... 6 = Thứ bảy). */
+  non_working_weekdays: number[]
+  /** Số tháng làm việc tính từ ngày nào. */
+  months_from: MonthsFrom
+  /** Giờ làm tính từ đâu (luôn cộng thêm số giờ HR nhập lúc xếp bậc). */
+  hours_from: HoursFrom
+  /** Tiền cộng theo bậc có tính thuế TNCN không. */
+  pay_taxable: boolean
+  /** Full-time cộng cố định mà đổi bậc giữa tháng: chia theo ngày hay tính trọn tháng theo bậc cuối kỳ. */
+  ft_mid_month: FtMidMonth
+}
+
 export interface CareerPathSettings {
   version: number
   updated_at: string
   updated_by: string
+  /** true sau khi CEO/HR lưu cài đặt lần đầu. Chưa cài đặt thì không xét bậc, không đề xuất, không cộng lương. */
+  configured: boolean
   positions: CareerPositionConfig[]
   grades: CareerGradeConfig[]
   ft_pay_method: FullTimePayMethod
+  /** Bật thì bảng lương (kỳ chưa khóa) tự cộng thêm tiền theo bậc. Mặc định tắt để HR kiểm tra trước. */
+  payroll_link_enabled: boolean
   skills: CareerSkillConfig[]
+  /** Mức (1-3) coi là "đạt" với tiêu chuẩn chung bắt buộc (ATTP, SOP...). */
+  common_pass_level: number
   approval: CareerApprovalConfig
+  rules: CareerRulesConfig
   m1: CareerM1Config
 }
 
@@ -91,75 +126,46 @@ const req = (r: Partial<CareerGradeRequirement>): CareerGradeRequirement => ({
   ...r,
 })
 
-const skill = (
-  code: string,
-  name: string,
-  position: CareerPositionCode | null,
-  group: CareerSkillGroup,
-  standard: string
-): CareerSkillConfig => ({ code, name, position, group, standard, active: true })
-
 export function getDefaultCareerPathSettings(): CareerPathSettings {
   return {
     version: 1,
     updated_at: '',
     updated_by: '',
+    configured: false,
     positions: [
       { code: 'cashier', label: 'Thu ngân' },
       { code: 'barista', label: 'Pha chế' },
     ],
     grades: [
       { code: 'T0', label: 'Hội nhập', description: 'Tháng đầu: học luồng đơn, nội quy, ATTP.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
-      { code: 'G1', label: 'Nền tảng', description: 'Làm các nghiệp vụ cơ bản đã học của vị trí chính.', min_months: 1, min_hours: 120, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({ main_min_level: 1, common_required: true }) },
-      { code: 'G2', label: 'Chuyên môn', description: 'Thành thạo vị trí chính, hỗ trợ được vị trí còn lại.', min_months: 2, min_hours: 240, hourly_step_vnd: 1500, ft_monthly_vs_g1_vnd: 315000, requirement: req({ main_min_level: 3, support_min_level: 2, common_required: true }) },
-      { code: 'G3', label: 'Đa nhiệm', description: 'Thành thạo vị trí chính, độc lập toàn bộ vị trí thứ hai.', min_months: 3, min_hours: 480, hourly_step_vnd: 2000, ft_monthly_vs_g1_vnd: 735000, requirement: req({ main_min_level: 3, second_min_level: 2, common_required: true }) },
-      { code: 'G4', label: 'Chủ chốt', description: 'Thành thạo cả hai vị trí, phòng ngừa lỗi và hướng dẫn.', min_months: 4, min_hours: 720, hourly_step_vnd: 1500, ft_monthly_vs_g1_vnd: 1050000, requirement: req({ main_min_level: 3, second_min_level: 3, advanced_min_level: 2, common_required: true }) },
+      { code: 'G1', label: 'Nền tảng', description: 'Làm các nghiệp vụ cơ bản đã học của vị trí chính.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
+      { code: 'G2', label: 'Chuyên môn', description: 'Thành thạo vị trí chính, hỗ trợ được vị trí còn lại.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
+      { code: 'G3', label: 'Đa nhiệm', description: 'Thành thạo vị trí chính, độc lập toàn bộ vị trí thứ hai.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
+      { code: 'G4', label: 'Chủ chốt', description: 'Thành thạo cả hai vị trí, phòng ngừa lỗi và hướng dẫn.', min_months: 0, min_hours: 0, hourly_step_vnd: 0, ft_monthly_vs_g1_vnd: 0, requirement: req({}) },
     ],
     ft_pay_method: 'fixed_monthly',
-    skills: [
-      skill('CS01', 'Menu, tư vấn', 'cashier', 'core', 'Giải thích đúng món, tùy chọn, ưu đãi'),
-      skill('CS02', 'POS', 'cashier', 'core', 'Nhập đúng món, số lượng, yêu cầu'),
-      skill('CS03', 'Thanh toán', 'cashier', 'core', 'Đúng phương thức, xác nhận giao dịch'),
-      skill('CS04', 'Food App', 'cashier', 'core', 'Nhận, theo dõi, xử lý đơn thông thường'),
-      skill('CS05', 'Theo dõi đơn', 'cashier', 'core', 'Không bỏ sót hoặc trùng đơn'),
-      skill('CS06', 'QC đơn', 'cashier', 'core', 'Đúng món, đủ ly, phụ kiện'),
-      skill('CS07', 'Đóng gói', 'cashier', 'core', 'Đúng quy cách'),
-      skill('CS08', 'Giao đơn', 'cashier', 'core', 'Đúng mã và người nhận'),
-      skill('CS09', 'SOP, vật tư', 'cashier', 'core', 'Mở / trong / đóng ca đúng phạm vi'),
-      skill('CS10', 'Xử lý tình huống', 'cashier', 'core', 'Xử lý hoặc báo đúng quyền'),
-      skill('BR01', 'Nguyên liệu', 'barista', 'core', 'Nhận diện và sử dụng đúng'),
-      skill('BR02', 'Thiết bị', 'barista', 'core', 'Sử dụng an toàn, đúng cách'),
-      skill('BR03', 'Tem ly', 'barista', 'core', 'Đọc đúng size, đường, đá, topping'),
-      skill('BR04', 'Trà sữa', 'barista', 'core', 'Toàn nhóm món đang bán'),
-      skill('BR05', 'Trà trái cây', 'barista', 'core', 'Toàn nhóm món đang bán'),
-      skill('BR06', 'Topping', 'barista', 'core', 'Đúng loại, định lượng'),
-      skill('BR07', 'Bán thành phẩm', 'barista', 'core', 'Đúng SOP được giao'),
-      skill('BR08', 'Date, bảo quản', 'barista', 'core', 'Kiểm tra hạn và điều kiện bảo quản'),
-      skill('BR09', 'QC sản phẩm', 'barista', 'core', 'Đúng công thức và ngoại quan'),
-      skill('BR10', 'Năng suất, SOP', 'barista', 'core', 'Tổ chức tem, thao tác, vệ sinh khu vực'),
-      skill('SB01', 'Đọc tem, chuẩn bị ly/dụng cụ', 'barista', 'support', 'Thu ngân hỗ trợ Pha chế'),
-      skill('SB02', 'Chuẩn bị topping đã học', 'barista', 'support', 'Thu ngân hỗ trợ Pha chế'),
-      skill('SB03', 'Bổ sung vật tư pha chế', 'barista', 'support', 'Thu ngân hỗ trợ Pha chế'),
-      skill('SC01', 'Đọc mã đơn, kiểm tra đủ ly', 'cashier', 'support', 'Pha chế hỗ trợ Thu ngân'),
-      skill('SC02', 'Đóng gói đúng quy cách', 'cashier', 'support', 'Pha chế hỗ trợ Thu ngân'),
-      skill('SC03', 'Giao đúng đơn theo phân công', 'cashier', 'support', 'Pha chế hỗ trợ Thu ngân'),
-      skill('SC04', 'POS cơ bản theo phân quyền', 'cashier', 'support', 'Pha chế hỗ trợ Thu ngân'),
-      skill('AT01', 'ATTP & vệ sinh', null, 'common', 'Bắt buộc đạt ở mọi bậc'),
-      skill('AT02', 'SOP & tác phong', null, 'common', 'Bắt buộc đạt ở mọi bậc'),
-      skill('AD01', 'Phòng ngừa lỗi', null, 'advanced', 'Phát hiện thiếu topping, sai tem, date'),
-      skill('AD02', 'Xử lý sự cố', null, 'advanced', 'Xác định phạm vi, xử lý đúng SOP, báo cáo'),
-      skill('AD03', 'Hướng dẫn', null, 'advanced', 'Làm mẫu, quan sát, sửa lỗi, kiểm tra lại'),
-      skill('AD04', 'Cải tiến', null, 'advanced', 'Nhận biết điểm nghẽn, đề xuất có căn cứ'),
-    ],
+    payroll_link_enabled: false,
+    skills: PLAYBOOK_V7_SKILLS.map((sk) => ({ ...sk })),
+    common_pass_level: 0,
     approval: {
       assessor_roles: ['store_manager', 'area_manager', 'hr_admin', 'ceo'],
       approver_roles: ['ceo', 'hr_admin'],
       store_manager_can_approve_up_to: null,
       require_different_approver: true,
-      review_rounds_per_month: 2,
-      respond_within_working_days: 3,
-      assess_within_working_days: 7,
-      notify_within_working_days: 2,
+      review_rounds_per_month: 0,
+      respond_within_working_days: 0,
+      assess_within_working_days: 0,
+      notify_within_working_days: 0,
+    },
+    rules: {
+      reason_min_chars: 0,
+      allow_exception: true,
+      exception_reason_min_chars: 0,
+      non_working_weekdays: [],
+      months_from: 'hire_date',
+      hours_from: 'all_attendance',
+      pay_taxable: true,
+      ft_mid_month: 'prorate_days',
     },
     m1: { enabled: true, full_time_only: true, min_grade: 'G4' },
   }
@@ -224,6 +230,22 @@ export function validateCareerPathSettings(s: CareerPathSettings): string[] {
       errors.push(`Vị trí ${pos === 'cashier' ? 'Thu ngân' : 'Pha chế'} chưa có kỹ năng chính nào đang dùng.`)
     }
   }
+  const needsCommon = s.grades.some((g) => g.requirement.common_required)
+  if (!isWholeNonNegative(s.common_pass_level) || s.common_pass_level > 3 || (needsCommon && s.common_pass_level < 1)) {
+    errors.push('Có bậc bắt buộc đạt SOP / ATTP: hãy chọn mức coi là “đạt” (1 đến 3) ở tab Kỹ năng.')
+  }
+  const r = s.rules
+  if (!isWholeNonNegative(r?.reason_min_chars) || !isWholeNonNegative(r?.exception_reason_min_chars)) {
+    errors.push('Số ký tự tối thiểu của lý do phải là số nguyên không âm.')
+  }
+  if (!Array.isArray(r?.non_working_weekdays) || !r.non_working_weekdays.every((d) => isWholeNonNegative(d) && d <= 6)) {
+    errors.push('Ngày nghỉ trong tuần không hợp lệ.')
+  } else if (r.non_working_weekdays.length >= 7) {
+    errors.push('Phải còn ít nhất một ngày làm việc trong tuần.')
+  }
+  if (r?.months_from !== 'hire_date' && r?.months_from !== 'first_placement') errors.push('Cách tính số tháng không hợp lệ.')
+  if (r?.hours_from !== 'all_attendance' && r?.hours_from !== 'since_first_placement') errors.push('Cách tính số giờ không hợp lệ.')
+  if (r?.ft_mid_month !== 'prorate_days' && r?.ft_mid_month !== 'grade_at_period_end') errors.push('Cách tính Full-time đổi bậc giữa tháng không hợp lệ.')
   const a = s.approval
   if (!a.approver_roles?.length) errors.push('Phải chọn ít nhất một vai trò được duyệt nâng bậc.')
   if (!a.assessor_roles?.length) errors.push('Phải chọn ít nhất một vai trò được đánh giá.')
@@ -253,6 +275,10 @@ export function normalizeCareerPathSettings(raw: Partial<CareerPathSettings> | n
     grades,
     skills: Array.isArray(raw.skills) && raw.skills.length > 0 ? raw.skills : d.skills,
     approval: { ...d.approval, ...(raw.approval || {}) },
+    rules: { ...d.rules, ...(raw.rules || {}) },
     m1: { ...d.m1, ...(raw.m1 || {}) },
+    payroll_link_enabled: raw.payroll_link_enabled === true,
+    // Bản đã lưu trước khi có cờ này (có updated_at) coi như đã cài đặt.
+    configured: raw.configured === true || Boolean(raw.updated_at),
   }
 }

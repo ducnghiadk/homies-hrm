@@ -57,7 +57,9 @@ const SIDEBAR_ENTRIES: SidebarEntry[] = [
       { href: '/employees', label: 'Hồ sơ nhân sự', roles: MANAGER_ROLES },
       { href: '/employees/invitations', label: 'Lời mời tuyển dụng', roles: ADMIN_ROLES },
       { href: '/employees/contracts', label: 'Hợp đồng lao động', roles: MANAGER_ROLES },
-      { href: '/career-path', label: 'Lộ trình thăng tiến', roles: MANAGER_ROLES },
+      { href: '/career-path/placement', label: 'Xếp bậc nhân viên', roles: ADMIN_ROLES },
+      { href: '/career-path/assessment', label: 'Đánh giá kỹ năng', roles: ['store_manager', 'area_manager', 'hr_admin', 'ceo'] },
+      { href: '/career-path/review', label: 'Đề xuất & duyệt nâng bậc', roles: ['store_manager', 'area_manager', 'hr_admin', 'ceo'] },
       { href: '/onboarding', label: 'Học việc & Onboarding', roles: MANAGER_ROLES },
     ],
   },
@@ -116,6 +118,7 @@ const SIDEBAR_ENTRIES: SidebarEntry[] = [
       { href: '/kpi/violations', label: 'Sự cố & Vi phạm', roles: KPI_INCIDENT_ROLES },
       { href: '/news', label: 'Truyền thông nội bộ', roles: ALL_ROLES },
       { href: '/policies', label: 'Chính sách & Nội quy', roles: ALL_ROLES },
+      { href: '/career-path/me', label: 'Lộ trình của tôi', roles: ALL_ROLES },
     ],
   },
   {
