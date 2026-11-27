@@ -146,7 +146,12 @@ export const kpiBscSyncService = {
       evidence_refs: input.evidence_url ? [input.evidence_url] : [],
     }
 
-    await kpiAdapter.addIncident(kpiIncident, input.logged_by)
+    try {
+      await kpiAdapter.addIncident(kpiIncident, input.logged_by)
+    } catch (error) {
+      // Bản sao trong kho KPI không chặn việc ghi sổ lỗi BSC (cổng nhập bằng mã PIN không có phiên đăng nhập).
+      console.warn('[kpiBscSync] Chưa lưu được sự cố vào kho KPI trên máy chủ:', error)
+    }
 
     // 2. Tạo lỗi cho BSC Adapter
     let bscErrorId = ''

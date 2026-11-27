@@ -15,7 +15,7 @@ import {
 
 export interface KPIPeerReviewSettingsPanelProps {
   policy: KpiPeerReviewPolicy
-  runtimeMode: 'local_demo' | 'supabase_secure'
+  runtimeMode: 'local_demo' | 'supabase_secure' | 'server_secure'
   onChange(policy: KpiPeerReviewPolicy): void
   disabled?: boolean
 }
@@ -69,7 +69,7 @@ export function KPIPeerReviewSettingsPanel({
         ) : (
           <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800">
             <ShieldCheck size={14} className="shrink-0 text-emerald-600" />
-            <span className="font-medium">Supabase RLS Bảo Mật</span>
+            <span className="font-medium">{runtimeMode === 'server_secure' ? 'Lưu trên máy chủ, bảo mật' : 'Supabase RLS Bảo Mật'}</span>
           </div>
         )}
       </div>

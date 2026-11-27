@@ -1,6 +1,7 @@
 import { buildKpiSeed } from '../kpi/seed'
 import { createLocalKpiRepository } from '../kpi/local-repository'
 import { createSupabaseKpiRepository } from '../kpi/supabase-repository'
+import { createServerKpiRepository } from '../kpi/server-kpi-repository'
 import { createKpiSourceService, confirmManualPosSource } from '../kpi/source-service'
 import type { KpiIncidentPolicy } from '../kpi/incident-service'
 import type { CreateKpiSourceServiceOptions } from '../kpi/source-service'
@@ -10,9 +11,15 @@ import type { KpiDatabase } from '../kpi/repository'
 import { isRealDbMode } from './repository-config'
 
 const seed = buildKpiSeed()
-const repository = (process.env.NEXT_PUBLIC_KPI_REPOSITORY === 'supabase' || isRealDbMode())
+// Trên trình duyệt: dữ liệu KPI lưu trên máy chủ (/api/kpi/database), mọi máy dùng chung.
+// Kho trên trình duyệt chỉ còn dùng cho kiểm thử chạy ngoài trình duyệt.
+const useSupabase = process.env.NEXT_PUBLIC_KPI_REPOSITORY === 'supabase' || isRealDbMode()
+const useServer = !useSupabase && typeof window !== 'undefined'
+const repository = useSupabase
   ? createSupabaseKpiRepository()
-  : createLocalKpiRepository()
+  : useServer
+    ? createServerKpiRepository()
+    : createLocalKpiRepository()
 const STATIC_SOURCE_OPTIONS: CreateKpiSourceServiceOptions = {
   attendance_hours: {
     emp_pt1: {
@@ -82,6 +89,10 @@ const INCIDENT_POLICY: KpiIncidentPolicy = {
 }
 
 async function ensureSeeded() {
+  if (useServer) {
+    // Máy chủ là nguồn dữ liệu duy nhất: không dùng dữ liệu mẫu, không lùi về trình duyệt.
+    return repository.load()
+  }
   let current: KpiDatabase
   try {
     current = await repository.load()
@@ -217,6 +228,11 @@ export const kpiAdapter = {
       ],
     }
 
+    if (useServer) {
+      // Lỗi lưu (mất mạng, không đủ quyền, người khác vừa sửa) phải báo cho người dùng.
+      await repository.save(nextDb, current.revision)
+      return nextIncident
+    }
     try {
       await repository.save(nextDb, current.revision)
     } catch (saveError) {

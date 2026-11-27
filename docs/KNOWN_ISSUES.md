@@ -1,5 +1,14 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-27 (KPI tháng và đánh giá đồng nghiệp lưu trên máy chủ):
+  1) Nguyên nhân: toàn bộ dữ liệu KPI (bộ tiêu chí, kỳ KPI, phiếu chấm, sự cố, khiếu nại, lộ trình) và đánh giá đồng nghiệp ẩn danh chỉ lưu trên trình duyệt (`homies_kpi_saas_v1`, `homies_kpi_peer_review_demo_v1`), mỗi máy một bản, còn tự nạp dữ liệu mẫu; phiếu đánh giá đồng nghiệp và tên người chấm nằm ngay trên trình duyệt.
+  2) Cách giải quyết:
+     - `/api/kpi/database` (GET/PUT/POST): lưu KPI trên máy chủ (`kpi_database`), có số phiên bản chống ghi đè. Mỗi người chỉ nhận phần được xem (`kpi-access-policy.ts`): CEO/HR toàn bộ; quản lý vùng toàn chuỗi; quản lý cửa hàng/trưởng ca chi nhánh mình; nhân viên chỉ dữ liệu của mình. Cài đặt KPI chỉ CEO/HR sửa; nhân viên chỉ gửi được khiếu nại mới của mình; nhật ký chỉ ghi thêm.
+     - `/api/kpi/peer-reviews`: đánh giá đồng nghiệp chạy trên máy chủ (`kpi_peer_reviews`), vai trò lấy từ phiên đăng nhập, trình duyệt chỉ nhận đúng phần được xem; trưởng ca không thấy ai là người chấm.
+     - Máy chủ không tự nạp dữ liệu mẫu. Trang `/kpi/settings` khi còn trống có nút "Bắt đầu thiết lập chương trình mới" (bản nháp để trống mục tiêu/vị trí/điều kiện) và nút "Chuyển dữ liệu cũ lên máy chủ" (CEO/HR, một lần, chỉ khi máy chủ trống, không xóa dữ liệu trên trình duyệt).
+  3) Lưu ý vận hành: dữ liệu cũ trên trình duyệt có thể là dữ liệu mẫu, chỉ chuyển khi chắc là dữ liệu thật. Ứng dụng chưa có chỗ tạo hồ sơ đánh giá đồng nghiệp hằng tháng (trước đây chỉ có dữ liệu mẫu), nên đánh giá đồng nghiệp sẽ trống cho tới khi làm bước tạo tự động khi mở kỳ KPI. Còn 3 kiểm thử cũ trong `career-map-deployment-service.test.ts` đang lỗi từ trước, không liên quan.
+  4) File liên quan: `src/lib/kpi/kpi-access-policy.ts`, `src/lib/kpi/server-kpi-repository.ts`, `src/lib/kpi/starter-draft.ts`, `src/lib/server/kpi-viewer.ts`, `src/app/api/kpi/database/route.ts`, `src/app/api/kpi/peer-reviews/route.ts`, `src/lib/adapters/kpi-adapter.ts`, `src/lib/adapters/peer-review-adapter.ts`, `src/components/kpi/KpiServerSetupPanel.tsx`, `src/app/kpi/settings/page.tsx`, `src/lib/services/kpi-bsc-sync-service.ts`, `src/lib/server/db.ts`, `src/lib/server/supabase-store.ts`.
+
 - Đã fix 2026-11-27 (Bảng lương — làm nốt 3 điểm còn lại):
   1) Nguyên nhân:
      - Bảo hiểm của nhân viên toàn thời gian chỉ tính trên lương hợp đồng, bỏ sót phụ cấp ghi trong hợp đồng (Điều 89 Luật BHXH).

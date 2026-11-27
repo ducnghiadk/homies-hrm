@@ -4,6 +4,8 @@ import type { CareerPathSettings } from '@/lib/career-path/settings'
 import type { CareerPlacement, CareerGradeHistoryEntry } from '@/lib/career-path/placement'
 import type { SkillAssessmentEntry } from '@/lib/career-path/assessment'
 import type { PromotionProposal } from '@/lib/career-path/promotion'
+import type { KpiDatabase } from '@/lib/kpi/repository'
+import type { LocalPeerReviewDatabase } from '@/lib/kpi/local-peer-review-repository'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
@@ -662,6 +664,10 @@ export interface ServerDatabaseSchema {
   career_grade_history?: CareerGradeHistoryEntry[]
   career_skill_assessments?: SkillAssessmentEntry[]
   career_promotions?: PromotionProposal[]
+  /** KPI tháng (bộ tiêu chí, kỳ KPI, phiếu chấm, sự cố, khiếu nại) dùng chung mọi máy. Trống cho đến khi CEO/HR thiết lập hoặc chuyển dữ liệu cũ lên. */
+  kpi_database?: KpiDatabase
+  /** Đánh giá đồng nghiệp ẩn danh: chỉ máy chủ đọc trực tiếp, người dùng chỉ nhận phần được phép xem. */
+  kpi_peer_reviews?: LocalPeerReviewDatabase
   sessions: Record<string, { userId: string; role: string; email: string; createdAt: string; mustChangePassword?: boolean }>
 }
 

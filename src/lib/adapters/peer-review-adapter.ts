@@ -12,8 +12,9 @@ import {
   type PeerResponseDraftInput,
 } from '../kpi/index.ts'
 import { supabase, isSupabaseConfigured } from '../supabase.ts'
+import { createServerPeerReviewRepository } from '../kpi/server-kpi-repository.ts'
 
-export type PeerReviewRuntimeMode = 'local_demo' | 'supabase_secure'
+export type PeerReviewRuntimeMode = 'local_demo' | 'supabase_secure' | 'server_secure'
 
 export interface PeerReviewAdapter extends KpiPeerReviewRepository {
   getRuntimeMode(): PeerReviewRuntimeMode
@@ -24,6 +25,8 @@ export interface CreatePeerReviewAdapterOptions {
   supabaseConfigured: boolean
   localRepository: KpiPeerReviewRepository
   secureRepository?: KpiPeerReviewRepository
+  /** Kho trên máy chủ (/api/kpi/peer-reviews): phiếu và người chấm chỉ máy chủ đọc. */
+  serverRepository?: KpiPeerReviewRepository
 }
 
 export function buildPeerCandidateFacts(input: {
@@ -214,6 +217,9 @@ export function createPeerReviewAdapter(
     }
     return new PeerReviewAdapterService(options.secureRepository, 'supabase_secure')
   }
+  if (options.requestedMode === 'server_secure' && options.serverRepository) {
+    return new PeerReviewAdapterService(options.serverRepository, 'server_secure')
+  }
 
   return new PeerReviewAdapterService(options.localRepository, 'local_demo')
 }
@@ -221,14 +227,18 @@ export function createPeerReviewAdapter(
 const localRepository = createLocalPeerReviewRepository({
   initialData: buildPeerReviewDemoSeed(),
 })
+// Trên trình duyệt: đánh giá đồng nghiệp chạy trên máy chủ, không còn dữ liệu mẫu trên trình duyệt.
 const requestedMode: PeerReviewRuntimeMode = process.env.NEXT_PUBLIC_KPI_REPOSITORY === 'supabase'
   ? 'supabase_secure'
-  : 'local_demo'
+  : typeof window !== 'undefined'
+    ? 'server_secure'
+    : 'local_demo'
 
 export const peerReviewAdapter = createPeerReviewAdapter({
   requestedMode,
   supabaseConfigured: isSupabaseConfigured,
   localRepository,
+  serverRepository: typeof window !== 'undefined' ? createServerPeerReviewRepository() : undefined,
   secureRepository: isSupabaseConfigured
     ? createSupabasePeerReviewRepository(supabase as unknown as import('../kpi/index.ts').SupabaseClientLike)
     : undefined,
