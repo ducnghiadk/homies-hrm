@@ -51,6 +51,7 @@ import {
   DEFAULT_KPI_POLICY,
   cloneAsNextDraft,
   createSingleStageExceptionDraft,
+  deriveProgramScopeFromCareerMap,
   publishVersion,
   validateKpiSet,
   getDefaultPeerReviewPolicy,
@@ -594,6 +595,28 @@ export default function KPISettingsPage() {
     toast.success('Đã chuẩn bị bộ chuẩn Homies. Hãy xem lại trước khi áp dụng.')
   }
 
+  /** Bản nháp còn trống chức danh / chặng tăng bậc thì lấy theo Sơ đồ lộ trình ở bước 2. */
+  function careerMapScopePatch(version: KpiSetVersion): Partial<KpiSetVersion> {
+    const hasPositions = Boolean(version.position_ids?.length)
+    const rule = version.promotion_rule
+    const hasPath = Boolean(rule?.from_position_id && rule?.to_position_id && rule.from_position_id !== rule.to_position_id)
+    if (hasPositions && hasPath) return {}
+    const derived = deriveProgramScopeFromCareerMap(activeCareerMap)
+    if (!derived) return {}
+    return {
+      ...(hasPositions ? {} : { position_ids: derived.position_ids }),
+      ...(hasPath
+        ? {}
+        : {
+            promotion_rule: getDefaultPromotionRule(
+              derived.from_position_id,
+              derived.to_position_id,
+              'employee_to_leader'
+            ),
+          }),
+    }
+  }
+
   async function handleSourcesContinue() {
     if (!selectedVersion) return
     const sourcePolicy =
@@ -602,12 +625,17 @@ export default function KPISettingsPage() {
         selectedVersion.primary_purpose || 'promotion',
         isManagerAudience ? 'manager' : 'employee'
       )
-    await updateProgramMetadata({ source_policy: sourcePolicy, program_setup_step: 'readiness' })
+    await updateProgramMetadata({
+      ...careerMapScopePatch(selectedVersion),
+      source_policy: sourcePolicy,
+      program_setup_step: 'readiness',
+    })
   }
 
   async function handleSelectProgramStep(step: KpiProgramSetupStep) {
     if (!selectedVersion || step === currentProgramStep) return
-    await updateProgramMetadata({ program_setup_step: step })
+    const scopePatch = step === 'purpose' || step === 'scope' ? {} : careerMapScopePatch(selectedVersion)
+    await updateProgramMetadata({ ...scopePatch, program_setup_step: step })
   }
 
   async function handlePublishVersion(mode: 'now' | 'scheduled') {

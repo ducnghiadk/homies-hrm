@@ -331,7 +331,7 @@ describe('evaluation-service', () => {
 
     assert.throws(
       () => autosaveEvaluation(autosaved, 0),
-      /Du lieu da duoc nguoi khac cap nhat/
+      /Dữ liệu KPI vừa được người khác cập nhật/
     )
 
     assert.throws(

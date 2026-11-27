@@ -6,6 +6,7 @@ export {
   buildCareerStageSuggestions,
   createCareerStageDrafts,
   createSingleStageExceptionDraft,
+  deriveProgramScopeFromCareerMap,
   getAdjacentCareerTargetIds,
   getDefaultPromotionRule,
   getDefaultSourcePolicy,

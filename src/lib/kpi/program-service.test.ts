@@ -269,3 +269,24 @@ describe('KPI program defaults', () => {
     )
   })
 })
+
+describe('deriveProgramScopeFromCareerMap', () => {
+  it('lấy chức danh và chặng tăng bậc đầu tiên từ sơ đồ lộ trình', async () => {
+    const { deriveProgramScopeFromCareerMap } = await import('./program-service.ts')
+    const node = (id: string, position_id: string, level: number) => ({ id, position_id, position_level_snapshot: level, active: true })
+    const map = {
+      nodes: [node('n1', 'pos_staff', 1), node('n2', 'pos_staff', 2), node('n3', 'pos_leader', 4)],
+      edges: [
+        { id: 'e1', source_node_id: 'n1', target_node_id: 'n2', active: true },
+        { id: 'e2', source_node_id: 'n2', target_node_id: 'n3', active: true },
+      ],
+    } as never
+    const scope = deriveProgramScopeFromCareerMap(map)
+    assert.deepEqual(scope, { position_ids: ['pos_staff', 'pos_leader'], from_position_id: 'pos_staff', to_position_id: 'pos_leader' })
+  })
+
+  it('trả về null khi chưa có sơ đồ', async () => {
+    const { deriveProgramScopeFromCareerMap } = await import('./program-service.ts')
+    assert.equal(deriveProgramScopeFromCareerMap(null), null)
+  })
+})

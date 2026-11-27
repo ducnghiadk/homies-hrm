@@ -1,5 +1,11 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-27 (Lưu KPI luôn báo "dữ liệu đã được người khác cập nhật"):
+  1) Nguyên nhân: `kpi-adapter.ts` vẫn chọn kho Supabase cũ (bảng `kpi_*`, dữ liệu mẫu, không có số phiên bản) khi `NEXT_PUBLIC_USE_REAL_SUPABASE` bật sẵn trên Vercel, thay vì kho máy chủ `/api/kpi/database`; mọi lần lưu bị coi là xung đột. Ngoài ra bước Xem trước không cho Phát hành vì bản nháp thiếu chức danh / chặng tăng bậc dù Sơ đồ lộ trình đã có.
+  2) Cách giải quyết: trình duyệt luôn dùng kho máy chủ (chỉ đọc thẳng Supabase khi đặt riêng `NEXT_PUBLIC_KPI_REPOSITORY=supabase`); thông báo lỗi đổi sang tiếng Việt có dấu; khi qua bước Cách đánh giá / Điều kiện / Xem trước, bản nháp tự lấy chức danh và chặng tăng bậc từ Sơ đồ lộ trình nếu còn trống (`deriveProgramScopeFromCareerMap`, có test).
+  3) Lưu ý vận hành: máy chủ KPI đang trống; bản nháp "KPI cửa hàng tháng 09/2026" cũ là dữ liệu mẫu. Sau khi triển khai, CEO/HR vào `/kpi/settings`, bấm "Bắt đầu thiết lập chương trình mới" rồi thiết lập lại.
+  4) File liên quan: `src/lib/adapters/kpi-adapter.ts`, `src/lib/kpi/program-service.ts`, `src/lib/kpi/index.ts`, `src/app/kpi/settings/page.tsx`, `src/lib/kpi/local-repository.ts`, `src/lib/kpi/supabase-repository.ts`, `src/lib/kpi/evaluation-service.ts`.
+
 - Đã fix 2026-11-27 (Tự tạo phiếu đánh giá đồng nghiệp hằng tháng):
   1) Nguyên nhân: ứng dụng không có chỗ nào tạo hồ sơ đánh giá tháng, nên đánh giá đồng nghiệp luôn trống; việc quá hạn chọn người / nộp phiếu cũng không có ai đẩy bước tiếp theo.
   2) Cách giải quyết: `src/lib/kpi/peer-review-scheduler.ts` (có test) chạy trên máy chủ mỗi khi có người lưu KPI hoặc thao tác đánh giá đồng nghiệp. Kỳ KPI ở trạng thái "Đang thu thập" thì mỗi nhân viên / trưởng ca trong kỳ có một hồ sơ tháng: người chấm chính là trưởng ca làm chung nhiều ca nhất (không có thì quản lý cửa hàng), trưởng ca do quản lý cửa hàng chấm; danh sách đồng nghiệp có thể chấm xếp theo số ca làm chung lấy từ chấm công thật của tháng. Quá hạn quản lý chọn thì hệ thống tự chọn người đứng đầu; đủ phiếu hoặc hết hạn nộp thì chuyển sang người chấm chính, thiếu phiếu thì đánh dấu thiếu mẫu (điểm đồng nghiệp không tính). Mọi con số lấy từ Cài đặt đánh giá đồng nghiệp của chương trình KPI.

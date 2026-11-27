@@ -223,7 +223,7 @@ export function submitEvaluation(evaluation: KpiEvaluation, actor: KpiActor): Kp
 
 export function autosaveEvaluation(evaluation: KpiEvaluation, nextRevision: number): KpiEvaluation {
   if (nextRevision <= evaluation.revision) {
-    throw new Error('Du lieu da duoc nguoi khac cap nhat')
+    throw new Error('Dữ liệu KPI vừa được người khác cập nhật')
   }
 
   return {

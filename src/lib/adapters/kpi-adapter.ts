@@ -8,12 +8,15 @@ import type { CreateKpiSourceServiceOptions } from '../kpi/source-service'
 import type { KpiIncident } from '../kpi/types'
 import type { KpiDatabase } from '../kpi/repository'
 
-import { isRealDbMode } from './repository-config'
 
 const seed = buildKpiSeed()
 // Trên trình duyệt: dữ liệu KPI lưu trên máy chủ (/api/kpi/database), mọi máy dùng chung.
 // Kho trên trình duyệt chỉ còn dùng cho kiểm thử chạy ngoài trình duyệt.
-const useSupabase = process.env.NEXT_PUBLIC_KPI_REPOSITORY === 'supabase' || isRealDbMode()
+// Lưu ý: không dựa vào NEXT_PUBLIC_USE_REAL_SUPABASE (isRealDbMode) nữa. Cờ đó bật sẵn trên Vercel
+// nên trước đây trình duyệt đọc/ghi thẳng bảng kpi_* (dữ liệu mẫu cũ, số phiên bản lệch) thay vì
+// máy chủ, gây lỗi "dữ liệu đã được người khác cập nhật" ở mọi lần lưu.
+// Chỉ đọc thẳng Supabase khi đặt riêng NEXT_PUBLIC_KPI_REPOSITORY=supabase (giống đánh giá đồng nghiệp).
+const useSupabase = process.env.NEXT_PUBLIC_KPI_REPOSITORY === 'supabase'
 const useServer = !useSupabase && typeof window !== 'undefined'
 const repository = useSupabase
   ? createSupabaseKpiRepository()

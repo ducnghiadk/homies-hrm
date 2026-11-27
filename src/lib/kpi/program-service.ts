@@ -11,6 +11,7 @@ import type {
   KpiReviewSource,
   KpiSetVersion,
 } from './types.ts'
+import type { KpiCareerMapNode, KpiCareerMapVersion } from './career-map-types.ts'
 import { createVersionFromTemplate, getFnbTemplate } from './fnb-template-catalog.ts'
 import {
   getDefaultPeerReviewPolicy,
@@ -611,4 +612,32 @@ export function validateProgramVersion(version: KpiSetVersion): KpiProgramValida
   }
 
   return issues
+}
+
+/**
+ * Lấy phạm vi chương trình (chức danh áp dụng + chặng xét tăng bậc) từ Sơ đồ lộ trình.
+ * Bước "Lộ trình" chỉ còn chỉnh sơ đồ, không còn ô chọn chức danh riêng, nên khi bản nháp
+ * còn trống chức danh thì lấy theo sơ đồ để chương trình phát hành được.
+ * Chặng xét tăng bậc là đường nối đầu tiên (theo cấp thấp nhất) giữa hai chức danh khác nhau.
+ */
+export function deriveProgramScopeFromCareerMap(
+  map: Pick<KpiCareerMapVersion, 'nodes' | 'edges'> | null | undefined,
+): { position_ids: string[]; from_position_id: string; to_position_id: string } | null {
+  if (!map || !map.nodes?.length) return null
+  const nodes = map.nodes.filter((node) => node.active !== false)
+  const nodeById = new Map(nodes.map((node) => [node.id, node]))
+  const positionIds = [...new Set(nodes.map((node) => node.position_id).filter(Boolean))]
+  const crossEdges = (map.edges || [])
+    .filter((edge) => edge.active !== false)
+    .map((edge) => ({ source: nodeById.get(edge.source_node_id), target: nodeById.get(edge.target_node_id) }))
+    .filter((pair): pair is { source: KpiCareerMapNode; target: KpiCareerMapNode } =>
+      Boolean(pair.source && pair.target && pair.source.position_id !== pair.target.position_id))
+    .sort((a, b) => (a.source.position_level_snapshot ?? 0) - (b.source.position_level_snapshot ?? 0))
+  const first = crossEdges[0]
+  if (!positionIds.length || !first) return null
+  return {
+    position_ids: positionIds,
+    from_position_id: first.source.position_id,
+    to_position_id: first.target.position_id,
+  }
 }
