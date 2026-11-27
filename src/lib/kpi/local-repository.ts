@@ -54,7 +54,7 @@ export function createLocalKpiRepository(options: LocalKpiRepositoryOptions = {}
       const current = await this.load()
 
       if (current.revision !== expectedRevision) {
-        throw new Error('Du lieu da duoc nguoi khac cap nhat. Vui long tai lai va thu lai.')
+        throw new Error('Dữ liệu KPI vừa được người khác cập nhật. Vui lòng tải lại trang rồi thử lại.')
       }
 
       const normalized = normalizeDatabase(next)

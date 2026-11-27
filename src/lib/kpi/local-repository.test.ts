@@ -45,7 +45,7 @@ describe('createLocalKpiRepository', () => {
 
     await assert.rejects(
       repo.save({ ...first, revision: first.revision + 1 }, first.revision),
-      /Du lieu da duoc nguoi khac cap nhat/
+      /Dữ liệu KPI vừa được người khác cập nhật/
     )
   })
 

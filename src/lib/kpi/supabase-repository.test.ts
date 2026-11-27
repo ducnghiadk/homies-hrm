@@ -291,7 +291,7 @@ describe('createSupabaseKpiRepository', () => {
 
     await assert.rejects(
       repo.save({ ...current, revision: 8 }, 6),
-      /Du lieu da duoc nguoi khac cap nhat/
+      /Dữ liệu KPI vừa được người khác cập nhật/
     )
 
     assert.equal(fake.calls.filter((item) => item.type === 'replace').length, 0)
@@ -344,7 +344,7 @@ describe('createSupabaseKpiRepository', () => {
 
     await assert.rejects(
       repo.save({ ...current, revision: 8 }, 7),
-      /Khong the dong bo KPI len Supabase luc nay/
+      /Không thể đồng bộ KPI lên Supabase lúc này/
     )
   })
 
