@@ -66,6 +66,10 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
   + `src/components/payroll/PitSettingsPanel.tsx`: khoi cai dat thue TNCN trong `/settings/payroll` (muc giam tru, bieu thue, khau tru part-time).
   + `src/lib/time/vn-time.ts`: lay ngay/gio theo gio Viet Nam (UTC+7) cho may chu chay UTC.
   + `src/app/api/payroll/route.ts`: GET xuat bang tinh luong chi tiet doi soat tung dong voi iPOS, quan ly cot late_deduction.
+  + `src/app/api/kpi/database/route.ts`: GET/PUT du lieu KPI thang tren may chu (`kpi_database`) loc theo quyen, chong ghi de theo `revision`; POST chuyen du lieu KPI cu tu trinh duyet (CEO/HR, khi may chu trong). Quy tac quyen: `src/lib/kpi/kpi-access-policy.ts` (co test).
+  + `src/app/api/kpi/peer-reviews/route.ts`: danh gia dong nghiep an danh chay tren may chu (`kpi_peer_reviews`), POST `{action, args}`, vai tro lay tu phien (`src/lib/server/kpi-viewer.ts`).
+  + `src/lib/kpi/peer-review-scheduler.ts` (co test) + `src/lib/server/kpi-peer-sync.ts`: tu tao ho so danh gia dong nghiep thang khi ky KPI o trang thai collecting (xep nguoi cham theo so ca lam chung tu cham cong), tu chon nguoi / dong thu phieu khi qua han; goi trong PUT `/api/kpi/database` va POST `/api/kpi/peer-reviews`.
+  + `src/lib/kpi/server-kpi-repository.ts`: kho KPI/danh gia dong nghiep phia trinh duyet goi 2 API tren; `src/lib/kpi/starter-draft.ts`: ban nhap KPI dau tien de trong; `src/components/kpi/KpiServerSetupPanel.tsx`: man bat dau/chuyen du lieu cu tai `/kpi/settings`.
   + `src/app/api/kpi/incidents/route.ts`: GET & POST ho so vi pham ky luat cham cong va su co van hanh dong bo giua CSDL server va So loi KPI.
   + `src/app/payroll/lock/route.ts`: POST khoa so bang luong thang (chi CEO / HR Admin).
   + `src/app/checkin/kiosk/page.tsx`: man hinh Kiosk QR Code dong full-screen quay bar.

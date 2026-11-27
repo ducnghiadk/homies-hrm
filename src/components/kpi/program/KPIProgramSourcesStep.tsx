@@ -27,7 +27,7 @@ import {
 export type KPIProgramSourcesStepProps = {
   policy: KpiEvaluationSourcePolicy
   peerReviewPolicy?: KpiPeerReviewPolicy
-  runtimeMode?: 'local_demo' | 'supabase_secure'
+  runtimeMode?: 'local_demo' | 'supabase_secure' | 'server_secure'
   purpose: KpiProgramPurpose
   audience: 'employee' | 'manager'
   onChange(policy: KpiEvaluationSourcePolicy): void

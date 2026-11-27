@@ -40,6 +40,8 @@ import { employeeAdapter } from '@/lib/adapters/employee-adapter'
 import { MasterDataAdapter } from '@/lib/adapters/master-data-adapter'
 import { getFnbTemplate } from '@/lib/kpi/fnb-template-catalog'
 import { buildHomiesCareerMapSeed } from '@/lib/kpi/seed'
+import { buildStarterKpiDraft } from '@/lib/kpi/starter-draft'
+import { KpiServerSetupPanel } from '@/components/kpi/KpiServerSetupPanel'
 import { inferJobFamily, inferPositionLevel, selectEditableCareerMap } from '@/lib/kpi/career-map-service'
 import type {
   KpiCareerPositionSnapshot,
@@ -274,6 +276,7 @@ export default function KPISettingsPage() {
   const router = useRouter()
 
   const [database, setDatabase] = useState<KpiDatabase | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [stores, setStores] = useState<Array<{ id: string; name: string }>>([])
   const [positions, setPositions] = useState<Array<{ id: string; name: string; level?: number }>>([])
   const [employees, setEmployees] = useState<
@@ -344,12 +347,14 @@ export default function KPISettingsPage() {
       setActiveGroupId(preferredVersion?.groups[0]?.id ?? '')
     }
 
-    void loadData()
+    void loadData().catch((error) => {
+      if (!cancelled) toast.error(error instanceof Error ? error.message : 'Chưa tải được dữ liệu KPI từ máy chủ.')
+    })
 
     return () => {
       cancelled = true
     }
-  }, [user])
+  }, [user, reloadKey])
 
   useEffect(() => {
     if (user && !['ceo', 'hr_admin'].includes(user.role)) router.push('/kpi')
@@ -791,6 +796,26 @@ export default function KPISettingsPage() {
 
   if (!user || !['ceo', 'hr_admin'].includes(user.role)) {
     return null
+  }
+
+  if (database && database.sets.length === 0) {
+    return (
+      <AppShell showNav className="w-full max-w-none bg-[#FFF8E8] min-h-screen">
+        <KpiServerSetupPanel
+          onImported={() => setReloadKey((key) => key + 1)}
+          onStartBlank={async () => {
+            const draft = buildStarterKpiDraft(user.id)
+            try {
+              await persistDatabase((latest) => ({ ...latest, sets: [draft, ...latest.sets] }))
+              setSelectedVersionId(draft.id)
+              setActiveGroupId(draft.groups[0]?.id ?? '')
+            } catch {
+              // persistDatabase đã báo lỗi cho người dùng
+            }
+          }}
+        />
+      </AppShell>
+    )
   }
 
   if (!database || !selectedVersion) {

@@ -44,6 +44,8 @@ export const PERSISTED_KEYS = [
   'career_grade_history',
   'career_skill_assessments',
   'career_promotions',
+  'kpi_database',
+  'kpi_peer_reviews',
 ] as const
 
 const TABLE_NAME = 'homies_runtime_store'
