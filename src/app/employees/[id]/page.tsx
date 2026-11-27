@@ -39,6 +39,8 @@ type EmployeeProfileExtras = {
   pit_contract_term?: '' | 'khong_hop_dong' | 'duoi_3_thang' | 'tu_3_thang'
   pit_commitment_08?: boolean
   insurance_salary?: number
+  weekly_rest_days?: number[]
+  contract_insurance_allowances?: number
   marital_status?: string
 }
 
@@ -77,6 +79,8 @@ type EditFormData = {
   pit_contract_term: '' | 'khong_hop_dong' | 'duoi_3_thang' | 'tu_3_thang'
   pit_commitment_08: boolean
   insurance_salary: string
+  weekly_rest_days: number[]
+  contract_insurance_allowances: string
 }
 
 type EditFormErrors = Partial<Record<keyof EditFormData, string>>
@@ -267,6 +271,8 @@ const buildEditForm = (employee: AuthUser, profile?: EmployeeProfileExtras): Edi
   pit_contract_term: profile?.pit_contract_term || '',
   pit_commitment_08: profile?.pit_commitment_08 === true,
   insurance_salary: typeof profile?.insurance_salary === 'number' && profile.insurance_salary > 0 ? String(profile.insurance_salary) : '',
+  contract_insurance_allowances: typeof profile?.contract_insurance_allowances === 'number' && profile.contract_insurance_allowances > 0 ? String(profile.contract_insurance_allowances) : '',
+  weekly_rest_days: Array.isArray(profile?.weekly_rest_days) ? profile.weekly_rest_days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6) : [],
 })
 
 export default function EmployeeDetailPage() {
@@ -367,6 +373,8 @@ export default function EmployeeDetailPage() {
     pit_contract_term: '',
     pit_commitment_08: false,
     insurance_salary: '',
+    weekly_rest_days: [],
+    contract_insurance_allowances: '',
   })
 
   const employeeId = params.id as string
@@ -604,6 +612,8 @@ export default function EmployeeDetailPage() {
         pit_contract_term: editForm.pit_contract_term || undefined,
         pit_commitment_08: editForm.pit_commitment_08,
         insurance_salary: Number(editForm.insurance_salary) > 0 ? Number(editForm.insurance_salary) : undefined,
+        contract_insurance_allowances: Number(editForm.contract_insurance_allowances) > 0 ? Number(editForm.contract_insurance_allowances) : undefined,
+        weekly_rest_days: editForm.weekly_rest_days.length > 0 ? [...editForm.weekly_rest_days].sort() : undefined,
       }
       if (salaryToSave !== undefined) {
         profileUpdates.official_salary = salaryToSave
@@ -1371,6 +1381,49 @@ export default function EmployeeDetailPage() {
                       />
                       <span className="mt-1 block text-[11px] text-gray-500">
                         Không được thấp hơn lương ghi trong hợp đồng và lương tối thiểu vùng; nếu thấp hơn, bảng lương sẽ cảnh báo.
+                      </span>
+                    </FormField>
+
+                    <FormField label="Phụ cấp ghi trong hợp đồng tính đóng bảo hiểm (toàn thời gian)">
+                      <input
+                        type="number"
+                        min={0}
+                        value={editForm.contract_insurance_allowances}
+                        onChange={e => setEditForm({ ...editForm, contract_insurance_allowances: e.target.value })}
+                        className={getInputClassName(false)}
+                        placeholder="Để trống: không có phụ cấp tính bảo hiểm"
+                      />
+                      <span className="mt-1 block text-[11px] text-gray-500">
+                        Tổng tiền các phụ cấp ghi trong hợp đồng mỗi tháng (chức vụ, trách nhiệm, thâm niên...). Không gồm tiền cơm, chuyên cần, xăng xe, điện thoại. Khi ô &quot;Mức lương đóng bảo hiểm&quot; để trống, bảng lương đóng theo lương hợp đồng cộng số này.
+                      </span>
+                    </FormField>
+
+                    <FormField label="Ngày nghỉ hằng tuần riêng (để trống = theo Cài đặt lương)">
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { d: 1, label: 'T2' }, { d: 2, label: 'T3' }, { d: 3, label: 'T4' }, { d: 4, label: 'T5' },
+                          { d: 5, label: 'T6' }, { d: 6, label: 'T7' }, { d: 0, label: 'CN' },
+                        ].map(({ d, label }) => {
+                          const selected = editForm.weekly_rest_days.includes(d)
+                          return (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => setEditForm({
+                                ...editForm,
+                                weekly_rest_days: selected
+                                  ? editForm.weekly_rest_days.filter(x => x !== d)
+                                  : [...editForm.weekly_rest_days, d],
+                              })}
+                              className={`rounded-lg border px-2.5 py-1 text-xs font-bold ${selected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-200 bg-white text-gray-600'}`}
+                            >
+                              {label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <span className="mt-1 block text-[11px] text-gray-500">
+                        Làm thêm giờ vào ngày được chọn tính theo hệ số &quot;OT Ngày Nghỉ&quot;. Không chọn ngày nào thì dùng ngày nghỉ tuần chung trong Cài đặt lương.
                       </span>
                     </FormField>
                   </>

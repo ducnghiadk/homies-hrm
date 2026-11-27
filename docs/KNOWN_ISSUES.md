@@ -1,5 +1,17 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-27 (Bảng lương — làm nốt 3 điểm còn lại):
+  1) Nguyên nhân:
+     - Bảo hiểm của nhân viên toàn thời gian chỉ tính trên lương hợp đồng, bỏ sót phụ cấp ghi trong hợp đồng (Điều 89 Luật BHXH).
+     - Ngày nghỉ hằng tuần chỉ có một cài đặt chung cho cả chuỗi, không chọn riêng được cho từng người.
+     - Màn dự báo chi phí nhân sự viết cứng danh sách ngày lễ 2026 và coi Thứ 7, Chủ nhật là cuối tuần.
+  2) Cách giải quyết:
+     - Hồ sơ nhân viên có ô "Phụ cấp ghi trong hợp đồng tính đóng bảo hiểm" (`contract_insurance_allowances`), để trống = 0. Khi ô "Mức lương đóng bảo hiểm" để trống, bảng lương đóng theo lương hợp đồng + số này; cảnh báo `muc_dong_bh_thap` cũng so với tổng này.
+     - Hồ sơ nhân viên có "Ngày nghỉ hằng tuần riêng" (`weekly_rest_days`), để trống = theo Cài đặt lương; bảng lương dùng ngày riêng khi tính tăng ca ngày nghỉ.
+     - `mock-data-labor-cost.ts` đọc ngày lễ và ngày nghỉ tuần từ Cài đặt lương; để trống = không có.
+  3) Lưu ý vận hành: HR cần nhập phụ cấp hợp đồng cho từng nhân viên toàn thời gian có phụ cấp; các ô mới hiện lưu cùng chỗ với "Mức lương đóng bảo hiểm".
+  4) File liên quan: `src/lib/payroll-engine.ts`, `src/lib/mock-data-labor-cost.ts`, `src/app/employees/[id]/page.tsx`, `src/store/auth-store.ts`.
+
 - Đã fix 2026-11-26 (Mức lương đóng bảo hiểm riêng từng nhân viên):
   1) Nguyên nhân: mức đóng bảo hiểm luôn tự tính (toàn thời gian = lương hợp đồng, bán thời gian = lương thực nhận trong tháng), HR không chọn được mức đóng cho từng người.
   2) Cách giải quyết: hồ sơ nhân viên có ô "Mức lương đóng bảo hiểm" (`insurance_salary`), để trống = tự tính như cũ. Khi có nhập, bảng lương dùng mức này (vẫn áp trần BH) và gắn cảnh báo `muc_dong_bh_thap` nếu thấp hơn lương hợp đồng hoặc lương tối thiểu vùng trong Cài đặt lương; không chặn tính lương.

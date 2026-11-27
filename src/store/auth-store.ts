@@ -63,6 +63,10 @@ export type AuthUser = {
   pit_commitment_08?: boolean
   /** Mức lương đóng bảo hiểm do HR nhập (để trống = tính theo lương cơ bản / lương thực nhận). */
   insurance_salary?: number
+  /** Ngày nghỉ hằng tuần riêng của nhân viên (0 = Chủ nhật ... 6 = Thứ Bảy). Để trống = theo Cài đặt lương. */
+  weekly_rest_days?: number[]
+  /** Tổng phụ cấp ghi trong hợp đồng phải tính đóng BH (toàn thời gian). Để trống = 0. */
+  contract_insurance_allowances?: number
   marital_status?: string
   ethnicity?: string
   religion?: string
