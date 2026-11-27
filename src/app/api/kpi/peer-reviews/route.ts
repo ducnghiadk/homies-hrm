@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb } from '@/lib/server/db'
 import { isAdminRole, requireAuth } from '@/lib/server/auth-helper'
 import { buildKpiActor } from '@/lib/server/kpi-viewer'
+import { syncPeerReviewsFromServerDb } from '@/lib/server/kpi-peer-sync'
+import { normalizeKpiDatabase } from '@/lib/kpi/kpi-access-policy'
 import {
   createEmptyLocalPeerReviewDatabase,
   createLocalPeerReviewRepository,
@@ -107,9 +109,13 @@ export async function POST(req: NextRequest) {
       ? rawArgs.slice(0, 2)
       : rawArgs
 
-  // Kho tạm trong bộ nhớ, nạp từ máy chủ; mọi kiểm tra quyền nằm trong kho đánh giá đồng nghiệp.
+  // Trước mỗi thao tác: tự tạo hồ sơ tháng cho kỳ KPI đang thu thập và đẩy các bước quá hạn.
   const before = JSON.stringify(current)
-  let snapshot = before
+  const synced = syncPeerReviewsFromServerDb(db, normalizeKpiDatabase(db.kpi_database), current)
+  const working = synced.peer
+
+  // Kho tạm trong bộ nhớ, nạp từ máy chủ; mọi kiểm tra quyền nằm trong kho đánh giá đồng nghiệp.
+  let snapshot = JSON.stringify(working)
   const storage = {
     getItem: (key: string) => (key === STORAGE_KEY ? snapshot : null),
     setItem: (key: string, value: string) => { if (key === STORAGE_KEY) snapshot = value },
@@ -118,7 +124,7 @@ export async function POST(req: NextRequest) {
   const repository = createLocalPeerReviewRepository({
     storage: storage as unknown as Storage,
     storageKey: STORAGE_KEY,
-    initialData: current,
+    initialData: working,
   })
   const actor = buildKpiActor(gate.user)
 

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerDb, saveServerDb } from '@/lib/server/db'
 import { ADMIN_ROLES, isAdminRole, requireAuth } from '@/lib/server/auth-helper'
 import { buildKpiViewer } from '@/lib/server/kpi-viewer'
+import { syncPeerReviewsFromServerDb } from '@/lib/server/kpi-peer-sync'
+import { createEmptyLocalPeerReviewDatabase, type LocalPeerReviewDatabase } from '@/lib/kpi/local-peer-review-repository'
 import {
   filterKpiDatabaseForViewer,
   isKpiDatabaseEmpty,
@@ -15,6 +17,17 @@ import {
 // Mỗi người chỉ nhận phần được phép xem; khi lưu, máy chủ ghép theo quyền (xem kpi-access-policy).
 
 const MAX_BYTES = 8_000_000
+
+function readPeerDb(input: LocalPeerReviewDatabase | undefined): LocalPeerReviewDatabase {
+  const empty = createEmptyLocalPeerReviewDatabase()
+  if (!input || typeof input !== 'object') return empty
+  return {
+    ...empty,
+    ...input,
+    candidates_by_review: input.candidates_by_review || {},
+    employee_names: input.employee_names || {},
+  }
+}
 
 function saveFailed(reason?: string) {
   return NextResponse.json(
@@ -72,6 +85,9 @@ export async function PUT(req: NextRequest) {
   }
 
   db.kpi_database = merged
+  // Kỳ KPI vừa chuyển sang "đang thu thập": tự tạo hồ sơ đánh giá đồng nghiệp tháng cho từng người.
+  const peerSync = syncPeerReviewsFromServerDb(db, merged, readPeerDb(db.kpi_peer_reviews))
+  if (peerSync.changed) db.kpi_peer_reviews = peerSync.peer
   const result = await saveServerDb(db)
   if (!result.ok) return saveFailed(result.reason)
   return NextResponse.json({ success: true, data: filterKpiDatabaseForViewer(merged, viewer) })

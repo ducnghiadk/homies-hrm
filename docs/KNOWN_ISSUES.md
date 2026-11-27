@@ -1,5 +1,11 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-27 (Tự tạo phiếu đánh giá đồng nghiệp hằng tháng):
+  1) Nguyên nhân: ứng dụng không có chỗ nào tạo hồ sơ đánh giá tháng, nên đánh giá đồng nghiệp luôn trống; việc quá hạn chọn người / nộp phiếu cũng không có ai đẩy bước tiếp theo.
+  2) Cách giải quyết: `src/lib/kpi/peer-review-scheduler.ts` (có test) chạy trên máy chủ mỗi khi có người lưu KPI hoặc thao tác đánh giá đồng nghiệp. Kỳ KPI ở trạng thái "Đang thu thập" thì mỗi nhân viên / trưởng ca trong kỳ có một hồ sơ tháng: người chấm chính là trưởng ca làm chung nhiều ca nhất (không có thì quản lý cửa hàng), trưởng ca do quản lý cửa hàng chấm; danh sách đồng nghiệp có thể chấm xếp theo số ca làm chung lấy từ chấm công thật của tháng. Quá hạn quản lý chọn thì hệ thống tự chọn người đứng đầu; đủ phiếu hoặc hết hạn nộp thì chuyển sang người chấm chính, thiếu phiếu thì đánh dấu thiếu mẫu (điểm đồng nghiệp không tính). Mọi con số lấy từ Cài đặt đánh giá đồng nghiệp của chương trình KPI.
+  3) Lưu ý vận hành: chưa có dữ liệu sự cố nghiêm trọng / đình chỉ để loại người chấm; người chấm dự bị chưa tự thay khi phiếu quá hạn.
+  4) File liên quan: `src/lib/kpi/peer-review-scheduler.ts`, `src/lib/kpi/peer-review-scheduler.test.ts`, `src/lib/server/kpi-peer-sync.ts`, `src/app/api/kpi/database/route.ts`, `src/app/api/kpi/peer-reviews/route.ts`.
+
 - Đã fix 2026-11-27 (KPI tháng và đánh giá đồng nghiệp lưu trên máy chủ):
   1) Nguyên nhân: toàn bộ dữ liệu KPI (bộ tiêu chí, kỳ KPI, phiếu chấm, sự cố, khiếu nại, lộ trình) và đánh giá đồng nghiệp ẩn danh chỉ lưu trên trình duyệt (`homies_kpi_saas_v1`, `homies_kpi_peer_review_demo_v1`), mỗi máy một bản, còn tự nạp dữ liệu mẫu; phiếu đánh giá đồng nghiệp và tên người chấm nằm ngay trên trình duyệt.
   2) Cách giải quyết:
