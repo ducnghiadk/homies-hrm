@@ -7,6 +7,7 @@ import {
   getShiftById,
   type Schedule,
 } from './mock-data'
+import { getActivePayrollPolicy } from './services/payroll-policy-service'
 
 // ─── Types ───
 
@@ -94,15 +95,29 @@ export const laborBudgets: LaborBudget[] = [
   { id: 'lb-003', store_id: 'store-003', weekly_budget: 18000000, monthly_budget: 72000000 },
 ]
 
-// ─── Vietnamese Public Holidays 2026 ───
+// ─── Ngày lễ & ngày nghỉ tuần: lấy từ Cài đặt lương (không viết cứng) ───
 
-const VN_HOLIDAYS = [
-  '2026-01-01', // Tết Dương lịch
-  '2026-01-28', '2026-01-29', '2026-01-30', '2026-01-31', '2026-02-01', // Tết Nguyên đán
-  '2026-04-30', // Giải phóng
-  '2026-05-01', // Quốc tế Lao động
-  '2026-09-02', // Quốc khánh
-]
+function readPolicySafe() {
+  try {
+    return getActivePayrollPolicy()
+  } catch {
+    return null
+  }
+}
+
+/** Danh sách ngày lễ trong Cài đặt lương. Để trống = không có ngày lễ. */
+function getHolidayDates(): Set<string> {
+  const list = readPolicySafe()?.holidays
+  if (!Array.isArray(list)) return new Set()
+  return new Set(list.map(h => (h && typeof h.date === 'string' ? h.date.trim() : '')).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)))
+}
+
+/** Ngày nghỉ hằng tuần trong Cài đặt lương (0 = Chủ nhật ... 6 = Thứ Bảy). Để trống = không có. */
+function getWeeklyRestDays(): Set<number> {
+  const days = readPolicySafe()?.weeklyRestDays
+  if (!Array.isArray(days)) return new Set()
+  return new Set(days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6))
+}
 
 // ─── Helpers ───
 
@@ -120,12 +135,11 @@ function getShiftHours(shift: { start_time: string; end_time: string }): number 
 
 function isWeekend(dateStr: string): boolean {
   const d = new Date(dateStr + 'T00:00:00')
-  const day = d.getDay()
-  return day === 0 || day === 6
+  return getWeeklyRestDays().has(d.getDay())
 }
 
 function isHoliday(dateStr: string): boolean {
-  return VN_HOLIDAYS.includes(dateStr)
+  return getHolidayDates().has(dateStr)
 }
 
 /** Calculate night hours within a shift (22:00-06:00) */

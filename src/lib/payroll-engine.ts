@@ -46,6 +46,10 @@ export interface PayrollInput {
   pitCommitment08?: boolean
   /** Mức lương đóng bảo hiểm do HR nhập trong hồ sơ (để trống = tính tự động). */
   insuranceSalary?: number
+  /** Ngày nghỉ hằng tuần riêng của nhân viên (để trống = theo Cài đặt lương). */
+  weeklyRestDays?: number[]
+  /** Tổng phụ cấp ghi trong hợp đồng phải tính đóng BH (toàn thời gian). Để trống = 0. */
+  contractInsuranceAllowances?: number
 }
 
 export interface FnbAllocationBreakdown {
@@ -180,6 +184,15 @@ export function getPolicyWeeklyRestDays(policy?: ReturnType<typeof getActivePayr
   const p = policy ?? getActivePayrollPolicy()
   const days = Array.isArray(p.weeklyRestDays) ? p.weeklyRestDays : []
   return new Set(days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6))
+}
+
+/** Ngày nghỉ tuần của 1 nhân viên: dùng ngày riêng trong hồ sơ nếu có, không thì theo Cài đặt lương. */
+export function resolveWeeklyRestDays(employeeDays?: number[], policy?: ReturnType<typeof getActivePayrollPolicy>): Set<number> {
+  if (Array.isArray(employeeDays) && employeeDays.length > 0) {
+    const own = new Set(employeeDays.filter(d => Number.isInteger(d) && d >= 0 && d <= 6))
+    if (own.size > 0) return own
+  }
+  return getPolicyWeeklyRestDays(policy)
 }
 
 export function isRestDay(dateStr: string | undefined, restDays: Set<number>): boolean {
@@ -539,6 +552,7 @@ function getLatePenaltySettings(policy: ReturnType<typeof getActivePayrollPolicy
 function summarizeAttendanceRecords(
   records: PayrollAttendanceRecord[],
   overtimeThresholdHours?: number,
+  employeeRestDays?: number[],
 ): AttendanceSummaryForPayroll {
   let totalShifts = 0
   const workedDates = new Set<string>()
@@ -557,7 +571,7 @@ function summarizeAttendanceRecords(
   const dailyRecordedOtMap = new Map<string, number>()
   const anomalies: PayrollAnomaly[] = []
   const holidayDates = getPolicyHolidayDates()
-  const restDays = getPolicyWeeklyRestDays()
+  const restDays = resolveWeeklyRestDays(employeeRestDays)
   const leaveDates = new Set<string>()
 
   for (const r of records) {
@@ -794,7 +808,7 @@ export function getPayrollAttendanceSummary(
     ? ((typeof policy.partTimeOvertimeThresholdHours === 'number' && policy.partTimeOvertimeThresholdHours > 0) ? policy.partTimeOvertimeThresholdHours : 8)
     : 0
   const records = AttendanceService.getLocalAttendanceRecordsForPeriod(periodStart, periodEnd, employeeId)
-  return summarizeAttendanceRecords(records, otThreshold)
+  return summarizeAttendanceRecords(records, otThreshold, getEmployeeTaxProfile(employeeId).weeklyRestDays)
 }
 
 export async function getPayrollAttendanceSummaryAsync(
@@ -807,7 +821,7 @@ export async function getPayrollAttendanceSummaryAsync(
     ? ((typeof policy.partTimeOvertimeThresholdHours === 'number' && policy.partTimeOvertimeThresholdHours > 0) ? policy.partTimeOvertimeThresholdHours : 8)
     : 0
   const records = await AttendanceService.getAttendanceRecordsForPeriod(periodStart, periodEnd, employeeId)
-  return summarizeAttendanceRecords(records, otThreshold)
+  return summarizeAttendanceRecords(records, otThreshold, getEmployeeTaxProfile(employeeId).weeklyRestDays)
 }
 
 // ══════════════════════════════════════
@@ -1069,7 +1083,7 @@ export function countPaidHolidayOffDays(
 }
 
 /** Thông tin thuế khai trong hồ sơ nhân viên (thời hạn hợp đồng, cam kết 08, người phụ thuộc). */
-export function getEmployeeTaxProfile(employeeId: string): Pick<PayrollInput, 'contractTerm' | 'pitCommitment08' | 'dependents' | 'insuranceSalary'> {
+export function getEmployeeTaxProfile(employeeId: string): Pick<PayrollInput, 'contractTerm' | 'pitCommitment08' | 'dependents' | 'insuranceSalary' | 'weeklyRestDays' | 'contractInsuranceAllowances'> {
   try {
     const profile = EmployeeService.getEmployeeById(employeeId)
     if (!profile) return {}
@@ -1079,6 +1093,8 @@ export function getEmployeeTaxProfile(employeeId: string): Pick<PayrollInput, 'c
       pitCommitment08: profile.pit_commitment_08 === true,
       dependents: typeof profile.dependents_count === 'number' ? profile.dependents_count : undefined,
       insuranceSalary: typeof profile.insurance_salary === 'number' && profile.insurance_salary > 0 ? profile.insurance_salary : undefined,
+      weeklyRestDays: Array.isArray(profile.weekly_rest_days) && profile.weekly_rest_days.length > 0 ? profile.weekly_rest_days : undefined,
+      contractInsuranceAllowances: typeof profile.contract_insurance_allowances === 'number' && profile.contract_insurance_allowances > 0 ? profile.contract_insurance_allowances : undefined,
     }
   } catch {
     return {}
@@ -1262,7 +1278,11 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
   // ── Step 9: Insurance
   // BUG-F FIX: Under VN law, statutory insurance base excludes OT. Part-time base uses baseEarned only.
   // Mức đóng BH nhập tay trong hồ sơ (nếu có) được ưu tiên; để trống thì tính tự động như trên.
-  const autoInsuranceBase = isPartTime ? baseEarned : baseSalary
+  // Toàn thời gian: lương hợp đồng + phụ cấp ghi trong hợp đồng (Điều 89 Luật BHXH), nhập trong hồ sơ nhân viên.
+  const contractInsuranceAllowances = !isPartTime && typeof input.contractInsuranceAllowances === 'number' && input.contractInsuranceAllowances > 0
+    ? input.contractInsuranceAllowances
+    : 0
+  const autoInsuranceBase = isPartTime ? baseEarned : baseSalary + contractInsuranceAllowances
   const customInsuranceSalary = typeof input.insuranceSalary === 'number' && input.insuranceSalary > 0 ? input.insuranceSalary : undefined
   const insuranceBase = customInsuranceSalary ?? autoInsuranceBase
   // Theo Khoản 3 Điều 85 Luật BHXH: Người lao động không làm việc và không hưởng tiền lương từ 14 ngày làm việc trở lên trong tháng
@@ -1280,12 +1300,12 @@ export function calculatePayroll(input: PayrollInputResolved): PayrollResult {
 
   // Mức đóng BH nhập tay thấp hơn lương hợp đồng hoặc lương tối thiểu vùng: chỉ cảnh báo, không chặn
   if (customInsuranceSalary !== undefined && shouldCalculateInsurance) {
-    const contractSalary = isPartTime ? 0 : baseSalary
+    const contractSalary = isPartTime ? 0 : baseSalary + contractInsuranceAllowances
     const minRegion = policy.legal?.minRegionSalary
     if (contractSalary > 0 && customInsuranceSalary < contractSalary) {
       anomalies.push({
         type: 'muc_dong_bh_thap',
-        message: `Mức lương đóng bảo hiểm ${customInsuranceSalary.toLocaleString('vi-VN')}đ thấp hơn lương trong hợp đồng ${contractSalary.toLocaleString('vi-VN')}đ. Luật yêu cầu đóng theo lương và phụ cấp ghi trong hợp đồng, có thể bị truy thu khi thanh tra.`,
+        message: `Mức lương đóng bảo hiểm ${customInsuranceSalary.toLocaleString('vi-VN')}đ thấp hơn lương${contractInsuranceAllowances > 0 ? ' và phụ cấp' : ''} trong hợp đồng ${contractSalary.toLocaleString('vi-VN')}đ. Luật yêu cầu đóng theo lương và phụ cấp ghi trong hợp đồng, có thể bị truy thu khi thanh tra.`,
       })
     } else if (typeof minRegion === 'number' && minRegion > 0 && customInsuranceSalary < minRegion) {
       anomalies.push({
@@ -1493,6 +1513,7 @@ export async function calculatePayrollBatchAsync(
         attendanceSummary: summarizeAttendanceRecords(
           attendanceRecords.filter(record => record.employee_id === emp.id),
           otThreshold,
+          getEmployeeTaxProfile(emp.id).weeklyRestDays,
         ),
       }),
     )
@@ -1607,6 +1628,7 @@ export async function calculatePayrollBatchAsync(
         contractTerm: getEmployeeTaxProfile(emp.id).contractTerm,
         pitCommitment08: getEmployeeTaxProfile(emp.id).pitCommitment08,
         insuranceSalary: getEmployeeTaxProfile(emp.id).insuranceSalary,
+        contractInsuranceAllowances: getEmployeeTaxProfile(emp.id).contractInsuranceAllowances,
         hasInsurance: payrollEmp?.tham_gia_bao_hiem ?? undefined,
         dependents: payrollEmp?.so_nguoi_phu_thuoc ?? undefined,
         employee: emp,
@@ -1616,6 +1638,7 @@ export async function calculatePayrollBatchAsync(
         attendanceSummary: summarizeAttendanceRecords(
           attendanceRecords.filter(record => record.employee_id === emp.id),
           otThreshold,
+          getEmployeeTaxProfile(emp.id).weeklyRestDays,
         ),
       })
       return {
