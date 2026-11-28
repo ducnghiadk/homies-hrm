@@ -1,7 +1,6 @@
 import type { UserRole } from '@/store/auth-store'
 import type { LucideIcon } from 'lucide-react'
 import {
-  Award,
   BarChart3,
   Bell,
   CalendarDays,
@@ -94,7 +93,6 @@ const SIDEBAR_ENTRIES: SidebarEntry[] = [
       { href: '/kpi', label: 'Tổng quan KPI', roles: MANAGER_ROLES },
       { href: '/kpi/review', label: 'Việc cần đánh giá', roles: KPI_REVIEW_ROLES },
       { href: '/kpi/result', label: 'Kết quả & cải thiện', roles: MANAGER_ROLES },
-      { href: '/kpi/promotion', label: 'Sẵn sàng tăng bậc', roles: KPI_ADMIN_ROLES },
       { href: '/kpi/settings', label: 'Chương trình đánh giá', roles: KPI_ADMIN_ROLES },
     ],
   },

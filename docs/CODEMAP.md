@@ -127,6 +127,7 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - Tab chung "Lịch đã chốt / Đăng ký lịch rảnh": `src/components/scheduling/MyScheduleTabs.tsx` (dùng ở `/my-schedule` và `/shifts/register`)
 - Component manager: `src/components/dashboard/ManagerDashboardPremium.tsx` ("Việc của quán hôm nay" từ `/api/schedules`, `/api/attendance`, `/api/requests`; logic thuần `src/lib/dashboard/store-today.ts` (có test))
 - Bảng xếp lịch 3 bước: `src/components/scheduling/ScheduleStepsCard.tsx` (dùng trong `ManagerSchedulingBoard.tsx`, công cụ ít dùng sau nút "Công cụ khác"); bảng chấm công `/attendance` mặc định lọc "Cần xử lý"
+- Bảng lương 4 bước: `src/components/payroll/PayrollStepsCard.tsx` (dùng trong `src/app/payroll/page.tsx`, chỉ quản lý thấy). Lộ trình chính thức là V7 (`/career-path/me`, `/career-path/review`); các route `/career-path` cũ chuyển hướng trong `next.config.ts` (mục 7), `/kpi/promotion` chỉ xem dữ liệu C1–C5 cũ. Trình thiết lập KPI hiện 4 bước trong `src/components/kpi/program/KPIProgramStepper.tsx` (bước 3 gồm `sources` + `readiness`).
 - Component admin: `src/components/dashboard/AdminDashboardPremium.tsx` (kết nối 100% REST API máy chủ /api/reports, /api/employees, /api/requests)
 - Shared premium components: `src/components/dashboard/premium/`
 - Service layer: `src/lib/services/dashboard-service.ts`

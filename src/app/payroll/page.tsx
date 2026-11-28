@@ -24,6 +24,7 @@ import { PayrollPaymentModal, type PayrollPaymentBankAccount } from '@/component
 import type { PayrollPaymentMethod } from '@/lib/payroll-payment-ledger'
 import { fetchRemotePayrollPolicy, saveStoredPayrollPolicy, getStoredPayrollPolicy, getActivePayrollPolicy } from '@/lib/services/payroll-policy-service'
 import PayrollHourlyRateDrawer, { type HourlyRateDrawerTarget } from '@/components/payroll/PayrollHourlyRateDrawer'
+import { PayrollStepsCard } from '@/components/payroll/PayrollStepsCard'
 import {
   DollarSign, TrendingUp, ChevronDown, FileText,
   Search, RefreshCw, Download, Building2, Store, PlusCircle, MinusCircle,
@@ -1450,6 +1451,23 @@ export default function PayrollPage() {
           </div>
         )}
 
+        {/* 4 bước làm bảng lương (Đợt 4 giao diện dễ dùng) */}
+        {isManager && tab === 'table' && (
+          <PayrollStepsCard
+            pendingShifts={pendingSummary.totalShifts}
+            anomalyCount={anomalySummary.length}
+            hasResults={payrollResults.length > 0}
+            isLoading={isPayrollLoading}
+            isLocked={!canEditPeriod(payrollPeriodStatus)}
+            totalRows={filteredTableRows.length}
+            sentRows={filteredTableRows.filter(r => r.status === 'Đã gửi phiếu lương').length}
+            paidRows={filteredTableRows.filter(r => r.status === 'Đã thanh toán').length}
+            canRecalculate={canEditPeriod(payrollPeriodStatus) && !policyUnavailable}
+            onRecalculate={() => setPayrollReloadKey(key => key + 1)}
+            onGoToTable={() => document.getElementById('payroll-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          />
+        )}
+
         {/* TẦNG 2: 4 THẺ CHỈ SỐ VĨ MÔ (Macro KPI Cards) - Hiển thị cố định cho Cấp Quản Lý */}
         {isManager && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-fade-in">
@@ -1602,7 +1620,7 @@ export default function PayrollPage() {
 
         {/* COMPLETE FULL 29-COLUMN DATA TABLE WITH DYNAMIC COLUMN VISIBILITY */}
         {(tab === 'table' && isManager) && (
-          <div className="card p-0 overflow-hidden shadow-sm border border-gray-200 animate-slide-up">
+          <div id="payroll-table" className="card p-0 overflow-hidden shadow-sm border border-gray-200 animate-slide-up">
 
             {/* Table Control Header Bar */}
             <div className="p-3 bg-slate-900 text-white flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -1731,15 +1749,6 @@ export default function PayrollPage() {
                   <Download size={13} /> Xuất Excel
                 </button>
 
-                {/* Nút Xuất Bảng Đối Soát HBP T8 */}
-                <button
-                  onClick={handleExportHbpAuditCsv}
-                  className="btn bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-1.5 px-3 border-0 gap-1.5 font-bold flex items-center shadow-xs cursor-pointer"
-                  title="Xuất bảng đối soát dữ liệu công và lương chuẩn cơ sở Hồ Bá Phấn Tháng 8/2026"
-                >
-                  <FileText size={13} /> Đối Soát HBP T8
-                </button>
-
                 {/* Thao Tác Menu Dropdown */}
                 <div className="relative">
                   <button
@@ -1790,6 +1799,14 @@ export default function PayrollPage() {
                       >
                         <Download size={14} className="text-emerald-400" />
                         <span>Xuất Excel</span>
+                      </button>
+
+                      <button
+                        onClick={() => { handleExportHbpAuditCsv(); setIsActionMenuOpen(false) }}
+                        className="w-full px-3.5 py-2 text-left hover:bg-sky-800/80 flex items-center gap-2.5 border-t border-sky-800/60 transition-colors cursor-pointer"
+                      >
+                        <FileText size={14} className="text-indigo-300" />
+                        <span>Xuất bảng đối soát công</span>
                       </button>
 
                       <button
