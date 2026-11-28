@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
+import { MyScheduleTabs } from '@/components/scheduling/MyScheduleTabs'
 import { useAuthStore } from '@/store/auth-store'
 import { ScheduleService } from '@/lib/services/schedule-service'
 import { getShiftById, getStoreById, mockAttendances, mockEmployees, type Attendance, type Schedule } from '@/lib/mock-data'
@@ -414,6 +415,7 @@ function MySchedulePageContent() {
   return (
     <AppShell showNav>
       <div className="animate-fade-in space-y-5 pb-20">
+        {targetUserId === user.id && <MyScheduleTabs active="published" />}
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-gray-800">

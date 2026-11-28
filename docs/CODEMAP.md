@@ -118,7 +118,8 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 ### Trang chu theo role
 - Mo ta: route `/` chon dashboard theo role nhan vien, quan ly, admin.
 - File chinh: `src/app/page.tsx`
-- Component employee: `src/components/dashboard/EmployeeDashboardPremium.tsx`
+- Component employee: `src/components/dashboard/EmployeeDashboardPremium.tsx` (trang "Hôm nay" của nhân viên/trưởng ca: ca hôm nay + nút chấm công, việc cần làm, lịch tuần đã chốt từ `/api/schedules`, `/api/shifts/register`, `/api/requests`); hiển thị tên/giờ ca dùng chung `src/lib/scheduling/shift-display.ts`
+- Tab chung "Lịch đã chốt / Đăng ký lịch rảnh": `src/components/scheduling/MyScheduleTabs.tsx` (dùng ở `/my-schedule` và `/shifts/register`)
 - Component manager: `src/components/dashboard/ManagerDashboardPremium.tsx`
 - Component admin: `src/components/dashboard/AdminDashboardPremium.tsx` (kết nối 100% REST API máy chủ /api/reports, /api/employees, /api/requests)
 - Shared premium components: `src/components/dashboard/premium/`
