@@ -1,5 +1,10 @@
 # Known Issues - Các lỗi đã biết
 
+- Đã fix 2026-11-28 (Giao diện dễ dùng — Đợt 1: nhân viên trên điện thoại, menu, chữ khó hiểu):
+  1) Nguyên nhân: trang chủ nhân viên chỉ hiện số liệu mẫu (KPI, ca, thành tích giả); thanh dưới không có nút Chấm công và Đơn từ; "Lịch của tôi" và "Đăng ký lịch rảnh" là 2 trang rời; menu quản lý tên dài, nhiều chữ tiếng Anh; Cài đặt lương còn khối "Bậc thang phạt đi muộn" (phạt tiền) dù bảng lương đã bỏ cách này, sửa ô này không có tác dụng.
+  2) Cách giải quyết: trang chủ nhân viên/trưởng ca thành "Hôm nay" đọc dữ liệu thật (ca hôm nay, nút chấm công lớn, việc cần làm, lịch tuần đã chốt); thanh dưới: Hôm nay · Chấm công · Lịch · Đơn từ · Tôi (trưởng ca: Nhân sự thay Tôi); thêm 2 tab chung ở 2 trang lịch; đổi tên và sắp lại menu (không đổi quyền); bỏ khối phạt bậc thang không còn dùng, đổi chữ OT/Net/Simulator sang tiếng Việt.
+  3) File liên quan: `src/components/dashboard/EmployeeDashboardPremium.tsx`, `src/lib/scheduling/shift-display.ts`, `src/components/layout/BottomNav.tsx`, `src/components/scheduling/MyScheduleTabs.tsx`, `src/app/my-schedule/page.tsx`, `src/app/shifts/register/page.tsx`, `src/lib/navigation/sidebar-config.ts`, `src/app/settings/payroll/page.tsx`.
+
 - Đã fix 2026-11-27 (Lưu KPI luôn báo "dữ liệu đã được người khác cập nhật"):
   1) Nguyên nhân: `kpi-adapter.ts` vẫn chọn kho Supabase cũ (bảng `kpi_*`, dữ liệu mẫu, không có số phiên bản) khi `NEXT_PUBLIC_USE_REAL_SUPABASE` bật sẵn trên Vercel, thay vì kho máy chủ `/api/kpi/database`; mọi lần lưu bị coi là xung đột. Ngoài ra bước Xem trước không cho Phát hành vì bản nháp thiếu chức danh / chặng tăng bậc dù Sơ đồ lộ trình đã có.
   2) Cách giải quyết: trình duyệt luôn dùng kho máy chủ (chỉ đọc thẳng Supabase khi đặt riêng `NEXT_PUBLIC_KPI_REPOSITORY=supabase`); thông báo lỗi đổi sang tiếng Việt có dấu; khi qua bước Cách đánh giá / Điều kiện / Xem trước, bản nháp tự lấy chức danh và chặng tăng bậc từ Sơ đồ lộ trình nếu còn trống (`deriveProgramScopeFromCareerMap`, có test).

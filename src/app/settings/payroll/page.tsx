@@ -1334,85 +1334,13 @@ function SettingsPayrollContent() {
                       </p>
                     </div>
 
-                    {/* KHỐI 1: BẬC THANG PHẠT ĐI MUỘN / VỀ SỚM */}
-                    <div className="rounded-2xl border border-rose-200/80 bg-rose-50/20 p-5 space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-100 pb-3">
-                        <div>
-                          <h3 className="text-sm font-bold text-[#001D3D] flex items-center gap-2">
-                            <Clock size={16} className="text-rose-600" />
-                            <span>Bậc Thang Phạt Đi Muộn / Về Sớm Chuẩn F&B</span>
-                          </h3>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Áp dụng bậc thang công bằng thay cho phạt cào bằng cố định
-                          </p>
-                        </div>
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200 self-start sm:self-auto">
-                          Quy chế Homies 3 Bậc
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                        {/* Bậc 1: < 15 phút */}
-                        <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-gray-800">Bậc 1: Dưới 15 phút</span>
-                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                              Nhắc nhở
-                            </span>
-                          </div>
-                          <div className="text-lg font-mono font-bold text-gray-700">0 đ</div>
-                          <p className="text-[11px] text-gray-500">
-                            Đi trễ dưới 15 phút chỉ nhắc nhở nội bộ, không trừ tiền lương.
-                          </p>
-                        </div>
-
-                        {/* Bậc 2: 15 – 30 phút */}
-                        <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-amber-900">Bậc 2: 15 – 30 phút</span>
-                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200">
-                              Trừ mức cố định
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <MoneyNumberInput
-                              value={policy.latePenaltyPolicy?.tier2Amount ?? 25000}
-                              step={5000}
-                              disabled={!canEdit}
-                              onChange={(val) => updateLatePolicy('tier2Amount', val)}
-                            />
-                            <span className="text-xs text-amber-800 font-medium">/ lần</span>
-                          </div>
-                          <p className="text-[11px] text-amber-800">
-                            Khấu trừ trực tiếp vào tổng các khoản phạt trong kỳ.
-                          </p>
-                        </div>
-
-                        {/* Bậc 3: > 30 phút */}
-                        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-rose-900">Bậc 3: Trên 30 phút</span>
-                            <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md border border-rose-200">
-                              Nghỉ nửa ca
-                            </span>
-                          </div>
-                          <div className="text-sm font-bold text-rose-700">
-                            Trừ 50% tiền lương ca làm
-                          </div>
-                          <p className="text-[11px] text-rose-700">
-                            Đi trễ trên 30 phút tính bằng nửa ca công và trừ 50% tiền lương của ca đó.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* KHỐI 2: HỆ SỐ LÀM THÊM GIỜ (OVERTIME - OT) */}
                     <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/20 p-5 space-y-4">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100 pb-3">
                         <div>
                           <h3 className="text-sm font-bold text-[#001D3D] flex items-center gap-2">
                             <Sparkles size={16} className="text-indigo-600" />
-                            <span>Hệ Số Tính Lương Làm Thêm Giờ (Overtime - OT)</span>
+                            <span>Hệ số trả lương tăng ca</span>
                           </h3>
                           <p className="text-xs text-gray-500 mt-0.5">
                             Quy định tỷ lệ chi trả lương tăng ca theo Bộ Luật Lao Động &amp; Thực tế F&B
@@ -1426,7 +1354,7 @@ function SettingsPayrollContent() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                         {/* OT Ngày thường */}
                         <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
-                          <span className="text-xs font-bold text-gray-800 block">OT Ngày Thường</span>
+                          <span className="text-xs font-bold text-gray-800 block">Tăng ca ngày thường</span>
                           <div className="flex items-center gap-2">
                             <input
                               type="number"
@@ -1452,7 +1380,7 @@ function SettingsPayrollContent() {
 
                         {/* OT Cuối tuần */}
                         <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
-                          <span className="text-xs font-bold text-gray-800 block">OT Ngày Nghỉ Hằng Tuần</span>
+                          <span className="text-xs font-bold text-gray-800 block">Tăng ca ngày nghỉ hằng tuần</span>
                           <div className="flex items-center gap-2">
                             <input
                               type="number"
@@ -1478,7 +1406,7 @@ function SettingsPayrollContent() {
 
                         {/* OT Ngày Lễ / Tết */}
                         <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
-                          <span className="text-xs font-bold text-gray-800 block">OT Ngày Lễ / Tết</span>
+                          <span className="text-xs font-bold text-gray-800 block">Tăng ca ngày lễ, Tết</span>
                           <div className="flex items-center gap-2">
                             <input
                               type="number"
@@ -1553,7 +1481,7 @@ function SettingsPayrollContent() {
                               )
                             })}
                           </div>
-                          <p className="text-[11px] text-gray-500">Làm thêm giờ vào ngày được chọn tính theo hệ số &quot;OT Ngày Nghỉ&quot;. Không chọn ngày nào = tăng ca mọi ngày tính hệ số ngày thường. Quán làm xoay ca thì thường để trống.</p>
+                          <p className="text-[11px] text-gray-500">Làm thêm giờ vào ngày được chọn tính theo hệ số &quot;Tăng ca ngày nghỉ hằng tuần&quot;. Không chọn ngày nào = tăng ca mọi ngày tính hệ số ngày thường. Quán làm xoay ca thì thường để trống.</p>
                         </div>
                       </div>
                     </div>
@@ -1726,7 +1654,7 @@ function SettingsPayrollContent() {
                       <div>
                         <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
                           <Coins size={16} className="text-amber-600" />
-                          <span>Cơ Chế Phân Bổ Tiền Tip &amp; Phí Dịch Vụ F&amp;B</span>
+                          <span>Chia tiền tip và phí phục vụ</span>
                         </h3>
                         <p className="text-xs text-gray-500">Tự động chia quỹ Tip theo tỷ lệ giờ công đóng góp của nhân viên</p>
                       </div>
@@ -2066,7 +1994,7 @@ function SettingsPayrollContent() {
                   <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs mt-4">
                     <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
                       <Coins size={16} className="text-emerald-600" />
-                      <span>Quy Tắc Làm Tròn Lương Thực Nhận (Net)</span>
+                      <span>Làm tròn lương thực nhận</span>
                     </h3>
                     <p className="text-xs text-gray-500 mb-4">Phương thức làm tròn số tiền chi trả trên bảng lương và file ủy nhiệm chi ngân hàng</p>
 
@@ -2326,7 +2254,7 @@ function SettingsPayrollContent() {
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-[#001D3D]">Mô Phỏng Lương Tức Thì</h3>
-                      <span className="text-[11px] text-gray-400 font-medium">Live Salary Simulator</span>
+                      <span className="text-[11px] text-gray-400 font-medium">Thử tính lương</span>
                     </div>
                   </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">

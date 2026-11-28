@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
+import { MyScheduleTabs } from '@/components/scheduling/MyScheduleTabs'
 import { useAuthStore } from '@/store/auth-store'
 import { mockStores } from '@/lib/mock-data'
 import { ShiftRegistrationService } from '@/lib/services/scheduling/shift-registration-service'
@@ -290,7 +291,7 @@ export default function ShiftRegisterPage() {
               <span>Lịch của tôi</span>
             </Link>
             <h1 className="text-sm font-bold text-[#001D3D] text-center">
-              Đăng Ký Ca Làm Việc
+              Đăng ký lịch rảnh
             </h1>
             <div className="w-12 text-right">
               <span className="text-[11px] font-mono tabular-nums font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#2F6FA8]">
@@ -301,6 +302,7 @@ export default function ShiftRegisterPage() {
         </div>
 
         <div className="max-w-xl mx-auto px-4 pt-4 space-y-4">
+          <MyScheduleTabs active="availability" />
           {/* Banner hướng dẫn thân thiện */}
           <div className="bg-gradient-to-r from-blue-50/80 to-amber-50/60 rounded-2xl p-4 border border-blue-100/60 shadow-xs flex items-start gap-3">
             <div className="w-8 h-8 rounded-xl bg-[#2F6FA8] text-white flex items-center justify-center shrink-0 shadow-xs">

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Calendar, CalendarOff, Home, MoreHorizontal, Settings, User, Users, Wallet, Bell } from 'lucide-react'
+import { Calendar, CalendarOff, Fingerprint, FileText, Home, MoreHorizontal, Settings, User, Users, Wallet, Bell } from 'lucide-react'
 import { useAuthStore } from '@/store/auth-store'
 import { cn } from '@/lib/utils'
 
@@ -21,19 +21,19 @@ export default function BottomNav() {
 
   const navItems: NavItem[] = role === 'employee'
     ? [
-        { href: '/', icon: Home, label: 'Trang chủ' },
-        { href: '/my-schedule', icon: Calendar, label: 'Lịch làm' },
-        { href: '/leave', icon: CalendarOff, label: 'Nghỉ phép' },
-        { href: '/payroll/salary-slip', icon: Wallet, label: 'Phiếu lương' },
+        { href: '/', icon: Home, label: 'Hôm nay' },
+        { href: '/checkin', icon: Fingerprint, label: 'Chấm công' },
+        { href: '/my-schedule', icon: Calendar, label: 'Lịch' },
+        { href: '/requests', icon: FileText, label: 'Đơn từ' },
         { href: '/profile', icon: User, label: 'Tôi' },
       ]
     : role === 'shift_leader'
       ? [
-          { href: '/', icon: Home, label: 'Trang chủ' },
+          { href: '/', icon: Home, label: 'Hôm nay' },
+          { href: '/checkin', icon: Fingerprint, label: 'Chấm công' },
+          { href: '/my-schedule', icon: Calendar, label: 'Lịch' },
+          { href: '/requests', icon: FileText, label: 'Đơn từ' },
           { href: '/employees', icon: Users, label: 'Nhân sự' },
-          { href: '/my-schedule', icon: Calendar, label: 'Lịch làm' },
-          { href: '/leave', icon: CalendarOff, label: 'Nghỉ phép' },
-          { href: '/profile', icon: User, label: 'Tôi' },
         ]
       : role === 'store_manager' || role === 'area_manager'
         ? [
@@ -53,6 +53,7 @@ export default function BottomNav() {
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/'
+    if (href === '/my-schedule' && pathname.startsWith('/shifts/register')) return true
     return pathname.startsWith(href)
   }
 
