@@ -207,6 +207,8 @@ export default function AttendanceTimesheetPage() {
   const [weekOffset, setWeekOffset] = useState<number>(0)
   const [monthOffset, setMonthOffset] = useState<number>(0)
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
+  // Mặc định chỉ hiện người có ca cần xử lý (đi trễ, về sớm, quên tan ca, đã sửa tay)
+  const [showExceptionsOnly, setShowExceptionsOnly] = useState<boolean>(true)
   const [isLocked, setIsLocked] = useState<boolean>(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0)
@@ -906,6 +908,22 @@ export default function AttendanceTimesheetPage() {
         }
       })
   }, [fullEmployeeList, activeStoreId, selectedPositionId, searchQuery, mergedTimesheetData, activeDatesList])
+
+  // Người cần xử lý: có ca đi trễ, về sớm, quên tan ca hoặc ca đã sửa tay trong kỳ đang xem
+  const exceptionRows = useMemo(
+    () =>
+      tableRows.filter(row =>
+        Object.values(row.days).some(slots =>
+          slots.some(
+            slot =>
+              !slot.isFromSchedule &&
+              (slot.status === 'late' || slot.status === 'early' || slot.status === 'missing_checkout' || slot.isEdited)
+          )
+        )
+      ),
+    [tableRows]
+  )
+  const visibleRows = showExceptionsOnly ? exceptionRows : tableRows
 
   // Tính 4 Chỉ Số Vĩ Mô (Macro KPI Cards)
   const macroStats = useMemo(() => {
@@ -2423,6 +2441,30 @@ export default function AttendanceTimesheetPage() {
               </div>
             )}
 
+            <div className="flex flex-col gap-2 border-b border-gray-100 bg-white px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-gray-600">
+                {showExceptionsOnly
+                  ? `Đang hiện ${exceptionRows.length}/${tableRows.length} người có ca cần xử lý (đi trễ, về sớm, quên tan ca, đã sửa tay).`
+                  : `Đang hiện tất cả ${tableRows.length} người.`}
+              </p>
+              <div className="flex items-center rounded-xl border border-gray-200 bg-gray-100 p-0.5 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setShowExceptionsOnly(true)}
+                  className={`rounded-lg px-3 py-1 transition ${showExceptionsOnly ? 'bg-white text-[#001D3D] shadow-2xs' : 'text-gray-500'}`}
+                >
+                  Cần xử lý ({exceptionRows.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExceptionsOnly(false)}
+                  className={`rounded-lg px-3 py-1 transition ${!showExceptionsOnly ? 'bg-white text-[#001D3D] shadow-2xs' : 'text-gray-500'}`}
+                >
+                  Xem tất cả
+                </button>
+              </div>
+            </div>
+
             <div 
               ref={mainTableScrollRef}
               className="overflow-x-auto scrollbar-thin scrollbar-thumb-[#2F6FA8] scrollbar-track-slate-100"
@@ -2455,14 +2497,16 @@ export default function AttendanceTimesheetPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-xs">
-                  {tableRows.length === 0 ? (
+                  {visibleRows.length === 0 ? (
                     <tr>
                       <td colSpan={activeDatesList.length + 3} className="py-12 text-center text-gray-400 font-medium">
-                        Không tìm thấy nhân viên nào phù hợp với bộ lọc hiện tại.
+                        {showExceptionsOnly && tableRows.length > 0
+                          ? 'Không có ca nào cần xử lý trong kỳ này. Bấm "Xem tất cả" để xem bảng công đầy đủ.'
+                          : 'Không tìm thấy nhân viên nào phù hợp với bộ lọc hiện tại.'}
                       </td>
                     </tr>
                   ) : (
-                    tableRows.map((row, index) => (
+                    visibleRows.map((row, index) => (
                       <tr
                         key={row.employee.id}
                         className="hover:bg-blue-50/20 transition-colors group"
