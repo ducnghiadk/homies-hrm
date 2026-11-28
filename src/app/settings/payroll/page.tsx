@@ -288,6 +288,7 @@ function SettingsPayrollContent() {
   const tabParam = searchParams.get('tab')
 
   const [activeTab, setActiveTab] = useState<MainTab>('core_salary')
+  const [viewMode, setViewMode] = useState<'basic' | 'advanced'>(tabParam ? 'advanced' : 'basic')
   const [displayUnit, setDisplayUnit] = useState<'month' | 'hour'>('month')
   const [selectedGradeDetail, setSelectedGradeDetail] = useState<SalaryGrade | null>(null)
 
@@ -810,10 +811,40 @@ function SettingsPayrollContent() {
         </div>
 
         <div className="w-full px-4 sm:px-6 lg:px-8 mt-4 space-y-4">
+          {/* Chọn mức hiển thị: Cơ bản (đủ để tính lương) / Nâng cao (toàn bộ) */}
+          <div className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-[#001D3D]">
+                {viewMode === 'basic' ? 'Đang xem: Cơ bản' : 'Đang xem: Nâng cao'}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {viewMode === 'basic'
+                  ? 'Chỉ hiện những ô cần điền để tính lương đúng: ngày công, tăng ca, đi trễ, lương tối thiểu, bảo hiểm, thuế, ngày lễ.'
+                  : 'Hiện toàn bộ: khung lương theo vị trí, phụ cấp, tiền tip, ngân sách, làm tròn, lịch sử phiên bản.'}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1 rounded-xl bg-gray-100 p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('basic')}
+                className={`rounded-lg px-4 py-2 text-xs font-bold transition ${viewMode === 'basic' ? 'bg-[#2F6FA8] text-white shadow-xs' : 'text-gray-600 hover:bg-white'}`}
+              >
+                Cơ bản
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('advanced')}
+                className={`rounded-lg px-4 py-2 text-xs font-bold transition ${viewMode === 'advanced' ? 'bg-[#2F6FA8] text-white shadow-xs' : 'text-gray-600 hover:bg-white'}`}
+              >
+                Nâng cao
+              </button>
+            </div>
+          </div>
 
           {/* ========================================================================= */}
           {/* TẦNG 2: DẢI 4 THẺ CHỈ SỐ VĨ MÔ (Macro KPI Cards - Đưa Lên Đầu Rất Thoáng) */}
           {/* ========================================================================= */}
+          {viewMode === 'advanced' && (
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
             {/* Card 1: Ngân Sách Tháng */}
             <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-xs">
@@ -888,6 +919,7 @@ function SettingsPayrollContent() {
               </p>
             </div>
           </div>
+          )}
 
           {/* ========================================================================= */}
           {/* TẦNG 3: THANH TAB CHÍNH & TỶ LỆ VÀNG (2/3 NỘI DUNG + 1/3 LIVE SIMULATOR) */}
@@ -895,9 +927,10 @@ function SettingsPayrollContent() {
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
             
             {/* CỘT CHÍNH (8/12 - Chiếm ~2/3 Màn Hình) */}
-            <div className="space-y-4 lg:col-span-8">
+            <div className={`space-y-4 ${viewMode === 'basic' ? 'lg:col-span-12 lg:max-w-4xl' : 'lg:col-span-8'}`}>
               
               {/* Thanh Điều Hướng 4 Tab Tinh Gọn */}
+              {viewMode === 'advanced' && (
               <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-1.5 shadow-xs overflow-x-auto">
                 <div className="flex items-center gap-1.5 min-w-max">
                   <button
@@ -963,12 +996,14 @@ function SettingsPayrollContent() {
                   </button>
                 </div>
               </div>
+              )}
 
               {/* ------------------------------------------------------------------- */}
               {/* TAB 1: KHUNG LƯƠNG THEO VỊ TRÍ (CORE SALARY) */}
               {/* ------------------------------------------------------------------- */}
-              {activeTab === 'core_salary' && (
+              {(viewMode === 'basic' || activeTab === 'core_salary') && (
                 <div className="space-y-4">
+                  {viewMode === 'advanced' && (<>
                   {/* Cảnh báo ghi nhớ nghiệp vụ */}
                   <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
                     <Info size={16} className="text-amber-700 shrink-0 mt-0.5" />
@@ -1150,6 +1185,7 @@ function SettingsPayrollContent() {
                       </span>
                     </div>
                   </div>
+                  </>)}
 
                   {/* Khối: Thông số tính lương chung */}
                   <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs space-y-4">
@@ -1492,7 +1528,7 @@ function SettingsPayrollContent() {
               {/* ------------------------------------------------------------------- */}
               {/* TAB 2: CHẾ ĐỘ & PHỤ CẤP F&B (CHUẨN SAAS DYNAMIC DROPDOWN SELECTION) */}
               {/* ------------------------------------------------------------------- */}
-              {activeTab === 'fnb_perks' && (
+              {viewMode === 'advanced' && activeTab === 'fnb_perks' && (
                 <div className="space-y-4">
                   {/* Card Phụ Cấp Đang Áp Dụng (Doanh nghiệp có cái gì thì add cái đó) */}
                   <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs">
@@ -1722,8 +1758,9 @@ function SettingsPayrollContent() {
               {/* ------------------------------------------------------------------- */}
               {/* TAB 3: NGÂN SÁCH & BẢO HIỂM (BUDGET & COMPLIANCE) */}
               {/* ------------------------------------------------------------------- */}
-              {activeTab === 'compliance_budget' && (
+              {(viewMode === 'basic' || activeTab === 'compliance_budget') && (
                 <div className="space-y-4">
+                  {viewMode === 'advanced' && (<>
                   {/* Ngân Sách Theo Chi Nhánh */}
                   <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs">
                     <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
@@ -1823,6 +1860,7 @@ function SettingsPayrollContent() {
                       </div>
                     </div>
                   </div>
+                  </>)}
 
                   {/* Quy tắc đi trễ (đúng Điều 127 BLLĐ: không phạt tiền) */}
                   <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs mt-4">
@@ -1925,6 +1963,7 @@ function SettingsPayrollContent() {
                     </div>
                   </div>
 
+                  {viewMode === 'advanced' && (<>
                   {/* Quy Chuẩn Ca Làm Việc F&B */}
                   <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs mt-4">
                     <h3 className="text-sm font-bold text-[#001D3D] mb-1 flex items-center gap-2">
@@ -2034,6 +2073,7 @@ function SettingsPayrollContent() {
                       })}
                     </div>
                   </div>
+                  </>)}
 
                   {/* Thông Số Pháp Lý (Lương Vùng & Thuế) */}
                   <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs mt-4">
@@ -2183,7 +2223,7 @@ function SettingsPayrollContent() {
               {/* ------------------------------------------------------------------- */}
               {/* TAB 4: LỊCH SỬ & SO SÁNH PHIÊN BẢN */}
               {/* ------------------------------------------------------------------- */}
-              {activeTab === 'history' && (
+              {viewMode === 'advanced' && activeTab === 'history' && (
                 <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-xs space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -2243,6 +2283,7 @@ function SettingsPayrollContent() {
             {/* ========================================================================= */}
             {/* CỘT PHỤ (4/12 - Chiếm ~1/3 Màn Hình): BỘ MÔ PHỎNG TÍNH LƯƠNG TRỰC TIẾP */}
             {/* ========================================================================= */}
+            {viewMode === 'advanced' && (
             <div className="space-y-4 lg:col-span-4">
               <div className="sticky top-20 rounded-2xl border border-gray-100 bg-white p-5 shadow-xs space-y-4">
                 
@@ -2420,6 +2461,7 @@ function SettingsPayrollContent() {
 
               </div>
             </div>
+            )}
 
           </div>
 

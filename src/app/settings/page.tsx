@@ -1,25 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useAuthStore } from '@/store/auth-store'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { ChevronRight, Search } from 'lucide-react'
+import { useAuthStore } from '@/store/auth-store'
 import AppShell from '@/components/layout/AppShell'
-import { SetupWizardBanner } from '@/components/settings/SetupWizardBanner'
-import { SettingCategoryTabs } from '@/components/settings/SettingCategoryTabs'
-import { SettingSearch } from '@/components/settings/SettingSearch'
-import { SettingCard } from '@/components/settings/SettingCard'
-import {
-  settingItems,
-  settingCategories,
-  getSettingsByCategory,
-} from '@/lib/mock-data/settings'
-import type { SettingItem, SettingCategoryId } from '@/lib/types/settings'
+import { SetupChecklist } from '@/components/settings/SetupChecklist'
+import { countAdvanced, getHubGroups } from '@/lib/settings/settings-hub'
 
+/** Một trang Cài đặt duy nhất: việc cần cài đặt ở trên, các nhóm cài đặt bên dưới. */
 export default function SettingsPage() {
   const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const router = useRouter()
-  const [selectedCategory, setSelectedCategory] = useState<SettingCategoryId | 'all'>('all')
-  const [searchResults, setSearchResults] = useState<SettingItem[] | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated) router.push('/login?redirect=/settings')
@@ -28,8 +23,8 @@ export default function SettingsPage() {
   if (!hasHydrated) {
     return (
       <AppShell title="Cài đặt">
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
         </div>
       </AppShell>
     )
@@ -37,86 +32,57 @@ export default function SettingsPage() {
 
   if (!user || !isAuthenticated) return null
 
-  const displayItems = searchResults
-    ? searchResults
-    : selectedCategory === 'all'
-      ? settingItems
-      : getSettingsByCategory(selectedCategory)
-
-  const groupedItems = selectedCategory === 'all' && !searchResults
-    ? settingCategories.map(cat => ({
-        ...cat,
-        items: getSettingsByCategory(cat.id),
-      }))
-    : null
+  const role = user.role
+  const isAdmin = role === 'ceo' || role === 'hr_admin'
+  const groups = getHubGroups(role, showAdvanced, query)
+  const advancedCount = countAdvanced(role)
 
   return (
-    <AppShell title="Tổng quan Cài đặt">
-      <div className="space-y-5 pb-24">
-        {/* Setup Wizard */}
-        <SetupWizardBanner />
+    <AppShell title="Cài đặt">
+      <div className="mx-auto max-w-3xl space-y-4 pb-24">
+        {isAdmin && <SetupChecklist />}
 
-        {/* Search */}
-        <SettingSearch onSearch={setSearchResults} />
-
-        {/* Category Tabs */}
-        {!searchResults && (
-          <SettingCategoryTabs
-            selected={selectedCategory}
-            onSelect={setSelectedCategory}
+        <label className="flex items-center gap-2 rounded-2xl border border-gray-200/80 bg-white px-4 py-3 shadow-xs">
+          <Search size={18} className="text-gray-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Tìm cài đặt, ví dụ: ngày lễ, Wi-Fi, ca làm"
+            className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
           />
-        )}
+        </label>
 
-        {/* Search Results */}
-        {searchResults && (
-          <div className="animate-fade-in">
-            <p className="text-xs mb-3" style={{ color: 'var(--text-muted, #9ca3af)' }}>
-              🔍 Tìm thấy <strong style={{ color: 'var(--text-secondary, #6b7280)' }}>{searchResults.length}</strong> kết quả
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {searchResults.map(item => (
-                <SettingCard key={item.id} item={item} />
+        {groups.map((group) => (
+          <section key={group.id} className="rounded-2xl border border-gray-200/80 bg-white shadow-xs">
+            <h2 className="px-5 pt-4 text-sm font-semibold text-[#001D3D]">{group.title}</h2>
+            <ul className="mt-1 divide-y divide-gray-100">
+              {group.items.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href} className="flex items-center gap-3 px-5 py-3 hover:bg-[#FFF8E8]/60">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-gray-800">{item.title}</span>
+                      <span className="block text-xs text-gray-500">{item.description}</span>
+                    </span>
+                    <ChevronRight size={16} className="shrink-0 text-gray-400" />
+                  </Link>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          </section>
+        ))}
+
+        {groups.length === 0 && (
+          <p className="py-10 text-center text-sm text-gray-500">Không tìm thấy cài đặt phù hợp.</p>
         )}
 
-        {/* Grouped View (All categories) */}
-        {groupedItems && !searchResults && (
-          <div className="space-y-6 animate-slide-up">
-            {groupedItems.map(category => (
-              <div key={category.id}>
-                <h2 className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2 px-1"
-                  style={{ color: 'var(--text-muted, #9ca3af)' }}>
-                  <span>{category.icon}</span>
-                  <span>{category.label}</span>
-                  <span className="font-normal">— {category.description}</span>
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {category.items.map(item => (
-                    <SettingCard key={item.id} item={item} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Filtered View (Single category) */}
-        {!groupedItems && !searchResults && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 animate-slide-up">
-            {displayItems.map(item => (
-              <SettingCard key={item.id} item={item} />
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {displayItems.length === 0 && (
-          <div className="text-center py-16">
-            <div className="text-4xl mb-3">🔍</div>
-            <p className="text-sm" style={{ color: 'var(--text-muted, #9ca3af)' }}>Không tìm thấy cài đặt phù hợp</p>
-          </div>
+        {!query && advancedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="w-full rounded-2xl border border-dashed border-gray-300 bg-white/60 py-3 text-sm font-medium text-gray-600 hover:text-[#2F6FA8]"
+          >
+            {showAdvanced ? 'Ẩn cài đặt nâng cao' : `Hiện cài đặt nâng cao (${advancedCount})`}
+          </button>
         )}
       </div>
     </AppShell>

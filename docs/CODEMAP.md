@@ -114,6 +114,11 @@ Muc tieu: vao dung diem sua, giam doc full file, giam token.
 - Dung khi: sua doi endpoint REST API, logic xac thuc API, cau truc du lieu server-side, kiosk checkin, dang ky ca mobile, phieu luong ca nhan, quan ly BSC va quen mat khau.
 
 
+### Trang Cai dat & Viec can cai dat (Dot 2 giao dien de dung)
+- Mo ta: trang `/settings` gom 4 nhom co tim kiem, muc it dung an sau "Hien cai dat nang cao"; danh sach "Viec can cai dat" doc du lieu that tren may chu (chi nhanh GPS/PIN, Wi-Fi, ca mau, han nop lich ranh, cai dat luong, ngay le, thue, don gia nhan vien, lo trinh). Cai dat luong co che do Co ban / Nang cao.
+- File chinh: `src/lib/settings/setup-checklist.ts` (co test), `src/app/api/setup-status/route.ts` (chi CEO/HR), `src/components/settings/SetupChecklist.tsx` (prop `compact` dung o trang chu admin), `src/lib/settings/settings-hub.ts` (danh sach nhom/muc, quyen khop `proxy.ts`), `src/app/settings/page.tsx`, `src/app/settings/payroll/page.tsx`
+- Dung khi: them muc cai dat moi vao trang Cai dat, them buoc vao danh sach viec can cai dat.
+
 ## Dashboard
 ### Trang chu theo role
 - Mo ta: route `/` chon dashboard theo role nhan vien, quan ly, admin.

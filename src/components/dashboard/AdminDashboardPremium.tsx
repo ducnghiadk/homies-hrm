@@ -25,6 +25,7 @@ import { ActionList } from './premium/ActionList';
 import { InsightsBanner } from './premium/InsightsBanner';
 import { QuickActions } from './premium/QuickActions';
 import { GlassCard } from './premium/GlassCard';
+import { SetupChecklist } from '@/components/settings/SetupChecklist';
 import {
   getActionItems, getBranchComparison, getAdminInsights, getAdminOverview,
 } from '@/lib/services/dashboard-service';
@@ -186,6 +187,9 @@ export function AdminDashboardPremium({ user }: Props) {
           
           {/* Cột chính (2/3) */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Việc cần cài đặt (tự ẩn khi đã cài đủ) */}
+            <SetupChecklist compact />
+
             {/* Business Overview & Chart */}
             <div className="animate-slideUp">
               <GlassCard>
