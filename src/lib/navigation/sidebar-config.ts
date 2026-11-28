@@ -137,12 +137,7 @@ const SIDEBAR_ENTRIES: SidebarEntry[] = [
     icon: Settings,
     roles: MANAGER_ROLES,
     items: [
-      { href: '/settings', label: 'Tất cả cài đặt', roles: MANAGER_ROLES },
-      { href: '/settings/organization', label: 'Quán & chi nhánh', roles: ADMIN_ROLES },
-      { href: '/settings/schedule-rules', label: 'Ca làm & xếp lịch', roles: MANAGER_ROLES },
-      { href: '/settings/payroll', label: 'Lương & phụ cấp', roles: ADMIN_ROLES },
-      { href: '/settings/integrations/ipos', label: 'Kết nối iPOS', roles: ADMIN_ROLES },
-      { href: '/settings/permissions', label: 'Phân quyền', roles: ADMIN_ROLES },
+      { href: '/settings', label: 'Trang cài đặt', roles: MANAGER_ROLES },
     ],
   },
 ]
