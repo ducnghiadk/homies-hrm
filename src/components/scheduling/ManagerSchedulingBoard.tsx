@@ -33,6 +33,7 @@ import {
   isFlexibleShiftText,
 } from '@/lib/services/scheduling/shift-mapping-memory'
 import { useAuthStore, type AuthUser } from '@/store/auth-store'
+import ScheduleStepsCard from '@/components/scheduling/ScheduleStepsCard'
 import readXlsxFile, { readSheet } from 'read-excel-file/browser'
 import {
   ChevronLeft,
@@ -332,6 +333,7 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
   const [weekOffset, setWeekOffset] = useState(0)
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedPositionFilter, setSelectedPositionFilter] = useState<string>('ALL')
+  const [showMoreTools, setShowMoreTools] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [messageTone, setMessageTone] = useState<'info' | 'warning' | 'error'>('info')
   const [sessionExpired, setSessionExpired] = useState(false)
@@ -2229,74 +2231,87 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
             {/* Top Toolbar Action Buttons */}
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => {
-                  setShiftSettingsList(ShiftTemplateService.getAll())
-                  setShowShiftSettingsModal(true)
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#2F6FA8] hover:bg-blue-100 transition shadow-2xs cursor-pointer"
+                type="button"
+                onClick={() => setShowMoreTools(v => !v)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs"
+                aria-expanded={showMoreTools}
               >
                 <Settings size={14} />
-                Cài đặt ca làm
+                {showMoreTools ? 'Ẩn công cụ khác' : 'Công cụ khác'}
               </button>
-              <button
-                onClick={() => setShowDemandEditor(true)}
-                className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs"
-              >
-                Nhu cầu tuần
-              </button>
-              <button
-                onClick={() => setShowImportModal(true)}
-                className="inline-flex items-center rounded-xl border border-emerald-600 bg-[#1E9E57] px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition cursor-pointer"
-              >
-                Nhập Excel
-              </button>
-              <button
-                onClick={handleExportWeekScheduleExcel}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-white px-3.5 py-1.5 text-xs font-bold text-emerald-700 shadow-2xs hover:bg-emerald-50 transition cursor-pointer"
-                title="Xuất file Excel lịch tuần dạng lưới (Nhân viên x Thứ 2 - CN) để in ấn hoặc gửi Zalo nhóm"
-              >
-                <Download size={14} />
-                <span>Xuất Excel</span>
-              </button>
-              <button
-                onClick={handleClearWeekSchedules}
-                className="inline-flex items-center rounded-xl border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 shadow-2xs hover:bg-red-100 transition cursor-pointer"
-                title="Xóa toàn bộ ca trong tuần này để làm sạch bảng"
-              >
-                Làm sạch tuần
-              </button>
-              <button
-                onClick={() => window.location.href = `/schedule/by-employee?weekStart=${activeWeekStart}&storeId=${activeStoreId}`}
-                className="inline-flex items-center rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#2F6FA8] hover:bg-blue-100 transition shadow-2xs"
-              >
-                Xem theo nhân viên
-              </button>
-              <Link
-                href={`/schedule/registrations?storeId=${encodeURIComponent(activeStoreId)}&weekStart=${encodeURIComponent(activeWeekStart)}`}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-100 transition cursor-pointer"
-                title="Xem bản đồ lịch rảnh tuần từ iPOS / Homies để xếp ca"
-              >
-                <Layers size={14} className="text-amber-600" />
-                <span>Lịch Rảnh Tuần {availabilityCount > 0 ? `(${availabilityCount})` : ''}</span>
-              </Link>
-              {!isPublished && availabilityCount > 0 && (
+              {showMoreTools && (
+                <>
                 <button
-                  type="button"
-                  disabled={isSeedingDraft}
-                  onClick={handleSeedDraftFromAvailability}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-1.5 text-xs font-bold text-sky-900 shadow-2xs hover:bg-sky-100 transition cursor-pointer disabled:opacity-50"
-                  title="Đổ nhanh lịch rảnh vào Bản Nháp để kéo-thả tinh chỉnh trước khi chốt"
+                  onClick={() => {
+                    setShiftSettingsList(ShiftTemplateService.getAll())
+                    setShowShiftSettingsModal(true)
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#2F6FA8] hover:bg-blue-100 transition shadow-2xs cursor-pointer"
                 >
-                  <Zap size={14} className="text-amber-500" />
-                  <span>{isSeedingDraft ? 'Đang điền...' : `Điền nhanh vào Bản Nháp (${availabilityCount})`}</span>
+                  <Settings size={14} />
+                  Cài đặt ca làm
                 </button>
+                <button
+                  onClick={() => setShowDemandEditor(true)}
+                  className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs"
+                >
+                  Nhu cầu tuần
+                </button>
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="inline-flex items-center rounded-xl border border-emerald-600 bg-[#1E9E57] px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition cursor-pointer"
+                >
+                  Nhập Excel
+                </button>
+                <button
+                  onClick={handleExportWeekScheduleExcel}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-white px-3.5 py-1.5 text-xs font-bold text-emerald-700 shadow-2xs hover:bg-emerald-50 transition cursor-pointer"
+                  title="Xuất file Excel lịch tuần dạng lưới (Nhân viên x Thứ 2 - CN) để in ấn hoặc gửi Zalo nhóm"
+                >
+                  <Download size={14} />
+                  <span>Xuất Excel</span>
+                </button>
+                <button
+                  onClick={handleClearWeekSchedules}
+                  className="inline-flex items-center rounded-xl border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 shadow-2xs hover:bg-red-100 transition cursor-pointer"
+                  title="Xóa toàn bộ ca trong tuần này để làm sạch bảng"
+                >
+                  Làm sạch tuần
+                </button>
+                <button
+                  onClick={() => window.location.href = `/schedule/by-employee?weekStart=${activeWeekStart}&storeId=${activeStoreId}`}
+                  className="inline-flex items-center rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-[#2F6FA8] hover:bg-blue-100 transition shadow-2xs"
+                >
+                  Xem theo nhân viên
+                </button>
+                <Link
+                  href={`/schedule/registrations?storeId=${encodeURIComponent(activeStoreId)}&weekStart=${encodeURIComponent(activeWeekStart)}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-100 transition cursor-pointer"
+                  title="Xem bản đồ lịch rảnh tuần từ iPOS / Homies để xếp ca"
+                >
+                  <Layers size={14} className="text-amber-600" />
+                  <span>Lịch Rảnh Tuần {availabilityCount > 0 ? `(${availabilityCount})` : ''}</span>
+                </Link>
+                {!isPublished && availabilityCount > 0 && (
+                  <button
+                    type="button"
+                    disabled={isSeedingDraft}
+                    onClick={handleSeedDraftFromAvailability}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-1.5 text-xs font-bold text-sky-900 shadow-2xs hover:bg-sky-100 transition cursor-pointer disabled:opacity-50"
+                    title="Đổ nhanh lịch rảnh vào Bản Nháp để kéo-thả tinh chỉnh trước khi chốt"
+                  >
+                    <Zap size={14} className="text-amber-500" />
+                    <span>{isSeedingDraft ? 'Đang điền...' : `Điền nhanh vào Bản Nháp (${availabilityCount})`}</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleSaveDraftWeek}
+                  className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs"
+                >
+                  Bản nháp
+                </button>
+                </>
               )}
-              <button
-                onClick={handleSaveDraftWeek}
-                className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-2xs"
-              >
-                Bản nháp
-              </button>
               <button
                 onClick={handlePublish}
                 className="inline-flex items-center rounded-xl bg-[#2F6FA8] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#1D3E61] transition"
@@ -2437,42 +2452,16 @@ export default function ManagerSchedulingBoard({ weekStartQuery, storeIdQuery }:
           </div>
         )}
 
-        {/* Banner gợi ý nguồn Lịch Rảnh Tuần - chỉ hiện khi tuần chưa chốt */}
-        {!isPublished && availabilityCount > 0 && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50/70 p-3.5 shadow-xs animate-fade-in">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-[#2F6FA8] text-white flex items-center justify-center shrink-0 shadow-2xs">
-                <Sparkles size={16} />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-[#001D3D]">
-                  Đang có {availabilityCount} khung giờ rảnh từ iPOS / Homies để tham khảo xếp ca
-                </p>
-                <p className="text-[11px] text-gray-600">
-                  Nhân viên chỉ thấy lịch đi làm sau khi bạn thiết kế xong Bản Nháp và bấm Chốt &amp; Phát hành.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Link
-                href={`/schedule/registrations?storeId=${encodeURIComponent(activeStoreId)}&weekStart=${encodeURIComponent(activeWeekStart)}`}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-white px-3.5 py-2 text-xs font-bold text-sky-800 shadow-xs hover:bg-sky-50 transition cursor-pointer"
-              >
-                <Layers size={14} className="text-sky-600" />
-                <span>Xem Lịch Rảnh Tuần</span>
-              </Link>
-              <button
-                type="button"
-                disabled={isSeedingDraft}
-                onClick={handleSeedDraftFromAvailability}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#2F6FA8] to-[#1D3E61] px-4 py-2 text-xs font-bold text-white shadow-xs hover:from-[#1D3E61] hover:to-[#001D3D] transition cursor-pointer shrink-0 active:scale-98 disabled:opacity-50"
-              >
-                <Zap size={14} className="text-amber-300" />
-                <span>{isSeedingDraft ? 'Đang điền vào Nháp...' : 'Điền nhanh từ lịch rảnh vào Nháp'}</span>
-              </button>
-            </div>
-          </div>
-        )}
+        {/* 3 BƯỚC XẾP LỊCH: xem lịch rảnh -> điền nháp & chỉnh -> chốt */}
+        <ScheduleStepsCard
+          availabilityCount={availabilityCount}
+          totalAssigned={totalAssigned}
+          isPublished={isPublished}
+          isSeedingDraft={isSeedingDraft}
+          registrationsHref={`/schedule/registrations?storeId=${encodeURIComponent(activeStoreId)}&weekStart=${encodeURIComponent(activeWeekStart)}`}
+          onSeed={handleSeedDraftFromAvailability}
+          onPublish={handlePublish}
+        />
 
         {/* Thông báo hệ thống */}
         {message && (
