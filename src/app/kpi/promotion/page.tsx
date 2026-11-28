@@ -199,6 +199,10 @@ export default function PromotionPage() {
 
   return (
     <AppShell showNav className="min-h-screen w-full max-w-none bg-[#FFF8E8]">
+      <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:mx-6 lg:mx-8">
+        Lộ trình thăng tiến chính thức nay dùng bậc T0 → G4 (Playbook V7). Trang này chỉ còn để xem lại dữ liệu cấp bậc C1–C5 cũ, không xóa dữ liệu.{' '}
+        <Link href="/career-path/review" className="font-semibold text-[#2F6FA8] underline">Mở Đề xuất & duyệt nâng bậc</Link>
+      </div>
       <div className="sticky top-0 z-30 w-full border-b border-gray-100 bg-white px-4 py-3.5 shadow-2xs sm:px-6 lg:px-8">
         <div className="flex w-full flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="space-y-0.5">

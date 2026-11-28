@@ -137,7 +137,7 @@ const nextConfig: NextConfig = {
       { source: '/staffing/workspace', destination: '/settings/staffing', permanent: false },
 
       // 3. Lộ trình sự nghiệp, Đánh giá & Vi phạm
-      { source: '/career', destination: '/career-path', permanent: false },
+      { source: '/career', destination: '/career-path/me', permanent: false },
       { source: '/evaluation', destination: '/kpi/review', permanent: false },
       { source: '/kpi/evaluate', destination: '/kpi/result', permanent: false },
       { source: '/kpi/leaderboard', destination: '/kpi/reports?view=leaderboard', permanent: false },
@@ -168,7 +168,17 @@ const nextConfig: NextConfig = {
       { source: '/branches', destination: '/stores', permanent: false },
       { source: '/leave/approvals', destination: '/leave/approval', permanent: false },
       { source: '/tasks', destination: '/tasks/daily', permanent: false },
-      { source: '/career-path/promotions', destination: '/career-path', permanent: false },
+      { source: '/career-path/promotions', destination: '/career-path/me', permanent: false },
+
+      // 7. Gộp lộ trình thăng tiến về một nơi (Playbook V7). Các trang lộ trình cũ chỉ là dữ liệu mẫu,
+      //    nay chuyển về trang lộ trình thật. Không xóa trang hay dữ liệu cũ.
+      { source: '/career-path', destination: '/career-path/me', permanent: false },
+      { source: '/career-path/leaderboard', destination: '/career-path/me', permanent: false },
+      { source: '/career-path/skills', destination: '/career-path/me', permanent: false },
+      { source: '/career-path/goals', destination: '/career-path/me', permanent: false },
+      { source: '/career-path/promotion', destination: '/career-path/review', permanent: false },
+      { source: '/career-path/notifications', destination: '/notifications', permanent: false },
+      { source: '/career-path/reports', destination: '/career-path/review', permanent: false },
     ]
   },
 

@@ -8,7 +8,7 @@ function getEntry(role: 'ceo' | 'store_manager', id: string) {
 }
 
 describe('desktop sidebar KPI information architecture', () => {
-  it('keeps the CEO KPI hub focused on the five approved destinations', () => {
+  it('keeps the CEO KPI hub focused on the four approved destinations (tăng bậc nằm ở Lộ trình V7)', () => {
     const kpiEntry = getEntry('ceo', 'kpi')
 
     assert.deepEqual(
@@ -17,7 +17,6 @@ describe('desktop sidebar KPI information architecture', () => {
         { href: '/kpi', label: 'Tổng quan KPI' },
         { href: '/kpi/review', label: 'Việc cần đánh giá' },
         { href: '/kpi/result', label: 'Kết quả & cải thiện' },
-        { href: '/kpi/promotion', label: 'Sẵn sàng tăng bậc' },
         { href: '/kpi/settings', label: 'Chương trình đánh giá' },
       ]
     )
